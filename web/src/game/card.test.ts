@@ -1,8 +1,9 @@
 // The card is drawn on a canvas, where no stylesheet reaches: its chapters' colours are the day's tokens in app.css,
 // written again, and held equal here.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { test } from "node:test";
+import { pictures } from "../art/pictures.ts";
 import { cardTiles, deep, mix, vivid } from "./card.ts";
 
 const css = readFileSync(new URL("../app.css", import.meta.url), "utf8");
@@ -28,4 +29,16 @@ test("a question that counts for nobody keeps its place on the card, dashed and 
   ];
   assert.deepEqual(cardTiles(marks).slice(0, 5), ["right", "near", "void", "wrong", "right"]);
   assert.equal(cardTiles(marks).length, 10);
+});
+
+// The server draws the same card for a link's preview (internal/card), in Go, from the chapters' glyphs as pictures.ts
+// draws them: kept in internal/card/glyphs.json, written again by WRITE_GLYPHS=1 npm test, and held equal here.
+test("the server's card has the chapters' glyphs as pictures.ts draws them", () => {
+  const file = new URL("../../../internal/card/glyphs.json", import.meta.url);
+  const glyphs = Object.fromEntries(
+    Object.keys(vivid).map((id) => [id, pictures[`topic-${id}`] ?? assert.fail(`no picture for ${id}`)]),
+  );
+  const want = `${JSON.stringify(glyphs, null, 2)}\n`;
+  if (process.env.WRITE_GLYPHS) writeFileSync(file, want);
+  assert.equal(readFileSync(file, "utf8"), want, "internal/card/glyphs.json is old: WRITE_GLYPHS=1 npm test");
 });

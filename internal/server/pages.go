@@ -297,7 +297,7 @@ func (s *Server) preview(r *http.Request, shared play.Share) (title, description
 	image = "/og.png"
 	switch path := r.URL.Path; {
 	case shared.Code != "":
-		title = fmt.Sprintf("%d от %d · АЛМАНАХ, Брой %d", shared.Rights(), len(shared.Shape), shared.Issue)
+		title = fmt.Sprintf("%d от %d · АЛМАНАХ, Брой %d", shared.Rights(), shared.Counted(), shared.Issue)
 		description = "Десет въпроса на ден, едни и същи за цяла България. Колко ще познаеш ти?"
 		image = cardOf(shared)
 	case strings.HasPrefix(path, "/players/"):
@@ -399,7 +399,7 @@ func accepts(r *http.Request, encoding string) bool {
 
 // publicFiles are served from the site's root as they are (web/public).
 var publicFiles = []string{
-	"favicon.svg", "bimi.svg", "manifest.webmanifest", "sw.js", "og.png",
+	"favicon.svg", "bimi.svg", "manifest.webmanifest", "sw.js",
 	"icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "badge-96.png",
 }
 

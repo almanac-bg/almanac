@@ -317,7 +317,9 @@ flat shapes with depth, lit from the top left, no outlines, painted from one ton
   link (`game/share.ts`). Unsigned.
 - **The card** (`game/card.ts`), drawn in the browser as it's shared, one look in every theme: the mark and the name,
   „Брой N“ big with its date, the ten tiles two rows of five (filled, half, dashed and hollow: they part in grey too),
-  and almanac.bg. No score, no streak, no name. The server's card (`internal/card`) stays for a link's preview.
+  and almanac.bg. No score, no streak, no name. The server draws the same card for a shared link's preview
+  (`internal/card`), and in the same look the site's own picture (`/og.png`): the mark and the name, „Десет въпроса на
+  ден, едни и същи за цяла България.“, a day's ten tiles and almanac.bg.
 - **The sheet** („Сподели резултата“): the card, the text, „Сподели“ (the text with its link, through the device's
   share sheet), „Копирай текста“, and „Сподели картинката“ where the device shares a picture. Never the text and the
   card together: an app given both may keep only the picture (WhatsApp on an iPhone), and the link is the share's

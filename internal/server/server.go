@@ -245,6 +245,7 @@ func (s *Server) routes() http.Handler {
 
 	mux.HandleFunc("GET /qimg/{file}", s.picture)
 	mux.HandleFunc("GET /card/{file}", s.card)
+	mux.HandleFunc("GET /og.png", s.sitePicture)
 	mux.HandleFunc("GET /assets/{file...}", s.asset)
 	for _, f := range publicFiles {
 		mux.HandleFunc("GET /"+f, s.publicFile)

@@ -15,7 +15,7 @@ import (
 // <code>, the code eight random letters and digits (shares), so that nobody finds another's by counting, and nothing
 // in it says whose it is. Whose it is stays with the run, and goes with it: a player who deletes their profile takes
 // their links with them, and a guest's day that a sign-in drops (merge.go) its link. Opened (Shared), a link tells
-// the day, its issue and the shape (each question that counts, right or not), never an answer, nor whose it was.
+// the day, its issue and the shape (how each of the ten went), never an answer, nor whose it was.
 //
 // The text shared is Share.Text; the picture a link shows where it's sent, internal/card.
 
@@ -27,21 +27,20 @@ type Share struct {
 	Code  string `json:"-"`
 	Day   string `json:"day"`
 	Issue int    `json:"issue"`
-	// Shape is how each question that counts went, in order: '1' right, '0' not (wrong, close, or not answered). A
-	// question that counts for nobody (Mark.Void) has no place in it, as it has none in the score.
+	// Shape is how each of the day's ten went, in the issue's order, as the tiles show it (and the card: internal/card):
+	// '1' right, '2' close („близо“: not right, half a tile), '0' wrong or not answered, '3' a question that counts for
+	// nobody (Mark.Void), which has no place in the score.
 	Shape string `json:"shape"`
 }
 
 // Rights is how many of the questions that count were right.
 func (s Share) Rights() int { return strings.Count(s.Shape, "1") }
 
+// Counted is how many questions count: the score is Rights of Counted.
+func (s Share) Counted() int { return len(s.Shape) - strings.Count(s.Shape, "3") }
+
 // Path is the link's path: /d/9-k4f2m7qa.
 func (s Share) Path() string { return fmt.Sprintf("/d/%d-%s", s.Issue, s.Code) }
-
-// IssueWords is a day's issue as its dateline says it: „Брой 9 · 20 ноември“.
-func IssueWords(day string) string {
-	return fmt.Sprintf("Брой %d · %s", Issue(day), DateWords(day))
-}
 
 // months are the months as a date says them (20 ноември).
 var months = [12]string{"януари", "февруари", "март", "април", "май", "юни", "юли", "август", "септември", "октомври",
@@ -62,8 +61,11 @@ func shapeOf(s State) string {
 	for _, m := range s.Trail {
 		switch {
 		case m.Void:
+			b.WriteByte('3')
 		case m.Right:
 			b.WriteByte('1')
+		case m.Close:
+			b.WriteByte('2')
 		default:
 			b.WriteByte('0')
 		}

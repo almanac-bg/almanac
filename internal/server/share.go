@@ -21,7 +21,7 @@ import (
 // Sharing the day's result (play/share.go): the link a player shares, made as they first share their day (POST
 // /api/runs/{id}/share: the text to share, ending with it); the page it opens (/d/<issue>-<code>: the app, with the
 // shared day in its boot, which shows the day's issue to play while it lasts, and the card in its preview: pages.go);
-// and the card (GET /card/<issue>-<shape>.png: internal/card).
+// and the card (GET /card/<issue>-<shape>.png: internal/card, drawn with the issue's chapters).
 //
 // What it costs, if one network does it all day: a link is made once for each finished day, and asked for within
 // sharesPlayer a player and sharesNet a network an hour (with their site's); a card is the same for every result of
@@ -43,8 +43,27 @@ const (
 // sharePath is a shared day's link (play.Share.Path), and cardName a card's file.
 var (
 	sharePath = regexp.MustCompile(`^/d/([0-9]{1,5})-([a-z2-9]{8})$`)
-	cardName  = regexp.MustCompile(`^([0-9]{1,5})-([01]{1,10})\.png$`)
+	cardName  = regexp.MustCompile(`^([0-9]{1,5})-([0-3]{1,10})\.png$`)
 )
+
+// siteImage is the site's own picture (card.Site), drawn once.
+var siteImage = sync.OnceValues(card.Site)
+
+// sitePicture serves the site's own picture (GET /og.png): what a link to any page but a shared day shows, and a
+// card's stand-in past its budget.
+func (s *Server) sitePicture(w http.ResponseWriter, r *http.Request) {
+	b, err := siteImage()
+	if err != nil {
+		slog.Error("site picture", "err", err)
+		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
+		return
+	}
+	if w.Header().Get("Cache-Control") == "" {
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+	}
+	w.Header().Set("Content-Type", "image/png")
+	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(b))
+}
 
 // share makes the link to a player's finished day, or gives the one it has, with the text to share.
 func (s *Server) share(w http.ResponseWriter, r *http.Request) error {
@@ -155,12 +174,16 @@ func (s *Server) card(w http.ResponseWriter, r *http.Request) {
 		if !s.allowFrom(r, "card", cardsNet, cardsSite, time.Hour) {
 			// Past its budget: the game's own picture, for now.
 			w.Header().Set("Cache-Control", "no-store")
-			serveFile(w, r, s.client, "og.png")
+			s.sitePicture(w, r)
 			return
 		}
-		var err error
-		if b, err = s.cards.draw(r.Context(), name, card.Card{Issue: play.IssueWords(play.IssueDay(issue)),
-			Shape: m[2]}); err != nil {
+		day := play.IssueDay(issue)
+		topics, err := s.game.IssueTopics(r.Context(), day)
+		if err == nil {
+			b, err = s.cards.draw(r.Context(), name, card.Card{Issue: issue, Date: play.DateWords(day), Topics: topics,
+				Shape: m[2]})
+		}
+		if err != nil {
 			if r.Context().Err() == nil {
 				slog.Error("card", "err", err)
 			}
