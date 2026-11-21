@@ -5308,11 +5308,6 @@
     line-height: 0.85;
   }
 
-  /* What a chapter's game wrote: grey, as the book has it. */
-  .grey-row {
-    color: var(--grey);
-  }
-
   .news-met {
     color: var(--ink-3);
     font: 700 0.875rem / 1.35 var(--font-sans);
@@ -6533,6 +6528,12 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    /* Each answer its own height, not its row's: beside one of two lines, the other isn't stretched, so it doesn't
+       shrink back as the answer comes and that one goes to a line. */
+    .playing .options.choices {
+      align-items: start;
+    }
+
     /* Rows of a list too (more specific from 48rem, above). */
     .playing .option,
     .playing :is(.sortable-list, .match, .match-result, .split-result) .option {
@@ -6578,8 +6579,10 @@
       gap: var(--space-1);
     }
 
+    /* Each clue a line's height: three of them and two rows of answers start on the screen, a row with an answer of
+       two lines too („Волфганг Амадеус Моцарт“ beside the room kept at its end). */
     .playing .clue {
-      min-height: 2.5rem;
+      min-height: 2rem;
       padding-block: 4px;
     }
 

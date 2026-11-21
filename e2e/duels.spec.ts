@@ -88,7 +88,10 @@ test("against a recording: a real game's ten, its player named, its answers as t
     timeout: 10_000,
   });
   await c.keyboard.press("Shift");
-  await expect(c.locator(".duel-head .kicker")).toHaveText(`По-силен запис · ${owner}`);
+  // Called by the level chosen only if the recording is it (stronger than the player); else only „Запис“.
+  await expect(c.locator(".duel-head .kicker")).toContainText(owner);
+  const kicker = (await c.locator(".duel-head .kicker").textContent()) ?? "";
+  expect([`По-силен запис · ${owner}`, `Запис · ${owner}`]).toContain(kicker);
   await expect(c.locator(".duel-meant")).toContainText(`Записът е от истинска игра на ${owner}`);
   await expect(c.getByRole("button", { name: "Още един дуел срещу запис" })).toBeVisible();
 });

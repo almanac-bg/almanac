@@ -2,6 +2,7 @@ package play
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"slices"
@@ -479,28 +480,43 @@ func TestRecordingByLevel(t *testing.T) {
 			t.Fatalf("a new player's expected right answers on game %d: %.1f", run, e)
 		}
 	}
-	if fit(w.b, w.picks(weakRun), 5) >= fit(w.b, w.picks(strongRun), 10) {
+	weakOff, weakEven := fit(w.b, w.picks(weakRun), 5)
+	strongOff, _ := fit(w.b, w.picks(strongRun), 10)
+	if weakOff >= strongOff {
 		t.Fatal("five right isn't nearer a new player's level than ten")
 	}
-	got := func(level string) int64 {
+	if _, even := fit(w.b, w.picks(strongRun), 10); even {
+		t.Fatal("ten right is „равен“ to a new player")
+	}
+	got := func(level string) (int64, string) {
 		t.Helper()
 		id, err := w.g.DuelRecording(ctx, gal, level)
 		if err != nil {
 			t.Fatal(err)
 		}
 		var ghost int64
-		if err := w.db.Read.QueryRow(`SELECT ghost_run FROM duels WHERE id = ?`, id).Scan(&ghost); err != nil {
+		var kept sql.NullString
+		if err := w.db.Read.QueryRow(`SELECT ghost_run, level FROM duels WHERE id = ?`, id).Scan(&ghost,
+			&kept); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := w.db.Write.Exec(`DELETE FROM duels WHERE id = ?`, id); err != nil { // chosen again, fresh
 			t.Fatal(err)
 		}
-		return ghost
+		return ghost, kept.String
 	}
-	if g := got(Even); g != weakRun {
-		t.Fatalf("„равен“: game %d, want %d", g, weakRun)
+	// Each the one nearest the level chosen, called by it only if it is that level.
+	if g, kept := got(Even); g != weakRun || (kept == Even) != weakEven || kept == Stronger {
+		t.Fatalf("„равен“: game %d (%q), want %d", g, kept, weakRun)
 	}
-	if g := got(Stronger); g != strongRun {
-		t.Fatalf("„по-силен“: game %d, want %d", g, strongRun)
+	if g, kept := got(Stronger); g != strongRun || kept != Stronger {
+		t.Fatalf("„по-силен“: game %d (%q), want %d", g, kept, strongRun)
+	}
+	// With none stronger, the nearest there is, called only „Запис“: never „по-силен“ for one that isn't.
+	if _, err := w.db.Write.Exec(`UPDATE runs SET shadow = ? WHERE id = ?`, ShadowScript, strongRun); err != nil {
+		t.Fatal(err)
+	}
+	if g, kept := got(Stronger); g != weakRun || kept != "" {
+		t.Fatalf("„по-силен“ with none stronger: game %d (%q), want %d and no level", g, kept, weakRun)
 	}
 }

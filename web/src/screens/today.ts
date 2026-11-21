@@ -146,6 +146,9 @@ export function today() {
   const hand = handToken(location.hash);
   if (hand) history.replaceState(history.state, "", `${location.pathname}${location.search}`);
   const screen = slot(() => h("p", { class: "muted" }, "…"));
+  // When yesterday's issue, offered first (lateView), can no longer be finished.
+  let lateEnds: ReturnType<typeof setTimeout> | undefined;
+  onCleanup(() => clearTimeout(lateEnds));
   const load = async () => {
     try {
       const t = inPage ?? (await api<Today>("GET", "/api/day"));
@@ -166,13 +169,22 @@ export function today() {
   /** Днес for yesterday's issue (`t.yesterday`): its day, issue, chapters and run; nothing of today's (its board, its
    * friends, its entry); and, once finished, the way on to today's. */
   const lateView = (t: Today): Today | null => {
+    clearTimeout(lateEnds);
     const y = t.yesterday;
     if (!y) return null;
+    // On to today's: the day asked for again (its streak, its board and friends as they are now, after yesterday's).
     const today = () => {
-      t.yesterday = undefined;
-      screen.show(() => home(t, t.run, false));
       scrollTo(0, 0);
+      load();
     };
+    // Its time over (DayGrace), Днес is today's: unless a question of it is being played (it ends by its own clock) or
+    // counted down to, when the next drawing of Днес asks the day again anyway.
+    lateEnds = setTimeout(
+      () => {
+        if (!playing.peek() && !counting) load();
+      },
+      Math.max(0, y.until - serverNow()) + 1000,
+    );
     return {
       ...t,
       day: y.day,
@@ -353,9 +365,11 @@ function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): 
           h(
             "h1",
             { class: "issue-title" },
-            lead
-              ? `Някой позна ${sharedMarks.filter((m) => m.right).length} от ${sharedMarks.length}. А ти?`
-              : "Десет въпроса за днес",
+            t.late
+              ? "Десет въпроса от вчера"
+              : lead
+                ? `Някой позна ${sharedMarks.filter((m) => m.right).length} от ${sharedMarks.length}. А ти?`
+                : "Десет въпроса за днес",
           ),
           at
             ? [h("p", { class: "issue-deck" }, `Следва въпрос ${at + 1} от 10.`), tiles(marks, order)]
@@ -371,14 +385,15 @@ function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): 
           h(
             "p",
             { class: "issue-meta" },
-            at
-              ? t.late
-                ? `Вчерашният брой. Довърши го до ${clockAt(t.late.until)}.`
-                : "Довърши броя до полунощ."
-              : // Who has played today, once enough have for it to say something.
-                players >= crowdFrom
-                ? `Около три минути · Днес играха ${formatNumber(players)}\u00a0души`
-                : "Около три минути",
+            // Yesterday's, begun or not: until when it can be finished.
+            t.late
+              ? `Вчерашният брой. Довърши го до ${clockAt(t.late.until)}.`
+              : at
+                ? "Довърши броя до полунощ."
+                : // Who has played today, once enough have for it to say something.
+                  players >= crowdFrom
+                  ? `Около три минути · Днес играха ${formatNumber(players)}\u00a0души`
+                  : "Около три минути",
           ),
         ),
       ],
@@ -513,8 +528,9 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   const order = t.topics ?? [];
   // The streak with today's, the game's stake, and the reminder's ask. A guest in an app's own browser has the way out
   // for the action; a guest on the first day, or one whose game was just brought here, the ask to keep it and be
-  // reminded (while it's there to ask), right under the score; everyone else, sharing the day. Past the first results
-  // a guest is asked again in „Утре“ (to keep the game, by mail); a player with a profile isn't asked twice.
+  // reminded (while it's there to ask), right under the score; everyone else, sharing the day, and the reminder's ask
+  // in „Утре“ (a guest's by mail keeps the game too), never a second action: at most three times, once a day
+  // (remindAsk). None for yesterday's issue finished late: „Утре“ isn't there.
   const streak = () => (just && fresh() === t ? 0 : fresh().streak);
   const stake = keepStake(
     () => (streak() >= 2 ? 2 : 1),
@@ -524,7 +540,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   const away = !!app && guest;
   // A first day: as the server says, or, for a visitor who had no game at all when Днес came, this one.
   const askFirst = !away && guest && (handedIn.peek() || t.firstDay !== false);
-  const ask = askFirst || guest ? remindAsk(t.day, stake, askFirst) : null;
+  const ask = away || t.late ? null : remindAsk(t.day, stake, askFirst);
   const first = away || askFirst;
   // While the action is another (the ask, the way out), sharing stays a quiet link beside the tiles.
   const shareQuiet = () =>
@@ -934,9 +950,6 @@ function shareSheet(run: State, t: Today, streak: number): void {
   sheet.showModal();
 }
 
-/** Tomorrow: the next issue's date set large, when it comes and what it makes of the streak (`streak`: with today's);
- * a guest's ask to keep the game (keep.ts: what it risks till then, `stake`); and, where it isn't on yet, the
- * reminder's ask (`ask`; null where the result's action is the ask, or the way out of an app's browser). */
 /** Yesterday's issue finished after midnight (`t.late`): in tomorrow's place, today's issue, out already, and the way to
  * it. */
 function onToToday(t: Today, today: () => void): Child {
@@ -962,6 +975,9 @@ function onToToday(t: Today, today: () => void): Child {
   );
 }
 
+/** Tomorrow: the next issue's date set large, when it comes and what it makes of the streak (`streak`: with today's);
+ * a guest's ask to keep the game (keep.ts: what it risks till then, `stake`); and, where it isn't on yet, the
+ * reminder's ask (`ask`; null where the result's action is the ask, or the way out of an app's browser). */
 function tomorrow(
   t: Today,
   streak: () => number,

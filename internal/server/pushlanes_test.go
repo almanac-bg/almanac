@@ -82,9 +82,11 @@ func TestLaneRests(t *testing.T) {
 }
 
 // A lane sends laneSends at once and keeps laneWaits waiting; a send past those is held back for the lane's pace,
-// later the more there are before it, and other lanes go on.
+// later the more there are before it, and other lanes go on. The lane's clock stands still: on a busy machine (the race
+// detector) the moments between the sends would eat the pace's step, and two held back would seem held as long.
 func TestLaneFull(t *testing.T) {
-	ls := &lanes{}
+	clock := time.Date(2030, 1, 1, 19, 0, 0, 0, time.UTC)
+	ls := &lanes{now: func() time.Time { return clock }}
 	ctx := t.Context()
 	release := make(chan struct{})
 	wait := func(context.Context) error {

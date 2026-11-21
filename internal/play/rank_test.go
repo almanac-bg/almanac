@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -344,8 +345,47 @@ func TestMergeCountsRanksAgain(t *testing.T) {
 	}
 }
 
-// A chapter's game says what it wrote: its facts, met first, in grey (never ink: only the issue writes it).
-func TestChapterGameNewsSaysItsGrey(t *testing.T) {
+// A guest's issue still being played, brought to an account, is in the book at once, and counts for the ranks as it
+// finishes, as any issue: ranks change only when an issue finishes (the privacy page says so).
+func TestMergeLeavesAnIssueUnfinishedToItsEnd(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	owner, guest := w.user(), w.user()
+	var facts []answered
+	for _, q := range w.b.Live("geography", "") {
+		if q.Extra().Fact != "" && len(facts) < 15 {
+			facts = append(facts, answered{q.Base().ID, true})
+		}
+	}
+	w.dayHistory(owner, facts[:10])
+	w.dayHistory(guest, facts[10:])
+	if _, err := w.db.Write.Exec(`UPDATE runs SET day = '2024-06-01', finished_at = NULL WHERE user_id = ?`,
+		guest); err != nil {
+		t.Fatal(err)
+	}
+	w.countRanks(owner)
+	if err := w.db.Tx(ctx, func(tx *sql.Tx) error { return w.g.Merge(tx, guest, owner) }); err != nil {
+		t.Fatal(err)
+	}
+	if r := w.rankIn(owner, "geography"); r.Level != 2 || r.Ink != 10 {
+		t.Fatalf("the rank with the guest's issue still being played: %+v", r)
+	}
+	if ink, _ := w.g.InkOf(ctx, owner); ink["geography"] != 15 {
+		t.Fatalf("the book's ink: %v", ink)
+	}
+	if _, err := w.db.Write.Exec(`UPDATE runs SET finished_at = 2000 WHERE user_id = ? AND day = '2024-06-01'`,
+		owner); err != nil {
+		t.Fatal(err)
+	}
+	w.countRanks(owner)
+	if r := w.rankIn(owner, "geography"); r.Level != 3 || r.Ink != 15 {
+		t.Fatalf("the rank once the issue finished: %+v", r)
+	}
+}
+
+// A chapter's game writes its facts in grey, and its news counts none of them: grey is never counted (DECISIONS.md,
+// „The direction“), and only the issue writes ink.
+func TestChapterGameNewsCountsNoGrey(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
@@ -354,8 +394,11 @@ func TestChapterGameNewsSaysItsGrey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	facts := w.count(`SELECT count(*) FROM facts WHERE user_id = ? AND run_id = ? AND NOT ink`, ana, run)
-	if n.Ink != 0 || n.Grey == 0 || n.Grey > facts {
-		t.Fatalf("a chapter's game: %+v, %d facts in grey", n, facts)
+	if facts := w.count(`SELECT count(*) FROM facts WHERE user_id = ? AND run_id = ? AND NOT ink`, ana, run); facts == 0 {
+		t.Fatal("the chapter's game wrote nothing in grey")
+	}
+	data, _ := json.Marshal(n)
+	if n.Ink != 0 || strings.Contains(string(data), "grey") {
+		t.Fatalf("a chapter's game: %s", data)
 	}
 }

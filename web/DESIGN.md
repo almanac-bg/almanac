@@ -62,7 +62,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/fi
      „България днес: средно 6,2“. Ten of ten: „Всички верни“ and the mark drawn over it.
   2. On the first results (a guest's first day, a game just brought here, an app's own browser): the action, right
      under the score — keeping the game and being reminded, or the way out to the phone's browser; sharing then stays a
-     quiet link beside the tiles („Сподели резултата“). A player with a profile is asked to be reminded only there.
+     quiet link beside the tiles („Сподели резултата“).
   3. The day's entry („Днес в Алманаха“, or „Най-рядкото ти попадение“ with a crowd): a sheet of its chapter with the
      chip, the answer as a headword, the question, the fact. Under it what the day wrote (`game/news.ts`): „+6 с
      мастило“; „Един от въпросите вече беше в твоя Алманах и остава в сиво.“; the chapter nearest its next rank with
@@ -70,7 +70,10 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/fi
      big moment.
   4. Friends who played it, up to five (`.friends-day`): avatar, name, worn seal, their small squares, their score.
   5. The action, past the first results: „Сподели“.
-  6. Tomorrow: the next issue's date set big, when it comes, what it makes of the streak.
+  6. Tomorrow: the next issue's date set big, when it comes, what it makes of the streak; past the first results, the
+     reminder's ask under it while reminders are off, a player with a profile's too (a plain button, never a second
+     action; three times at most, once a day). Yesterday's issue finished after midnight has today's in its place
+     („Вече излезе.“, „Към днешния брой“).
 
   Everything else is under „Въпросите и фактите“ (`.more`): how others played the player's recordings, how all of
   България spread, and each question with its fact (its verdict never a true-or-not's answer: „Точно“, „Грешно“).
@@ -80,8 +83,9 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/fi
 - **A chapter:** its head on its sheet (glyph, name, the seal with its pips, its ink, how much to the next rank),
   „Игра на главата“, then its facts, the latest first: ink black, facts met in grey (a thin solid 1.5px grey outline,
   lighter text). Where grey first shows: „В сиво са всички останали факти, които срещнеш. С мастило се пише само в броя на деня.“
-  Its game's result: on the chapter's sheet its chip, the score and its tiles; under it what the game wrote („+4 в
-  сиво“); „Още десет въпроса“ the action.
+  Its game's result: on the chapter's sheet its chip, the score and its tiles; under it, with no number (grey is never
+  counted), „Фактите от играта са в книгата ти, в сиво.“ While the day's issue waits, „Към въпросите на деня“ is the
+  action, the streak's stake under it, and „Още десет“ plain; once it's played, „Още десет въпроса“ the action.
 - **Приятели:** the board (friends by default, or all of България: its spread and the player's place first, then the
   top rows); the friends (a row each: avatar, name, seal, today's score, the duels between you „дуели 3 : 1“); the
   duels („Твой ред“ the page's action, „Чакаш“, „Изиграни“: each its score and, on even right answers, what broke the

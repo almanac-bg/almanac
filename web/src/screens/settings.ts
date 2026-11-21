@@ -135,7 +135,7 @@ export function settings(kit: Kit) {
                     "Излезе от профила си. Влез пак с имейла си или започни да играеш.",
                   )
                 : h("p", { class: "lead" }, "Още нямаш профил. Влез с имейл или започни да играеш."),
-            signIn({ done: (said) => signedIn.set(said) }),
+            signIn({ form: "settings", done: (said) => signedIn.set(said) }),
           ),
           looks(),
           sounds(),
@@ -300,7 +300,7 @@ function account(): Child {
           { class: "muted" },
           "Засега играта ти е само на това устройство. Добави имейл и ще я имаш навсякъде, където влезеш с него. Вече имаш профил? Влез с имейла му и играта оттук ще се добави към него.",
         ),
-        signIn({ enter: "Потвърди", done: (said) => signedIn.set(said) }),
+        signIn({ form: "settings-keep", enter: "Потвърди", done: (said) => signedIn.set(said) }),
       ],
     ),
   );

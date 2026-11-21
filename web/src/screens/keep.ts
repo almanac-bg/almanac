@@ -13,6 +13,7 @@ import { type ApiError, api, errorText } from "../lib/api.ts";
 import { type Child, computed, h, onCleanup, signal, slot, when } from "../lib/dom.ts";
 import { embedded, handMark, handToken, outsideLink } from "../lib/embedded.ts";
 import { askToKeep } from "../lib/keep.ts";
+import { fragment } from "../lib/router.ts";
 import { notice, type User, user } from "../state.ts";
 import { signIn } from "./signin.ts";
 
@@ -54,7 +55,13 @@ export function keepLine(stake: () => string | null, quiet: () => boolean): Chil
               "div",
               { class: "stack keep-line" },
               h("p", { class: "muted" }, stake),
-              signIn({ primary: false, note: keepNote, enter: "Потвърди", done: (s) => said.set(s) }),
+              signIn({
+                form: "keep-line",
+                primary: false,
+                note: keepNote,
+                enter: "Потвърди",
+                done: (s) => said.set(s),
+              }),
             ),
           () => h("p", { class: "muted keep-line" }, stake, " ", keep("Запази я с имейл"), "."),
         ),
@@ -141,7 +148,14 @@ export function mailAsk({
         when(
           open,
           () => [
-            signIn({ primary, send: "Напомняй ми по имейл", note: keepNote, enter: "Потвърди", done: turnOn }),
+            signIn({
+              form: "remind-mail",
+              primary,
+              send: "Напомняй ми по имейл",
+              note: keepNote,
+              enter: "Потвърди",
+              done: turnOn,
+            }),
             no ? h("div", { class: "remind-actions" }, nope()) : null,
           ],
           () =>
@@ -177,7 +191,7 @@ export function keepGame(signedIn: () => void): Child {
           "section",
           { class: "card keep-card" },
           h("h2", { class: "card-title" }, "Запази играта си"),
-          signIn({ primary: false, note: keepNote, enter: "Потвърди", done: told(signedIn) }),
+          signIn({ form: "keep-game", primary: false, note: keepNote, enter: "Потвърди", done: told(signedIn) }),
         )
       : h(
           "p",
@@ -202,7 +216,7 @@ export function haveProfile(
   return () =>
     opened()
       ? h("section", { class: "card keep-card" }, h("h2", { class: "card-title" }, "Влез в профила си"), () =>
-          signIn({ primary, done: told(signedIn), email: email() }),
+          signIn({ form: "have-profile", primary, done: told(signedIn), email: email() }),
         )
       : h(
           "p",
@@ -231,7 +245,8 @@ export function exitWay(stake: () => string | null): Child {
     });
     if (!gone) {
       offer.set(r);
-      history.replaceState(history.state, "", `${location.pathname}${location.search}${handMark}${r.token}`);
+      // On the page's own entry, even while the game's end is still going back to it (router.ts).
+      fragment(`${handMark}${r.token}`, () => !gone);
     }
     return r.token;
   };
@@ -292,7 +307,10 @@ export function exitWay(stake: () => string | null): Child {
         ? h("button", { class: "link tap", type: "button", onclick: () => keeping.set(true) }, "Или я запази с имейл")
         : null,
     ),
-    () => (keeping() ? signIn({ primary: false, note: keepNote, enter: "Потвърди", done: (s) => said.set(s) }) : null),
+    () =>
+      keeping()
+        ? signIn({ form: "exit-keep", primary: false, note: keepNote, enter: "Потвърди", done: (s) => said.set(s) })
+        : null,
     () => said() && h("p", { class: "muted keep-said", role: "status" }, said()),
   );
 }

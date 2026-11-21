@@ -261,8 +261,13 @@ func (g *Game) ability(ctx context.Context, db querier, userID int64, category s
 }
 
 // recordingFit is how far a recording (its picks, its right answers) is from the level a player chose: lower fits
-// better (recordedRun).
-type recordingFit func(b *bank.Bank, picks []Pick, rights int) float64
+// better (recordedRun); and whether it's that level at all (meets: „по-силен“ stronger than the player, „равен“
+// within EvenWithin of them), or only the nearest there was.
+type recordingFit func(b *bank.Bank, picks []Pick, rights int) (off float64, meets bool)
+
+// EvenWithin is how near a recording's right answers are to what the player would get on its ten, at most, to be
+// „равен“.
+const EvenWithin = 1.5
 
 // expectedRights is how many of these questions a player of an ability over all topics would get right: each known
 // with the chance σ(ability − hardness), and, of the rest, guessed right as often as a guess of its kind is.
@@ -291,16 +296,18 @@ func (g *Game) recordingFit(ctx context.Context, userID int64, level string) (re
 	if err != nil {
 		return nil, err
 	}
-	return func(b *bank.Bank, picks []Pick, rights int) float64 {
+	return func(b *bank.Bank, picks []Pick, rights int) (float64, bool) {
 		want := expectedRights(b, h, ability, picks)
 		if level != Stronger {
-			return math.Abs(float64(rights) - want)
+			off := math.Abs(float64(rights) - want)
+			return off, off <= EvenWithin
 		}
 		off := math.Abs(float64(rights) - want - StrongerBy)
-		if float64(rights) < want+1 {
+		stronger := float64(rights) >= want+1
+		if !stronger {
 			off += Length // not stronger: after every one that is
 		}
-		return off
+		return off, stronger
 	}, nil
 }
 

@@ -28,13 +28,25 @@ func TestNounUse(t *testing.T) {
 	s, _ := w.g.StartDay(ctx, ana)
 	w.play(ana, s.ID, repeat(w.right, Length)...)
 	today := w.g.Today()
+	// Reminded by a notification: one that reached a device counts; one held out (experiment.go), or never
+	// delivered, doesn't.
+	cy, dee := w.user(), w.user()
+	for _, r := range []struct {
+		user            int64
+		held, delivered bool
+	}{{ana, false, true}, {cy, true, true}, {dee, false, false}} {
+		if _, err := w.db.Write.Exec(`INSERT INTO push_reminded (user_id, day, at, held, delivered) VALUES (?, ?, 0, ?, ?)`,
+			r.user, today, r.held, r.delivered); err != nil {
+			t.Fatal(err)
+		}
+	}
 	week := WeekOf(today)
 	use, err := w.g.NounUse(ctx, week, today)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if use["almanac"] != 2 || use["seal"] != 1 || use["friends"] != 0 || use["day"] != 1 || use["ink"] != 1 ||
-		use["streak"] != 0 {
+		use["streak"] != 0 || use["reminder"] != 1 {
 		t.Fatalf("this week: %v", use)
 	}
 	// The next week: marked anew.

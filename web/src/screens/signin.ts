@@ -11,6 +11,9 @@ import { pushable, pushOn } from "../lib/push.ts";
 import { type User, user } from "../state.ts";
 
 export interface SignInOptions {
+  /** Which form it is, of the game's („settings“, „remind-mail“…): a code it sent is kept by it, for a reload to come
+   * back to the step that takes it there, and only there. */
+  form: string;
   /** Its first button gold (Настройки), or plain (Начало, a card's). */
   primary?: boolean;
   /** The first button's words, which send the code: „Прати ми код“ unless said. */
@@ -19,7 +22,7 @@ export interface SignInOptions {
   note?: string;
   /** The button that takes the code: „Влез“ unless said („Потвърди“ where a guest keeps their game). */
   enter?: string;
-  /** The address, filled in (a mail's link: server/streakmail.go, mailWho). */
+  /** The address, filled in (a mail's link: server/streakmail.go, mailWho): it wins over a code kept for another. */
   email?: string;
   /** The code taken: what came of it in words (keptWords), and the player now, told before the player is set, so that
    * what draws the screen anew as they are can say it. */
@@ -29,21 +32,24 @@ export interface SignInOptions {
 /** Signing in by email, with a code (SignInOptions). Never in Meta's or TikTok's own browsers (lib/embedded.ts,
  * forms): what's typed there the app can read, so the way is the phone's own browser. */
 export function signIn({
+  form,
   primary = true,
   send: sendWords = "Прати ми код",
   note = "Без пароли: всеки път ти пращаме код за вход.",
   enter = "Влез",
   done,
   email: filled = "",
-}: SignInOptions = {}): Child {
+}: SignInOptions): Child {
   if (embedded && !embedded.forms)
     return h(
       "p",
       { class: "muted" },
       "Тук не може да се влиза с имейл. Отвори играта в браузъра на телефона и я запази там.",
     );
-  // A code sent from this form a little while ago, in this tab: a reload comes back to the step that takes it.
-  const was = sentBefore(enter);
+  // A code sent from this form a little while ago, in this tab: a reload comes back to the step that takes it; not
+  // where a mail's link fills in another address.
+  const kept = sentBefore(form);
+  const was = kept && (!filled || kept.email === filled) ? kept : null;
   const email = signal(was?.email ?? filled);
   const code = signal("");
   const sent = signal(!!was);
@@ -95,7 +101,7 @@ export function signIn({
         digits: digits.peek(),
         at: Date.now(),
         again: Date.now() + (r.again ?? 60) * 1000,
-        enter,
+        form,
       });
     });
 
@@ -227,14 +233,13 @@ export function signIn({
 }
 
 /** A code sent, as this tab keeps it (sessionStorage) so that a reload comes back to the step that takes it: the
- * address, the code's length, when it went and when another may, and the form's own words (`enter`: which form it
- * was, of those on a page). */
+ * address, the code's length, when it went and when another may, and which form sent it (SignInOptions.form). */
 interface Sent {
   email: string;
   digits: number;
   at: number;
   again: number;
-  enter: string;
+  form: string;
 }
 
 const sentKey = "almanac.signin";
@@ -242,11 +247,11 @@ const sentKey = "almanac.signin";
 /** How long a code sent is taken back to after a reload: inside its own life (account.CodeTTL, fifteen minutes). */
 const sentFor = 14 * 60_000;
 
-/** The code this form (`enter`) sent a little while ago in this tab, if any. */
-function sentBefore(enter: string): Sent | null {
+/** The code this form sent a little while ago in this tab, if any. */
+function sentBefore(form: string): Sent | null {
   try {
     const s = JSON.parse(sessionStorage.getItem(sentKey) ?? "null") as Sent | null;
-    return s && s.enter === enter && typeof s.email === "string" && Date.now() - s.at < sentFor ? s : null;
+    return s && s.form === form && typeof s.email === "string" && Date.now() - s.at < sentFor ? s : null;
   } catch {
     return null; // no storage: the form starts at the address
   }

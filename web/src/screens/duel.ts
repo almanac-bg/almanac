@@ -80,8 +80,8 @@ export interface DuelView {
 /** A recording as it's chosen (play.Even, play.Stronger): about as strong as the player, or stronger. */
 export type Level = "even" | "stronger";
 
-/** What a recording is called, by the level it was chosen at: „По-силен запис“, „Равен запис“ (one from before
- * levels were kept: „Запис“). */
+/** What a recording is called, by the level it was chosen at: „По-силен запис“, „Равен запис“; „Запис“ where it was
+ * only the nearest there was to it (play.DuelRecording keeps no level then). */
 export const recordingName = (level?: Level) =>
   level === "stronger" ? "По-силен запис" : level === "even" ? "Равен запис" : "Запис";
 
@@ -371,7 +371,7 @@ export function duelNew() {
             h(
               "p",
               { class: "muted" },
-              "Играеш десетте въпроса от истинска игра на друг играч и след всеки виждаш как е отговорено в нея. Равният запис е на твоето ниво, по-силният – малко над него.",
+              "Играеш десетте въпроса от истинска игра на друг играч и след всеки виждаш как е отговорено в нея. Равен: на твоето ниво. По-силен: малко над него.",
             ),
             (["even", "stronger"] as const).map((level) =>
               h(
@@ -416,7 +416,7 @@ function notHere(signedIn: () => void): Child {
       h("h1", null, "Дуелът е в профила ти"),
       h("p", { class: "lead" }, "Влез с имейла на профила си и го виж тук."),
     ),
-    h("section", { class: "card" }, signIn()),
+    h("section", { class: "card" }, signIn({ form: "duel" })),
   );
 }
 

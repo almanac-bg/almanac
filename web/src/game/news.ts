@@ -18,8 +18,6 @@ interface News {
   ink?: number;
   /** Right answers in the issue to questions the book had already: their facts stay grey (play: „вече срещан“). */
   metBefore?: number;
-  /** A chapter's game: the facts it wrote in grey, met first (play.News.Grey). */
-  grey?: number;
   /** The ranks risen since last told, as one (play.Rose): Бележка never; Страница brings the chapter's art; `best`, the
    * player's best rank rose. */
   rose?: { ranks: { chapter: string; name: string; to?: number; art?: boolean }[]; best?: boolean };
@@ -57,7 +55,6 @@ export function news(run: number, delay = 0, late?: { title?: string }, recordin
     const best = n.rose?.best ? rankUp(n.rose) : null;
     const lines = [
       n.ink ? inkLine(n.ink) : null,
-      n.grey ? greyLine(n.grey) : null,
       n.metBefore ? metLine(n.metBefore) : null,
       n.rose && !best ? roseLine(n.rose) : n.step && !n.rose ? stepLine(n.step) : null,
     ].filter(Boolean);
@@ -80,16 +77,6 @@ function inkLine(ink: number): Child {
     h("span", { class: "i i-nib", "aria-hidden": "true" }),
     h("b", { class: "num" }, `+${ink}`),
     " с мастило",
-  );
-}
-
-/** What a chapter's game wrote in the book, a tap from it: „+4 в сиво“ (only the issue writes ink). */
-function greyLine(grey: number): Child {
-  return h(
-    "a",
-    { class: "news-facts ink-row grey-row", href: "/almanac" },
-    h("b", { class: "num" }, `+${grey}`),
-    " в сиво",
   );
 }
 
