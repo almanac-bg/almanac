@@ -280,17 +280,20 @@ export function startScreen(
   left: { at: number; total: number; marks?: Mark[] } | null,
   start: () => void,
   button = left ? "Продължи" : "Започни",
+  chapter = "",
 ): Child {
   const go = h("button", { class: "btn primary big", type: "button", onclick: start }, button);
+  const words = [
+    h("h1", null, what),
+    h("p", { class: "lead" }, left ? `Следва въпрос ${left.at + 1}\u00a0от\u00a0${left.total}.` : lead),
+  ];
   return h(
     "div",
-    { class: "screen get-ready start-screen" },
-    h(
-      "div",
-      { class: "intro" },
-      h("h1", null, what),
-      h("p", { class: "lead" }, left ? `Следва въпрос ${left.at + 1} от ${left.total}.` : lead),
-    ),
+    { class: chapter ? "screen get-ready start-screen start-chapter" : "screen get-ready start-screen" },
+    // A chapter's game (Микс, България too) on its sheet, with its glyph, as the chapter's page has it.
+    chapter
+      ? leaf(chapter, [glyph(chapter, 72), h("div", { class: "intro" }, words)], "start-leaf")
+      : h("div", { class: "intro" }, words),
     left?.marks ? trail(left.marks, left.total, left.at) : null,
     h("div", { class: "actions" }, go),
   );
@@ -406,15 +409,23 @@ export function guardLeaving(
 
 /** The top of a question: the way out, what's played (the day's issue, or the topic: `aside`; in a duel, with whom:
  * `versus`), and which one of how many. A game has the whole screen, the header with it, so the
- * way out is here: a cross to Днес (on Днес itself too, where the day's ten are played: it opens afresh, the
- * day waiting there), the way back (router.ts): back in the history where Днес is the page before. */
-export function questionHead(n: number, total: number, aside: string, versus: Child = null): Child {
+ * way out is here: a cross to the place the game is played from (`out`): Днес for the day's ten and a duel (on Днес
+ * itself too: it opens afresh, the day waiting there), the Алманах for a chapter's game (Микс, България), where the
+ * game left shows with the way to go on. The way back (router.ts): back in the history where that place is the page
+ * before. */
+export function questionHead(
+  n: number,
+  total: number,
+  aside: string,
+  versus: Child = null,
+  out: [href: string, label: string] = ["/", "Към Днес"],
+): Child {
   return h(
     "header",
     { class: "question-head" },
     h(
       "a",
-      { class: "game-leave", href: "/", "data-back": true, "aria-label": "Към Днес", title: "Към Днес" },
+      { class: "game-leave", href: out[0], "data-back": true, "aria-label": out[1], title: out[1] },
       h("span", { class: "i i-close", "aria-hidden": "true" }),
     ),
     h(
@@ -758,6 +769,7 @@ function question(
       s.total,
       s.kind === "day" && s.day ? `Брой ${issueOf(s.day)}` : topicName(s.category ?? q.category),
       versusNow,
+      s.kind === "topic" && !versus ? ["/almanac", "Към Алманаха"] : undefined,
     ),
     progress,
     timer(q.leftMs, q.limitMs, ans.left, ans.stopped),

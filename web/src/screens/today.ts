@@ -44,7 +44,7 @@ interface DayEntry {
   right: number;
   /** None of the day's others got it: „само ти го позна“. */
   alone?: boolean;
-  fact: { category: string; question?: string; answer: string; untrue?: boolean; fact: string };
+  fact: { category: string; question?: string; answer: string; lines?: string[]; untrue?: boolean; fact: string };
 }
 
 export interface Today {
@@ -619,7 +619,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       "div",
       { class: "result-main page-1" },
       hero,
-      zero ? missed(missedList, openReview, reviewList) : null,
+      zero ? missed(missedList, () => [recordings(), bulgariaToday(fresh(), run, reviewOf(run.id))]) : null,
       first ? action : null,
       // 2. The day's entry in the book, and what the day wrote.
       () => entryOfDay(fresh().entry),
@@ -668,14 +668,16 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
 const missedShown = 4;
 
 /** None right: the first questions, each its chapter's tile, the question, the right answer and the fact, right under
- * the score; „Още 6 въпроса“ opens them all (`more`, with the rest of „Въпросите и фактите“). Never a word of praise:
- * only what the questions were. */
-function missed(all: () => Reviewed[] | null, more: () => void, opened: () => Reviewed[] | null): Child {
+ * the score; „Още 6 въпроса“ shows the rest in place, and after them the rest of „Въпросите и фактите“ (`rest`: how
+ * others played the player's recordings, how all of България did). Never a word of praise: only what the questions
+ * were. */
+function missed(all: () => Reviewed[] | null, rest: () => Child): Child {
+  const open = signal(false);
   return () => {
     const list = all();
     if (!list?.length) return null;
-    const shown = list.slice(0, missedShown);
-    const rest = list.length - shown.length;
+    const shown = open() ? list : list.slice(0, missedShown);
+    const left = list.length - shown.length;
     return h(
       "section",
       { class: "sect missed-day" },
@@ -683,14 +685,13 @@ function missed(all: () => Reviewed[] | null, more: () => void, opened: () => Re
         "div",
         { class: "sect-head" },
         h("h2", null, "Въпросите и фактите"),
-        h("span", { class: "sect-note" }, `1–${shown.length} от ${list.length}`),
+        left ? h("span", { class: "sect-note" }, `1–${shown.length} от ${list.length}`) : null,
       ),
       h(
         "ol",
         { class: "missed" },
-        shown.map((q) => {
-          const answer = answerWords(q.view, q.reveal);
-          return h(
+        shown.map((q) =>
+          h(
             "li",
             { class: "miss" },
             h(
@@ -699,21 +700,43 @@ function missed(all: () => Reviewed[] | null, more: () => void, opened: () => Re
               h("span", { class: "tile-pic" }, picture(`topic-${q.category}`)),
             ),
             h("p", { class: "miss-q" }, q.view.text),
-            answer ? h("p", { class: "miss-a" }, answer) : null,
+            rightAnswer(q),
             q.reveal.fact ? h("p", { class: "miss-f" }, q.reveal.fact) : null,
-          );
-        }),
+          ),
+        ),
       ),
-      rest > 0
+      left > 0
         ? h(
             "button",
-            { class: "more", type: "button", "aria-expanded": () => !!opened(), onclick: more },
-            rest === 1 ? "Още един въпрос" : `Още ${rest} въпроса`,
+            { class: "more", type: "button", "aria-expanded": "false", onclick: () => open.set(true) },
+            left === 1 ? "Още един въпрос" : `Още ${left} въпроса`,
             h("span", { class: "i i-right", "aria-hidden": "true" }),
           )
-        : null,
+        : rest(),
     );
   };
+}
+
+/** A question's right answer, as a miss shows it: a word or a number; an order its items in their right order, a
+ * match its pairs, a split each group with its items, a line each. */
+function rightAnswer(q: Reviewed): Child {
+  const { view: v, reveal: r } = q;
+  const lines =
+    v.type === "order"
+      ? (r.order ?? []).map((item, i) => `${i + 1}. ${v.items[item] ?? ""}`)
+      : v.type === "match"
+        ? v.left.map((left, i) => `${left} — ${v.right[r.pairs?.[i] ?? -1] ?? ""}`)
+        : v.type === "split"
+          ? v.groups.map((g, k) => `${g}: ${v.items.filter((_, i) => (r.sides?.[i] ?? 0) === k).join(", ")}`)
+          : null;
+  if (lines)
+    return h(
+      "ul",
+      { class: "miss-a miss-lines" },
+      lines.map((l) => h("li", null, l)),
+    );
+  const answer = answerWords(v, r);
+  return answer ? h("p", { class: "miss-a" }, answer) : null;
 }
 
 /** A question of the ten by its place, as the result's line names it („Десетият“). */
@@ -892,7 +915,20 @@ function entryOfDay(r?: DayEntry | null): Child {
       f.category,
       [
         h("div", { class: "entry-tags" }, chip(f.category), h("span", { class: "entry-kicker" }, kicker)),
-        h("p", { class: "entry-word" }, f.untrue ? h("span", { class: "entry-untrue" }, "Невярно: ") : null, f.answer),
+        // An answer of parts (an order, a match, a split) a line each at the entry's size, never one headword of six
+        // lines.
+        f.lines?.length
+          ? h(
+              "ul",
+              { class: "entry-lines" },
+              f.lines.map((l) => h("li", null, l)),
+            )
+          : h(
+              "p",
+              { class: "entry-word" },
+              f.untrue ? h("span", { class: "entry-untrue" }, "Невярно: ") : null,
+              f.answer,
+            ),
         f.question ? h("p", { class: "entry-q" }, f.question) : null,
         h("p", { class: "entry-fact" }, f.fact),
       ],

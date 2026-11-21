@@ -1,7 +1,7 @@
 // The avatar's choice: how a player shows to others. Every animal is anyone's from the first day (play.Shapes); a
-// chapter's art is the player's from the chapter's Страница (play/rank.go), and until then shows hollow, „от
-// Страница“. On Профил (picker) and on a page of its own (/avatar, avatarChoice): each with its name, the one worn
-// ringed; a tap wears it at once.
+// chapter's art is the player's from the chapter's Страница (play/rank.go), and until then shows hollow. On Профил
+// (picker) and on a page of its own (/avatar, avatarChoice): each with its name, the one worn ringed; a tap wears it
+// at once.
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -52,8 +52,8 @@ export function picker(kit: Kit, ranks: () => Rank[]): Child {
 }
 
 /** The animals, each in its own colours, then the chapters' art, each with its name; the one worn ringed; a tap wears
- * it at once (the frame's and Профил's with it: state.ts, look). A chapter's art not the player's yet is hollow, „от
- * Страница“, and can't be worn. */
+ * it at once (the frame's and Профил's with it: state.ts, look). A chapter's art not the player's yet is hollow (its
+ * name only; when it opens is said once under the grid), and can't be worn. */
 function choice(ranks: () => Rank[]): Child {
   const error = signal("");
   const wear = async (id: string) => {
@@ -99,11 +99,8 @@ function choice(ranks: () => Rank[]): Child {
               onclick: () => (open ? wear(`${c.id}-natural`) : null),
             },
             avatar(`${c.id}-natural`),
-            h(
-              "span",
-              { class: "pick-name" },
-              open ? chapterName(c.id) : `${chapterName(c.id)} · от печат\u00a0„Страница“`,
-            ),
+            // Locked or not, only its name: the rule is said once, under the grid.
+            h("span", { class: "pick-name" }, chapterName(c.id)),
           );
         }),
       ),

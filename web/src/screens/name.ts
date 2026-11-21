@@ -87,7 +87,8 @@ function sheet(
   const input = h("input", {
     name: "name",
     autocomplete: "nickname",
-    maxlength: 30,
+    // Room past the rule's 30, so that a longer name is refused in words (the server's), never cut short and saved.
+    maxlength: 60,
     value: u.name,
     onfocus: (e: FocusEvent) => (e.target as HTMLInputElement).select(),
   });

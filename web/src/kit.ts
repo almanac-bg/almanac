@@ -41,7 +41,7 @@ import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
 import { missing } from "./screens/missing.ts";
 import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
-import { signIn } from "./screens/signin.ts";
+import { noEmail, noEmailLine, signIn } from "./screens/signin.ts";
 import { loadStats } from "./screens/stats.ts";
 import { rankName, rankNames } from "./seal.ts";
 import {
@@ -194,6 +194,8 @@ export const kit = {
   shapeNames,
   signal,
   signIn,
+  noEmail,
+  noEmailLine,
   slot,
   soundOn,
   startDuel,

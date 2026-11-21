@@ -51,6 +51,8 @@ interface Learned {
   /** The question; none for a statement to judge, whose answer is the statement itself. */
   question?: string;
   answer: string;
+  /** An answer of parts (an order, a match, a split): a line each, listed rather than set as one headword. */
+  lines?: string[];
   /** A statement that isn't so: its answer is the statement, said untrue. */
   untrue?: boolean;
   fact: string;
@@ -102,6 +104,13 @@ function setKit(kit: Kit) {
   } = kit);
 }
 
+/** A chapter's game (or Микс's, България's) left unfinished today (play.Left): where it stopped. */
+interface Left {
+  category: string;
+  at: number;
+  total: number;
+}
+
 /** The book's chapters, in its order: the bank's topics, then „Микс“ and „България“ (a chapter's page each, played
  * from the book's head). */
 const chapters = () => topics.map((t) => t.id);
@@ -115,6 +124,12 @@ export function almanac(kit: Kit): Child {
   if (!user.peek()) return book({ facts: [], found: 0, ink: {} });
   const page = signal<Page | null>(null);
   const failed = signal<unknown>(null);
+  // The games of a chapter left half-way today: each with the way to go on (a game's cross comes back here).
+  const left = signal<Left[]>([]);
+  api<{ runs: Left[] }>("GET", "/api/runs/left").then(
+    (r) => left.set(r.runs),
+    () => {},
+  );
   const load = () => {
     failed.set(null);
     api<Page>("GET", "/api/almanac").then(page.set, failed.set);
@@ -123,12 +138,13 @@ export function almanac(kit: Kit): Child {
   return () => {
     const p = page();
     if (!p) return failed() ? failure(failed(), load) : h("p", { class: "muted" }, "…");
-    return book(p);
+    return book(p, left);
   };
 }
 
-/** The book as a page: its head, and its chapters, the one nearest its next rank first. */
-function book(p: Page): Child {
+/** The book as a page: its head (with a game left half-way today, the way to go on), and its chapters, the one
+ * nearest its next rank first. */
+function book(p: Page, left: () => Left[] = () => []): Child {
   const name = user.peek()?.name;
   const rankOf = (id: string) => p.ranks?.find((r) => r.chapter === id);
   // The chapter nearest its next rank: the least ink still to come, of those begun.
@@ -156,6 +172,21 @@ function book(p: Page): Child {
         way("mix", "Микс", "всички глави"),
         bulgaria.open ? way("bulgaria", "България", "въпроси за България") : null,
       ),
+      () =>
+        left().map((l) =>
+          h(
+            "p",
+            { class: `book-left t-${l.category}` },
+            glyph(l.category, 32),
+            h(
+              "span",
+              { class: "book-left-words" },
+              h("b", null, nameOf(l.category)),
+              ` Следва въпрос ${l.at + 1}\u00a0от\u00a0${l.total}.`,
+            ),
+            h("a", { class: "btn inline", href: `/play/${l.category}` }, "Продължи"),
+          ),
+        ),
     ),
     h(
       "ol",
@@ -170,13 +201,13 @@ function way(id: string, name: string, note: string): Child {
   return h(
     "a",
     { class: `way t-${id}`, href: `/play/${id}` },
-    glyph(id, 44),
+    glyph(id, 36),
     h("span", { class: "way-words" }, h("b", null, name), h("small", null, note)),
   );
 }
 
-/** A chapter's card: its colour, its name, its seal as the badge (or its glyph, before a rank), its ink, and its rank
- * with the ink to the next. The corner turned, as a page of the book. */
+/** A chapter's card: its colour, its seal as the badge (or its glyph, before a rank) over its name, its ink, and its
+ * rank with the ink to the next. The corner turned, as a page of the book. */
 function card(id: string, ink: number, r: Rank | undefined, nearest: boolean): Child {
   const ranked = r && r.level > 0 ? r : null;
   const left = ranked ? Math.max(1, ranked.nextAt - ranked.ink) : 0;
@@ -192,14 +223,16 @@ function card(id: string, ink: number, r: Rank | undefined, nearest: boolean): C
         h(
           "span",
           { class: "card-top" },
-          h("span", { class: "card-name" }, nameOf(id)),
           ranked ? seal(id, ranked.level, 40) : glyph(id, 40),
+          h("span", { class: "card-name" }, nameOf(id)),
         ),
         // A counter at zero is hidden: the book's head says once how ink is written.
         ink
           ? h("span", { class: "card-ink" }, h("b", { class: "num" }, formatNumber(ink)), h("span", null, "с мастило"))
           : null,
-        ranked ? h("span", { class: "card-rank" }, `${ranked.name} · още ${left} с мастило до „${ranked.next}“`) : null,
+        ranked
+          ? h("span", { class: "card-rank" }, `${ranked.name} · още ${left}\u00a0с мастило до „${ranked.next}“`)
+          : null,
       ],
       "card-leaf",
       { next: "" },
@@ -335,7 +368,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
             ),
             () => {
               const l = left();
-              return l ? h("p", { class: "small" }, `Следва въпрос ${l.at + 1} от ${l.total}.`) : null;
+              return l ? h("p", { class: "small" }, `Следва въпрос ${l.at + 1}\u00a0от\u00a0${l.total}.`) : null;
             },
           )
         : null,
@@ -428,7 +461,7 @@ function stand(id: string, r: Rank | undefined, ink: number): Child {
             h(
               "p",
               { class: "ch-next" },
-              `още ${Math.max(1, ranked.nextAt - ranked.ink)} с мастило до „${ranked.next}“`,
+              `още ${Math.max(1, ranked.nextAt - ranked.ink)}\u00a0с мастило до „${ranked.next}“`,
             ),
           ]
         : h("p", { class: "ch-next" }, "Всеки верен отговор в броя на деня вписва факт с мастило."),
@@ -444,9 +477,9 @@ function whence(f: Learned): string {
   return from ? `${shortDate(day)} · ${from}` : shortDate(day);
 }
 
-/** A fact as an entry of the book: ink (a card with an ink edge and „мастило“), or grey (outlined thin, lighter); its
- * dateline, the answer as its headword (a statement to judge is its own headword, „Невярно:“ before one that isn't so),
- * the question, and the fact. */
+/** A fact as an entry of the book: ink (a card with an ink edge and „с мастило“), or grey („в сиво“, outlined thin,
+ * lighter); its dateline, the answer as its headword (a statement to judge is its own headword, „Невярно:“ before one
+ * that isn't so; an answer of parts a line each), the question, and the fact. */
 function entry(f: Learned): Child {
   return h(
     "li",
@@ -455,11 +488,17 @@ function entry(f: Learned): Child {
       "p",
       { class: "entry-when" },
       f.ink
-        ? h("span", { class: "tag ink" }, h("span", { class: "i i-nib", "aria-hidden": "true" }), "мастило")
+        ? h("span", { class: "tag ink" }, h("span", { class: "i i-nib", "aria-hidden": "true" }), "с мастило")
         : h("span", { class: "tag grey" }, "в сиво"),
       whence(f),
     ),
-    h("p", { class: "entry-word" }, f.untrue ? h("span", { class: "entry-untrue" }, "Невярно: ") : null, f.answer),
+    f.lines?.length
+      ? h(
+          "ul",
+          { class: "entry-lines" },
+          f.lines.map((l) => h("li", null, l)),
+        )
+      : h("p", { class: "entry-word" }, f.untrue ? h("span", { class: "entry-untrue" }, "Невярно: ") : null, f.answer),
     f.question ? h("p", { class: "entry-q" }, f.question) : null,
     h("p", { class: "entry-fact" }, f.fact),
   );

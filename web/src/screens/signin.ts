@@ -29,6 +29,13 @@ export interface SignInOptions {
   done?: (said: string, now: User) => void;
 }
 
+/** Whether this browser is one where no email or code is asked for (Meta's, TikTok's: lib/embedded.ts, forms): there
+ * a screen offers no email at all, only the one line that says so (noEmailLine). */
+export const noEmail = !!embedded && !embedded.forms;
+
+/** The one line said where no email is asked for (noEmail), in place of every way in by email. */
+export const noEmailLine = "Тук не може да се влиза с имейл. Отвори играта в браузъра на телефона и я запази там.";
+
 /** Signing in by email, with a code (SignInOptions). Never in Meta's or TikTok's own browsers (lib/embedded.ts,
  * forms): what's typed there the app can read, so the way is the phone's own browser. */
 export function signIn({
@@ -40,12 +47,7 @@ export function signIn({
   done,
   email: filled = "",
 }: SignInOptions): Child {
-  if (embedded && !embedded.forms)
-    return h(
-      "p",
-      { class: "muted" },
-      "Тук не може да се влиза с имейл. Отвори играта в браузъра на телефона и я запази там.",
-    );
+  if (noEmail) return h("p", { class: "muted" }, noEmailLine);
   // A code sent from this form a little while ago, in this tab: a reload comes back to the step that takes it; not
   // where a mail's link fills in another address.
   const kept = sentBefore(form);

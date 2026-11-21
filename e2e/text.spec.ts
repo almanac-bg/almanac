@@ -3,7 +3,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
-import { befriend, daysPlayed, dealt, startDay } from "./play.ts";
+import { befriend, cutOrOverlapping, daysPlayed, dealt, keptPlayer, startDay } from "./play.ts";
 
 /** The text at `percent` of its size from the page's start, as a phone set to large text gives it (a style the page's
  * own rules can't undo; CSP lets the test add it). */
@@ -253,6 +253,48 @@ test.describe("a player's places at twice the text on a 320px phone", () => {
         .locator(".places-foot a")
         .evaluateAll((links) => links.filter((a) => a.scrollWidth > a.clientWidth + 1).map((a) => a.textContent));
       expect(cut, `the places at the foot, ${size} %`).toEqual([]);
+    }
+  });
+});
+
+test.describe("a kept player's places at twice the text on a 320px phone", () => {
+  test.use({ viewport: { width: 320, height: 640 }, bypassCSP: true });
+
+  test("Профил, another's page, Приятели, a chapter, a duel's result, /admin, Настройки: whole, apart, not sideways", async ({
+    page,
+    browser,
+  }) => {
+    test.setTimeout(180_000);
+    const kept = await keptPlayer(page, browser);
+    for (const size of [200, 150]) {
+      await textAt(page, size);
+      for (const path of [
+        "/me",
+        `/players/${kept.tag}`,
+        "/friends",
+        "/almanac",
+        "/almanac/literature",
+        `/duel/${kept.duel}`,
+        "/admin",
+        "/settings",
+      ]) {
+        await page.goto(path);
+        await expect(page.locator("h1").first()).toBeVisible();
+        await fits(page, `${path}, ${size} %`);
+        expect(await cutOrOverlapping(page), `${path}, ${size} %`).toEqual([]);
+      }
+      // A new visitor's cover: the name and „Вход“ apart.
+      const cover = await (
+        await browser.newContext({ viewport: { width: 320, height: 640 }, bypassCSP: true })
+      ).newPage();
+      await textAt(cover, size);
+      await cover.goto("/");
+      await expect(cover.locator(".bar-in")).toBeVisible();
+      const [brand, signIn] = await Promise.all(
+        [".brand", ".bar-in"].map((s) => cover.locator(s).evaluate((el) => el.getBoundingClientRect().toJSON())),
+      );
+      expect(brand.right, `the name runs into „Вход“, ${size} %`).toBeLessThanOrEqual(signIn.left + 1);
+      await cover.context().close();
     }
   });
 });

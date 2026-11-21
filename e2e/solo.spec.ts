@@ -62,8 +62,13 @@ test("a day with none right opens its questions and their facts under the score,
   // Right under the score: the first four, each with its fact, and the way to the rest.
   await expect(page.locator(".result-score + .missed-day .miss")).toHaveCount(4);
   await expect(page.locator(".missed-day .sect-note")).toHaveText("1–4 от 10");
+  // The rest in place, each with its right answer (an order's, a match's, a split's in lines): never the ten again
+  // under a second heading.
   await page.getByRole("button", { name: "Още 6 въпроса" }).click();
-  await expect(page.locator(".reviewed")).toHaveCount(10);
+  await expect(page.locator(".missed-day .miss")).toHaveCount(10);
+  await expect(page.locator(".missed-day .miss .miss-a")).toHaveCount(10);
+  await expect(page.locator(".reviewed")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Въпросите и фактите" })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Въпросите и фактите" })).toHaveCount(0);
   await expect(page.locator(".screen")).not.toContainText(/[Бб]раво|[Пп]оздрав|[Сс]упер|[Оо]тлично/);
 });
@@ -117,9 +122,12 @@ test("a topic, ten questions, a question reported, and ten more", async ({ page 
   await page.getByLabel("Какво не е наред?").fill("Отговорът е остарял.");
   await page.getByRole("button", { name: "Прати" }).click();
   await expect(page.getByText("Благодарим ти! Ще го прегледаме.")).toBeVisible();
-  // Another topic is a tap away, under the result.
-  await expect(page.locator(".other-topics .chip")).toHaveCount(3);
-  await expect(page.locator(".other-topics")).not.toContainText("История");
+  // One action; the other ways on are quiet links, the way back to its chapter among them.
+  await expect(page.locator(".summary > .actions .btn.primary")).toHaveCount(1);
+  await expect(page.locator(".result-links").getByRole("link", { name: "Към главата" })).toHaveAttribute(
+    "href",
+    "/almanac/history",
+  );
   // Ten more from a result start at once: the player is ready, no count.
   await page.getByRole("button", { name: "Още десет въпроса" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10");
@@ -259,7 +267,8 @@ test("a question left while its time runs: asked first, given up, and the topic 
   await moveOn(page);
   await expect(page.locator(".question-head")).toContainText("2 от 10", { timeout: 10_000 });
   // Leaving would cost the question: the arrow asks first, and „Остани“ plays on.
-  const leave = page.getByRole("link", { name: "Към Днес", exact: true });
+  // A chapter's game is left to the Алманах, where it's played from.
+  const leave = page.getByRole("link", { name: "Към Алманаха", exact: true });
   const asked = page.getByText("Ако излезеш сега, въпросът остава без отговор.");
   await leave.click();
   await expect(asked).toBeVisible();
@@ -268,11 +277,13 @@ test("a question left while its time runs: asked first, given up, and the topic 
   await expect(page.locator(".question-head")).toContainText("2 от 10");
   await leave.click();
   await page.getByRole("button", { name: "Излез" }).click();
-  await expect(page).toHaveURL(/\/$/);
-  await expect(page.locator(".issue")).toBeVisible();
-  // Back to the topic, from its chapter: the same game, the question left counted unanswered, the third next.
-  await page.goto("/almanac/history");
-  await page.getByRole("link", { name: "Продължи играта" }).click();
+  await expect(page).toHaveURL(/\/almanac$/);
+  // The book shows the game left half-way, and the way to go on with it: the same game, the question left counted
+  // unanswered, the third next.
+  const left = page.locator(".book-left");
+  await expect(left).toContainText("История");
+  await expect(left).toContainText(/Следва въпрос \d+\u00a0от\u00a010\./);
+  await left.getByRole("link", { name: "Продължи" }).click();
   await page.getByRole("button", { name: "Започни сега" }).click();
   // First, once, what the question given up was: its answer, without points; then on.
   const missed = page.locator(".given-up");

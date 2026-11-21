@@ -27,10 +27,13 @@ type Learned struct {
 	Category string `json:"category"`
 	Question string `json:"question,omitempty"`
 	Answer   string `json:"answer"`
-	Untrue   bool   `json:"untrue,omitempty"`
-	Fact     string `json:"fact"`
-	Ink      bool   `json:"ink,omitempty"`
-	At       int64  `json:"at"`
+	// Lines is an answer of parts (an order, a match, a split: bank.AnswerLines), a line each: the entry lists them
+	// under a short headword rather than set the whole answer as one.
+	Lines  []string `json:"lines,omitempty"`
+	Untrue bool     `json:"untrue,omitempty"`
+	Fact   string   `json:"fact"`
+	Ink    bool     `json:"ink,omitempty"`
+	At     int64    `json:"at"`
 	// Kind is the game it was learned in ("day", "topic", "duel"), and Issue the day's, for one of the day's ten.
 	Kind  string `json:"kind,omitempty"`
 	Issue int    `json:"issue,omitempty"`
@@ -90,7 +93,7 @@ type learnedAt struct {
 // learnedAs is a written question as its almanac shows it.
 func learnedAs(q bank.Question, at learnedAt, ink bool) Learned {
 	l := Learned{ID: q.Base().ID, Category: q.Base().Category, Question: q.Base().Text, Answer: bank.AnswerText(q),
-		Fact: q.Extra().Fact, At: at.at, Kind: at.kind, Ink: ink}
+		Lines: bank.AnswerLines(q), Fact: q.Extra().Fact, At: at.at, Kind: at.kind, Ink: ink}
 	if at.kind == "day" {
 		l.Issue = Issue(at.day)
 	}

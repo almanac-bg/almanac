@@ -844,3 +844,28 @@ func TestAnswerTextIsBulgarian(t *testing.T) {
 		t.Errorf("order: %q", got)
 	}
 }
+
+// An answer of parts is a line each for the book's entry (a short headword over them, not one of six lines); an
+// answer of one word or number has none.
+func TestAnswerLines(t *testing.T) {
+	o := &Order{Unit: "млн. км²", Items: []OrderItem{{Text: "Европа", Value: 10.18}, {Text: "Азия", Value: 44.6}}, Direction: "desc"}
+	s := &Split{Groups: [2]string{"Шекспир", "Молиер"}, Items: []SplitItem{{"Просперо", 0}, {"Тартюф", 1}, {"Миранда", 0}}}
+	m := &Match{Pairs: []MatchPair{{Left: "Франция", Right: "Париж"}, {Left: "Италия", Right: "Рим"}}, Decoy: "Сидни"}
+	for _, c := range []struct {
+		q    Question
+		want []string
+	}{
+		{o, []string{"Азия (44,6 млн. км²)", "Европа (10,18 млн. км²)"}},
+		{s, []string{"Шекспир: Просперо, Миранда", "Молиер: Тартюф"}},
+		{m, []string{"Франция — Париж", "Италия — Рим"}},
+		{&Number{Answer: 1876, Step: 1}, nil},
+		{&TrueFalse{Answer: true}, nil},
+	} {
+		if got := AnswerLines(c.q); !slices.Equal(got, c.want) {
+			t.Errorf("%T: %q, want %q", c.q, got, c.want)
+		}
+		if c.want != nil && AnswerText(c.q) == "" {
+			t.Errorf("%T: no answer text", c.q)
+		}
+	}
+}

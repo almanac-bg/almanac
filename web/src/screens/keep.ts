@@ -15,7 +15,7 @@ import { embedded, handMark, handToken, outsideLink } from "../lib/embedded.ts";
 import { askToKeep } from "../lib/keep.ts";
 import { fragment } from "../lib/router.ts";
 import { notice, type User, user } from "../state.ts";
-import { signIn } from "./signin.ts";
+import { noEmail, noEmailLine, signIn } from "./signin.ts";
 
 /** This page's app browser, if it's in one. */
 export const app = embedded;
@@ -132,6 +132,8 @@ export function mailAsk({
       if (said()) return h("p", { class: "muted", role: "status" }, said());
       if (saving()) return h("p", { class: "muted" }, "…");
       const to = email();
+      // Where no email may be asked for, a guest isn't offered mail at all (the page says why, once).
+      if (!to && noEmail) return null;
       if (to)
         return [
           lead(to),
@@ -184,6 +186,8 @@ const told =
 /** Профил's ask to a guest to keep their game, from the first game: a quiet line that opens the form in place; once
  * the code is in, `signedIn` draws Профил again as the profile has it, and it says what came of it (notice). */
 export function keepGame(signedIn: () => void): Child {
+  // Where no email is asked for: no offer of one, only why not, and the way (the phone's browser).
+  if (noEmail) return h("p", { class: "muted keep-line" }, `Играта ти е само на това устройство. ${noEmailLine}`);
   const opened = signal(false);
   return () =>
     opened()
@@ -212,6 +216,8 @@ export function haveProfile(
   email: () => string = () => "",
   primary = false,
 ): Child {
+  // Where no email is asked for, the way in is the phone's browser: said once, by keepGame or the page.
+  if (noEmail) return primary ? h("p", { class: "muted" }, noEmailLine) : null;
   const opened = signal(open);
   return () =>
     opened()
@@ -232,8 +238,8 @@ const menuWay = () => (app?.platform === "ios" ? "··· → Отвори в Saf
  * is written into Днес's address (its fragment) while this is on screen, and only then, so that the app's own „Open
  * in browser“ takes it along; it's asked for again as the page comes back into view, and changes only when it has
  * less than 10 minutes left (account.HandoffRotate). On Android a button opens the phone's browser at that address;
- * on an iPhone, where no link can, one line names the app's menu. The number another browser may ask for is said
- * under it. Where the app's browser may be trusted with a form (lib/embedded.ts, forms), keeping the game with an
+ * elsewhere (an iPhone), where no link can, a button copies it for the phone's browser; under either, the app's menu,
+ * named. The number another browser may ask for is said under it. Where the app's browser may be trusted with a form (lib/embedded.ts, forms), keeping the game with an
  * email is a tap away too. `stake`: what the game risks here. */
 export function exitWay(stake: () => string | null): Child {
   const offer = signal<{ token: string; number: number } | null>(null);
@@ -281,7 +287,10 @@ export function exitWay(stake: () => string | null): Child {
       done = Promise.reject(err);
     }
     done.then(
-      () => said.set("Копирано. Отвори Safari и постави връзката в адресното поле."),
+      () =>
+        said.set(
+          `Копирано. Отвори ${app?.platform === "ios" ? "Safari" : "браузъра на телефона"} и постави връзката в адресното поле.`,
+        ),
       () => said.set(at()),
     );
   };
@@ -292,21 +301,27 @@ export function exitWay(stake: () => string | null): Child {
     h("p", { class: "muted" }, () =>
       [stake(), "Продължи в браузъра на телефона и утре играта ще те чака там."].filter(Boolean).join(" "),
     ),
+    // The way out is a button either way: on Android it opens the phone's browser; where no link can (an iPhone), it
+    // copies the address for it. Under it, the app's own menu, named.
     android
       ? h("button", { class: "btn primary", type: "button", onclick: open }, "Отвори в браузъра")
-      : h("p", { class: "exit-menu" }, h("b", null, menuWay())),
+      : h(
+          "button",
+          { class: "btn primary", type: "button", onclick: copy },
+          app?.platform === "ios" ? "Копирай връзката за Safari" : "Копирай връзката за браузъра",
+        ),
+    h("p", { class: "exit-menu" }, "Или от менюто на приложението: ", h("b", null, menuWay())),
     () => {
       const o = offer();
       return o ? h("p", { class: "small exit-number" }, `Ако браузърът поиска число, въведи ${o.number}.`) : null;
     },
-    h(
-      "div",
-      { class: "remind-actions" },
-      android ? null : h("button", { class: "link tap", type: "button", onclick: copy }, "Копирай връзката"),
-      app?.forms
-        ? h("button", { class: "link tap", type: "button", onclick: () => keeping.set(true) }, "Или я запази с имейл")
-        : null,
-    ),
+    app?.forms
+      ? h(
+          "div",
+          { class: "remind-actions" },
+          h("button", { class: "link tap", type: "button", onclick: () => keeping.set(true) }, "Или я запази с имейл"),
+        )
+      : null,
     () =>
       keeping()
         ? signIn({ form: "exit-keep", primary: false, note: keepNote, enter: "Потвърди", done: (s) => said.set(s) })

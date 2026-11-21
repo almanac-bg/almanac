@@ -236,7 +236,7 @@ func mustJSON(v any) json.RawMessage {
 }
 
 // AnswerText is a question's answer in words, as players read it (Моят Алманах): numbers written the Bulgarian way,
-// with their unit.
+// with their unit; an answer of parts (AnswerLines) on one line.
 func AnswerText(q Question) string {
 	switch q := q.(type) {
 	case *Choice:
@@ -246,22 +246,35 @@ func AnswerText(q Question) string {
 	case *Number:
 		return strings.TrimSpace(sayNumber(q.Answer, q.Step) + " " + q.Unit)
 	case *Order:
-		items := make([]string, 0, len(q.Items))
-		for _, i := range q.right() {
-			items = append(items, fmt.Sprintf("%s (%s)", q.Items[i].Text, strings.TrimSpace(sayNumber(q.Items[i].Value, 0.01)+" "+q.Unit)))
-		}
-		return strings.Join(items, " → ")
+		return strings.Join(AnswerLines(q), " → ")
 	case *TrueFalse:
 		if q.Answer {
 			return "Вярно"
 		}
 		return "Невярно"
+	case *Match, *Split:
+		return strings.Join(AnswerLines(q), "; ")
+	}
+	return ""
+}
+
+// AnswerLines is an answer of parts, a line each, as an entry of the book lists it under a short headword: an
+// order's items in their right order, each with its value; a match's pairs; a split's two groups, each with its items.
+// Nil for an answer of one word or number.
+func AnswerLines(q Question) []string {
+	switch q := q.(type) {
+	case *Order:
+		items := make([]string, 0, len(q.Items))
+		for _, i := range q.right() {
+			items = append(items, fmt.Sprintf("%s (%s)", q.Items[i].Text, strings.TrimSpace(sayNumber(q.Items[i].Value, 0.01)+" "+q.Unit)))
+		}
+		return items
 	case *Match:
 		pairs := make([]string, 0, len(q.Pairs))
 		for _, p := range q.Pairs {
 			pairs = append(pairs, p.Left+" — "+p.Right)
 		}
-		return strings.Join(pairs, "; ")
+		return pairs
 	case *Split:
 		groups := [2][]string{}
 		for _, it := range q.Items {
@@ -269,9 +282,9 @@ func AnswerText(q Question) string {
 				groups[it.Group] = append(groups[it.Group], it.Text)
 			}
 		}
-		return q.Groups[0] + ": " + strings.Join(groups[0], ", ") + "; " + q.Groups[1] + ": " + strings.Join(groups[1], ", ")
+		return []string{q.Groups[0] + ": " + strings.Join(groups[0], ", "), q.Groups[1] + ": " + strings.Join(groups[1], ", ")}
 	}
-	return ""
+	return nil
 }
 
 // KeeperText is the answer as whoever keeps the bank reads it (the admin page): a match's decoy too.

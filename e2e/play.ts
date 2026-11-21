@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { expect, type Page } from "@playwright/test";
+import { type Browser, expect, type Page } from "@playwright/test";
 
 /** Answers the question showing: the first option; „Вярно“; a number on the game's pad; an order, dragging the first
  * item to the end (by a finger in Chromium) and tapping it back (which checks that both ways work); a match, joining each left to the right beside it (a line
@@ -236,6 +236,48 @@ export async function knows(page: Page, ids: string[], at = Date.now(), ink = fa
   });
 }
 
+/** The book's ten chapters (the bank's topics). */
+export const chapters = [
+  "general",
+  "science",
+  "history",
+  "geography",
+  "movies",
+  "music",
+  "sports",
+  "technology",
+  "literature",
+  "nature",
+];
+
+/** Makes the player (a guest, made now if there's none) one with a seal of `level` in every chapter (2 Страница, 3
+ * Тетрадка …), its rank told, straight in the test server's database: Профил's seals, a long name („Изкуство и
+ * литература“) among them. */
+export async function ranked(page: Page, level = 3): Promise<void> {
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" }).format(new Date());
+  await inDB(page, (db, id) => {
+    const add = db.prepare(`INSERT OR REPLACE INTO ranks (user_id, chapter, level, quarter, ink, day, told)
+      VALUES (?, ?, ?, 1, ?, ?, ?)`);
+    for (const c of chapters) add.run(id, c, level, [0, 1, 5, 15, 40][level] ?? 15, day, level);
+  });
+}
+
+/** Makes the player (a guest, made now if there's none) an admin, straight in the test server's database. */
+export async function admin(page: Page): Promise<void> {
+  await inDB(page, (db, id) => {
+    db.prepare("UPDATE users SET admin = 1 WHERE id = ?").run(id);
+  });
+}
+
+/** Plays a run of ten through the API, each question given up (none right), as the player of `page`. */
+export async function givenUp(page: Page, run: number): Promise<void> {
+  for (let n = 0; n < 10; n++) {
+    await page.request.post(`/api/runs/${run}/show`, { data: {} });
+    await page.request.post(`/api/runs/${run}/start`, { data: { n } });
+    expect((await page.request.post(`/api/runs/${run}/answer`, { data: { n, answer: null } })).ok()).toBe(true);
+  }
+}
+
 /** Does something to the player (a guest, made now if there's none) straight in the test server's database. */
 async function inDB(page: Page, f: (db: DatabaseSync, id: number) => void): Promise<void> {
   const id = await page.evaluate(async () => {
@@ -291,4 +333,78 @@ export function mailedCode(email: string): string {
   } catch {
     return ""; // not sent yet
   }
+}
+
+/** A player kept a while, as their places show them: a seal in every chapter, a friend of a long name with seals too,
+ * a duel with the friend played to its end, the keys to /admin. Returns the friend's username and the duel. */
+export async function keptPlayer(page: Page, browser: Browser): Promise<{ tag: string; duel: number }> {
+  const other = await (await browser.newContext()).newPage();
+  await page.goto("/");
+  await ranked(page);
+  await admin(page);
+  await befriend(page, other);
+  await ranked(other);
+  const name = (p: Page, to: string) =>
+    p.evaluate(
+      (to) =>
+        fetch("/api/me", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: to }),
+        }),
+      to,
+    );
+  await name(page, "Константинова-Христозова");
+  await name(other, "Радостина Хаджиниколова");
+  const friend = await other.evaluate(
+    async () => (await (await fetch("/api/me")).json()).user as { id: number; tag: string },
+  );
+  const made = await (await page.request.post("/api/duels", { data: { friend: friend.id } })).json();
+  const duel = made.duel as { id: number; runId?: number };
+  const mine =
+    duel.runId ?? (await (await page.request.post(`/api/duels/${duel.id}/play`, { data: {} })).json()).duel.runId;
+  await givenUp(page, mine);
+  const theirs = (await (await other.request.post(`/api/duels/${duel.id}/play`, { data: {} })).json()).duel.runId;
+  await givenUp(other, theirs);
+  await other.context().close();
+  return { tag: friend.tag, duel: duel.id };
+}
+
+/** What of a page is cut or runs into its neighbour: a name clipped where its row has room, a word past its card, the
+ * @username where no two friends share a name, two seals over each other. */
+export async function cutOrOverlapping(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out: string[] = [];
+    const say = (el: Element) => `${el.className}: „${(el.textContent ?? "").trim().slice(0, 40)}“`;
+    // A name in a wide row whole: never clipped or ended with „…“.
+    for (const el of document.querySelectorAll(
+      ".friend-name, .duel-name, .duel-row .who-label, .me-who h1, .rk-words b",
+    ))
+      if (
+        el.scrollWidth > el.clientWidth + 1 ||
+        (getComputedStyle(el).textOverflow === "ellipsis" && getComputedStyle(el).overflowX !== "visible")
+      )
+        out.push(`cut ${say(el)}`);
+    // A friend's @username only where two share a name.
+    for (const el of document.querySelectorAll(".friend-tag:not(.same)"))
+      if ((el as HTMLElement).offsetParent !== null) out.push(`a tag shown ${say(el)}`);
+    // Inside its card: a seal's name, a friend's day, a chapter's words.
+    for (const card of document.querySelectorAll(".rk, .friend, .duel-row, .ch-stand, .entry, .way, .card-leaf")) {
+      const box = card.getBoundingClientRect();
+      for (const el of card.querySelectorAll("*")) {
+        const r = el.getBoundingClientRect();
+        if (r.width && (r.right > box.right + 1 || r.left < box.left - 1)) {
+          out.push(`past its card ${say(el)}`);
+          break;
+        }
+      }
+    }
+    // The seals side by side, never over each other.
+    const seals = [...document.querySelectorAll(".seal-list > li")].map((li) => li.getBoundingClientRect());
+    for (const [i, a] of seals.entries())
+      for (const b of seals.slice(i + 1))
+        if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1)
+          out.push("two seals over each other");
+    return out;
+  });
 }

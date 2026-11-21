@@ -44,6 +44,7 @@ let {
   user,
   back,
   signIn,
+  noEmail,
   mailAsk,
   segmented,
 } = {} as Kit;
@@ -88,6 +89,7 @@ export function settings(kit: Kit) {
     user,
     back,
     signIn,
+    noEmail,
     mailAsk,
     segmented,
   } = kit);
@@ -134,7 +136,13 @@ export function settings(kit: Kit) {
                     { class: "lead", role: "status" },
                     "Излезе от профила си. Влез пак с имейла си или започни да играеш.",
                   )
-                : h("p", { class: "lead" }, "Още нямаш профил. Влез с имейл или започни да играеш."),
+                : h(
+                    "p",
+                    { class: "lead" },
+                    noEmail
+                      ? "Още нямаш профил. Започни да играеш."
+                      : "Още нямаш профил. Влез с имейл или започни да играеш.",
+                  ),
             signIn({ form: "settings", done: (said) => signedIn.set(said) }),
           ),
           looks(),
@@ -230,7 +238,8 @@ function nameForm(): Child {
               (el as HTMLInputElement).select();
             });
         },
-        maxlength: 30,
+        // Room past the rule's 30, so that a longer name is refused in words (the server's), never cut short and saved.
+        maxlength: 60,
         value: name,
         oninput: typed(name.set),
       }),
@@ -298,7 +307,10 @@ function account(): Child {
         h(
           "p",
           { class: "muted" },
-          "Засега играта ти е само на това устройство. Добави имейл и ще я имаш навсякъде, където влезеш с него. Вече имаш профил? Влез с имейла му и играта оттук ще се добави към него.",
+          // Where no email is asked for, none is offered: the line under it says why, and the way.
+          noEmail
+            ? "Засега играта ти е само на това устройство."
+            : "Засега играта ти е само на това устройство. Добави имейл и ще я имаш навсякъде, където влезеш с него. Вече имаш профил? Влез с имейла му и играта оттук ще се добави към него.",
         ),
         signIn({ form: "settings-keep", enter: "Потвърди", done: (said) => signedIn.set(said) }),
       ],

@@ -1,7 +1,9 @@
 // A chapter's game: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays
 // the same game. It's started from its chapter in the Алманах („Играй главата“: a topic, „Микс“ — every topic at once —
 // or „България“ — the questions about Bulgaria from every topic, while the bank has them); a run of one is
-// /play/<topic>, whose result offers ten more at once, the way back to its chapter, and another chapter a tap away.
+// /play/<topic>, whose result has one action (the day's ten while they wait, else ten more at once) and the rest as
+// quiet links: ten more, its questions gone over, the way back to its chapter (to the Алманах for Микс and България,
+// which aren't chapters).
 
 import { news } from "../game/news.ts";
 import { summary } from "../game/results.ts";
@@ -11,7 +13,7 @@ import { api, errorText } from "../lib/api.ts";
 import { type Child, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { backOut, byTap, entry, hold, mark, title } from "../lib/router.ts";
 import { bulgaria, categories, mix, player, user } from "../state.ts";
-import { stakeLine, toneOf, topicMark } from "../ui.ts";
+import { stakeLine } from "../ui.ts";
 import { missing } from "./missing.ts";
 
 export function topic([category = ""]: string[]) {
@@ -38,6 +40,7 @@ export function topic([category = ""]: string[]) {
   if (user.peek()) ask();
   return run({
     name,
+    chapter: category,
     home: `/almanac/${category}`,
     lead:
       category === mix.id
@@ -63,12 +66,9 @@ export function topic([category = ""]: string[]) {
           {
             main: () => nextOf(day(), again, category).main,
             also: [() => nextOf(day(), again, category).also],
+            quiet: true,
           },
-          [
-            h("p", { class: "news-met" }, "Фактите от играта са в твоя Алманах, в сиво."),
-            just ? news(s.id) : null,
-            otherTopics(category),
-          ],
+          [h("p", { class: "news-met" }, "Фактите от играта са в твоя Алманах, в сиво."), just ? news(s.id) : null],
           just,
           category,
         ),
@@ -76,45 +76,23 @@ export function topic([category = ""]: string[]) {
   });
 }
 
-/** A chapter game's result's buttons. While the day's ten wait, the way to them is the one gold action (the habit
- * comes first), the streak at stake under it, and „Още десет въпроса“ plain beside the way to the chapter; once the day is
- * played, „Още десет въпроса“ is the action. */
+/** A chapter game's result's ways on. While the day's ten wait, the way to them is the one action (the habit comes
+ * first), the streak at stake under it, and „Още десет въпроса“ a quiet link beside the way back; once the day is
+ * played, „Още десет въпроса“ is the action. The way back is to the chapter, or to the Алманах from Микс and
+ * България (two ways to play at its head, not chapters). */
 function nextOf(d: DayWaits | null, again: () => void, chapter: string): { main: Child; also: Child[] } {
-  const book = h("a", { class: "btn", href: `/almanac/${chapter}` }, "Към главата");
+  const book = isChapter(chapter)
+    ? h("a", { class: "link tap", href: `/almanac/${chapter}` }, "Към главата")
+    : h("a", { class: "link tap", href: "/almanac" }, "Към Алманаха");
   if (!d) return { main: h("button", { class: "btn primary big", onclick: again }, "Още десет въпроса"), also: [book] };
   return {
     main: [h("a", { class: "btn primary big", href: "/" }, "Към днешния брой"), stakeLine(d.streak, d.spare)],
-    also: [h("button", { class: "btn", onclick: again }, "Още десет въпроса"), book],
+    also: [h("button", { class: "link tap", onclick: again }, "Още десет въпроса"), book],
   };
 }
 
-/** How many other topics a topic's result offers. */
-const othersShown = 3;
-
-/** Under a topic's result, a way to another, a tap away (Начало's tiles are a scroll from there): the ones after it in
- * the book's order, so that the game goes round the chapters. */
-function otherTopics(current: string): Child {
-  const at = Math.max(
-    0,
-    categories.findIndex((c) => c.id === current),
-  );
-  const others = [...categories.slice(at + 1), ...categories.slice(0, at)]
-    .filter((c) => c.id !== current)
-    .slice(0, othersShown);
-  return () =>
-    h(
-      "nav",
-      { class: "other-topics", "aria-label": "Друга глава" },
-      h("p", { class: "kicker" }, "Друга глава"),
-      h(
-        "ul",
-        { class: "chips" },
-        others.map((c) =>
-          h("li", null, h("a", { class: `chip ${toneOf(c.id)}`, href: `/play/${c.id}` }, topicMark(c.id), c.name)),
-        ),
-      ),
-    );
-}
+/** Whether a game's topic is a chapter of the book (not Микс or България). */
+const isChapter = (id: string) => categories.some((c) => c.id === id);
 
 /** The day's ten, while they wait for the player: the streak (to yesterday) and whether the week would forgive a day
  * missed. */
@@ -150,6 +128,8 @@ export async function loadLeft(): Promise<LeftRun[]> {
  * (`finished`: `again` plays another, `just` says it was played this moment, so its news is told). */
 interface Run {
   name: string;
+  /** The chapter it's of (Микс, България too): its start on the chapter's sheet. */
+  chapter: string;
   lead: string;
   /** Where „Откажи“ on the count goes back to, if not where the game was opened from: its chapter. */
   home: string;
@@ -220,8 +200,13 @@ function run(r: Run): Child {
       const marks = left ? (await api<State>("GET", `/api/runs/${left.id}`).catch(() => null))?.trail : undefined;
       if (life.aborted) return;
       screen.show(() =>
-        startScreen(r.name, r.lead, left ? { at: left.at, total: left.total, marks } : null, () =>
-          left?.open ? start() : ready(),
+        startScreen(
+          r.name,
+          r.lead,
+          left ? { at: left.at, total: left.total, marks } : null,
+          () => (left?.open ? start() : ready()),
+          undefined,
+          r.chapter,
         ),
       );
     };
