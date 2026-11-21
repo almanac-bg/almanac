@@ -15,8 +15,9 @@ import (
 // worth judging again. The answers are people's: a game played at a script's speed says nothing of how hard a
 // question is (fair.go).
 //
-// A score is compared after taking away what guessing alone would get (a quarter on a choice, half on a true-or-not,
-// what an order or a match put down at random is worth, nothing on a number): what's left is how much players knew.
+// The share of right answers is compared after taking away what guessing alone would get right (rightChance: a
+// quarter on a choice, half on a true-or-not, one in six on an order): what's left is how much players knew. Right,
+// not a score: a close number counts as not right, as everywhere else.
 
 // CalibrateFrom is how many answers a question needs before its answers say how hard it is.
 const CalibrateFrom = 30
@@ -26,20 +27,6 @@ const (
 	EasyFrom   = 0.65 // most players know it
 	MediumFrom = 0.35 // about half do
 )
-
-// chance is the score a guess gets on average, by kind of question.
-// An order's and a match's grading already takes most of the luck out (bank.orderScore, bank.matchScore): at random,
-// four items in order are worth 7/36 on average, four pairs 1/8, four pairs with a decoy 53/480, and six things split
-// into two groups 5/32.
-var chance = map[string]float64{"choice": 0.25, "truefalse": 0.5, "order": 7.0 / 36, "match": 0.125, "split": 5.0 / 32, "clues": 0.25, "number": 0}
-
-// chanceOf is the score a guess at q gets on average.
-func chanceOf(q bank.Question) float64 {
-	if m, ok := q.(*bank.Match); ok && m.Decoy != "" {
-		return 53.0 / 480
-	}
-	return chance[q.Base().Type]
-}
 
 // KnownToDifficulty is the difficulty a share of knowledge (above chance) points to.
 func KnownToDifficulty(known float64) bank.Difficulty {
@@ -59,7 +46,7 @@ type Calibrated struct {
 	Type     string          `json:"type"`
 	Labelled bank.Difficulty `json:"labelled"`
 	Answers  int             `json:"answers"`
-	Score    float64         `json:"score"` // the mean, 0–1
+	Right    float64         `json:"right"` // the share right, 0–1
 	Known    float64         `json:"known"` // above chance, 0–1
 	Observed bank.Difficulty `json:"observed"`
 }
@@ -69,7 +56,7 @@ type Calibrated struct {
 func (g *Game) Calibrate(ctx context.Context) ([]Calibrated, error) {
 	// By version, and by the hour, so that only the answers to a question as it is now count (versions.go: those from
 	// before versions were kept, by the day it last changed).
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, version, at / 3600000, count(*), sum(score) FROM answers
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, version, at / 3600000, count(*), sum(is_right) FROM answers
 		WHERE `+FairAnswers+` GROUP BY question_id, version, at / 3600000`)
 	if err != nil {
 		return nil, err
@@ -82,7 +69,7 @@ func (g *Game) Calibrate(ctx context.Context) ([]Calibrated, error) {
 		var version sql.NullInt64
 		var hour int64
 		var n int
-		var sum float64
+		var sum int
 		if err := rows.Scan(&id, &version, &hour, &n, &sum); err != nil {
 			return nil, err
 		}
@@ -99,7 +86,7 @@ func (g *Game) Calibrate(ctx context.Context) ([]Calibrated, error) {
 			sums[id] = c
 		}
 		c.Answers += n
-		c.Score += sum
+		c.Right += float64(sum)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -110,12 +97,12 @@ func (g *Game) Calibrate(ctx context.Context) ([]Calibrated, error) {
 			continue
 		}
 		c := *s
-		c.Score /= float64(c.Answers)
+		c.Right /= float64(c.Answers)
 		q, _ := b.Get(c.ID)
 		h := q.Base()
 		c.Category, c.Type, c.Labelled = h.Category, h.Type, h.Difficulty
-		guess := chanceOf(q)
-		c.Known = max(0, (c.Score-guess)/(1-guess))
+		guess := rightChance[h.Type]
+		c.Known = max(0, (c.Right-guess)/(1-guess))
 		c.Observed = KnownToDifficulty(c.Known)
 		out = append(out, c)
 	}

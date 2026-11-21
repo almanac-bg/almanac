@@ -1,5 +1,5 @@
-// Sounds: made in the browser (no files), for a game's moments — a pick, the other side answering, the count before a
-// game and its start, the clock's last seconds, a right answer (higher with each one in a row), a wrong one or none,
+// Sounds: made in the browser (no files), for a game's moments — a pick, the count before a game and its start, the
+// clock's last seconds, a right answer (every one the same: nothing counts a row of them), a wrong one or none,
 // the end (won, lost, perfect or just over), the result's pips and the streak, a note in the book, and something new
 // waiting. On unless the player turns them off (kept on this device).
 //
@@ -14,7 +14,6 @@ import { signal } from "./dom.ts";
 export type SoundName =
   | "tap"
   | "key"
-  | "them"
   | "count"
   | "go"
   | "tick"
@@ -190,10 +189,9 @@ export function voice(name: SoundName, lift = 0): void {
   kit.sound(c, name, lift, t0);
 }
 
-/** How an answer sounds: a right one a step of the scale higher for each before it in a row, up to an octave. */
-export function playAnswer(kind: "exact" | "right" | "partial" | "wrong" | "time", inRow = 0): void {
-  const right = kind === "exact" || kind === "right";
-  voice(kind, right ? Math.min(Math.max(inRow - 1, 0), 5) : 0);
+/** How an answer sounds: every right one the same, whatever came before it. */
+export function playAnswer(kind: "exact" | "right" | "partial" | "wrong" | "time"): void {
+  voice(kind);
 }
 
 /** The beeps before a game starts: one for each of its last three seconds. */

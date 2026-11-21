@@ -392,7 +392,7 @@ func TestTagsKeepPlayers(t *testing.T) {
 	}
 	var tag, avatar, email string
 	_ = db.Read.QueryRow(`SELECT tag, avatar, email FROM users WHERE id = 1`).Scan(&tag, &avatar, &email)
-	if tag != "player1" || avatar != "dog-gold" || email != "a@b.bg" { // the moon is drawn as a dog since 0023
+	if tag != "player1" || avatar != "dog" || email != "a@b.bg" { // the moon is drawn as a dog since 0023, toneless since 0112
 		t.Fatalf("after the rebuild: %q %q %q", tag, avatar, email)
 	}
 	if _, err := db.Write.Exec(`UPDATE users SET name = 'Аз' WHERE id = 2`); err != nil {

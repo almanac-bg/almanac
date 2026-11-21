@@ -347,7 +347,7 @@ func TestVoidDayIsOfNine(t *testing.T) {
 		t.Fatalf("past the void one: %+v", first.State)
 	}
 	again, err := w.answer(cy, sc.ID, k-1, w.right(sc.ID, k-1))
-	if err != nil || !again.Right || again.InRow != first.InRow || again.Reveal == nil {
+	if err != nil || !again.Right || again.Reveal == nil {
 		t.Fatalf("sent again: %+v %v", again, err)
 	}
 }

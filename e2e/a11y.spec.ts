@@ -113,20 +113,20 @@ for (const scheme of ["light", "dark"] as const) {
 // the duel question by question with the deciding one marked, and the record.
 for (const scheme of ["light", "dark"] as const) {
   test(`a duel's result is accessible (${scheme})`, async ({ page }) => {
-    const mark = (right: number, ms: number) => ({ right: right > 0, ms });
-    const side = (name: string, tag: string, rights: number[], slower = 0) => ({
+    const mark = (right: number) => ({ right: right > 0 });
+    const side = (name: string, tag: string, rights: number[]) => ({
       name,
       tag,
       rights: rights.filter((p) => p > 0).length,
       done: true,
-      look: { avatar: "hare-gold" },
-      marks: rights.map((p, i) => mark(p, 3000 + 300 * i + slower)),
+      look: { avatar: "hare" },
+      marks: rights.map((p) => mark(p)),
     });
     const duel = {
       id: 1,
       state: "won",
       you: side("Заек 817", "", [1, 1, 0, 1, 1, 0, 1, 1, 1, 1]),
-      opponent: side("Мария", "maria", [1, 0, 1, 1, 1, 0, 1, 0, 1, 0], 500),
+      opponent: side("Мария", "maria", [1, 0, 1, 1, 1, 0, 1, 0, 1, 0]),
       runId: 1,
       first: true,
       createdAt: Date.now(),

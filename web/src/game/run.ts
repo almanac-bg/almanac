@@ -68,8 +68,8 @@ function showing(run: number): void {
 
 /** Plays a run from where it stands; `done` draws what comes after its last answer. A duel is named over each
  * question as its page names it (`versus`: „Дуел с Мария“, „По-силен запис · Краси“); played second (the run's
- * `against`), the other's answer (`them`, their name) shows as they gave it: a word at the moment they did, and how it
- * went once the player's own is in. */
+ * `against`), how the other's answer went (`them`, their name) shows once the player's own is in, never when they gave
+ * it: a duel isn't a race. */
 export function playRun(initial: State, done: (s: State) => Child, versus = "", them = ""): Child {
   const screen = slot();
   hold();
@@ -561,22 +561,8 @@ function question(
   onCleanup(() => {
     over = true;
   });
-  // Played second: a word over the question as the other answered it (at the moment they did, as far into its time),
-  // and how it went for them once the player's own is in.
-  const theirs = them ? s.against?.[q.n] : undefined;
-  const theyAnswered = signal(false);
-  if (theirs && !theirs.missed) {
-    const when = window.setTimeout(
-      () => {
-        if (ans.locked.peek()) return; // the player's own is in: theirs shows with it
-        theyAnswered.set(true);
-        play("them");
-      },
-      Math.max(0, theirs.ms - (q.limitMs - q.leftMs)),
-    );
-    onCleanup(() => clearTimeout(when));
-  }
-  const versusNow: Child = theirs ? () => (theyAnswered() ? `${them} отговори` : versus) : versus;
+  // Played second: how it went for the other once the player's own answer is in (theirLine), never when they answered:
+  // a duel isn't a race.
 
   // Moving on, once the answer has shown for a while: never into a question nobody's looking at (a tab in the
   // background), as its time would run unseen.
@@ -665,7 +651,7 @@ function question(
     now.children[q.n]?.classList.add("fresh");
     progress.replaceWith(now);
     progress = now;
-    playAnswer(kind, res.inRow ?? 0);
+    playAnswer(kind);
     // The fact behind the answer (and on its date, what happened that day), at the moment the player most wants it:
     // time to read it, or a tap to move on. The verdict comes with all that follows it in place, still hidden, so
     // the panel opens once at its height and the answers settle once above it.
@@ -782,7 +768,7 @@ function question(
       q.n,
       s.total,
       s.kind === "day" && s.day ? `Брой ${issueOf(s.day)}` : topicName(s.category ?? q.category),
-      versusNow,
+      versus,
       s.kind === "topic" && !versus ? ["/almanac", "Към Алманаха"] : undefined,
     ),
     progress,

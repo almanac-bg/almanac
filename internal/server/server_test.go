@@ -472,7 +472,7 @@ func TestPlayingOverHTTP(t *testing.T) {
 		case "number":
 			answer = map[string]float64{"value": 1}
 		case "order":
-			answer = map[string][]int{"order": {0, 1, 2, 3}}
+			answer = map[string][]int{"order": {0, 1, 2}}
 		case "truefalse":
 			answer = map[string]bool{"truth": true}
 		case "match":
@@ -788,7 +788,7 @@ func playRun(p *player, run map[string]any) {
 		case "number":
 			a = map[string]any{"value": 1}
 		case "order":
-			a = map[string]any{"order": []int{0, 1, 2, 3}}
+			a = map[string]any{"order": []int{0, 1, 2}}
 		case "truefalse":
 			a = map[string]any{"truth": true}
 		case "match":
@@ -1153,7 +1153,7 @@ func TestProfilesOverHTTP(t *testing.T) {
 	}
 
 	status, p := g.player().call("GET", "/api/players/@"+strings.ToUpper(anaTag), nil)
-	if status != http.StatusOK || p["name"] != name(a) || p["tag"] != anaTag || p["best"] != float64(0) ||
+	if status != http.StatusOK || p["name"] != name(a) || p["tag"] != anaTag || p["best"] != nil || p["streak"] != nil ||
 		p["friend"] != nil || p["id"] != nil || p["me"] != nil {
 		t.Fatalf("Ana's profile, to someone not signed in: %d %v", status, p)
 	}
@@ -1229,24 +1229,24 @@ func TestGuestIsOneAnimal(t *testing.T) {
 		name, _ := u["name"].(string)
 		tag, _ := u["tag"].(string)
 		if !strings.HasPrefix(name, a.Name+" ") || !strings.HasPrefix(tag, a.Tag) ||
-			!strings.HasPrefix(play.DefaultAvatar(int64(id)), a.Shape+"-") {
+			play.DefaultAvatar(int64(id)) != a.Shape {
 			t.Fatalf("a guest %q @%s with the avatar %s", name, tag, play.DefaultAvatar(int64(id)))
 		}
 	}
 }
 
-// Any animal in any tone is a player's to choose, from the first day; nothing else is. The Алманах's first page has the
-// notes in the book, none on a new player's.
+// Any animal is a player's to choose, by its shape alone, from the first day; nothing else is. The Алманах's first
+// page has the notes in the book, none on a new player's.
 func TestAvatarChosen(t *testing.T) {
 	g := start(t)
 	p := g.player()
 	p.call("POST", "/api/guest", map[string]any{})
-	if status, out := p.call("PATCH", "/api/me/look", map[string]any{"avatar": "lynx-natural"}); status != 200 ||
-		out["avatar"] != "lynx-natural" {
+	if status, out := p.call("PATCH", "/api/me/look", map[string]any{"avatar": "lynx"}); status != 200 ||
+		out["avatar"] != "lynx" {
 		t.Fatalf("a lynx: %d %v", status, out)
 	}
 	// A chapter's art is earned at its Страница (play/rank.go).
-	for _, bad := range []string{"crown-gold", "fox-gold/ring", "", "history-gold"} {
+	for _, bad := range []string{"crown", "fox-gold", "fox/ring", "", "history"} {
 		if status, out := p.call("PATCH", "/api/me/look", map[string]any{"avatar": bad}); status != 400 ||
 			out["error"] != "no_avatar" {
 			t.Fatalf("%q: %d %v", bad, status, out)

@@ -249,9 +249,9 @@ type State struct {
 	Question *Shown `json:"question,omitempty"`
 	Done     bool   `json:"done"`
 	// Against is, in a duel played second (the other side finished: a friend's, a recording), how the other side's
-	// answers went as far as the player has come, and no further (duelAgainst): each question the player has answered;
-	// and of the one shown, only when they answered it (Ms), if they did, for the
-	// screen to say so at that moment. How it went for them waits for the player's own answer.
+	// answers went as far as the player has come, and no further (duelAgainst): each question the player has answered,
+	// nothing of the one shown. How it went for them waits for the player's own answer, and when they answered is
+	// never said: a duel isn't a race.
 	Against []DuelMark `json:"against,omitempty"`
 }
 
@@ -264,7 +264,7 @@ type Mark struct {
 }
 
 // closeAnswer is whether an answer of a score is close („близо“): worth something, but not right (a number short of
-// bank.RightFrom, an order or a match nearly so). It counts as not right, in the score and everywhere else.
+// bank.RightFrom; never an order, right or not). It counts as not right, in the score and everywhere else.
 func closeAnswer(score float64, right bool) bool { return score > 0 && !right }
 
 // Shown is the question on screen, with the time it has left.
@@ -285,9 +285,6 @@ type Shown struct {
 
 // Result is how an answer went, the answer itself, and the run after it.
 type Result struct {
-	// InRow is how many right answers in a row the answer makes, from 2: heard and seen as the run's climb, worth
-	// nothing more.
-	InRow int     `json:"inRow,omitempty"`
 	Score float64 `json:"score"`
 	Right bool    `json:"right"`
 	Exact bool    `json:"exact,omitempty"`
@@ -344,7 +341,7 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 	}
 	if r.kind == "duel" {
 		var err error
-		if s.Against, err = duelAgainst(tx, r.id, r.at, s.Question != nil); err != nil {
+		if s.Against, err = duelAgainst(tx, r.id, r.at); err != nil {
 			return s, err
 		}
 	}
@@ -440,32 +437,6 @@ func (g *Game) finish(tx *sql.Tx, r *run) error {
 		return err
 	}
 	return g.afterDue(tx, r.id)
-}
-
-// rightsInRow is how many right answers a run's last ones are in a row: one that counts for nobody (day.go) neither
-// adds to a row nor breaks it.
-func rightsInRow(tx *sql.Tx, r *run) (int, error) {
-	rows, err := tx.Query(`SELECT n, is_right FROM answers WHERE run_id = ? ORDER BY n DESC`, r.id)
-	if err != nil {
-		return 0, err
-	}
-	defer rows.Close()
-	inRow := 0
-	for rows.Next() {
-		var n int
-		var right bool
-		if err := rows.Scan(&n, &right); err != nil {
-			return 0, err
-		}
-		switch {
-		case n < len(r.picks) && r.picks[n].Void:
-		case !right:
-			return inRow, nil
-		default:
-			inRow++
-		}
-	}
-	return inRow, rows.Err()
 }
 
 // read runs fn in a transaction of the read pool: what it reads is one moment's, and it waits on no write.
@@ -658,16 +629,6 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 		if late > Grace && gr.Given == nil {
 			res.TimedOut = true // only an answer is taken late: no answer late is the time run out (late.go)
 		}
-		inRow := 0
-		if gr.Right {
-			if inRow, err = rightsInRow(tx, r); err != nil {
-				return err
-			}
-			inRow++
-		}
-		if inRow > 1 {
-			res.InRow = inRow
-		}
 		number := d.Question().Base().Type == "number"
 		if res.Ink, err = g.record(tx, r, gr, number, min(took, limit).Milliseconds()); err != nil {
 			return err
@@ -723,15 +684,6 @@ func (g *Game) again(tx *sql.Tx, r *run, n int) (Result, bank.Dealt, error) {
 		}
 	} else {
 		res.TimedOut = took >= Limit(d.Question())
-	}
-	if res.Right {
-		inRow, err := rightsInRow(tx, r) // the run's last answer: the row it made
-		if err != nil {
-			return res, nil, err
-		}
-		if inRow > 1 {
-			res.InRow = inRow
-		}
 	}
 	res.State, err = g.state(tx, r)
 	return res, d, err

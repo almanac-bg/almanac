@@ -6,11 +6,11 @@ import { bankQuestions, portrait, type Q, sampleIds, words } from "./bank.ts";
 
 export type { Q };
 
-/** How a question is answered: right, wrong, or close (a number near, an order, pairs or groups partly right). */
+/** How a question is answered: right, wrong, or close (a number near, pairs or groups partly right). */
 export type How = "right" | "wrong" | "close";
 
-/** Whether a kind of question can be answered close: a number, or a whole made of parts. */
-export const closeable = (q: Q) => ["number", "order", "match", "split"].includes(q.type);
+/** Whether a kind of question can be answered close: a number, or pairs or groups (an order is right or not). */
+export const closeable = (q: Q) => ["number", "match", "split"].includes(q.type);
 
 /** One question of each kind, the longest the sample has: a choice, a choice of pictures, a choice under a picture,
  * „Вярно или невярно“, an order, pairs, groups, clues and a number; a choice under a portrait (the picture at its
@@ -113,13 +113,16 @@ export async function answerAs(page: Page, q: Q, how: How): Promise<void> {
       return;
     }
     case "order": {
-      const items = [...(q.items ?? [])].sort((a, b) =>
-        q.direction === "desc" ? (b.value ?? 0) - (a.value ?? 0) : (a.value ?? 0) - (b.value ?? 0),
-      );
-      const want = items.map((i) => i.text);
-      if (how === "wrong") want.reverse(); // none in its place
-      if (how === "close") want.splice(0, 2, want[1] ?? "", want[0] ?? ""); // the first two swapped
+      // Three of the bank's four are dealt (bank.OrderDealt): the ones shown, put in their right order.
       const rows = ask.locator(".sortable-list > .option");
+      const dealt = await rows.evaluateAll((els) =>
+        els.map((e) => (e.children[1]?.textContent ?? "").replaceAll("­", "")),
+      );
+      const items = (q.items ?? [])
+        .filter((i) => dealt.includes(i.text))
+        .sort((a, b) => (q.direction === "desc" ? (b.value ?? 0) - (a.value ?? 0) : (a.value ?? 0) - (b.value ?? 0)));
+      const want = items.map((i) => i.text);
+      if (how !== "right") want.reverse(); // never „близо“: an order is right or not
       for (const [place, text] of want.entries()) {
         const now = await rows.evaluateAll((els) =>
           els.map((e) => (e.children[1]?.textContent ?? "").replaceAll("\u00ad", "")),

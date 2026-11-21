@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-// A profile, anyone's to see, shows the seal, the ranks by chapter and the longest streak (DECISIONS.md, „The
+// A profile, anyone's to see, shows the seal and the ranks by chapter, never a streak (DECISIONS.md, „The
 // direction“): no lifetime totals and nothing of mastery. The ranks are kept as a day's issue finishes, so a game
 // under way never shows; its time is a date (review 2026-11-18, S12).
-func TestProfileShowsSealRanksAndBest(t *testing.T) {
+func TestProfileShowsSealAndRanks(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
@@ -20,12 +20,12 @@ func TestProfileShowsSealRanksAndBest(t *testing.T) {
 		t.Fatal(err)
 	}
 	p, err := w.g.ProfileOf(ctx, "player1", 0)
-	if err != nil || p.Seal != nil || p.Best != 0 || len(p.Ranks) != len(w.b.Categories) {
+	if err != nil || p.Seal != nil || len(p.Ranks) != len(w.b.Categories) {
 		t.Fatalf("a newcomer's profile: %+v %v", p, err)
 	}
 	w.dayGame(ana, nil)
 	w.g.AfterWait(ctx, ana)
-	if p, err = w.g.ProfileOf(ctx, "player1", 0); err != nil || p.Seal == nil || p.Best != 1 {
+	if p, err = w.g.ProfileOf(ctx, "player1", 0); err != nil || p.Seal == nil {
 		t.Fatalf("after a day: %+v %v", p, err)
 	}
 	// A topic's game, under way: nothing of it shows.
@@ -38,7 +38,7 @@ func TestProfileShowsSealRanksAndBest(t *testing.T) {
 		t.Fatalf("a game under way moved the profile: %+v, was %+v", again.Seal, p.Seal)
 	}
 	out, _ := json.Marshal(p)
-	for _, total := range []string{`"days"`, `"games"`, `"answers"`, `"right"`, `"duels"`, `"won"`, `"mastery"`, `"streak"`} {
+	for _, total := range []string{`"days"`, `"games"`, `"answers"`, `"right"`, `"duels"`, `"won"`, `"mastery"`, `"streak"`, `"best"`} {
 		if strings.Contains(string(out), total) {
 			t.Errorf("the profile says %s: %s", total, out)
 		}
@@ -54,7 +54,7 @@ func TestRecordingsNamed(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	owner, gal := w.user(), w.user()
-	if _, err := w.db.Write.Exec(`UPDATE users SET name = 'Мария', avatar = 'lynx-natural' WHERE id = ?`,
+	if _, err := w.db.Write.Exec(`UPDATE users SET name = 'Мария', avatar = 'lynx' WHERE id = ?`,
 		owner); err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestRecordingsNamed(t *testing.T) {
 	w.wait(time.Minute)
 
 	look, err := w.g.LookOf(ctx, owner)
-	if err != nil || look.Avatar != "lynx-natural" {
+	if err != nil || look.Avatar != "lynx" {
 		t.Fatalf("the owner's look: %+v %v", look, err)
 	}
 	var ownerTag string

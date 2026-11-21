@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// Order is „Подреди“: four things put in order by a number each has (a year, a height), the numbers shown with the
-// answer.
+// Order is „Подреди“: things put in order by a number each has (a year, a height), the numbers shown with the answer.
+// The bank keeps four of them (OrderItems); a deal shows three (OrderDealt: Deal).
 type Order struct {
 	Head
 	Items []OrderItem `json:"items"`
@@ -25,8 +25,11 @@ type OrderItem struct {
 	Value float64 `json:"value"`
 }
 
-// OrderItems is how many items an order question has.
-const OrderItems = 4
+// OrderItems is how many items an order question has in the bank, and OrderDealt how many of them a deal shows.
+const (
+	OrderItems = 4
+	OrderDealt = 3
+)
 
 func init() { register("order", func() Question { return &Order{} }) }
 
@@ -150,46 +153,43 @@ func (q *Order) right() []int {
 	return order
 }
 
-// Deal shows the items in an order the seed decides, but never one that is already worth much as it stands: between
-// a third and two thirds of its pairs the wrong way round (2 to 4 of 4 items' 6), so that „Готово“ untouched earns
-// a third at most, and so does the dealt order turned round. A plain shuffle deals the right order one time in 24 —
-// for everyone at once on the day, whose deal is the same for all. A seed whose shuffle fits keeps that deal; one
-// whose doesn't takes the next that does, still from the seed alone.
+
+// Deal shows OrderDealt of the bank's items, which of them and in what order as the seed decides (as a choice's options
+// are dealt), but never in their right order already: „Готово“ untouched is never right. An order is right or not
+// („близо“ is the number's alone), so it shows three: one chronology or ranking still, with two relations to judge and
+// six arrangements, where four were all or nothing over 24. A seed whose deal is in order takes the next that isn't,
+// still from the seed alone, so the day's deal is the same for everyone.
 func (q *Order) Deal(seed uint64) Dealt {
-	right, n := q.right(), len(q.Items)
-	pairs := n * (n - 1) / 2
+	n, right := min(OrderDealt, len(q.Items)), q.right()
 	for try := uint64(0); ; try++ {
-		order := shuffle(seed+try*0x9e3779b97f4a7c15, n)
-		if wrong := inversions(order, right); n < 3 || (3*wrong >= pairs && 3*wrong <= 2*pairs) {
+		order := shuffle(seed+try*0x9e3779b97f4a7c15, len(q.Items))[:n]
+		if n < 2 || !slices.Equal(order, inRight(order, right)) {
 			return &dealtOrder{q: q, order: order}
 		}
 	}
 }
 
-// inversions is how many pairs of given stand the wrong way round against right.
-func inversions(given, right []int) int {
-	rank := make(map[int]int, len(right))
-	for i, b := range right {
-		rank[b] = i
-	}
-	wrong := 0
-	for i := range given {
-		for j := i + 1; j < len(given); j++ {
-			if rank[given[i]] > rank[given[j]] {
-				wrong++
-			}
+// inRight is some of the bank's items (by their place in it) in their right order, as right has them all.
+func inRight(some, right []int) []int {
+	out := make([]int, 0, len(some))
+	for _, b := range right {
+		if slices.Contains(some, b) {
+			out = append(out, b)
 		}
 	}
-	return wrong
+	return out
 }
 
-// dealtOrder shows the bank's item order[i] as item i.
+// dealtOrder shows the bank's item order[i] as item i: OrderDealt of them.
 type dealtOrder struct {
 	q     *Order
 	order []int
 }
 
 func (d *dealtOrder) Question() Question { return d.q }
+
+// right is the items dealt, by their place in the bank, in their right order.
+func (d *dealtOrder) right() []int { return inRight(d.order, d.q.right()) }
 
 func (d *dealtOrder) View() any {
 	items := make([]string, len(d.order))
@@ -209,6 +209,7 @@ type OrderAnswer struct {
 	Order []int `json:"order"`
 }
 
+// Grade: an order is right with every item dealt in its place, and wrong otherwise (Score 1 or 0): never „близо“.
 func (d *dealtOrder) Grade(answer json.RawMessage) (Graded, error) {
 	var a OrderAnswer
 	if err := strictJSON(answer, &a); err != nil {
@@ -227,20 +228,19 @@ func (d *dealtOrder) Grade(answer json.RawMessage) (Graded, error) {
 		seen[shown] = true
 		bank[i] = d.order[shown]
 	}
-	return Graded{
-		Score: orderScore(bank, d.q.right()),
-		Right: slices.Equal(bank, d.q.right()),
-		Given: mustJSON(OrderAnswer{Order: bank}),
-		Shown: mustJSON(OrderAnswer{Order: a.Order}),
-	}, nil
+	g := Graded{Given: mustJSON(OrderAnswer{Order: bank}), Shown: mustJSON(OrderAnswer{Order: a.Order})}
+	if slices.Equal(bank, d.right()) {
+		g.Score, g.Right = 1, true
+	}
+	return g, nil
 }
 
 func (d *dealtOrder) Reveal(c *Crowd) any {
-	shownAt := make([]int, len(d.order))
+	shownAt := make(map[int]int, len(d.order))
 	for i, b := range d.order {
 		shownAt[b] = i
 	}
-	right := d.q.right()
+	right := d.right()
 	order := make([]int, len(right))
 	for i, b := range right {
 		order[i] = shownAt[b]
@@ -257,27 +257,5 @@ func (d *dealtOrder) Reveal(c *Crowd) any {
 	}{order, values, d.q.Unit, revealOf(&d.q.Head, &d.q.Tail, c.view(nil))}
 }
 
-// orderScore is what an order is worth: how many of its pairs stand the right way round, less how many stand the
-// wrong way, out of all of them (Kendall's tau), and nothing below 0. One pair of neighbours swapped is worth 2/3 of
-// a right order, where counting the places that are exactly right would give it half; and an order put down at
-// random is worth almost nothing (0.19 on average, against 0.25 for the places), so luck earns little.
-func orderScore(given, right []int) float64 {
-	rank := make(map[int]int, len(right))
-	for i, b := range right {
-		rank[b] = i
-	}
-	n, sum := len(given), 0
-	for i := range n {
-		for j := i + 1; j < n; j++ {
-			if rank[given[i]] < rank[given[j]] {
-				sum++
-			} else {
-				sum--
-			}
-		}
-	}
-	if n < 2 {
-		return 1
-	}
-	return max(0, float64(sum)/float64(n*(n-1)/2))
-}
+// lines are the items dealt in their right order, each with its value (AnswerLines, as this deal showed them).
+func (d *dealtOrder) lines() []string { return orderLines(d.q, d.right()) }

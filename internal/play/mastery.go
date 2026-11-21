@@ -17,7 +17,7 @@ import (
 //
 // The model: in each topic a player has an ability, and each question a hardness, on one scale. A player knows a
 // question with the chance σ(ability − hardness), and gets it right with that chance and, of what's left, the luck of
-// a guess (chance, by kind of question). Each answer moves the ability as far as it tells something: a hard question
+// a guess (rightChance, by kind of question). Each answer moves the ability as far as it tells something: a hard question
 // right, or an easy one wrong, moves it a lot; a guess at a true-or-not little. How sure the ability is grows with
 // the answers, and fades a little with each one, so that what a player knows now counts more than what they knew a
 // year ago. The same ability over all topics shapes a run of all of them, and a duel.
@@ -58,8 +58,13 @@ type ability struct {
 
 func newAbility() ability { return ability{variance: priorVariance} }
 
-// learn moves an ability by an answer of a score (0–1) to a question of a hardness, where a guess gets luck.
-func (a *ability) learn(score, hardness, luck float64) {
+// learn moves an ability by an answer, right or not, to a question of a hardness, where a guess is right with the
+// chance luck. A close number is not right, here as everywhere.
+func (a *ability) learn(right bool, hardness, luck float64) {
+	score := 0.0
+	if right {
+		score = 1
+	}
 	a.variance += drift
 	k := sigmoid(a.mean - hardness)
 	p := min(max(luck+(1-luck)*k, 0.01), 0.99) // the chance of getting it right
@@ -113,7 +118,7 @@ func (g *Game) countHardness(ctx context.Context, now time.Time, b *bank.Bank) (
 	type tally struct {
 		counted Counted
 		n       int
-		sum     float64
+		right   int
 	}
 	answered := make(map[string]*tally, len(b.Questions))
 	for _, q := range b.Questions {
@@ -122,23 +127,25 @@ func (g *Game) countHardness(ctx context.Context, now time.Time, b *bank.Bank) (
 		}
 	}
 	// Summed here, not by GROUP BY: SQLite would sort every answer by its question for it, or go through them in the
-	// question's index and look each one's score up, both many times slower than reading them as they lie.
-	rows, err := g.DB.Scan.QueryContext(ctx, `SELECT question_id, version, score, at FROM answers WHERE `+FairAnswers)
+	// question's index and look each one's answer up, both many times slower than reading them as they lie.
+	rows, err := g.DB.Scan.QueryContext(ctx, `SELECT question_id, version, is_right, at FROM answers WHERE `+FairAnswers)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var id []byte
 	var version sql.NullInt64
-	var score float64
+	var right bool
 	var at int64
 	for rows.Next() {
-		if err := rows.Scan(&id, &version, &score, &at); err != nil {
+		if err := rows.Scan(&id, &version, &right, &at); err != nil {
 			return nil, err
 		}
 		if t := answered[string(id)]; t != nil && t.counted.Counts(version, at) { // no copy of the id for a lookup
 			t.n++
-			t.sum += score
+			if right {
+				t.right++
+			}
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -153,8 +160,8 @@ func (g *Game) countHardness(ctx context.Context, now time.Time, b *bank.Bank) (
 		}
 		known := labelKnown[head.Difficulty]
 		if t.n > 0 {
-			luck := chanceOf(q)
-			seen := min(max((t.sum/float64(t.n)-luck)/(1-luck), 0.02), 0.98) // above chance, as calibrate.go
+			luck := rightChance[head.Type]
+			seen := min(max((float64(t.right)/float64(t.n)-luck)/(1-luck), 0.02), 0.98) // above chance, as calibrate.go
 			known = (float64(t.n)*seen + hardnessPrior*known) / float64(t.n+hardnessPrior)
 		}
 		byID[head.ID] = hardnessOf(known)
@@ -213,7 +220,7 @@ type skillsKey struct {
 // goOver goes over a player's answers (abilities), for a bank.
 func (g *Game) goOver(ctx context.Context, db querier, h *hardnesses, b *bank.Bank, userID, until int64, finished bool) (map[string]ability, ability, error) {
 	topics, all := map[string]ability{}, newAbility()
-	rows, err := db.QueryContext(ctx, `SELECT a.question_id, a.score FROM answers a JOIN runs r ON r.id = a.run_id
+	rows, err := db.QueryContext(ctx, `SELECT a.question_id, a.is_right FROM answers a JOIN runs r ON r.id = a.run_id
 		WHERE r.user_id = ?1 AND (?2 = 0 OR a.at <= ?2) AND (NOT ?3 OR r.finished_at IS NOT NULL)
 		ORDER BY a.at, a.run_id, a.n`, userID, until, finished)
 	if err != nil {
@@ -222,8 +229,8 @@ func (g *Game) goOver(ctx context.Context, db querier, h *hardnesses, b *bank.Ba
 	defer rows.Close()
 	for rows.Next() {
 		var id string
-		var score float64
-		if err := rows.Scan(&id, &score); err != nil {
+		var right bool
+		if err := rows.Scan(&id, &right); err != nil {
 			return nil, all, err
 		}
 		q, ok := b.Get(id)
@@ -236,9 +243,10 @@ func (g *Game) goOver(ctx context.Context, db querier, h *hardnesses, b *bank.Ba
 			a = newAbility()
 		}
 		hard := h.of(q)
-		a.learn(score, hard, chanceOf(q))
+		luck := rightChance[head.Type]
+		a.learn(right, hard, luck)
 		topics[head.Category] = a
-		all.learn(score, hard, chanceOf(q))
+		all.learn(right, hard, luck)
 	}
 	return topics, all, rows.Err()
 }
@@ -318,7 +326,7 @@ func (g *Game) recordingFit(ctx context.Context, userID int64, level string) (re
 func topicSlots(ability float64) []slot {
 	right := map[bank.Difficulty]float64{}
 	for d, known := range labelKnown {
-		luck := chance["choice"]
+		luck := rightChance["choice"]
 		right[d] = luck + (1-luck)*sigmoid(ability-hardnessOf(known))
 	}
 	easy, medium, off := 0, 0, math.Inf(1)

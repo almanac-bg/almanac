@@ -48,7 +48,7 @@ function choice(ranks: () => Rank[]): Child {
       error.set(errorText(err));
     }
   };
-  const worn = (s: string) => s === (look() || "fox").split("-")[0];
+  const worn = (s: string) => s === (look() || "fox");
   return [
     h(
       "ul",
@@ -59,7 +59,7 @@ function choice(ranks: () => Rank[]): Child {
           null,
           h(
             "button",
-            { class: "pick", type: "button", "aria-pressed": () => worn(s), onclick: () => wear(`${s}-natural`) },
+            { class: "pick", type: "button", "aria-pressed": () => worn(s), onclick: () => wear(s) },
             avatar(s),
             h("span", { class: "pick-name" }, shapeNames[s]),
           ),
@@ -80,9 +80,9 @@ function choice(ranks: () => Rank[]): Child {
               class: open ? "pick" : "pick locked",
               type: "button",
               "aria-pressed": () => worn(c.id),
-              onclick: () => (open ? wear(`${c.id}-natural`) : tell()),
+              onclick: () => (open ? wear(c.id) : tell()),
             },
-            avatar(`${c.id}-natural`),
+            avatar(c.id),
             h("span", { class: "pick-name" }, chapterName(c.id)),
             // When it opens, where it's seen.
             open ? null : h("span", { class: "pick-when" }, "при „Страница“"),

@@ -1,7 +1,6 @@
 package play
 
 import (
-	"encoding/json"
 	"slices"
 	"testing"
 	"time"
@@ -345,8 +344,10 @@ func TestBoardSharesPlaces(t *testing.T) {
 			t.Fatal(err)
 		}
 		w.play(user, s.ID, append(repeat(w.right, rights), repeat(w.wrong, Length-rights)...)...)
-		if _, err := w.db.Write.ExecContext(ctx, `UPDATE runs SET closeness = ?, ms = ? WHERE id = ?`,
-			closeness, ms, s.ID); err != nil {
+		if _, err := w.db.Write.ExecContext(ctx, `UPDATE runs SET closeness = ? WHERE id = ?`, closeness, s.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.db.Write.ExecContext(ctx, `UPDATE answers SET ms = ? WHERE run_id = ?`, ms/Length, s.ID); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -428,40 +429,6 @@ func TestTiebreakAdds(t *testing.T) {
 	}
 	if b.cmp(a) != -1 || a.cmp(b) != 1 || a.cmp(a) != 0 {
 		t.Fatal("the closer number doesn't break the tie")
-	}
-}
-
-// A run counts right answers in a row, for the climb's feel only: a wrong one starts the row again, and the score is
-// the right answers, however they fell.
-func TestRowsInARun(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	bo := w.user()
-	answer := func(runID int64, n int, how func(int64, int) json.RawMessage) Result {
-		t.Helper()
-		w.show(bo, runID)
-		w.wait(time.Second)
-		res, err := w.g.Answer(ctx, bo, runID, n, how(runID, n))
-		if err != nil {
-			t.Fatal(err)
-		}
-		return res
-	}
-	s, _ := w.g.StartTopic(ctx, bo, MixTopic)
-	for n, c := range []struct {
-		how   func(int64, int) json.RawMessage
-		inRow int
-	}{{w.right, 0}, {w.right, 2}, {w.right, 3}, {w.wrong, 0}, {w.right, 0}, {w.right, 2}} {
-		if res := answer(s.ID, n, c.how); res.InRow != c.inRow {
-			t.Fatalf("answer %d: %d in a row; want %d", n, res.InRow, c.inRow)
-		}
-	}
-	var last Result
-	for n := 6; n < Length; n++ {
-		last = answer(s.ID, n, w.right)
-	}
-	if !last.State.Done || last.State.Rights != Length-1 || last.InRow != 6 {
-		t.Fatalf("the game's end: %+v, %d in a row", last.State, last.InRow)
 	}
 }
 

@@ -70,7 +70,7 @@ func TestMergeCarriesTheRest(t *testing.T) {
 	ctx := t.Context()
 	guest, owner := w.user(), w.user()
 	for _, q := range []string{
-		`UPDATE users SET avatar = 'lynx-mint', streak_told = 'forgiven:2026-11-12',
+		`UPDATE users SET avatar = 'lynx', streak_told = 'forgiven:2026-11-12',
 			created_at = 5, seen_at = 900, friends_seen_at = 700 WHERE id = ?2`,
 		`UPDATE users SET streak_told = 'ended:2026-11-01', created_at = 10,
 			seen_at = 100, friends_seen_at = 50 WHERE id = ?1`,
@@ -103,7 +103,7 @@ func TestMergeCarriesTheRest(t *testing.T) {
 	if reports != 1 || reminded != 2 || queued != 2 {
 		t.Fatalf("%d reports, reminded on %d days, %d pushes on the way", reports, reminded, queued)
 	}
-	if avatar != "lynx-mint" || streak != "forgiven:2026-11-12" {
+	if avatar != "lynx" || streak != "forgiven:2026-11-12" {
 		t.Fatalf("look and told: %s, %q", avatar, streak)
 	}
 	if created != 5 || seen != 900 || looked != 700 {

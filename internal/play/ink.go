@@ -111,11 +111,12 @@ func metBefore(tx *sql.Tx, r *run, id string) (bool, error) {
 	return met, err
 }
 
-// Written is a fact as the book has it: its question, and ink or grey.
+// Written is a fact as the book has it: its question, and ink or grey; and the game that wrote it (run: 0 if it's gone).
 type written struct {
 	id  string
 	ink bool
 	at  learnedAt
+	run int64
 }
 
 // written calls fn with every fact in a player's book that it shows (writtenShows), in the order they were written.
@@ -130,7 +131,7 @@ func (g *Game) written(ctx context.Context, userID int64, fn func(q bank.Questio
 func writtenIn(ctx context.Context, db querier, b *bank.Bank, userID int64, asOf time.Time,
 	fn func(q bank.Question, w written)) error {
 	rows, err := db.QueryContext(ctx, `SELECT f.question_id, f.ink, f.at, coalesce(r.kind, ''),
-			coalesce(r.day, ''), r.id IS NULL OR r.finished_at IS NOT NULL, r.shown_at
+			coalesce(r.day, ''), r.id IS NULL OR r.finished_at IS NOT NULL, r.shown_at, coalesce(r.id, 0)
 		FROM facts f LEFT JOIN runs r ON r.id = f.run_id
 		WHERE f.user_id = ?1
 		ORDER BY f.at, f.question_id`, userID)
@@ -141,7 +142,7 @@ func writtenIn(ctx context.Context, db querier, b *bank.Bank, userID int64, asOf
 	for rows.Next() {
 		var w written
 		var r run
-		if err := rows.Scan(&w.id, &w.ink, &w.at.at, &w.at.kind, &w.at.day, &r.finished, &r.shownAt); err != nil {
+		if err := rows.Scan(&w.id, &w.ink, &w.at.at, &w.at.kind, &w.at.day, &r.finished, &r.shownAt, &w.run); err != nil {
 			return err
 		}
 		r.kind, r.day = w.at.kind, w.at.day

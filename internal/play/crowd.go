@@ -419,7 +419,7 @@ type DayEntry struct {
 // EntryOfDay is the entry of a player's day's ten, finished, that its result shows (DayEntry), of the right answers
 // that count (day.go) and have a fact that's so: the rarest of those with a crowd, else the hardest; nil for none.
 func (g *Game) EntryOfDay(ctx context.Context, userID int64, day string) (*DayEntry, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.n, a.question_id FROM runs r JOIN answers a ON a.run_id = r.id
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.n, a.question_id, r.id FROM runs r JOIN answers a ON a.run_id = r.id
 		WHERE r.user_id = ? AND r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND a.is_right
 			AND NOT `+voidAt+` ORDER BY a.n`,
 		userID, day)
@@ -427,13 +427,14 @@ func (g *Game) EntryOfDay(ctx context.Context, userID int64, day string) (*DayEn
 		return nil, err
 	}
 	type right struct {
-		n  int
-		id string
+		n   int
+		id  string
+		run int64
 	}
 	var rights []right
 	for rows.Next() {
 		var it right
-		if err := rows.Scan(&it.n, &it.id); err != nil {
+		if err := rows.Scan(&it.n, &it.id, &it.run); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -469,7 +470,11 @@ func (g *Game) EntryOfDay(ctx context.Context, userID int64, day string) (*DayEn
 		if !ok || q.Extra().Fact == "" || q.Extra().Untrue() {
 			continue
 		}
-		hardest = &DayEntry{N: it.n, Fact: learnedAs(q, learnedAt{kind: "day", day: day}, inked[it.id])}
+		e := []entry{{learnedAs(q, learnedAt{kind: "day", day: day}, inked[it.id]), q, it.run}}
+		if err := g.asDealt(ctx, e); err != nil {
+			return nil, err
+		}
+		hardest = &DayEntry{N: it.n, Fact: e[0].l}
 		c, err := g.dayCrowd(ctx, g.DB.Read, day, q, userID)
 		if err != nil {
 			return nil, err

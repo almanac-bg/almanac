@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Every animal is every player's from the first day, in any tone; nothing else is an avatar.
+// Every animal is every player's from the first day, by its shape alone; nothing else is an avatar.
 func TestAvatars(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -15,16 +15,14 @@ func TestAvatars(t *testing.T) {
 		t.Fatalf("before choosing: %+v", look)
 	}
 	for _, shape := range Shapes {
-		for _, tone := range Tones {
-			if err := w.g.SetAvatar(ctx, ana, shape+"-"+tone); err != nil {
-				t.Fatalf("%s in %s: %v", shape, tone, err)
-			}
+		if err := w.g.SetAvatar(ctx, ana, shape); err != nil {
+			t.Fatalf("%s: %v", shape, err)
 		}
 	}
-	if look, _ := w.g.LookOf(ctx, ana); look.Avatar != "lynx-natural" {
+	if look, _ := w.g.LookOf(ctx, ana); look.Avatar != "lynx" {
 		t.Fatalf("the last chosen: %+v", look)
 	}
-	for _, bad := range []string{"crown-gold", "flame-gold", "fox-black", "fox", "", "fox-gold/ring"} {
+	for _, bad := range []string{"crown", "flame", "fox-gold", "fox-natural", "", "fox/ring"} {
 		if err := w.g.SetAvatar(ctx, ana, bad); !errors.Is(err, ErrNoAvatar) {
 			t.Fatalf("%q: %v", bad, err)
 		}

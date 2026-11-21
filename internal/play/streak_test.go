@@ -1,6 +1,8 @@
 package play
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -29,8 +31,9 @@ func (w *world) playDay(user int64) {
 	w.play(user, s.ID, repeat(w.right, Length)...)
 }
 
-// The longest streak is kept whatever came after, a year in a row too.
-func TestTheLongestStreakAndAYear(t *testing.T) {
+// A streak after one that ended counts from its own start, and nothing says the ended one's number (DECISIONS.md);
+// a year in a row is a year.
+func TestStreakAfterOneEndedAndAYear(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
@@ -38,8 +41,9 @@ func TestTheLongestStreakAndAYear(t *testing.T) {
 		w.daysPlayed(ana, d)
 	}
 	w.daysPlayed(ana, 3, 2, 1)
-	if s, _ := w.g.StatsOf(ctx, ana); s.Streak != 3 || s.Best != 12 {
-		t.Fatalf("a streak of 3 after one of 12: streak %d, best %d", s.Streak, s.Best)
+	s, _ := w.g.StatsOf(ctx, ana)
+	if out, _ := json.Marshal(s); s.Streak != 3 || strings.Contains(string(out), "12") {
+		t.Fatalf("a streak of 3 after one of 12: %s", out)
 	}
 
 	bo := w.user()
@@ -48,7 +52,7 @@ func TestTheLongestStreakAndAYear(t *testing.T) {
 	}
 	w.playDay(bo)
 	w.g.AftersDone(ctx)
-	if s, _ := w.g.StreakOf(ctx, bo); s.Days != 365 || s.Best != 365 {
+	if s, _ := w.g.StreakOf(ctx, bo); s.Days != 365 {
 		t.Fatalf("a year: %+v", s)
 	}
 }

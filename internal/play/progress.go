@@ -19,19 +19,15 @@ import (
 // What a game brings is told once, at its end (NewsOf): what it wrote in the book, the ranks it raised, or the
 // chapter nearest its next. A bad game brings no praise: what it's told is what's true of it.
 //
-// Every animal is every player's from the first day, in any tone (Shapes, Tones); a chapter's art is theirs too from
-// its Страница (rank.go).
+// Every animal is every player's from the first day (Shapes); a chapter's art is theirs too from its Страница
+// (rank.go).
 
 // ErrNoAvatar is an avatar there's no such thing as.
 var ErrNoAvatar = errors.New("no such avatar")
 
-// Avatars are a picture in a tone (web/src/art/pictures.ts draws them; a "shape" is a picture's id). Every one is
-// every player's. The tones are the theme's five, each painting the whole picture in its shades, and "natural": every
+// An avatar is a picture, by its shape alone (web/src/art/pictures.ts draws them; a "shape" is a picture's id): every
 // part in its own colour, as the thing looks (a fox orange with a white chest; web/src/app.css, .tone-natural).
 var (
-	Tones  = []string{"gold", "lilac", "sky", "rose", "mint", "natural"}
-	tinted = Tones[:5] // the theme's tones, which the game gives
-
 	// Starters are the animals a new player is given one of (DefaultAvatar), in account.Animals's order (their drawn
 	// names say the same animal: a test keeps it).
 	Starters = []string{"fox", "bear", "cat", "hare", "hedgehog", "dog", "deer", "stork", "frog"}
@@ -39,16 +35,11 @@ var (
 	Shapes = append(slices.Clone(Starters), "mouse", "squirrel", "sheep", "turtle", "badger", "lynx")
 )
 
-// DefaultAvatar is the avatar the game gives a player until they choose one: a starter and one of the theme's tones,
-// from their id. Both turn with the id (9 shapes and 5 tones have no common factor, so every pair comes, once in 45):
-// players who sign up one after another never share a tone, and no tone stands for the first ones. "natural" is only
-// ever chosen.
-func DefaultAvatar(userID int64) string {
-	n := max(userID, 0)
-	return Starters[n%int64(len(Starters))] + "-" + tinted[n%int64(len(tinted))]
-}
+// DefaultAvatar is the avatar the game gives a player until they choose one: a starter, from their id, turning with
+// it (account.AnimalOf: the animal of their drawn name).
+func DefaultAvatar(userID int64) string { return Starters[max(userID, 0)%int64(len(Starters))] }
 
-// Look is how a player shows to others: their avatar ("shape-tone"), and the seal they wear beside their name (rank.go:
+// Look is how a player shows to others: their avatar (a shape), and the seal they wear beside their name (rank.go:
 // none before a rank).
 type Look struct {
 	Avatar string `json:"avatar"`
@@ -96,12 +87,8 @@ func (g *Game) LookOf(ctx context.Context, userID int64) (Look, error) {
 	return g.lookOf(userID, read), err
 }
 
-// SetAvatar changes a player's avatar: a shape of Shapes in a tone of Tones ("fox-gold").
-func (g *Game) SetAvatar(ctx context.Context, userID int64, avatar string) error {
-	shape, tone, _ := strings.Cut(avatar, "-")
-	if !slices.Contains(Tones, tone) {
-		return ErrNoAvatar
-	}
+// SetAvatar changes a player's avatar: a shape of Shapes ("fox"), or a chapter's art the player has (rank.go).
+func (g *Game) SetAvatar(ctx context.Context, userID int64, shape string) error {
 	if chapter, ok := chapterOfArt(g.Bank(), shape); ok {
 		// A chapter's art, the player's from its Страница (rank.go).
 		has, err := g.HasArt(ctx, userID, chapter)
@@ -114,7 +101,7 @@ func (g *Game) SetAvatar(ctx context.Context, userID int64, avatar string) error
 	} else if !slices.Contains(Shapes, shape) {
 		return ErrNoAvatar
 	}
-	_, err := g.DB.Write.ExecContext(ctx, `UPDATE users SET avatar = ? WHERE id = ?`, avatar, userID)
+	_, err := g.DB.Write.ExecContext(ctx, `UPDATE users SET avatar = ? WHERE id = ?`, shape, userID)
 	return err
 }
 

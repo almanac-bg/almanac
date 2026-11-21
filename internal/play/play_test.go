@@ -438,12 +438,12 @@ func TestAnswerAgain(t *testing.T) {
 		out, _ := json.Marshal(r)
 		return string(out)
 	}
-	// Two right in a row: the second makes a row, and again too.
+	// Two right: the second sent again gets what it got the first time.
 	if _, err := answer(0, w.right(s.ID, 0)); err != nil {
 		t.Fatal(err)
 	}
 	first, err := answer(1, w.right(s.ID, 1))
-	if err != nil || !first.Right || first.InRow != 2 {
+	if err != nil || !first.Right {
 		t.Fatalf("the first time: %+v %v", first, err)
 	}
 	w.wait(5 * time.Second)
@@ -663,12 +663,12 @@ func TestStreakForgives(t *testing.T) {
 	streak("Monday, before playing", 3, []string{"2026-11-14"}, true)
 	w.wait(48 * time.Hour) // Monday and Tuesday missed, both forgiven
 	s = streak("Wednesday, before playing", 3, []string{"2026-11-14", "2026-11-16", "2026-11-17"}, false)
-	if s.Ended != nil || s.Best != 3 || s.Left != 0 {
+	if s.Ended != nil || s.Left != 0 {
 		t.Fatalf("still going: %+v", s)
 	}
 	w.wait(24 * time.Hour) // Wednesday missed too: the week's third, which ends it
 	s = streak("Thursday", 0, []string{}, false)
-	if s.Ended == nil || *s.Ended != (Ended{Days: 3, On: "2026-11-18"}) || s.Best != 3 {
+	if s.Ended == nil || *s.Ended != (Ended{Days: 3, On: "2026-11-18"}) {
 		t.Fatalf("ended: %+v", s)
 	}
 	// A Saturday and Sunday, then the Monday and Tuesday after: each two their own week's.
@@ -835,7 +835,7 @@ func TestStats(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Streak != 1 || s.Best != 1 ||
+	if s.Streak != 1 ||
 		s.Seal == nil || s.Seal.Level == 0 {
 		t.Fatalf("stats %+v", s)
 	}

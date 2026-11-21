@@ -20,12 +20,11 @@ import { missing } from "./missing.ts";
 import { nameFirst } from "./name.ts";
 import { signIn } from "./signin.ts";
 
-/** How one question of a duel went for one side: right, or close (not right), when it was answered (a recording's
- * answer shows at its time), and whether nothing was given. */
+/** How one question of a duel went for one side: right, or close (not right), and whether nothing was given; never
+ * when it was answered (play.DuelMark: a duel isn't a race). */
 export interface DuelMark {
   right: boolean;
   close?: boolean;
-  ms: number;
   missed?: boolean;
 }
 
@@ -99,7 +98,7 @@ export interface Duels {
 /** A duel as its screens show it: a player gone since shows as nobody's, a plain tile without an animal (no avatar of
  * theirs, nor one drawn from a name that isn't theirs). */
 const shown = (d: DuelView): DuelView =>
-  d.opponent?.gone ? { ...d, opponent: { ...d.opponent, look: { avatar: "-gone" } } } : d;
+  d.opponent?.gone ? { ...d, opponent: { ...d.opponent, look: { avatar: "gone" } } } : d;
 
 /** One of the player's duels, as its screen shows it. */
 const oneDuel = async (id: number) => shown((await api<{ duel: DuelView }>("GET", `/api/duels/${id}`)).duel);

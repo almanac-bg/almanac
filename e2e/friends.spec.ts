@@ -248,7 +248,7 @@ test("a day of none right isn't rubbed in: no place on the board of all Бълг
   page,
 }) => {
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" }).format(new Date());
-  const row = (name: string, rights: number, me = false) => ({ name, rights, of: 10, ms: 60_000, me });
+  const row = (name: string, rights: number, me = false) => ({ name, rights, of: 10, me });
   const board = (rights: number) => ({
     day,
     issue: 10,

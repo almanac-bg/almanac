@@ -132,10 +132,11 @@ func TestRunEndedByTheClock(t *testing.T) {
 		t.Fatalf("Gal's duel against a recording: %+v", d)
 	}
 	// A recording isn't its player: no record between the two.
-	var against sql.NullInt64
-	_ = w.db.Read.QueryRow(`SELECT opponent_id FROM runs WHERE id = ?`, run).Scan(&against)
-	if against.Valid {
-		t.Fatalf("a duel against a recording counts against its player %d", against.Int64)
+	var owner int64
+	_ = w.db.Read.QueryRow(`SELECT r.user_id FROM duels d JOIN runs r ON r.id = d.recording_run WHERE d.id = ?`, duel).
+		Scan(&owner)
+	if r, err := w.g.recordAgainst(ctx, gal, owner); err != nil || owner == 0 || r != (Record{}) {
+		t.Fatalf("a duel against a recording counts against its player %d: %+v %v", owner, r, err)
 	}
 
 	// One finished and not settled then (a restart in between) gets its result once its time is up.

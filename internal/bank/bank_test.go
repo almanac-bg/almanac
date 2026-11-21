@@ -221,12 +221,26 @@ func TestNumberGrading(t *testing.T) {
 	}
 }
 
+// An order deals three of its four items, never in their right order, and is right or not: no „близо“.
 func TestOrderGrading(t *testing.T) {
 	q := &Order{Head: Head{Type: "order"}, Direction: "asc", Items: []OrderItem{
 		{"Съединението", 1885}, {"Априлското въстание", 1876}, {"Балканската война", 1912}, {"Независимостта", 1908},
 	}}
-	for seed := range uint64(16) {
+	year := func(text string) float64 {
+		return q.Items[slices.IndexFunc(q.Items, func(it OrderItem) bool { return it.Text == text })].Value
+	}
+	left := map[string]int{} // how often each item is the one not dealt
+	for seed := range uint64(400) {
 		d := q.Deal(seed)
+		items := shown(t, d, "items")
+		if len(items) != OrderDealt {
+			t.Fatalf("seed %d dealt %d items", seed, len(items))
+		}
+		for _, it := range q.Items {
+			if !slices.Contains(items, it.Text) {
+				left[it.Text]++
+			}
+		}
 		r := revealed(t, d)
 		var order []int
 		for _, v := range r["order"].([]any) {
@@ -234,50 +248,50 @@ func TestOrderGrading(t *testing.T) {
 		}
 		answer, _ := json.Marshal(OrderAnswer{Order: order})
 		g := grade(t, d, string(answer))
-		if !g.Right || g.Score != 1 || string(g.Given) != `{"order":[1,0,3,2]}` {
-			t.Fatalf("the revealed order graded %+v (given %s)", g, g.Given)
+		if !g.Right || g.Score != 1 {
+			t.Fatalf("seed %d: the revealed order graded %+v", seed, g)
+		}
+		// The log keeps the bank's items, in the order given: the years rise.
+		var given OrderAnswer
+		_ = json.Unmarshal(g.Given, &given)
+		for i := 1; i < len(given.Order); i++ {
+			if q.Items[given.Order[i-1]].Value >= q.Items[given.Order[i]].Value {
+				t.Fatalf("seed %d: logged %v", seed, given.Order)
+			}
 		}
 		// The values shown with the answer are in the order the items were shown, so they line up.
-		items := shown(t, d, "items")
 		for i, v := range r["values"].([]any) {
-			if it := q.Items[slices.IndexFunc(q.Items, func(it OrderItem) bool { return it.Text == items[i] })]; it.Value != v.(float64) {
-				t.Fatalf("%s shown with %v", it.Text, v)
+			if year(items[i]) != v.(float64) {
+				t.Fatalf("%s shown with %v", items[i], v)
 			}
 		}
-		// Two neighbours swapped: five pairs of six the right way, one the wrong way.
-		swapped := slices.Clone(order)
-		swapped[1], swapped[2] = swapped[2], swapped[1]
-		answer, _ = json.Marshal(OrderAnswer{Order: swapped})
-		if g := grade(t, d, string(answer)); g.Right || math.Abs(g.Score-2.0/3) > 1e-9 {
-			t.Fatalf("two neighbours swapped graded %+v", g)
-		}
-		slices.Reverse(order)
-		answer, _ = json.Marshal(OrderAnswer{Order: order})
-		if g := grade(t, d, string(answer)); g.Right || g.Score != 0 {
-			t.Fatalf("the reverse order graded %+v", g)
-		}
-	}
-	// Left as dealt, or the dealt order turned round, an order is worth a third at most, and never right: over many
-	// seeds, as every player of a day gets the same one. The seeds whose plain shuffle already fits keep it.
-	untouched, turned := []int{0, 1, 2, 3}, []int{3, 2, 1, 0}
-	kept := 0
-	for seed := range uint64(2000) {
-		d := q.Deal(seed)
-		for _, as := range [][]int{untouched, turned} {
-			answer, _ := json.Marshal(OrderAnswer{Order: as})
-			if g := grade(t, d, string(answer)); g.Right || g.Score > 1.0/3+1e-9 {
-				t.Fatalf("seed %d: %v graded %+v", seed, as, g)
+		// Every other order is wrong, and worth nothing: an order is never „близо“.
+		for _, other := range [][]int{{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}} {
+			if slices.Equal(other, order) {
+				continue
+			}
+			answer, _ := json.Marshal(OrderAnswer{Order: other})
+			if g := grade(t, d, string(answer)); g.Right || g.Score != 0 {
+				t.Fatalf("seed %d: %v graded %+v", seed, other, g)
 			}
 		}
-		if slices.Equal(d.(*dealtOrder).order, shuffle(seed, OrderItems)) {
-			kept++
+		// Left as dealt, it's never right: the deal is never in order already.
+		if slices.Equal(order, []int{0, 1, 2}) {
+			t.Fatalf("seed %d dealt the right order", seed)
+		}
+		// The book's lines are the three dealt, in their right order.
+		_, lines := DealtAnswer(d)
+		if len(lines) != OrderDealt || !strings.HasPrefix(lines[0], items[order[0]]+" (") {
+			t.Fatalf("seed %d: lines %q", seed, lines)
 		}
 	}
-	if kept < 2000/2 || kept == 2000 {
-		t.Errorf("%d of 2000 seeds kept their shuffle (16 of 24 orders fit)", kept)
+	for _, it := range q.Items {
+		if left[it.Text] < 400/8 {
+			t.Errorf("%s left out %d times of 400", it.Text, left[it.Text])
+		}
 	}
 	d := q.Deal(3)
-	for _, bad := range []string{`{"order":[0,1,2]}`, `{"order":[0,1,2,2]}`, `{"order":[0,1,2,4]}`, `{}`} {
+	for _, bad := range []string{`{"order":[0,1]}`, `{"order":[0,1,2,3]}`, `{"order":[0,1,1]}`, `{"order":[0,1,3]}`, `{}`} {
 		if _, err := d.Grade(json.RawMessage(bad)); err == nil {
 			t.Errorf("%s was graded", bad)
 		}
@@ -516,7 +530,7 @@ func TestMatchGrading(t *testing.T) {
 	}
 }
 
-// Luck earns little: an order or a match put down at random is worth next to nothing on average.
+// Luck earns little: a match put down at random is worth next to nothing on average.
 func TestLuckTakenOut(t *testing.T) {
 	perms := [][]int{}
 	var permute func([]int, int)
@@ -532,9 +546,8 @@ func TestLuckTakenOut(t *testing.T) {
 		}
 	}
 	permute([]int{0, 1, 2, 3}, 0)
-	var order, match float64
+	var match float64
 	for _, p := range perms {
-		order += orderScore(p, []int{0, 1, 2, 3})
 		right := 0
 		for i, v := range p {
 			if i == v {
@@ -543,9 +556,9 @@ func TestLuckTakenOut(t *testing.T) {
 		}
 		match += matchScore(right, 4-right, 4, 4)
 	}
-	order, match = order/float64(len(perms)), match/float64(len(perms))
-	if math.Abs(order-7.0/36) > 1e-9 || math.Abs(match-0.125) > 1e-9 {
-		t.Errorf("at random: an order is worth %v, a match %v", order, match)
+	match /= float64(len(perms))
+	if math.Abs(match-0.125) > 1e-9 {
+		t.Errorf("at random: a match is worth %v", match)
 	}
 	// With a decoy: the four lefts joined at random to four of five rights.
 	decoy, n := 0.0, 0

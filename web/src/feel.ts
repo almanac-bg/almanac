@@ -22,9 +22,8 @@ import type { SoundName } from "./lib/sound.ts";
  * 5 is D6), when it starts (s), how long it rings (s), and how loud (0–1). */
 type Note = [voice: "b" | "p" | "t" | "s" | "w", step: number, at: number, ring: number, loud: number];
 
-/** A sound: its notes, whether it has the room (the reverb): only the big moments do; and where it stands, left (−1)
- * to right (1), if not in the middle. */
-type Cue = { notes: Note[]; room?: boolean; pan?: number };
+/** A sound: its notes, and whether it has the room (the reverb): only the big moments do. */
+type Cue = { notes: Note[]; room?: boolean };
 
 /** The motif's steps: D5, A5, F♯5, D6. */
 const motif = [0, 3, 2, 5];
@@ -41,15 +40,6 @@ const cues: Record<SoundName, Cue> = {
   // The player's own touch: a pick, a digit, a move.
   tap: { notes: [["p", 5, 0, 0.04, 0.55]] },
   key: { notes: [["p", 7, 0, 0.03, 0.4]] },
-  // Someone else: the other side of a duel answering (as they did, played second). Two soft low plucks, falling (A4, F♯4),
-  // off to one side: not a bell, which is for what's earned, and never the player's own tap.
-  them: {
-    notes: [
-      ["p", -2, 0, 0.1, 0.4],
-      ["p", -3, 0.06, 0.14, 0.32],
-    ],
-    pan: 0.3,
-  },
   // Before a game: a soft bell for each of the last seconds, then the start an octave up over the root.
   count: { notes: [["b", 3, 0, 0.2, 0.55]] },
   go: {
@@ -62,7 +52,7 @@ const cues: Record<SoundName, Cue> = {
   // last five, a step higher each.
   tick: { notes: [["p", 12, 0, 0.012, 0.45]] },
   hurry: { notes: [["s", 3, 0, 0.07, 0.5]] },
-  // A right answer: two bells, a step of the scale higher for each right one before it in a row.
+  // A right answer: two bells, the same for every one (nothing counts a row of them).
   right: {
     notes: [
       ["b", 0, 0, 0.3, 0.6],
@@ -220,15 +210,8 @@ function bell(c: BaseAudioContext, f: number, t: number, ring: number, loud: num
 
 /** Plays a sound from `t0` (in the audio's time), `lift` steps of the scale higher. */
 export function sound(c: BaseAudioContext, name: SoundName, lift: number, t0: number): void {
-  const { dry: middle, room, noise: white } = bus(c);
+  const { dry, room, noise: white } = bus(c);
   const cue = cues[name];
-  let dry: AudioNode = middle;
-  if (cue.pan && typeof c.createStereoPanner === "function") {
-    const side = c.createStereoPanner();
-    side.pan.value = cue.pan;
-    side.connect(middle);
-    dry = side;
-  }
   for (const [voice, step, at, ring, loud] of cue.notes) {
     const t = t0 + at;
     const f = hz(step + lift);
@@ -319,7 +302,7 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands, gap = 
   const timers: number[] = [];
   const at = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
   const pips = [...hero.querySelectorAll<HTMLElement>(".trail li, .tiles .tile")];
-  // Each pluck a step up the scale for each right answer before it, as the bell in a run: a good game climbs, a
+  // Each pluck a step up the scale for each right answer before it: a good game climbs as its score does, a
   // wrong one thuds where the climb stands. The score lands as the last pip fills.
   let rights = 0;
   pips.forEach((li, i) => {

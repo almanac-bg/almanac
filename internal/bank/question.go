@@ -156,9 +156,9 @@ type Dealt interface {
 
 // Graded is what an answer was worth.
 type Graded struct {
-	// Score runs from 0 (wrong) to 1 (perfect). Types with partial credit (a close number, an order half right) land in
-	// between, with what luck alone would get taken out (an order or a match put down at random is worth next to
-	// nothing). The game counts only Right in a score; a score short of right but above nothing is „близо“.
+	// Score runs from 0 (wrong) to 1 (perfect). Types with partial credit (a close number) land in between, with what
+	// luck alone would get taken out; an order is 1 or 0, right or not. The game counts only Right in a score; a score
+	// short of right but above nothing is „близо“.
 	Score float64
 	// Right is whether it counts as a right answer (for streaks and stats).
 	Right bool
@@ -264,11 +264,7 @@ func AnswerText(q Question) string {
 func AnswerLines(q Question) []string {
 	switch q := q.(type) {
 	case *Order:
-		items := make([]string, 0, len(q.Items))
-		for _, i := range q.right() {
-			items = append(items, fmt.Sprintf("%s (%s)", q.Items[i].Text, strings.TrimSpace(sayNumber(q.Items[i].Value, 0.01)+" "+q.Unit)))
-		}
-		return items
+		return orderLines(q, q.right())
 	case *Match:
 		pairs := make([]string, 0, len(q.Pairs))
 		for _, p := range q.Pairs {
@@ -285,6 +281,24 @@ func AnswerLines(q Question) []string {
 		return []string{q.Groups[0] + ": " + strings.Join(groups[0], ", "), q.Groups[1] + ": " + strings.Join(groups[1], ", ")}
 	}
 	return nil
+}
+
+// orderLines are an order's items (by their place in the bank, in the order given), each with its value.
+func orderLines(q *Order, items []int) []string {
+	out := make([]string, 0, len(items))
+	for _, i := range items {
+		out = append(out, fmt.Sprintf("%s (%s)", q.Items[i].Text, strings.TrimSpace(sayNumber(q.Items[i].Value, 0.01)+" "+q.Unit)))
+	}
+	return out
+}
+
+// DealtAnswer is a question's answer as a deal showed it (AnswerText, AnswerLines): an order's of the items it dealt.
+func DealtAnswer(d Dealt) (text string, lines []string) {
+	if o, ok := d.(*dealtOrder); ok {
+		lines = o.lines()
+		return strings.Join(lines, " → "), lines
+	}
+	return AnswerText(d.Question()), AnswerLines(d.Question())
 }
 
 // KeeperText is the answer as whoever keeps the bank reads it (the admin page): a match's decoy too.
