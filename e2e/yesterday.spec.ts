@@ -46,7 +46,7 @@ test("yesterday's issue finished: the way on to today's asks for the day again",
   if (await now.isVisible().catch(() => false)) await now.click();
   await playRun(page);
   const on = page.locator(".tomorrow");
-  await expect(on).toContainText("Вече излезе.");
+  await expect(on).toContainText("вече излезе.");
   await page.unrouteAll();
   await on.getByRole("button", { name: "Към днешния брой" }).click();
   // Today's, as the server has it now: the run played is today's here, so its result, with tomorrow.

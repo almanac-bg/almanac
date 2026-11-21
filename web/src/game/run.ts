@@ -907,6 +907,8 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
   }
   head.stick(head.stuckAt(y - was));
   if (y !== was) scrollTo({ top: y, behavior: "instant" });
+  // Moved after all (the panel at its least would have covered them): the panel takes the room the move made.
+  if (right && y !== was) page.style.setProperty("--keep", `${Math.ceil(keyBox().bottom + 12)}px`);
   // Where the right answer ends, taken before anything glides: once it does, its box is where it's drawn on the way.
   const keyAt = key.getBoundingClientRect();
   at(settling.duration, () => head.hold(false));
