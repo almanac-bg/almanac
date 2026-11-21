@@ -8,7 +8,7 @@ export interface Stats {
   /** The player's avatar, as others see it (a shape). */
   avatar: string;
   /** The seal they wear (play.Seal): a chapter's rank. */
-  seal?: { chapter: string; level: number; name: string; quarter: number };
+  seal?: { chapter: string; level: number; name: string };
   /** Each chapter's ink, as the book has it (its Алманах card's number): Профил's seals say it. */
   ink?: Record<string, number>;
   streak: number;

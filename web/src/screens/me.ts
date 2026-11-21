@@ -1,8 +1,9 @@
 // Профил: who you are in the game, in its budget's order (DESIGN.md, Places): your avatar with the seal you wear on its
-// corner, your name and tag; the streak as it is now; your seals, one list, a row a chapter with its rank, its
-// progress to the next and its ink (the one worn is the best: never chosen); the avatars (every animal yours); and
-// Настройки, last. A guest is asked to keep their game, and the way in for a profile from elsewhere is apart from it
-// (the sign-in page: screens/signin.ts, signInPage). Nobody on this device yet: that page instead. No lifetime totals.
+// corner (a tap on it, or „Смени“ under it, opens the animals on a sheet: screens/avatar.ts), your name and tag; the
+// streak as it is now; your seals, one list, a row a chapter with its rank, its progress to the next and its ink (the
+// one worn is the best: never chosen); and Настройки, last. One column, on a big screen too. A guest is asked to keep
+// their game, and the way in for a profile from elsewhere is apart from it (the sign-in page: screens/signin.ts,
+// signInPage). Nobody on this device yet: that page instead. No lifetime totals.
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -64,7 +65,7 @@ export function me(kit: Kit) {
   notice.set("");
   return h(
     "section",
-    { class: "screen me spread" },
+    { class: "screen me" },
     when(
       () => user(),
       () => {
@@ -81,15 +82,15 @@ export function me(kit: Kit) {
             () => ranks.set([]),
           );
         else ranks.set([]);
-        // The avatars: their own part (screens/avatar.ts), loaded with the page.
-        const picker = signal<Child>(null);
-        import("./avatar.ts").then((m) => picker.set(m.picker(kit)));
+        // The avatars: a sheet of their own (screens/avatar.ts), loaded with the page so that a tap opens it at once.
+        const avatars = import("./avatar.ts");
+        const pick = () => avatars.then((m) => m.pickAvatar(kit));
         return [
           h(
             "div",
-            { class: "me-intro page-1" },
+            { class: "me-intro" },
             said ? h("p", { class: "muted", role: "status" }, said) : null,
-            head(data),
+            head(data, pick),
             () => (failed() && !data() ? failure(failed(), () => go("/me", true)) : null),
             // A guest keeps their game with an email, or signs in to a profile they have elsewhere, and sees how others
             // see them: one line of ways (not four loose ones before anything else). Either way in, Профил again, as
@@ -101,13 +102,7 @@ export function me(kit: Kit) {
           ),
           h(
             "div",
-            { class: "me-side page-2" },
-            h(
-              "section",
-              { class: "sect me-avatars" },
-              h("div", { class: "sect-head" }, h("h2", null, "Аватар")),
-              picker,
-            ),
+            { class: "me-side" },
             h(
               "a",
               { class: "me-settings", href: "/settings" },
@@ -134,13 +129,20 @@ function theirView(tag: string | undefined): Child {
   return tag ? h("a", { class: "link muted", href: profileHref(tag) }, "Как те виждат другите") : null;
 }
 
-/** Who you are: your avatar as you wear it, the seal you wear on its corner, your name and tag; a name still the one
- * drawn says so, with the way to change it. */
-function head(data: () => Stats | null): Child {
+/** Who you are: your avatar as you wear it, the seal you wear on its corner, and „Смени“ under it (it, or a tap on the
+ * avatar, opens the animals: `pick`); your name and tag; a name still the one drawn says so, with the way to change
+ * it. */
+function head(data: () => Stats | null, pick: () => void): Child {
   return h(
     "div",
     { class: "me-head" },
-    h("span", { class: "me-avatar" }, () => avatar(look(), { size: "l", name: user.peek()?.name, seal: data()?.seal })),
+    // One button, the avatar and its word: the whole of it a tap.
+    h(
+      "button",
+      { class: "me-avatar", type: "button", "aria-label": "Смени аватара", onclick: pick },
+      () => avatar(look(), { size: "l", name: user.peek()?.name, seal: data()?.seal }),
+      h("span", { class: "me-avatar-change", "aria-hidden": "true" }, "Смени"),
+    ),
     h(
       "div",
       { class: "me-who" },

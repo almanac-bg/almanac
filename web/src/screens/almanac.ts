@@ -1,7 +1,7 @@
 // Алманах, one of the three places: the player's book (DESIGN.md, Places). Its head — whose book it is, what ink and
 // grey mean, and Микс and България as two ways to play — then its chapters, each a card in its colour with its seal as
 // the badge and its ink („22 с мастило“), the one nearest its next rank first. A chapter (/almanac/<topic>) is its head
-// on its sheet (the seal with its pips, its ink, the next rank), „Игра на главата“, and its facts, ink and grey, the
+// on its sheet (the seal, its ink, the rank and the way to the next), „Игра на главата“, and its facts, ink and grey, the
 // latest first, a page at a time, found by their words. How well a player knows a chapter (mastery) is the game's own,
 // never shown.
 
@@ -26,7 +26,7 @@ let {
   onCleanup,
   pictureCredit,
   textWords,
-  pips,
+  standing,
   rankName,
   rename,
   seal,
@@ -42,8 +42,8 @@ interface Rank {
   chapter: string;
   level: number;
   name: string;
-  /** The quarters of the way to the next rank: 0 to 3. */
-  quarter: number;
+  /** The ink its rank starts at: the bar under it is the way from here to `nextAt` (ui.ts, standing). */
+  from: number;
   ink: number;
   next: string;
   nextAt: number;
@@ -105,7 +105,7 @@ function setKit(kit: Kit) {
     onCleanup,
     pictureCredit,
     textWords,
-    pips,
+    standing,
     rankName,
     rename,
     seal,
@@ -231,11 +231,10 @@ function way(id: string, name: string, note: string): Child {
 }
 
 /** A chapter's card: its colour, its seal as the badge (or its glyph, before a rank) over its name, its ink, and its
- * rank and under it the ink to the next („Тетрадка“, „още 15 до „Книга““: the ink is said over it). The corner turned, as a
- * page of the book. */
+ * rank and under it the ink to the next over its bar („Тетрадка“, „още 15 до „Книга““: ui.ts, standing). The corner
+ * turned, as a page of the book. */
 function card(id: string, ink: number, r: Rank | undefined): Child {
   const ranked = r && r.level > 0 ? r : null;
-  const left = ranked ? Math.max(1, ranked.nextAt - ranked.ink) : 0;
   return h(
     "a",
     { class: "chapter-card", href: `/almanac/${id}` },
@@ -252,15 +251,8 @@ function card(id: string, ink: number, r: Rank | undefined): Child {
         ink
           ? h("span", { class: "card-ink" }, h("b", { class: "num" }, formatNumber(ink)), h("span", null, "с мастило"))
           : null,
-        // The rank over what's left to the next, a line each: no dot between them to hang at a line's end.
-        ranked
-          ? h(
-              "span",
-              { class: "card-rank" },
-              h("span", null, ranked.name),
-              h("span", null, `още\u00a0${left} до „${ranked.next}“`),
-            )
-          : null,
+        // The rank over what's left to the next and its bar: a card is narrow, so the rank has a line of its own.
+        ranked ? h("span", { class: "card-rank" }, h("span", null, ranked.name), standing(ranked, false)) : null,
       ],
       "card-leaf",
       { next: "" },
@@ -481,8 +473,8 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
   );
 }
 
-/** Where a chapter stands: its seal with the pips towards the next rank, its ink (the book's, as its card shows it), its
- * rank's name and the ink still to come. Before a rank, what writes its first: a right answer in the day's issue. */
+/** Where a chapter stands: its seal, its ink (the book's, as its card shows it), its rank's name, and the ink still to
+ * come over its bar (ui.ts, standing). Before a rank, what writes its first: a right answer in the day's issue. */
 function stand(id: string, r: Rank | undefined, ink: number): Child {
   const ranked = r && r.level > 0 ? r : null;
   return h(
@@ -494,11 +486,7 @@ function stand(id: string, r: Rank | undefined, ink: number): Child {
       { class: "ch-words" },
       ink ? h("p", { class: "ch-ink" }, h("b", { class: "num" }, formatNumber(ink)), " с мастило") : null,
       ranked
-        ? [
-            h("p", { class: "ch-rank" }, rankName(ranked.level)),
-            h("p", { class: "ch-next" }, `още\u00a0${Math.max(1, ranked.nextAt - ranked.ink)} до „${ranked.next}“`),
-            pips(ranked.quarter),
-          ]
+        ? [h("p", { class: "ch-rank" }, rankName(ranked.level)), standing(ranked, false)]
         : h("p", { class: "ch-next" }, "Всеки верен отговор в броя на деня вписва факт с мастило."),
     ),
   );

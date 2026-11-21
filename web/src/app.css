@@ -1487,26 +1487,70 @@
     font: 900 12.5px var(--font-numeral);
   }
 
-  /* How far towards the next rank: four pips under a seal of 32px or more. */
-  /* The quarters towards the next rank: four small bars beside the words that say it, under them. */
-  .seal-pips {
+  /* Where a chapter stands (ui.ts, standing): what's left to the next rank in words, and under them a slim bar of the
+     way from its rank to the next. On the page, the chapter's deep colour (4.5:1 on it, by day and night) over a track
+     of it; on a chapter's sheet, where its colour is the paper, the sheet's ink. Words too long for a line go on two,
+     with no dot left at a line's end: each part is led by its dot, and a line's first is out of sight to the left. */
+  .standing {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 4px;
-    width: 6.5rem;
-    margin-top: 4px;
+    gap: 6px;
+    min-width: 0;
   }
 
-  .seal-pips i {
-    height: 7px;
-    border-radius: 4px;
-    background: var(--line);
-    box-shadow: inset 0 0 0 1px var(--line-2);
+  .standing-words {
+    overflow: hidden;
+    color: var(--ink-3);
+    font: 700 0.8125rem / 1.3 var(--font-sans);
   }
 
-  .seal-pips i.on {
-    background: var(--ink);
-    box-shadow: none;
+  .standing-words > span {
+    display: flex;
+    flex-wrap: wrap;
+    margin-left: -1em;
+  }
+
+  /* A part: its dot, and its words beside it, wrapping under themselves, never under the dot (out of sight). */
+  .standing-words > span > span {
+    display: flex;
+    min-width: 0;
+  }
+
+  .standing-words > span > span > span {
+    min-width: 0;
+  }
+
+  .standing-dot {
+    flex: none;
+    width: 1em;
+    font-style: normal;
+    text-align: center;
+  }
+
+  .standing-bar {
+    display: block;
+    height: 6px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--td) 20%, transparent);
+    overflow: hidden;
+  }
+
+  .standing-bar > i {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--td);
+  }
+
+  .leaf .standing-words {
+    color: inherit;
+  }
+
+  .leaf .standing-bar {
+    background: color-mix(in srgb, #16132b 18%, transparent);
+  }
+
+  .leaf .standing-bar > i {
+    background: #16132b;
   }
 
   /* Art drawn on white (a glyph's tile, a tile's, the seal's core) keeps the day's inks by night too. */
@@ -3939,21 +3983,6 @@
     background: var(--tone, var(--ink));
   }
 
-  .meter {
-    display: block;
-    height: 6px;
-    border-radius: var(--radius-full);
-    background: var(--surface-2);
-    overflow: hidden;
-  }
-
-  .meter-fill {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: var(--tone, var(--ink));
-  }
-
   /* ---- Pictures (art/pictures.ts): painted from one ramp of the tone they sit in, with the night ink and white ---- */
 
   /* By day, on paper, the light inks and the tinted disc would wash out (a flask, the streak's flame), so they take
@@ -4308,7 +4337,8 @@
     --size: 72px;
   }
 
-  /* ---- Профил: the avatar with the seal worn, the name; the streak now; the seals; the avatars; Настройки ---- */
+  /* ---- Профил: the avatar with the seal worn, the name; the streak now; the seals; Настройки (the avatars on a
+     sheet: screens/avatar.ts) ---- */
 
   .me-intro,
   .me-side {
@@ -4324,10 +4354,42 @@
     gap: 18px;
   }
 
-  /* The avatar, the seal worn on its corner (.avatar > .seal). */
+  /* The avatar, the seal worn on its corner (.avatar > .seal); on one's own Профил a button, „Смени“ under it as a
+     link, the whole of it a tap that opens the animals. */
   .me-avatar {
     display: flex;
     flex: none;
+  }
+
+  button.me-avatar {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-3);
+    background: none;
+    color: var(--ink);
+    font: 800 0.9375rem / 1.2 var(--font-sans);
+    cursor: pointer;
+  }
+
+  .me-avatar-change {
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    button.me-avatar:hover .avatar {
+      box-shadow: 0 0 0 2px var(--line-2);
+    }
+  }
+
+  /* The avatars' sheet: a title and „Затвори“, the animals under it, scrolling inside the sheet where they don't fit. */
+  .avatar-sheet .sheet-panel {
+    display: grid;
+    gap: var(--space-4);
   }
 
   .me-avatar .avatar.l {
@@ -4376,8 +4438,9 @@
     gap: var(--space-2) var(--space-5);
   }
 
-  /* The seals (ui.ts, sealList): one list on a card, a row a chapter between hairlines: the seal, the chapter's name
-     over its rank and the pips towards the next, the ink at the row's end. */
+  /* The seals (ui.ts, sealList): one list on a card, a row a chapter between hairlines: the seal; the chapter's name,
+     its ink at the row's end; under them where it stands (.standing), the rank and what's left over its bar, as wide
+     as the row beside the seal. */
   .seal-list {
     margin: 0;
     padding: 2px 16px;
@@ -4387,16 +4450,40 @@
   }
 
   .seal-row {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    display: flex;
     align-items: center;
     gap: 12px;
-    min-height: 64px;
-    padding: 10px 0;
+    padding: 12px 0 14px;
   }
 
   .seal-row + .seal-row {
     border-top: 1px solid var(--line);
+  }
+
+  .seal-row > .seal {
+    flex: none;
+  }
+
+  .seal-row-body {
+    display: grid;
+    flex: 1;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  /* The name and the ink on a line, the name taking what the ink leaves it down to 5.5rem; with less room (large text),
+     the ink goes under the name. */
+  .seal-row-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 2px 10px;
+  }
+
+  .seal-row-head > .seal-row-name {
+    flex: 1 1 5.5rem;
+    min-width: 0;
   }
 
   .seal-worn {
@@ -4405,48 +4492,24 @@
     font: 700 0.9375rem / 1.4 var(--font-sans);
   }
 
-  .seal-row-words {
-    display: grid;
-    gap: 3px;
-    min-width: 0;
-  }
-
   /* A long name („Изкуство и литература“) wraps, and a word wider than its room breaks where Bulgarian breaks it. */
-  .seal-row-words b {
-    font: 900 0.9375rem / 1.15 var(--font-sans);
+  .seal-row-name {
+    font: 900 0.9375rem / 1.2 var(--font-sans);
     text-wrap: balance;
     overflow-wrap: break-word;
     hyphens: auto;
   }
 
-  /* The rank's name, the pips towards the next beside it (onto a line of their own where they don't fit). */
-  .seal-row-rank {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 2px 8px;
-    color: var(--ink-3);
-    font: 700 0.8125rem / 1.2 var(--font-sans);
-  }
-
-  .seal-row-rank > .seal-pips {
-    width: 3.75rem;
-    margin: 0;
-  }
-
-  /* The ink, a numeral over its words, at the row's end. */
+  /* The ink, its numeral and its words on the name's line, at the row's end. */
   .seal-row-ink {
-    display: grid;
-    justify-items: end;
     color: var(--ink-3);
-    font: 700 0.75rem / 1.1 var(--font-sans);
-    text-align: right;
+    font: 700 0.75rem / 1.2 var(--font-sans);
+    white-space: nowrap;
   }
 
   .seal-row-ink > .num {
     color: var(--ink);
-    font-size: 1.5rem;
-    line-height: 1;
+    font-size: 1.125rem;
   }
 
   /* Настройки, last: a row to its page. */
@@ -4488,13 +4551,13 @@
     }
   }
 
+  /* On a big screen, one column read top to bottom, as on a phone: a page of its own (no spread: a second page would
+     hold only Настройки). */
   @media (min-width: 56.25rem) {
-    .me.spread > .page-1 {
-      grid-column: 1 / span 5;
-    }
-
-    .me.spread > .page-2 {
-      grid-column: 6 / span 7;
+    .screen.me {
+      width: 100%;
+      max-width: 40rem;
+      margin-inline: auto;
     }
 
     .me-avatar .avatar.l {
@@ -4608,11 +4671,11 @@
     gap: var(--space-3);
   }
 
-  /* The avatars, each with its name under it: four to a row on a phone, eight on a big screen; the one worn ringed
-     in ink. */
+  /* The avatars, each with its name under it, on their sheet (screens/avatar.ts): as many to a row as its width holds;
+     the one worn ringed in ink. */
   .picker {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(4.5rem, 45%), 1fr));
     gap: var(--space-4) var(--space-2);
     margin: 0;
     padding: 0;
@@ -4655,7 +4718,7 @@
   /* The one worn ringed in ink, the ring following the tile's corners. */
   .pick[aria-pressed="true"] .avatar {
     box-shadow:
-      0 0 0 3px var(--bg),
+      0 0 0 3px var(--surface),
       0 0 0 5px var(--ink);
   }
 
@@ -4823,13 +4886,12 @@
     line-height: 0.85;
   }
 
+  /* The rank over what's left and its bar (.standing), clear of the turned corner. */
   .card-rank {
+    display: grid;
+    gap: 2px;
     padding-right: 22px;
     font: 700 0.8125rem / 1.25 var(--font-sans);
-  }
-
-  .card-rank > span {
-    display: block;
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -4915,19 +4977,15 @@
     flex: none;
   }
 
-  .ch-words .seal-pips i {
-    background: rgb(22 19 43 / 0.16);
-    box-shadow: none;
-  }
-
-  .ch-words .seal-pips i.on {
-    background: #16132b;
-  }
-
   .ch-words {
     display: grid;
+    flex: 1 1 auto;
     gap: 4px;
     min-width: 0;
+  }
+
+  .ch-words .standing-words {
+    font-size: 0.9375rem;
   }
 
   .ch-ink {
@@ -5710,8 +5768,11 @@
     flex: none;
   }
 
+  /* The chapter's name over where it stands (.standing), as wide as the line. */
   .step-words {
     display: grid;
+    flex: 1 1 auto;
+    gap: 2px;
     min-width: 0;
   }
 

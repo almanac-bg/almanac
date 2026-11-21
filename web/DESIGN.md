@@ -92,8 +92,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      chip, the answer as a headword (an order, a match, a split: its parts a line each, at the entry's size), the
      question, the fact. Under it what the day wrote (`game/news.ts`): „+6 с
      мастило“; „Един от въпросите вече беше в твоя Алманах и остава в сиво.“; the chapter nearest its next rank with
-     its seal and pips („История: още 2 до Книга“); or ranks risen, their seals and one line, each rank once with its
-     chapters, their names the links („Нови печати: „Страница“ в География и в Технологии и игри.“; one chapter's: its
+     its seal, its name and where it stands (`standing()`: „Тетрадка · още 2 до „Книга““ over its bar); or ranks
+     risen, their seals and one line, each rank once with its chapters, their names the links („Нови печати: „Страница“ в География и в Технологии и игри.“; one chapter's: its
      ladder under it).
   4. Friends who played it, up to five (`.friends-day`): avatar with its seal, name, their small squares, their score.
   5. The action, past the first results: „Сподели“.
@@ -118,8 +118,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   never pages of their own: every fact as one list is what the book isn't (DECISIONS.md). A chapter's game left
   half-way today shows under the head, where it stopped, with „Продължи“ (its cross comes back here).
 - **A chapter:** its head on its sheet (glyph, name, the seal, its ink, the rank, how much to the next „още 16 до
-  „Книга““ and the pips under it), „Игра на главата“, then its facts, the latest first, each as tall as it holds: ink
-  black, facts met in grey (a thin solid 1.5px grey outline, lighter text). An entry reads in the order it was lived:
+  „Книга““ over its bar: `standing()`), „Игра на главата“, then its facts, the latest first, each as tall as it holds:
+  ink black, facts met in grey (a thin solid 1.5px grey outline, lighter text). An entry reads in the order it was lived:
   the dateline, the question small and muted (a kicker), the answer as the headword (big, bold) between it and the
   fact, then the fact in body text; a statement has no question, its headword right under the dateline; an answer of
   parts a line each. A picture question shows its picture (a choice of pictures, its answer's) beside the question and
@@ -162,18 +162,21 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   hairlines; a spread on a big screen, the ways on (one width) and the record under them on the right (a phone has
   them in that order too: the next duel in sight under the result); its marks as the tiles (близо ◩),
   nothing ringed, no time on any of them: time never counts.
-- **Профил:** the avatar with the seal worn on its corner, the name; a guest's ways in one quiet line under it („Играта
-  ти е само на това устройство. Запази я с имейл · Имаш профил? Влез · Как те виждат другите“: the first opens its
-  form in the line's place, the second is the sign-in page); the streak as it is now (never an ended one's) and what the week forgives (that it's used up,
-  only while a streak runs); „Печати“, one list on a card (`sealList()`), a row a chapter with a rank (only those
-  earned), in the bank's order: its seal, its name, its rank's name with the pips towards the next, and its ink at the
-  row's end („27 с мастило“, the book's count); a view of the ranks: nothing to tap, none ringed, no single chapter's
-  ladder (the one worn is the best, never chosen: on the avatar's corner); the avatars, the fifteen animals and nothing
-  else (an avatar is a face: a seal is worn on it, never chosen as it), their one place (no page of their own);
-  Настройки last; no list of past games (a game isn't gone over after its day). No
-  duplicate avatar in the bar's corner on this page. Another player's page (`/players/<tag>`) is the same head,
-  seals (no streak: none of it is another's to see), with the way to be friends. Where no email may be asked for (an app's browser that reads what's
-  typed: `noEmail`), Профил and Настройки offer none, only the line that says so.
+- **Профил:** one column, on a big screen too: the avatar with the seal worn on its corner and „Смени“ under it, the
+  name; a guest's ways in one quiet line under it („Играта ти е само на това устройство. Запази я с имейл · Имаш
+  профил? Влез · Как те виждат другите“: the first opens its form in the line's place, the second is the sign-in page); the streak
+  as it is now (never an ended one's) and what the week forgives (that it's used up, only while a streak runs); „Печати“, one list on a card
+  (`sealList()`), a row a chapter with a rank (only those earned), in the bank's order: its seal; its name with its
+  ink at the line's end („27 с мастило“, the book's count; under the name where they don't fit); under them where it
+  stands (`standing()`); a view of the ranks: nothing to tap, none ringed, no single chapter's ladder (the one worn is
+  the best, never chosen: on the avatar's corner); „Как те виждат другите“; Настройки last. No list of past games (a
+  game isn't gone over after its day). No duplicate avatar in the bar's corner on this page. The avatars, the fifteen
+  animals and nothing else (an avatar is a face: a seal is worn on it, never chosen as it), are a choice made rarely,
+  so never on the page: a sheet (`screens/avatar.ts`) opened by the avatar with „Смени“ under it (one button), the one
+  worn ringed; a tap wears one and, once it's kept, puts the sheet away. Another player's page (`/players/<tag>`) is
+  the same head without a way to change it, the seals (no streak: none of it is another's to see), with the way to be
+  friends. Where no email may be asked for (an app's browser that reads what's typed: `noEmail`), Профил and
+  Настройки offer none, only the line that says so.
 
 ## Colour
 
@@ -293,8 +296,13 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   | Летопис  | 250      | the same with two tails                      |
 
   Then „Летопис · N“ for each further 100, its number on a tab from 32px. 24px at the least. How far towards the next
-  rank is four small bars (`pips()`) beside it, under the words that say what's left, on a chapter's page and the
-  result's line only. By day a fine
+  rank is said and drawn by one component, `standing()`, everywhere (Профил's seals, a chapter's page and card, the
+  result's line): the words („Страница · още 8 до „Тетрадка““; before a first seal „още 1 до „Бележка““; past
+  Летопис „Летопис · 2 · още 37 до „Летопис · 3““; the rank's name left out where a line over it says it), and under
+  them a slim continuous bar filled for the part of the way from the rank's ink to the next one's (play.ChapterRank:
+  `from`, `nextAt`), never full while the next isn't held. On the page the chapter's deep colour over a track of it; on
+  a chapter's sheet the sheet's ink (`standing.test.ts` holds both 3:1, day and night). Words too long for a line go on
+  two, with no dot left at a line's end. The seal itself never shows it. By day a fine
   outline in the deep colour; on a sheet (its own colour, often) a 2px ink rim (`.rimmed`), and a filled seal there a
   lighter disc of its colour, so Бележка, a thin open ring, shows the sheet through it and Страница doesn't. With a
   player only the seal shows, never its rank's word, and only in one place: on their avatar's lower right corner
@@ -312,7 +320,7 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   or a setting's few choices on a well, the chosen one a raised surface, of one width unless a word needs more (never broken inside one). A switch is a 52 × 30 track. Never a native
   select, radio or checkbox.
 - **Sheets over the page** (`.sheet`, a `<dialog>`): a surface with round top corners over a scrim, from the foot on a
-  phone, centred on a big screen (a name asked for, the share, a way out of a game); its title's words whole,
+  phone, centred on a big screen (a name asked for, the share, a way out of a game, the avatars); its title's words whole,
   „Затвори“ under it where they don't fit beside it.
 - **Names** (`nameWords()`): a name breaks between its words first; a single word wider than its line, and only
   then, at its syllables with a hyphen. „ти“ stays on its last word's line, never alone. Never cut
@@ -510,7 +518,7 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
 
 ## In code
 
-- `ui.ts`: `leaf`, `glyph`, `chip`, `tiles`, `mini`, `seal`, `pips`, `sealList`, `ladder`, `avatar`, `who`, `verdict`,
+- `ui.ts`: `leaf`, `glyph`, `chip`, `tiles`, `mini`, `seal`, `standing`, `sealList`, `ladder`, `avatar`, `who`, `verdict`,
   `fact`, `filed`, `segmented`, `failure`, `rosette`, `back`, `nameWords`, `textWords`, `emailWords`, `inSight`.
 - `game/run.ts`: `trail`, `questionHead`, `timer`, `settle`; `game/questions.ts` each kind; `game/news.ts` what a game
   wrote; `game/share.ts` the share.

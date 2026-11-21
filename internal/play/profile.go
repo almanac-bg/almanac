@@ -25,7 +25,7 @@ type Profile struct {
 	Look
 	// Since is when they started playing: the month (its first day, at noon in Bulgaria).
 	Since int64 `json:"since"`
-	// Seal is the seal they wear (none before a rank), whole (its name, its quarters): over the look's, which says
+	// Seal is the seal they wear (none before a rank), whole (its name, the way to the next): over the look's, which says
 	// only its chapter and level. Ranks their ranks in the bank's chapters.
 	Seal  *Seal         `json:"seal,omitempty"`
 	Ranks []ChapterRank `json:"ranks"`

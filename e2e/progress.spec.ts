@@ -14,13 +14,17 @@ test("a topic's game never tells how well the topic is known, and the avatar is 
   await expect(page.locator(".summary")).toBeVisible();
   await expect(page.locator(".summary")).not.toContainText(/XP|[Нн]иво \d|[Пп]остижени|оценка|Познавач|Новак/);
 
-  // The avatar, on Профил: every animal, none locked, and nothing else (a seal is worn on it, never as it).
+  // The avatar, on its sheet over Профил: every animal, none locked, and nothing else (a seal is worn on it, never as
+  // it).
   await page.goto("/me");
-  await expect(page.locator(".pick")).toHaveCount(15);
-  await page.getByRole("button", { name: "Рис", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Рис", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Смени аватара" }).click();
+  const sheet = page.getByRole("dialog", { name: "Аватар" });
+  await expect(sheet.locator(".pick")).toHaveCount(15);
+  await expect(sheet.locator(".pick:disabled")).toHaveCount(0);
+  await sheet.getByRole("button", { name: "Рис", exact: true }).click();
+  await expect(sheet).toHaveCount(0);
   // Avatars are pictures (art/pictures.ts), loaded after the first screen: the lynx is drawn on its tile.
-  await expect(page.locator('.pick[aria-pressed="true"] .avatar-pic path').first()).toBeAttached();
+  await expect(page.locator(".me-head .avatar.sh-lynx .avatar-pic path").first()).toBeAttached();
   // Kept: Профил shows it.
   await page.goto("/me");
   await expect(page.locator(".me-head .avatar.sh-lynx")).toBeVisible();

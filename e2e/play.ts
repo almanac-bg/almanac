@@ -415,7 +415,7 @@ export async function cutOrOverlapping(page: Page): Promise<string[]> {
     // has no box of its own to be cut in: its row's box is the one measured (and an inline box's own widths are
     // nothing to go by: Chromium has none, Firefox its words' run against a clientWidth of 0).
     for (const el of document.querySelectorAll(
-      ".friend-name, .duel-name, .duel-row .who-label, .me-who h1, .seal-row-words b",
+      ".friend-name, .duel-name, .duel-row .who-label, .me-who h1, .seal-row-name",
     )) {
       let box: Element = el;
       while (box.parentElement && getComputedStyle(box).display === "inline") box = box.parentElement;
@@ -432,7 +432,14 @@ export async function cutOrOverlapping(page: Page): Promise<string[]> {
     )) {
       const box = card.getBoundingClientRect();
       for (const el of card.querySelectorAll("*")) {
-        const r = el.getBoundingClientRect();
+        // What shows of it: a box that clips (.standing-words, its line's first dot out of sight) cuts it to its own.
+        let { left, right, width } = el.getBoundingClientRect();
+        for (let up = el.parentElement; up && up !== card; up = up.parentElement)
+          if (getComputedStyle(up).overflowX !== "visible") {
+            const clip = up.getBoundingClientRect();
+            [left, right] = [Math.max(left, clip.left), Math.min(right, clip.right)];
+          }
+        const r = { left, right, width: right > left ? width : 0 };
         if (r.width && (r.right > box.right + 1 || r.left < box.left - 1)) {
           out.push(`past its card ${card.getAttribute("class")}: ${say(el)}`);
           break;

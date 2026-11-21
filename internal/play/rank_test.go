@@ -11,7 +11,7 @@ import (
 )
 
 // The ladder: Бележка 1, Страница 5, Тетрадка 15, Книга 40, Том 100, Летопис 250, then „Летопис · N“ for each
-// further 100; the seal fills in quarters between two ranks.
+// further 100; the quarters between two ranks are kept with a rank.
 func TestRankLadder(t *testing.T) {
 	for _, c := range []struct {
 		ink, level int
@@ -33,6 +33,27 @@ func TestRankLadder(t *testing.T) {
 	} {
 		if q := Quarter(c.level, c.ink); q != c.q {
 			t.Errorf("level %d at %d ink: quarter %d, want %d", c.level, c.ink, q, c.q)
+		}
+	}
+}
+
+// A rank as the client gets it says the way to the next one: the ink its rank starts at, the chapter's ink and the
+// ink the next starts at, the bar between them (web/src/ui.ts, standing), before a first rank and past Летопис too.
+// The quarters are the kept rank's own, never sent.
+func TestRankSaysItsWay(t *testing.T) {
+	for _, c := range []struct {
+		k    keptRank
+		want string
+	}{
+		{keptRank{}, `{"chapter":"history","level":0,"name":"","from":0,"ink":0,"next":"Бележка","nextAt":1}`},
+		{keptRank{level: 2, quarter: 3, ink: 13}, `{"chapter":"history","level":2,"name":"Страница","from":5,"ink":13,` +
+			`"next":"Тетрадка","nextAt":15}`},
+		{keptRank{level: 7, ink: 413}, `{"chapter":"history","level":7,"name":"Летопис · 2","from":350,"ink":413,` +
+			`"next":"Летопис · 3","nextAt":450}`},
+	} {
+		got, err := json.Marshal(chapterRank("history", c.k))
+		if err != nil || string(got) != c.want {
+			t.Errorf("%+v sent as %s, want %s (%v)", c.k, got, c.want, err)
 		}
 	}
 }
@@ -188,9 +209,9 @@ func TestRanksToldOnce(t *testing.T) {
 	if some == 0 || n.Step == nil || n.Step.Left < 1 || n.Step.Next != "Страница" || n.Step.Level != 1 {
 		t.Fatalf("after a day: ranks %+v, step %+v", ranks, n.Step)
 	}
-	// The step's rank and quarters are its chapter's, as kept: the seal and pips it's drawn with.
+	// The step's rank and the way to the next are its chapter's, as kept: the seal and bar it's drawn with.
 	for _, r := range ranks {
-		if r.Chapter == n.Step.Chapter && (r.Level != n.Step.Level || r.Quarter != n.Step.Quarter) {
+		if r.Chapter == n.Step.Chapter && (r.Level != n.Step.Level || r.From != n.Step.From || r.NextAt != n.Step.NextAt) {
 			t.Fatalf("the step %+v, its chapter %+v", n.Step, r)
 		}
 	}
@@ -437,7 +458,8 @@ func TestIssueLeftUnfinishedCountsOnceItsDayIsOver(t *testing.T) {
 	if err != nil || s == nil {
 		t.Fatalf("no step: %v", err)
 	}
-	if r := w.rankIn(ana, s.Chapter); s.Left != max(1, r.NextAt-r.Ink) || s.Level != r.Level {
+	if r := w.rankIn(ana, s.Chapter); s.Left != max(1, r.NextAt-r.Ink) || s.Level != r.Level || s.From != r.From ||
+		s.NextAt != r.NextAt {
 		t.Fatalf("the step %+v against its rank %+v", s, r)
 	}
 	// Профил says each chapter's ink as its Алманах card does: the book's.
