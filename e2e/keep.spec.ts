@@ -310,7 +310,7 @@ test("Профил names Настройки in words, and a name still drawn lea
   await expect(page.getByText("Това име е избрано наслуки.")).toBeVisible();
   await expect(page.locator(".me-settings strong")).toHaveText("Настройки");
   await expect(page.locator(".me-settings")).toHaveAttribute("href", "/settings");
-  await page.getByRole("link", { name: "Смени името" }).click();
+  await page.getByRole("link", { name: "Смени го" }).click();
   await expect(page.getByLabel("Име", { exact: true })).toBeFocused();
   // Известия are there wherever notifications can't come, and say why.
   await expect(page.locator("section.stack", { has: page.getByRole("heading", { name: "Известия" }) })).toContainText(

@@ -43,8 +43,10 @@ test("Профил: the avatar is changed on a sheet, the one worn marked; a tap
   await page.goto("/");
   await playedBefore(page, 1);
   await page.goto("/me");
-  // Found by „Смени“ under the avatar as well as the avatar itself: one button, its name says what it does.
-  await page.locator(".me-avatar-change").click();
+  // The avatar is the button, named for what it does; its pencil is on it, no word beside it.
+  await expect(page.locator(".me-avatar-change")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Смени аватара" })).toHaveAttribute("title", "Смени аватара");
+  await page.getByRole("button", { name: "Смени аватара" }).click();
   const sheet = page.getByRole("dialog", { name: "Аватар" });
   await expect(sheet).toBeVisible();
   await expect(sheet.locator('.pick[aria-pressed="true"]')).toHaveCount(1);
