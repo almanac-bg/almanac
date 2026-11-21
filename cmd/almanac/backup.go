@@ -71,9 +71,8 @@ func backupRecipients() ([]age.Recipient, string) {
 //	restore [-identity F] [-unencrypted] [-into-place [-confirm KEY]] <key|latest> [path]   write a copy to a new
 //	                         database file and check it; or put it in place of the game's database (DB_PATH), with
 //	                         the game stopped, once its key is typed back (or given as -confirm)
-//	verify [-identity F] [key|latest]  bring a copy back and check it (the latest day's, if no key is given); with the
-//	                         key, off the server, it prints the copy's proof code
-//	proven <code>            record on the server that the key kept off it opened a copy (the code verify printed)
+//	verify [-identity F] [key|latest]  bring a copy back and check it (the latest day's, if no key is given); without
+//	                         the key (on the server), as far as it can be: stored whole, as this server sent it
 //	keys                     make the key pair that encrypts the copies (BACKUP_RECIPIENT) and opens them (kept off
 //	                         the server)
 //
@@ -92,14 +91,6 @@ func backupCommand(args []string) error {
 		}
 		fmt.Printf("# The key that opens the copies. Keep it off the server (in a password manager), and never lose it:\n"+
 			"# without it no copy can be opened.\n%s\n\n# For the server's settings (/etc/almanac/env):\nBACKUP_RECIPIENT=%s\n", secret, recipient)
-		return nil
-	}
-	if args[0] == "proven" && len(args) == 2 {
-		p, err := backup.Prove(filepath.Dir(dbPath()), args[1], time.Now())
-		if err != nil {
-			return err
-		}
-		fmt.Printf("recorded: the key kept off the server opens %s (the copies' key %s)\n", p.Key, p.Recipient)
 		return nil
 	}
 	s, err := backupStore()
@@ -391,8 +382,7 @@ func listBackups(ctx context.Context, s *backup.Store) error {
 }
 
 // verifyBackup brings back the copy under key ("latest": the newest under days/) and checks it. An encrypted copy is
-// opened with open's keys, where they are (off the server), and its proof code printed, for the server to record
-// (backup proven); without them, it's checked as far as it can be without its key: stored whole, as it was sent, and,
+// opened with open's keys, where they are (off the server); without them, it's checked as far as it can be without its key: stored whole, as it was sent, and,
 // where this server's records reach, one this server stored.
 func verifyBackup(ctx context.Context, s *backup.Store, key string, open backup.Opening) error {
 	key, err := resolveKey(ctx, s, key, "days/")
@@ -424,11 +414,6 @@ func verifyBackup(ctx context.Context, s *backup.Store, key string, open backup.
 		return fmt.Errorf("%s: %w", key, err)
 	}
 	printCounts(key+" brought back and whole", back.Rows)
-	if back.Proof != "" {
-		fmt.Printf("\nThe key opens it. Its proof code: %s\n"+
-			"Record it on the server, so the server knows the copies open (it asks for this monthly):\n"+
-			"  almanac backup proven %s\n", back.Proof, back.Proof)
-	}
 	return nil
 }
 

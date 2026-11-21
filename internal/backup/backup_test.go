@@ -373,7 +373,7 @@ func TestOldCopiesStillRestore(t *testing.T) {
 		t.Fatalf("an unencrypted copy taken with a key: %v", err)
 	}
 	back, err := Drill(t.Context(), w.store, "days/15.db.gz", w.dir, Opening{IDs: []age.Identity{owner}, Unencrypted: true})
-	if err != nil || back.Rows["runs"] != 1 || back.Encrypted || back.Proof != "" {
+	if err != nil || back.Rows["runs"] != 1 || back.Encrypted {
 		t.Fatalf("%+v %v", back, err)
 	}
 }
@@ -672,4 +672,48 @@ func damaged(t *testing.T) []byte {
 		}
 	}
 	return data
+}
+
+// plain opens the copies made with no key: unencrypted, and asked for.
+var plain = Opening{Unencrypted: true}
+
+// `latest` is only ever a copy as the server makes it: encrypted, named by its time, stored at that time. What someone
+// with the bucket's key puts there besides (unencrypted, named otherwise, or stored long after its name) is skipped,
+// and said to be.
+func TestLatestIsTheServersCopy(t *testing.T) {
+	w := newWorld(t)
+	owner, _ := age.GenerateX25519Identity()
+	w.at = time.Date(2026, 11, 15, 10, 0, 0, 0, time.UTC)
+	r, err := w.backer(w.db.Read, owner.Recipient()).Once(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	plant := func(key string, at time.Time, body []byte) {
+		w.fake.now = at
+		if err := w.store.Put(t.Context(), key, bytes.NewReader(body), nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	later := w.at.Add(30 * time.Minute)
+	plant("hours/2026-11-15T113000Z.db.gz", later, []byte("plain"))             // unencrypted
+	plant("hours/evil.db.gz.age", later, ageMagic)                              // not named by a time
+	plant("hours/2026-11-15T090000Z.db.gz.age", later.Add(time.Hour), ageMagic) // stored long after its name
+	plant("other/2026-11-15T113000Z.db.gz.age", later, ageMagic)                // not a copy's prefix
+	key, skipped, err := Latest(t.Context(), w.store, "")
+	if err != nil || key != r.Keys[0] || len(skipped) != 4 {
+		t.Fatalf("latest %q, skipped %v, %v", key, skipped, err)
+	}
+	if key, _, err := Latest(t.Context(), w.store, "days/"); err != nil || key != r.Keys[1] {
+		t.Fatalf("days: %q %v", key, err)
+	}
+	if _, _, err := Latest(t.Context(), newWorld(t).store, ""); !errors.Is(err, ErrMissing) {
+		t.Fatalf("none: %v", err)
+	}
+	// An unencrypted copy is never taken unless asked for, with a key or without.
+	path := filepath.Join(w.dir, "x.db")
+	for _, open := range []Opening{{IDs: []age.Identity{owner}}, {}} {
+		if _, err := Restore(t.Context(), w.store, "hours/2026-11-15T113000Z.db.gz", path, open); !errors.Is(err, ErrUnencrypted) {
+			t.Fatalf("%v", err)
+		}
+	}
 }

@@ -15,9 +15,7 @@
 //	almanac backup restore [-identity F] [-unencrypted] [-into-place [-confirm KEY]] <key|latest> [path]  write a copy
 //	                                    to a new database file, or in place of the game's (stopped; its key typed back);
 //	                                    -identity: the key that opens it (- : input); -unencrypted: a copy that isn't, by name
-//	almanac backup verify [-identity F] [key|latest]  bring a copy back and check it (the latest day's); with the key,
-//	                                    its proof code
-//	almanac backup proven <code>        record that the key kept off the server opened a copy (the code verify printed)
+//	almanac backup verify [-identity F] [key|latest]  bring a copy back and check it (the latest day's)
 //	almanac backup keys                 make the key pair the copies are encrypted to (BACKUP_RECIPIENT) and opened with
 //	almanac seed [-players N] [-days N] [-seed N] [-state dir]  development only (DEV=1): fill a new database (DB_PATH)
 //	                                    with sixty days of play by two hundred players, and print personas to sign in as
@@ -87,5 +85,5 @@ func run(args []string) error {
 }
 
 func usage() error {
-	return fmt.Errorf("usage: almanac serve | bank check [-sample] [-used file] [-live dir] [dir] | bank lint [-rule R,…] [-summary] [dir] | bank fmt [dir] | bank subjects [dir] | bank calibrate [dir] | bank suspects [dir] | bank reports [-resolve ids] | bank used | bank plan [-n N] [-json] [-used file] [dir] | bank add [-check] [-checked-by P] <batch> [dir] | backup now [-force] | backup list | backup restore [-identity F] [-unencrypted] [-into-place [-confirm KEY]] <key|latest> [path] | backup verify [-identity F] [key|latest] | backup proven <code> | backup keys | admin [-remove] <email> | seed [-players N] [-days N] [-seed N] [-state dir] (DEV=1, a new DB_PATH) | push keys | migrations | version")
+	return fmt.Errorf("usage: almanac serve | bank check [-sample] [-used file] [-live dir] [dir] | bank lint [-rule R,…] [-summary] [dir] | bank fmt [dir] | bank subjects [dir] | bank calibrate [dir] | bank suspects [dir] | bank reports [-resolve ids] | bank used | bank plan [-n N] [-json] [-used file] [dir] | bank add [-check] [-checked-by P] <batch> [dir] | backup now [-force] | backup list | backup restore [-identity F] [-unencrypted] [-into-place [-confirm KEY]] <key|latest> [path] | backup verify [-identity F] [key|latest] | backup keys | admin [-remove] <email> | seed [-players N] [-days N] [-seed N] [-state dir] (DEV=1, a new DB_PATH) | push keys | migrations | version")
 }

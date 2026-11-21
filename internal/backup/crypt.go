@@ -3,12 +3,9 @@ package backup
 import (
 	"bufio"
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
-	"slices"
 	"strings"
 
 	"filippo.io/age"
@@ -132,20 +129,4 @@ func opened(r io.Reader, open Opening) (io.Reader, bool, error) {
 		return nil, true, fmt.Errorf("decrypting: %w", err)
 	}
 	return d, true, nil
-}
-
-// Fingerprint names a set of recipients without spelling them out: the first 16 hex digits of the SHA-256 of their
-// keys, sorted. The same keys, however BACKUP_RECIPIENT lists them, have the same fingerprint.
-func Fingerprint(rs []age.Recipient) string {
-	keys := make([]string, 0, len(rs))
-	for _, r := range rs {
-		if s, ok := r.(fmt.Stringer); ok {
-			keys = append(keys, s.String())
-		} else {
-			keys = append(keys, fmt.Sprintf("%T %v", r, r))
-		}
-	}
-	slices.Sort(keys)
-	sum := sha256.Sum256([]byte(strings.Join(keys, "\n")))
-	return hex.EncodeToString(sum[:8])
 }

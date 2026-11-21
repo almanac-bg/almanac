@@ -15,12 +15,10 @@ import (
 	"time"
 )
 
-// Restored is what a copy brought back was: encrypted or not, its proof code (an encrypted copy's: ProofCode), when
-// the bucket says it was stored, and the core tables' rows its metadata names (as whoever stored it wrote them). Drill
+// Restored is what a copy brought back was: encrypted or not, when the bucket says it was stored, and the core tables' rows its metadata names (as whoever stored it wrote them). Drill
 // adds the rows the copy has.
 type Restored struct {
 	Encrypted bool
-	Proof     string
 	Modified  time.Time
 	Meta      string
 	Rows      map[string]int64
@@ -43,8 +41,6 @@ func Restore(ctx context.Context, s *Store, key, path string, open Opening) (*Re
 	}
 	r := &Restored{Encrypted: encrypted, Meta: header.Get("x-amz-meta-rows")}
 	r.Modified, _ = http.ParseTime(header.Get("Last-Modified"))
-	sum := sha256.New()
-	plain = io.TeeReader(plain, sum)
 	zr, err := gzip.NewReader(plain)
 	if err != nil {
 		return nil, fmt.Errorf("unzipping: %w", err)
@@ -62,18 +58,12 @@ func Restore(ctx context.Context, s *Store, key, path string, open Opening) (*Re
 	if _, err := io.Copy(f, zr); err != nil {
 		return fail(err)
 	}
-	if _, err := io.Copy(io.Discard, plain); err != nil { // to the end, all hashed (ProofCode)
-		return fail(err)
-	}
 	if err := f.Sync(); err != nil {
 		return fail(err)
 	}
 	if err := f.Close(); err != nil {
 		os.Remove(tmp)
 		return nil, err
-	}
-	if encrypted {
-		r.Proof = ProofCode(sum.Sum(nil))
 	}
 	return r, os.Rename(tmp, filepath.Clean(path))
 }

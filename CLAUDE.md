@@ -41,7 +41,7 @@ most). A change is judged by whether players come back: the retention numbers in
 | `internal/store` | SQLite; migrations in `internal/store/migrations`, applied once each by name |
 | `internal/bank` | Question types, the bank on disk, its checks |
 | `internal/card` | The pictures a link shows (1200 × 630 PNG): a shared day's card, which the browser also shares as the day's picture (`/card/<issue>-<shape>.png`), and the site's own (`/og.png`); drawn in Go with the game's fonts (static cuts made by `web/src/fonts/subset.sh`) and the chapters' glyphs (`glyphs.json`, from `art/pictures.ts`) |
-| `internal/account`, `mail`, `push`, `backup` | Players and sign-in, email, Web Push, backups to R2 every 15 minutes (each checked before it's sent, encrypted to a key kept off the server, one brought back daily, the owner's key proven monthly: `backup proven`) |
+| `internal/account`, `mail`, `push`, `backup` | Players and sign-in, email, Web Push, backups to R2 every 15 minutes (each checked before it's sent, encrypted to a key kept off the server, one brought back daily) |
 | `web/src` | The client, plain TypeScript, no framework: `lib/` (DOM, signals, router), `game/` (questions, a run), `screens/` (one file per page), `ui.ts`, `app.css` |
 | `web/DESIGN.md` | How it looks and speaks: tokens, components, copy rules. Follow it for any UI |
 | `e2e` | The game in real browsers (Playwright) |
