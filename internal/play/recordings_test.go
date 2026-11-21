@@ -206,6 +206,8 @@ func TestRecordingLevel(t *testing.T) {
 		if !strings.Contains(string(data), `"level":"`+c.level+`"`) {
 			t.Fatalf("chosen %q: %s", c.chosen, data)
 		}
+		// Listed once its first question has shown (made and left before, it isn't: TestUnbegunDuelGoes).
+		w.show(ana, w.playSide(ana, id, nil))
 		list, err := w.g.DuelsOf(ctx, ana)
 		if err != nil || len(list.Yours) == 0 || list.Yours[0].Level != c.level {
 			t.Fatalf("chosen %q, in the list: %+v %v", c.chosen, list.Yours, err)

@@ -110,6 +110,51 @@ test("against a recording: a real game's ten, its player named, its answers as t
   expect((await again).postDataJSON()).toEqual({ recording: true, level: "stronger" });
 });
 
+test("a duel left before its first question isn't „Твой ред“; one begun goes on with its own run from „Играй“", async ({
+  browser,
+}) => {
+  test.setTimeout(180_000);
+  const a = await (await browser.newContext()).newPage();
+  const b = await (await browser.newContext()).newPage();
+  await befriend(a, b);
+  // Whatever „Играй“ opens, never another game: no chapter's game is started meanwhile.
+  const other: string[] = [];
+  a.on("request", (r) => {
+    const path = new URL(r.url()).pathname;
+    if (r.method() === "POST" && (path === "/api/topic" || path === "/api/day")) other.push(path);
+  });
+
+  // A tap on „Дуел“, then „Отказ“ on the count: no question shown, so nothing waits in Приятели.
+  await a.goto("/friends");
+  await a.locator(".friend").getByRole("button", { name: /^Дуел/ }).click();
+  await meetAs(a, "Ана");
+  await expect(a).toHaveURL(/\/duel\/\d+$/);
+  const duel = new URL(a.url()).pathname;
+  await expect(a.getByRole("heading", { name: "Приготви се" })).toBeVisible();
+  await a.getByRole("button", { name: "Отказ" }).click();
+  await expect(a).toHaveURL(/\/friends$/);
+  await expect(a.locator(".duels").getByRole("link", { name: "Нов дуел" })).toBeVisible();
+  await expect(a.locator(".duel-turn")).toHaveCount(0);
+
+  // Tapped again: the same duel. Its first question answered, then away.
+  await a.locator(".friend").getByRole("button", { name: /^Дуел/ }).click();
+  await expect(a).toHaveURL(duel);
+  await countIn(a);
+  await expect(a.locator(".question-head")).toContainText("1 от 10", { timeout: 10_000 });
+  await answer(a);
+  await expect(a.locator(".verdict")).toBeVisible();
+  await a.goto("/friends");
+
+  // „Твой ред“, and „Играй“ goes on with the duel's own run, where it was left.
+  await expect(a.locator(".duel-turn")).toContainText("Довърши своята игра");
+  await a.locator(".duel-turn").getByRole("link", { name: "Играй" }).click();
+  await expect(a).toHaveURL(duel);
+  await a.getByRole("button", { name: "Продължи" }).click();
+  await expect(a.locator(".question-head")).toContainText("2 от 10", { timeout: 10_000 });
+  await expect(a.locator(".question-head .versus")).toContainText("Дуел с");
+  expect(other).toEqual([]);
+});
+
 test("a duel that is gone is said to be gone, to a guest too: not a sign-in", async ({ page }) => {
   await page.goto("/");
   expect((await page.request.post("/api/guest", { data: {} })).ok()).toBe(true);

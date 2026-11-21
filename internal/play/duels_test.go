@@ -93,7 +93,8 @@ func TestFriendDuel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Not played by Ana yet: hers to play, nothing of it Bo's.
+	// Not played by Ana yet: hers to play once its first question has shown, nothing of it Bo's.
+	w.show(ana, w.playSide(ana, id, nil))
 	if d, _ := w.g.DuelsOf(ctx, ana); len(d.Yours) != 1 || d.Yours[0].ID != id || !d.Yours[0].First {
 		t.Fatalf("Ana's duels before she played: %+v", d)
 	}
@@ -280,6 +281,71 @@ func TestDuelLapses(t *testing.T) {
 	}
 	if d, _ := w.g.DuelsOf(ctx, bo); len(d.Yours)+len(d.Theirs) != 0 {
 		t.Fatalf("open duels left: %+v", d)
+	}
+}
+
+// A duel made and left before its first question showed (a tap, then „Отказ“) isn't a duel yet: it isn't listed, a tap
+// on the same duel again goes on with it, and DuelUnbegun after it was made it goes, with its run; the friend never
+// hears of it. One begun stays, and is listed; its run is the duel's, never a chapter's game left to go on with.
+func TestUnbegunDuelGoes(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	var h heard
+	h.listen(w.g)
+	ana, bo := w.user(), w.user()
+	w.befriend(ana, bo)
+	settle := func() {
+		t.Helper()
+		if err := w.g.SettleDue(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	id, err := w.g.DuelFriend(ctx, ana, bo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run := w.playSide(ana, id, nil)
+	if d, _ := w.g.DuelsOf(ctx, ana); len(d.Yours)+len(d.Theirs) != 0 {
+		t.Fatalf("listed before its first question: %+v", d)
+	}
+	if d, err := w.g.DuelOf(ctx, ana, id); err != nil || d.State != DuelYours || d.RunID != run {
+		t.Fatalf("its own page: %+v %v", d, err)
+	}
+	w.wait(DuelUnbegun - time.Minute)
+	settle()
+	if again, err := w.g.DuelFriend(ctx, ana, bo); err != nil || again != id {
+		t.Fatalf("tapped again: %d %v, want %d", again, err, id)
+	}
+	w.wait(2 * time.Minute)
+	settle()
+	if there, _ := w.g.DuelExists(ctx, id); there {
+		t.Fatal("an unbegun duel is still there")
+	}
+	var runs int
+	if err := w.db.Read.QueryRow(`SELECT count(*) FROM runs WHERE id = ?`, run).Scan(&runs); err != nil || runs != 0 {
+		t.Fatalf("its run: %d %v", runs, err)
+	}
+	if _, err := w.g.PlayDuel(ctx, ana, id); !errors.Is(err, ErrDuelGone) {
+		t.Fatalf("played once gone: %v", err)
+	}
+
+	// Begun: its first question shown, then left. It stays, hers to play, and isn't a game of a chapter left.
+	begun, err := w.g.DuelFriend(ctx, ana, bo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	brun := w.playSide(ana, begun, nil)
+	w.show(ana, brun)
+	w.wait(2 * DuelUnbegun)
+	settle()
+	if d, _ := w.g.DuelsOf(ctx, ana); len(d.Yours) != 1 || d.Yours[0].ID != begun || d.Yours[0].RunID != brun {
+		t.Fatalf("a begun duel: %+v", d)
+	}
+	if left, err := w.g.Left(ctx, ana); err != nil || len(left) != 0 {
+		t.Fatalf("a duel's run among the games left: %+v %v", left, err)
+	}
+	if n := h.take(); len(n) != 0 {
+		t.Fatalf("Bo told of a duel not sent: %+v", n)
 	}
 }
 
