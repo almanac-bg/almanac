@@ -2,11 +2,12 @@
 // topic's colour. The stylesheet draws them; these only say what to draw.
 
 import { picture } from "./art/picture.ts";
+import type { Credit } from "./game/types.ts";
 import { errorText, passing } from "./lib/api.ts";
 import { hourInBulgaria } from "./lib/day.ts";
 import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
 import { type Scheme, scheme, setScheme } from "./lib/prefs.ts";
-import { formatNumber, formatValue, hyphenate, keepNumbers, stakeWords } from "./lib/words.ts";
+import { formatNumber, formatValue, found, hyphenate, keepNumbers, stakeWords } from "./lib/words.ts";
 import { glyphBox, rankName, rankNames, sealParts } from "./seal.ts";
 import { topics } from "./state.ts";
 
@@ -585,18 +586,46 @@ export const rightsOf = (rights: number, of: number): Child => [
 
 /** A word that may break (hyphenate: seven letters and more) held whole (`.whole-word`): it goes to the next line
  * whole where it fits there, and breaks at its syllables, with a hyphen, only where it's wider than its line. */
-const wholeWord = (word: string): Child => {
+const wholeWord = (word: string, find: string[] = []): Child => {
   const w = hyphenate(word);
-  return w === word ? word : h("span", { class: "whole-word" }, w);
+  const shown = marked(w, find);
+  return w === word ? shown : h("span", { class: "whole-word" }, shown);
 };
+
+/** A word with what a search found in it in a `<mark>` each (words.ts, found: across its soft hyphens). */
+function marked(word: string, find: string[]): Child {
+  const spans = found(word, find);
+  if (!spans.length) return word;
+  let at = 0;
+  const out: Child[] = [];
+  for (const [from, to] of spans) {
+    out.push(word.slice(at, from), h("mark", null, word.slice(from, to)));
+    at = to;
+  }
+  out.push(word.slice(at));
+  return out;
+}
 
 /** A text as a narrow line holds it (a fact, an entry, outside the play screen; questions.ts, wholeWords, holds a
  * question's): it breaks between its words, a word only where it's wider than its line, at its syllables, with a
- * hyphen, never at any letter (large text at 320 px). */
-export function textWords(text: string): Child {
+ * hyphen, never at any letter (large text at 320 px). With a search's words (`find`: words.ts, searchWords), what it
+ * found marked: a search's word has no space in it, so a word of the text holds each match whole. */
+export function textWords(text: string, find: string[] = []): Child {
   return keepNumbers(text)
     .split(/(\s+)/)
-    .map((part, i) => (i % 2 ? part : wholeWord(part)));
+    .map((part, i) => (i % 2 ? part : wholeWord(part, find)));
+}
+
+/** Whose a picture is, and on what licence, each a link: „Снимка: Иван Иванов · CC BY-SA 4.0“. */
+export function pictureCredit(c: Credit): Child {
+  return h(
+    "p",
+    { class: "credit" },
+    "Снимка: ",
+    h("a", { href: c.source, target: "_blank", rel: "noopener" }, c.credit),
+    " · ",
+    c.licenseUrl ? h("a", { href: c.licenseUrl, target: "_blank", rel: "noopener" }, c.license) : c.license,
+  );
 }
 
 /** A player's name as a line holds it (DESIGN.md, Names): it breaks between its words first, each word held whole,

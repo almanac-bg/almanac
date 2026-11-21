@@ -4,11 +4,13 @@ import {
   dateWords,
   formatNumber,
   formatValue,
+  found,
   hyphenate,
   issueOf,
   issueWords,
   keepNumbers,
   leftWords,
+  searchWords,
   stakeWords,
   weekday,
   withWord,
@@ -160,4 +162,37 @@ test("a number stays with its unit, a short word after it, and its own thousands
   assert.equal(keepNumbers("около 3 млн. души, 45 % от тях"), `около 3${nb}млн. души, 45${nb}% от тях`);
   assert.equal(keepNumbers("13 000 реда"), `13${nb}000${nb}реда`);
   assert.equal(keepNumbers("през 2010 година"), "през 2010 година");
+});
+
+test("a search's words as the server takes them: in lower case, between spaces, its first 60 letters", () => {
+  assert.deepEqual(searchWords("  Дунав   ЧЕРНО\tморе "), ["дунав", "черно", "море"]);
+  assert.deepEqual(searchWords(""), []);
+  assert.deepEqual(searchWords("   "), []);
+  assert.equal(searchWords(`${"а".repeat(58)} бвг`).join(" "), `${"а".repeat(58)} б`);
+});
+
+test("what a search found in a text: in any case, every place, across the soft hyphens a long word gets", () => {
+  // Marked as the text shows it: the soft hyphens in, `found` over them.
+  const mark = (text: string, words: string[]) => {
+    let out = "";
+    let at = 0;
+    for (const [from, to] of found(text, words)) {
+      out += `${text.slice(at, from)}[${text.slice(from, to)}]`;
+      at = to;
+    }
+    return (out + text.slice(at)).replaceAll("­", "-");
+  };
+  assert.equal(mark("Дунав и дунавът", searchWords("ДУНАВ")), "[Дунав] и [дунав]ът");
+  // Across the soft hyphens of „Съе-ди-не-ние-то“; one at the match's edge stays out of it.
+  const united = hyphenate("Съединението");
+  assert.equal(mark(united, ["единение"]), "Съ[е-ди-не-ние]-то");
+  assert.equal(mark(united, ["ди"]), "Съе-[ди]-не-ние-то");
+  assert.equal(mark(united, ["то"]), "Съе-ди-не-ние-[то]");
+  // Two words over one another are one mark; none where nothing was searched or nothing is there.
+  assert.equal(mark("Независимостта", ["неза", "зави"]), "[Незави]симостта");
+  assert.equal(mark(hyphenate("независимостта"), ["мостта"]), "не-за-ви-си-[мост-та]");
+  assert.deepEqual(found("Дунав", []), []);
+  assert.deepEqual(found("Дунав", ["волга"]), []);
+  // A number the line keeps whole (keepNumbers) is found by its digits.
+  assert.equal(mark(keepNumbers("през 1878 г."), ["1878"]), "през [1878]\u00a0г.");
 });

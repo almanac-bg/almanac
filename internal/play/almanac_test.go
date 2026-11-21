@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/almanac-bg/almanac/internal/bank"
@@ -122,5 +123,54 @@ func TestAlmanacEntries(t *testing.T) {
 	}
 	if f := byID[untruth]; f.Question != "" || !f.Untrue || f.Answer == "Невярно" {
 		t.Fatalf("an untrue statement: %+v", f)
+	}
+}
+
+// A picture question's entry shows its picture, as the play screen has it, with its credit: the one over the question,
+// or a choice of pictures' answer; a question without one has none.
+func TestAlmanacPictures(t *testing.T) {
+	w := setup(t)
+	ana := w.user()
+	var over, options, plain bank.Question
+	for _, q := range w.b.Live("", "") {
+		if q.Extra().Fact == "" {
+			continue
+		}
+		c, choice := q.(*bank.Choice)
+		switch {
+		case q.Extra().Image != nil && over == nil:
+			over = q
+		case choice && len(c.Pictures) > 0 && options == nil:
+			options = q
+		case !bank.HasPictures(q) && plain == nil:
+			plain = q
+		}
+	}
+	if over == nil || options == nil || plain == nil {
+		t.Fatal("the sample lacks a picture over a question, a choice of pictures or a question without one, each with a fact")
+	}
+	w.knows(ana, over.Base().ID, options.Base().ID, plain.Base().ID)
+	alm, err := w.g.AlmanacOf(t.Context(), ana, AlmanacQuery{Limit: AlmanacPage})
+	if err != nil || len(alm.Facts) != 3 {
+		t.Fatalf("%d facts (%v)", len(alm.Facts), err)
+	}
+	byID := map[string]Learned{}
+	for _, f := range alm.Facts {
+		byID[f.ID] = f
+	}
+	for _, c := range []struct {
+		q    bank.Question
+		file string
+	}{{over, over.Extra().Image.File}, {options, options.(*bank.Choice).Pictures[0].File}} {
+		f := byID[c.q.Base().ID]
+		stem := strings.TrimSuffix(c.file, ".webp")
+		if f.Image == nil || f.Credit == nil || !strings.HasPrefix(f.Image.Src, bank.ImagePath+stem) ||
+			!strings.Contains(f.Image.SrcSet, bank.ImagePath+c.file) || f.Image.W == 0 || f.Image.H == 0 ||
+			f.Image.Alt == "" || f.Credit.Credit == "" || f.Credit.Source == "" {
+			t.Fatalf("%s: its entry's picture %+v, credit %+v; want %s", c.q.Base().ID, f.Image, f.Credit, c.file)
+		}
+	}
+	if f := byID[plain.Base().ID]; f.Image != nil || f.Credit != nil {
+		t.Fatalf("a question without a picture has one in its entry: %+v", f)
 	}
 }

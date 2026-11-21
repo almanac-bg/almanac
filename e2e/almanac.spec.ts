@@ -100,6 +100,24 @@ test("a chapter finds its facts by their words", async ({ page }) => {
   await expect(page).toHaveURL(/\?q=/);
   await expect(entries.first()).toContainText(/Дунав/i);
   for (const text of await entries.allTextContents()) expect(text).toMatch(/дунав/i);
+  // What it found is marked in each entry, whole across a long word's soft hyphens, and nothing else is.
+  const marks = page.locator(".entry mark");
+  await expect(marks.first()).toBeVisible();
+  for (const m of await marks.all()) expect((await readText(m)).toLowerCase()).toBe("дунав");
+  for (const e of await entries.all()) await expect(e.locator("mark").first()).toBeVisible();
+  // A long word, broken by syllables („по-лу-ост-ров“), is marked in one piece over its soft hyphens.
+  await page.getByRole("searchbox", { name: "Търси във фактите" }).fill("луостр");
+  await expect(page).toHaveURL(/\?q=%D0%BB/);
+  await expect.poll(() => readText(marks.first())).toBe("луостр");
+  for (const m of await marks.all()) {
+    expect(await readText(m)).toBe("луостр");
+    expect(await m.textContent()).toContain("­");
+  }
+  // No search, no marks.
+  await page.getByRole("searchbox", { name: "Търси във фактите" }).fill("");
+  await expect(page).toHaveURL(/\/almanac\/geography$/);
+  await expect(entries).toHaveCount(facts.length);
+  await expect(marks).toHaveCount(0);
   await page.getByRole("searchbox", { name: "Търси във фактите" }).fill("щщщщщ");
   await expect(page.getByText("Нищо не е намерено. Опитай с друга дума.")).toBeVisible();
 });
@@ -135,8 +153,14 @@ test("a chapter's entries: the latest first, each with its dateline; a statement
   await expect
     .poll(() => readText(truth.locator(".entry-word")))
     .toBe("Българската държава на Балканите е основана през 681 г.");
-  // A question's answer is the headword, the question in italic under it.
+  // An entry reads as it was lived: the dateline, the question, its answer as the headword, then the fact.
   await expect(items.last().locator(".entry-q")).toHaveCount(1); // learned first
+  expect(
+    await items
+      .last()
+      .locator(".entry-when, .entry-q, .entry-word, .entry-lines, .entry-fact")
+      .evaluateAll((all) => all.map((e) => e.className)),
+  ).toEqual(["entry-when", "entry-q", expect.stringMatching(/^entry-(word|lines)$/), "entry-fact"]);
   // Two facts are read at a glance: no search over them.
   await expect(page.getByRole("searchbox", { name: "Търси във фактите" })).toHaveCount(0);
   // An untrue statement says so.
@@ -144,6 +168,46 @@ test("a chapter's entries: the latest first, each with its dateline; a statement
   await expect
     .poll(() => readText(page.locator(".entry-word", { hasText: "Дунав" })))
     .toBe("Невярно: Дунав се влива в Черно море на българска земя.");
+});
+
+test("a picture question's entry shows its picture, credited; a choice of pictures shows its answer's", async ({
+  page,
+}) => {
+  await page.goto("/");
+  // A flag over its question (geo-901), a choice of flags (geo-965), and a question without a picture (his-002).
+  await knows(page, ["geo-901", "geo-965"]);
+  await page.goto("/almanac/geography");
+  const entries = page.locator(".entry");
+  await expect(entries).toHaveCount(2);
+  for (const e of await entries.all()) {
+    const pic = e.locator("img.entry-pic");
+    await expect(pic).toBeVisible();
+    await expect(pic).toHaveAttribute("loading", "lazy");
+    await expect(pic).toHaveAttribute("src", /^\/qimg\/[0-9a-f]{16}-600\.webp$/);
+    // Drawn, at its own shape, beside the question and headword, in the entry's small text its credit.
+    expect(await pic.evaluate((im: HTMLImageElement) => im.complete && im.naturalWidth > 0)).toBe(true);
+    await expect(e.locator(".credit")).toContainText("Снимка:");
+    const [p, word] = [await pic.boundingBox(), await e.locator(".entry-word").boundingBox()];
+    expect(p && word && p.x > word.x).toBe(true);
+  }
+  await page.goto("/");
+  await knows(page, ["his-002"]);
+  await page.goto("/almanac/history");
+  await expect(page.locator(".entry")).toHaveCount(1);
+  await expect(page.locator(".entry img, .entry .credit")).toHaveCount(0);
+});
+
+test("on a big screen a chapter's entries are one column, the latest first, top to bottom", async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.goto("/");
+  await knows(page, sampleFacts("geography"));
+  await page.goto("/almanac/geography");
+  const entries = page.locator(".entry");
+  await expect(entries.first()).toBeVisible();
+  const boxes = await entries.evaluateAll((all) => all.map((e) => e.getBoundingClientRect().toJSON() as DOMRect));
+  expect(new Set(boxes.map((b) => Math.round(b.left))).size).toBe(1);
+  for (const [i, b] of boxes.slice(1).entries()) expect(b.top).toBeGreaterThan(boxes[i]?.bottom ?? 0);
+  expect(boxes[0]?.width).toBeLessThanOrEqual(44 * 16 + 1);
 });
 
 test("a chapter the book doesn't have is the page that isn't there; the book with a slash after it is the book", async ({
