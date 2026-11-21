@@ -801,25 +801,6 @@
     gap: var(--space-3);
   }
 
-  /* A page's picture beside its heading, small, not over it: the page opens on what it's for (its lead under both on
-     a phone, beside the picture on a big screen). */
-  .intro:has(> .page-art) {
-    grid-template-columns: auto minmax(0, 1fr);
-    column-gap: var(--space-4);
-  }
-
-  .intro:has(> .page-art) > :not(.page-art, h1) {
-    grid-column: 1 / -1;
-  }
-
-  .intro > .page-art {
-    grid-column: 1;
-    align-self: center;
-    width: 72px;
-    height: 72px;
-    margin: 0;
-  }
-
   /* ---- Cards and sections ---- */
 
   /* A card: a white surface with soft corners on the page. */
@@ -7201,21 +7182,6 @@
     /* A tablet: the column a little wider than a phone's. */
     #main {
       max-width: 48rem;
-    }
-
-    /* The page's picture beside its heading and its lead. */
-    .intro:has(> .page-art) > :not(.page-art, .back) {
-      grid-column: 2;
-    }
-
-    .intro > .page-art {
-      grid-row: span 2;
-      width: 112px;
-      height: 112px;
-    }
-
-    .intro:has(> .page-art) > h1 {
-      align-self: end;
     }
 
     /* A page's buttons are a hand's width (22rem), not the column's, at its left, the gold one first: the day's, a
