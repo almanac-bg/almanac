@@ -2,8 +2,7 @@
 // in the issue that stayed grey because the book had its fact already, and the chapter nearest its next rank (its
 // seal, how much ink is still to come, and the quarters as pips); or the ranks it raised (play/rank.go): several as
 // one line (one chapter's with its ladder of ranks), and a rise of the player's best rank as the result's one big
-// moment, the seal set large on its ladder, with the art Страница brings. In a card of its own, once a day, how others'
-// duels against the player's recordings went (play/recordings.go). A game that ended without its result on screen has
+// moment, the seal set large on its ladder, with the art Страница brings. A game that ended without its result on screen has
 // its news told on Днес later (play/told.go): under its result, if it's the day's; else under a line that says whose it
 // is. A bad game is never celebrated: what's said is what's true of it.
 
@@ -24,23 +23,19 @@ interface News {
   /** After a day's issue, the chapter nearest its next rank (play.Step), when none rose: its rank now (0: none yet) and
    * the quarters of the way to the next. */
   step?: { chapter: string; left: number; next: string; level: number; quarter: number };
-  /** Others' duels against the player's recordings, once a day, in a card of its own. */
-  recordings?: { text: string };
 }
 
 /** What a game brought, asked for once the game (run) is kept (after `delay`: a duel is kept a moment after it ends).
  * Told `late` (on Днес, of a game whose result was never on screen), it comes under a line that says whose it is
- * (`late.title`), if any. How others played the player's recordings goes to `recordingsTo`, where given, not with
- * the rest.
+ * (`late.title`), if any.
  */
-export function news(run: number, delay = 0, late?: { title?: string }, recordingsTo?: (view: Child) => void): Child {
+export function news(run: number, delay = 0, late?: { title?: string }): Child {
   const data = signal<News | null>(null);
   const t = setTimeout(
     () =>
       api<News>("POST", "/api/me/news", { run }).then(
         (n) => {
           data.set(n);
-          if (n.recordings && recordingsTo) recordingsTo(recordings(n.recordings));
           // Ink written, or a rank risen: the seal worn may be another now (a first one, or the best risen).
           if (n.ink || n.rose) refreshSeal();
         },
@@ -61,7 +56,6 @@ export function news(run: number, delay = 0, late?: { title?: string }, recordin
     const parts = [
       best,
       lines.length ? h("section", { class: "inkline", "aria-label": "Днес в Алманаха" }, lines) : null,
-      n.recordings && !recordingsTo ? recordings(n.recordings) : null,
     ];
     if (!late?.title) return parts;
     // Late, on Днес: whose news it is, over it; nothing at all when there's nothing to tell.
@@ -138,10 +132,4 @@ function rankUp(r: NonNullable<News["rose"]>): Child {
     top.art ? h("p", { class: "rankup-art" }, "Вече можеш да избереш картината на тази глава за аватар.") : null,
     others.length ? h("p", { class: "rankup-more" }, `И още: ${others.join(", ")}.`) : null,
   );
-}
-
-/** Others played against recordings of the player's games: how many, and how it went; never who (they see the
- * player, the player hears numbers: play/recordings.go). */
-function recordings(r: NonNullable<News["recordings"]>): Child {
-  return h("section", { class: "card stack" }, h("p", { class: "kicker" }, "Твоите записи"), h("p", null, r.text));
 }

@@ -159,81 +159,6 @@ func TestRecordingsLeaveOutGamesLeft(t *testing.T) {
 	}
 }
 
-// The recorded player hears, with a game's news and once a day, how others' duels against their recordings went.
-func TestRecordingsNews(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	owner, gal, bo := w.user(), w.user(), w.user()
-	news := func() *RecordingsNews {
-		t.Helper()
-		n, err := w.g.NewsOf(ctx, owner, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return n.Recordings
-	}
-	s, err := w.g.StartTopic(ctx, owner, MixTopic)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(owner, s.ID, repeat(w.right, Length)...)
-	if r := news(); r != nil {
-		t.Fatalf("news of recordings nobody has played: %+v", r)
-	}
-	duel := func(user int64, answer func(int64, int) json.RawMessage) {
-		t.Helper()
-		id, err := w.g.DuelRecording(ctx, user, Even)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if d, _ := w.g.DuelOf(ctx, user, id); d.Opponent == nil || d.Opponent.ID != owner {
-			t.Fatalf("a duel against the owner's game: %+v", d)
-		}
-		w.playSide(user, id, repeat(answer, Length))
-		w.wait(time.Minute)
-	}
-
-	// Gal loses twice to the owner's game, Bo once: the owner hears it, once today.
-	duel(gal, w.wrong)
-	duel(gal, w.wrong)
-	duel(bo, w.wrong)
-	r := news()
-	if r == nil || r.Text != "Днес 2 души играха срещу записи на твои игри. Записите ти спечелиха всички дуели." {
-		t.Fatalf("the recordings' news: %+v", r)
-	}
-	// Who played isn't told: the news is numbers only (S13).
-	if b, _ := json.Marshal(r); strings.Contains(string(b), "players") {
-		t.Fatalf("the recordings' news names who played: %s", b)
-	}
-	if r := news(); r != nil {
-		t.Fatalf("told twice in a day: %+v", r)
-	}
-	// Later the same day Bo wins: told the next day, as yesterday's.
-	w.wait(8 * time.Hour)
-	duel(bo, w.right)
-	w.wait(16 * time.Hour)
-	if r := news(); r == nil || r.Text != "Вчера един човек игра срещу запис на твоя игра." {
-		t.Fatalf("yesterday's evening, the next day: %+v", r)
-	}
-}
-
-func TestRecordingsWords(t *testing.T) {
-	for _, c := range []struct {
-		firstToday, lastToday bool
-		people, games, won    int
-		want                  string
-	}{
-		{true, true, 3, 3, 2, "Днес 3 души играха срещу записи на твои игри. Записите ти спечелиха 2 от 3 дуела."},
-		{true, true, 1, 1, 1, "Днес един човек игра срещу запис на твоя игра. Записът ти спечели дуела."},
-		{false, false, 1, 2, 2, "Вчера един човек игра срещу записи на твои игри. Записите ти спечелиха всички дуели."},
-		{false, true, 2, 2, 0, "Вчера и днес 2 души играха срещу записи на твои игри."},
-	} {
-		if got := recordingsWords(c.firstToday, c.lastToday, c.people, c.games, c.won); got != c.want {
-			t.Errorf("%+v: %q", c, got)
-		}
-	}
-}
-
 // A duel against a recording keeps the level it was chosen at, „равен“ or „по-силен“ (anything else is „равен“), and
 // says it (DuelView.Level): „По-силен запис · Краси“; played to its end, another follows, a new one. A friend's duel
 // has none.
@@ -298,7 +223,7 @@ func TestRecordingLevel(t *testing.T) {
 		if err != nil || next == id {
 			t.Fatalf("chosen %q after one played: %d %v, want a new one (not %d)", c.chosen, next, err, id)
 		}
-		if d, err := w.g.DuelOf(ctx, ana, next); err != nil || d.State != DuelYours || d.Asked != c.level {
+		if d, err := w.g.DuelOf(ctx, ana, next); err != nil || d.State != DuelYours {
 			t.Fatalf("chosen %q, the one after: %+v %v", c.chosen, d, err)
 		}
 	}

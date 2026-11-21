@@ -56,8 +56,6 @@ export interface DuelView {
   recorded?: boolean;
   /** Against a recording: as it was chosen, as strong as the player („равен“) or stronger („по-силен“). */
   level?: Level;
-  /** Against a recording, the level asked for (play.DuelView.Asked), met or not: another one asks for it again. */
-  asked?: Level;
   /** Against a recording of one topic's game: the topic. */
   topic?: string;
   /** The player played first (sent it). */
@@ -90,6 +88,27 @@ export const recordingName = (level?: Level) =>
 /** Who a duel is with, to start one: a friend (by their id), or a recording at a level. */
 type To = { friend: number } | { recording: true; level: Level };
 
+/** Where this device keeps the level the player last chose a recording at, for „Още един дуел срещу запис“. */
+const levelKey = "almanac.recording";
+
+/** The level the player last chose a recording at on this device, if kept: the server keeps only the level met. */
+function lastLevel(): Level | undefined {
+  try {
+    const v = localStorage.getItem(levelKey);
+    return v === "even" || v === "stronger" ? v : undefined;
+  } catch {
+    return undefined; // storage refused (a private window): the level the duel met, or „равен“
+  }
+}
+
+function keepLevel(level: Level): void {
+  try {
+    localStorage.setItem(levelKey, level);
+  } catch {
+    // Not kept: another duel asks for the level met, or „равен“.
+  }
+}
+
 /** The player's duels, as Приятели lists them (play.Duels). */
 export interface Duels {
   yours: DuelView[];
@@ -110,6 +129,7 @@ const oneDuel = async (id: number) => shown((await api<{ duel: DuelView }>("GET"
 export async function startDuel(to: To): Promise<DuelView | null> {
   await player();
   if ("friend" in to && !(await nameFirst())) return null;
+  if ("recording" in to) keepLevel(to.level);
   return shown((await api<{ duel: DuelView }>("POST", "/api/duels", to)).duel);
 }
 
@@ -483,7 +503,7 @@ export function duelOne(params: string[]) {
       d.friend && d.them
         ? again("Реванш", { friend: d.them })
         : d.recorded
-          ? again("Още един дуел срещу запис", { recording: true, level: d.asked ?? d.level ?? "even" })
+          ? again("Още един дуел срещу запис", { recording: true, level: lastLevel() ?? d.level ?? "even" })
           : null;
     screen.show(() =>
       duelResult(

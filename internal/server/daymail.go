@@ -121,7 +121,7 @@ func (s *Server) dayMail(ctx context.Context, today string, at time.Time, userID
 	word := s.reminder(ctx, today, userID)
 	m := mail.Message{To: email, Subject: word.Title, Unsubscribe: s.mailOffURL(userID, mailDay)}
 	// The link says it came from a mail: a browser signed out is asked to sign in first (screens/today.ts).
-	m.Text = word.Body + "\n\n" + s.mailLink(userID) + "\n\n—\n" +
+	m.Text = word.Body + "\n\n" + s.mailLink() + "\n\n—\n" +
 		"Пишем ти веднъж на ден, около часа, в който играеш, ако броят още те чака. Спри тези писма: " +
 		m.Unsubscribe + "\n"
 	sent := false

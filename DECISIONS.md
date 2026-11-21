@@ -92,8 +92,8 @@ packages' doc comments; this file holds only what must not drift.
   it's fixed as any bug (owner, 2026-11-18).
 - **A recording shows who played it.** Against a recording, the player sees the real player as anywhere in the game
   (name, profile, avatar), labelled „Запис“, never as an anonymous animal: a duel is
-  against someone (owner, 2026-11-19, undoing review S13's unnamed recordings). The other way stays numbers only: the
-  recorded player hears how many played their games and how it went, never who. The privacy page says so.
+  against someone (owner, 2026-11-19, undoing review S13's unnamed recordings). The other way, the recorded player is
+  never told who played their games. The privacy page says so.
 - **Removed to keep the game simple** (owner, 2026-11-19; sharing and friends' duels came back with the redesign): past days'
   questions (the archive of past issues, and going over a game after its day), winning a broken streak back, and the
   year's report; and on 20 Nov, Профил's chart of the days („Твоите броеве“), Начало's line of how yesterday ended,

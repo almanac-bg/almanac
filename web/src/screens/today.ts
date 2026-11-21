@@ -134,14 +134,6 @@ export function today() {
   notice.set("");
   // The game's mails link here with ?from=mail (server/streakmail.go, daymail.go): their reader has a profile.
   const fromMail = new URLSearchParams(location.search).get("from") === "mail";
-  // Whose mail it was (server: mailWho), for the sign-in to fill the address in.
-  const mailTo = new URLSearchParams(location.search).get("to") ?? "";
-  const mailedTo = signal("");
-  if (fromMail && mailTo && !user.peek()?.email)
-    api<{ email: string }>("GET", `/api/mail-who?${new URLSearchParams({ to: mailTo })}`).then(
-      (r) => mailedTo.set(r.email),
-      () => {},
-    );
   if (fromMail) history.replaceState(history.state, "", "/");
   // A game brought from an app's own browser: its token in the address's fragment (keep.ts, exitWay), taken out of
   // the address at once and taken here (takeHand), not in an app's browser (the one it came from, reloaded).
@@ -298,7 +290,7 @@ export function today() {
     const notices = [
       said ? h("p", { class: "notice", role: "status" }, said) : null,
       // Come from the streak's mail to a browser signed out: the way in comes first, open.
-      fromMail && !user.peek()?.email ? haveProfile(load, undefined, true, mailedTo) : null,
+      fromMail && !user.peek()?.email ? haveProfile(load, undefined, true) : null,
       // Come by an invite link: whose it is, and the way to be friends; or what came of one taken after a game.
       inviteCard(),
     ];
@@ -601,7 +593,6 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
     "result-score score-leaf",
   );
   if (just) land(hero, run.id, perfect, true);
-  const recordings = signal<Child>(null);
   const action = h(
     "div",
     { class: first ? "result-share result-first" : "result-share" },
@@ -622,13 +613,12 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       "div",
       { class: "result-main page-1" },
       hero,
-      zero ? missed(missedList, () => [recordings(), bulgariaToday(fresh(), run, reviewOf(run.id))]) : null,
+      zero ? missed(missedList, () => bulgariaToday(fresh(), run, reviewOf(run.id))) : null,
       first ? action : null,
       // 2. The day's entry in the book, and what the day wrote.
       () => entryOfDay(fresh().entry),
       // Asked on every visit: the ink and the nearest step are counted again; a rank risen is told once (play.NewsOf).
-      // Others' games against the player's recordings go under „Въпросите и фактите“: not one of the result's parts.
-      news(run.id, 0, undefined, recordings.set),
+      news(run.id),
     ),
     h(
       "div",
@@ -654,12 +644,10 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       const all = reviewList();
       if (!all) return null;
       reviewHead = h("h2", { class: "section-title review-head", tabindex: -1 }, "Въпросите и фактите");
-      const recs = recordings();
       return h(
         "div",
         { class: "result-review" },
         reviewHead,
-        recs,
         bulgariaToday(fresh(), run, reviewOf(run.id)),
         reviewed(all, null),
       );
@@ -672,7 +660,7 @@ const missedShown = 4;
 
 /** None right: the first questions, each its chapter's tile, the question, the right answer and the fact, right under
  * the score; „Още 6 въпроса“ shows the rest in place, and after them the rest of „Въпросите и фактите“ (`rest`: how
- * others played the player's recordings, how all of България did). Never a word of praise: only what the questions
+ * all of България did). Never a word of praise: only what the questions
  * were. */
 function missed(all: () => Reviewed[] | null, rest: () => Child): Child {
   const open = signal(false);

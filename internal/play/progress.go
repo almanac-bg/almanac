@@ -140,14 +140,12 @@ func (g *Game) Played(ctx context.Context, userID int64) (bool, error) {
 // News is what a game brought, told once: the facts it wrote in the Алманах in ink (Ink, a count: ink.go), and, of a
 // day's issue, how many of its right answers were to questions met before (MetBefore: in grey already, „1 вече
 // срещан“; grey itself is never counted, DECISIONS.md); the ranks risen since the player was last told (Rose, as one: rank.go),
-// or, after a day's issue, the chapter nearest its next rank (Step); and, once a day, what others' duels against the
-// player's recordings came to (recordings.go).
+// or, after a day's issue, the chapter nearest its next rank (Step).
 type News struct {
-	Ink        int             `json:"ink,omitempty"`
-	MetBefore  int             `json:"metBefore,omitempty"`
-	Rose       *Rose           `json:"rose,omitempty"`
-	Step       *Step           `json:"step,omitempty"`
-	Recordings *RecordingsNews `json:"recordings,omitempty"`
+	Ink       int   `json:"ink,omitempty"`
+	MetBefore int   `json:"metBefore,omitempty"`
+	Rose      *Rose `json:"rose,omitempty"`
+	Step      *Step `json:"step,omitempty"`
 }
 
 // NewsOf tells a player what's new, once: everything in it is marked as told. With the game just played (runID; 0 for
@@ -182,9 +180,6 @@ func (g *Game) NewsOf(ctx context.Context, userID, runID int64) (News, error) {
 	}
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var err error
-		if n.Recordings, err = g.recordingsNews(tx, userID); err != nil {
-			return err
-		}
 		if n.Rose, err = roseOf(tx, userID); err != nil {
 			return err
 		}
