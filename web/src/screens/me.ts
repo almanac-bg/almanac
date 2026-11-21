@@ -1,6 +1,6 @@
 // Профил: who you are in the game, in its budget's order (DESIGN.md, Places): your avatar with the seal you wear on its
-// corner, your name and tag; the longest streak; the seal you wear on its ladder of ranks; your seals, a chapter's each,
-// a view of them (the one worn is the best: never chosen); the avatars (every animal yours, a chapter's art yours from its
+// corner, your name and tag; the streak as it is now; the seal you wear on its ladder of ranks; your seals, a
+// chapter's each, a view of them (the one worn is the best: never chosen); the avatars (every animal yours, a chapter's art yours from its
 // Страница); and Настройки, last. A guest is asked to keep their game, and the way in for a profile from elsewhere is
 // apart from it. No lifetime totals.
 
@@ -110,7 +110,7 @@ export function me(kit: Kit) {
             // see them: one line of ways (not four loose ones before anything else). Either way in, Профил again, as
             // the profile has it.
             () => (user()?.email ? null : keepGame(() => go("/me", true), signingIn, theirView(user()?.tag))),
-            () => longest(data()),
+            () => streakNow(data()),
             () => wornLadder(data()),
             () => (user()?.email && user()?.tag ? h("p", { class: "me-links" }, theirView(user()?.tag)) : null),
           ),
@@ -188,21 +188,21 @@ function head(data: () => Stats | null): Child {
   );
 }
 
-/** The longest streak: its number and words, the flame by it; under it, what the week forgives (that it has
- * forgiven all it can, only while a streak runs). Nothing before a first day. */
-function longest(s: Stats | null): Child {
-  if (!s?.best) return null;
+/** The streak as it is now: its number and words, the flame by it (never the longest: an ended streak's number is
+ * never named, DECISIONS.md); under it, what the week forgives (that it has forgiven all it can, only while a streak
+ * runs). Nothing while there's none. */
+function streakNow(s: Stats | null): Child {
+  if (!s?.streak) return null;
   return [
     h(
       "div",
-      { class: "streak-chip me-longest" },
+      { class: "streak-chip me-streak" },
       illustration("flame", "streak-flame"),
-      h("b", { class: "status-n" }, formatNumber(s.best)),
+      h("b", { class: "status-n" }, formatNumber(s.streak)),
       h(
         "span",
         { class: "status-text" },
-        h("span", { class: "status-label" }, s.best === 1 ? "ден" : "дни"),
-        h("span", { class: "streak-note" }, "най-дълга серия"),
+        h("span", { class: "status-label" }, s.streak === 1 ? "ден в серията" : "дни в серията"),
       ),
     ),
     // The week's forgiving used up says something only of a streak that's running.

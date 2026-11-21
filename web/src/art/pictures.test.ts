@@ -50,12 +50,9 @@ test("every avatar is drawn and named, and the choice offers no other", () => {
   }
   // Never by a part's place among the picture's layers: the next change to the drawing would colour another part.
   assert.doesNotMatch(css, /avatar-pic\s*>\s*:nth-/, "an avatar's part is coloured by its ink, not by :nth-child");
-  const named = ui.slice(ui.indexOf("export const shapeNames"), ui.indexOf("export const toneNames"));
+  const named = ui.slice(ui.indexOf("export const shapeNames"), ui.indexOf("const freeShapes"));
   const names = [...named.matchAll(/\n {2}([a-z]+): "/g)].map((m) => m[1] ?? "");
   assert.deepEqual(names, animals, "shapeNames are the server's animals, in its order");
-  const tones = ui.slice(ui.indexOf("export const toneNames"), ui.indexOf("const freeShapes"));
-  const toned = [...tones.matchAll(/\n {2}([a-z]+): "/g)].map((m) => m[1] ?? "");
-  assert.deepEqual(toned, goList(go, "Tones"), "toneNames are the server's tones, in its order");
 });
 
 // The server draws a shared day's card (internal/card) in Go, from the chapters' glyphs as pictures.ts draws them:

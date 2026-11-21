@@ -239,7 +239,7 @@ func TestSealAndArt(t *testing.T) {
 	if s, err := w.g.SealOf(ctx, ana); s != nil || err != nil {
 		t.Fatalf("a seal of nothing: %+v %v", s, err)
 	}
-	if err := w.g.SetAvatar(ctx, ana, "geography-gold"); !errors.Is(err, ErrNoAvatar) {
+	if err := w.g.SetAvatar(ctx, ana, "geography"); !errors.Is(err, ErrNoAvatar) {
 		t.Fatalf("a chapter's art without its rank: %v", err)
 	}
 	var all []answered
@@ -256,13 +256,13 @@ func TestSealAndArt(t *testing.T) {
 	if s, _ := w.g.SealOf(ctx, ana); s == nil || s.Chapter != "history" || s.Name != "Страница" {
 		t.Fatalf("the best seal, on a tie the more ink: %+v", s)
 	}
-	if err := w.g.SetAvatar(ctx, ana, "geography-natural"); err != nil {
+	if err := w.g.SetAvatar(ctx, ana, "geography"); err != nil {
 		t.Fatalf("a chapter's art at its Страница: %v", err)
 	}
-	if err := w.g.SetAvatar(ctx, ana, "music-natural"); !errors.Is(err, ErrNoAvatar) {
+	if err := w.g.SetAvatar(ctx, ana, "music"); !errors.Is(err, ErrNoAvatar) {
 		t.Fatalf("a chapter's art at Бележка: %v", err)
 	}
-	if err := w.g.SetAvatar(ctx, ana, "lynx-gold"); err != nil {
+	if err := w.g.SetAvatar(ctx, ana, "lynx"); err != nil {
 		t.Fatalf("an animal: %v", err)
 	}
 }

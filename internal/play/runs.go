@@ -291,11 +291,11 @@ const (
 
 // StreakNow is a player's streak: the days they've played the day's issue one after another (up to today, or
 // yesterday while today isn't played yet; and a day still being played just after its midnight, within DayGrace, is
-// played yet neither), the days missed that it forgave, how many of this week's Forgives are left (Left; Spare: any), the last streak that ended, if one did, and the longest the player has
-// had (this one, maybe).
+// played yet neither), the days missed that it forgave, how many of this week's Forgives are left (Left; Spare: any),
+// and the last streak that ended, if one did (never how long it was, nor the longest: an ended streak's number is
+// never named, DECISIONS.md).
 type StreakNow struct {
 	Days     int      `json:"days"`
-	Best     int      `json:"best"`
 	Forgiven []string `json:"forgiven"`
 	Left     int      `json:"left"`
 	Spare    bool     `json:"spare"`
@@ -382,7 +382,6 @@ func walkStreak(h streakHistory, today string, saw func(day string, forgiven boo
 		switch {
 		case h.played[day]:
 			s.Days++
-			s.Best = max(s.Best, s.Days)
 		case day == today || day == h.open || s.Days == 0: // not played yet (it may be still), or no streak to keep
 		default:
 			if used < Forgives {

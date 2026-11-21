@@ -40,14 +40,11 @@ func TestAbility(t *testing.T) {
 			for range answers {
 				h := hardnessOf(labelKnown[mix[r.IntN(len(mix))]])
 				if truth < -10 { // a guesser
-					a.learn(float64(r.IntN(4)/3), h, chance["choice"])
+					a.learn(r.IntN(4) == 3, h, rightChance["choice"])
 					continue
 				}
-				score := 0.0
-				if r.Float64() < chance["choice"]+(1-chance["choice"])*sigmoid(truth-h) {
-					score = 1
-				}
-				a.learn(score, h, chance["choice"])
+				luck := rightChance["choice"]
+				a.learn(r.Float64() < luck+(1-luck)*sigmoid(truth-h), h, luck)
 			}
 			sum += a.mean
 		}
@@ -111,21 +108,21 @@ func TestMasteryShapesGames(t *testing.T) {
 // A hard question right moves an ability more than an easy one; an easy one wrong, more than a hard one; a guess
 // at a true-or-not, less than one at a choice.
 func TestLearnWeighsAnswers(t *testing.T) {
-	moved := func(score float64, d bank.Difficulty, typ string) float64 {
+	moved := func(right bool, d bank.Difficulty, typ string) float64 {
 		a := newAbility()
-		a.learn(score, hardnessOf(labelKnown[d]), chance[typ])
+		a.learn(right, hardnessOf(labelKnown[d]), rightChance[typ])
 		return a.mean
 	}
-	if moved(1, bank.Hard, "choice") <= moved(1, bank.Easy, "choice") {
+	if moved(true, bank.Hard, "choice") <= moved(true, bank.Easy, "choice") {
 		t.Error("a hard question right")
 	}
-	if moved(0, bank.Easy, "choice") >= moved(0, bank.Hard, "choice") {
+	if moved(false, bank.Easy, "choice") >= moved(false, bank.Hard, "choice") {
 		t.Error("an easy question wrong")
 	}
-	if moved(1, bank.Medium, "truefalse") >= moved(1, bank.Medium, "choice") {
+	if moved(true, bank.Medium, "truefalse") >= moved(true, bank.Medium, "choice") {
 		t.Error("a true-or-not right")
 	}
-	if moved(1, bank.Medium, "number") <= moved(1, bank.Medium, "choice") {
-		t.Error("a number right (no luck in it)")
+	if moved(true, bank.Medium, "number") <= moved(true, bank.Medium, "choice") {
+		t.Error("a number right (next to no luck in it)")
 	}
 }

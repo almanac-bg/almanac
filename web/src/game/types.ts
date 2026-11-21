@@ -175,7 +175,7 @@ export interface State {
   question?: Shown;
   done: boolean;
   /** In a duel played second, how the other side's answers went as far as the player has come (play.State.Against):
-   * each question answered; of the one shown, only when they answered it (`ms`), if they did. */
+   * each question answered, nothing of the one shown. */
   against?: TheirMark[];
 }
 
@@ -184,12 +184,9 @@ export interface TheirMark {
   right?: boolean;
   close?: boolean;
   missed?: boolean;
-  ms: number;
 }
 
 export interface Result {
-  /** How many right answers in a row the answer makes, from 2: the climb's feel, worth nothing more. */
-  inRow?: number;
   score: number;
   right: boolean;
   exact?: boolean;

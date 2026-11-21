@@ -84,12 +84,12 @@ func (w *world) friendIDs(p *player) ([]int64, error) {
 	return ids, nil
 }
 
-// dress has a player choose their avatar now and then: any animal, in any tone.
+// dress has a player choose their avatar now and then: any animal.
 func (w *world) dress(p *player) error {
 	if !w.chance(0.05) && !(p.persona != "" && w.day == w.today()-1) {
 		return nil
 	}
-	avatar := play.Shapes[w.r.IntN(len(play.Shapes))] + "-" + play.Tones[w.r.IntN(len(play.Tones))]
+	avatar := play.Shapes[w.r.IntN(len(play.Shapes))]
 	return w.g.SetAvatar(w.ctx, p.id, avatar)
 }
 

@@ -214,7 +214,7 @@ func TestScriptedOutOfStatistics(t *testing.T) {
 	// A recording: Ana's, never the script's (the latest, all right).
 	duel, err := w.g.DuelRecording(ctx, w.user(), Even)
 	var recording int64
-	_ = w.db.Read.QueryRow(`SELECT ghost_run FROM duels WHERE id = ?`, duel).Scan(&recording)
+	_ = w.db.Read.QueryRow(`SELECT recording_run FROM duels WHERE id = ?`, duel).Scan(&recording)
 	if err != nil || w.scripted(recording) {
 		t.Fatalf("a recording of a script's game: %d %v", recording, err)
 	}

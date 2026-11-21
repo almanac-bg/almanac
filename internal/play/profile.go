@@ -10,9 +10,9 @@ import (
 )
 
 // A profile is a player as anyone may see them, found by their tag: how they look, the seal they wear, their ranks by
-// chapter (rank.go: kept as each day's issue finishes, never as they play), and the longest streak they've had
-// (DECISIONS.md, „The direction“): no lifetime totals, and nothing of how well they know a topic (mastery is the
-// game's own). What only they see stays theirs: their games one by one, their Алманах, their email, their friends.
+// chapter (rank.go: kept as each day's issue finishes, never as they play) (DECISIONS.md, „The direction“). No
+// streak (the longest would name an ended one's number), no lifetime totals, and nothing of how well they know a topic
+// (mastery is the game's own). What only they see stays theirs: their games one by one, their Алманах, their email, their friends.
 // Its time is a date, the month they started, never the moment (review 2026-11-18, S12). The privacy page says what
 // it shows; the server limits how many anyone looks at (server.profileOf).
 
@@ -26,10 +26,9 @@ type Profile struct {
 	// Since is when they started playing: the month (its first day, at noon in Bulgaria).
 	Since int64 `json:"since"`
 	// Seal is the seal they wear (none before a rank), whole (its name, its quarters): over the look's, which says
-	// only its chapter and level. Ranks their ranks in the bank's chapters, Best the longest streak they've had.
+	// only its chapter and level. Ranks their ranks in the bank's chapters.
 	Seal  *Seal         `json:"seal,omitempty"`
 	Ranks []ChapterRank `json:"ranks"`
-	Best  int           `json:"best"`
 	// Friend is how the viewer stands with them: "yes" (friends), "asked" (the viewer asked them), "asks" (they
 	// asked the viewer), or "" (none of these, or no viewer). Request is the request's id, while one waits.
 	Friend  string `json:"friend,omitempty"`
@@ -74,11 +73,6 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 		return p, err
 	}
 	p.Me, p.Look = id == viewer, g.lookOf(id, avatar)
-	streak, err := g.StreakOf(ctx, id)
-	if err != nil {
-		return p, err
-	}
-	p.Best = streak.Best
 	if p.Ranks, err = g.RanksOf(ctx, id); err != nil {
 		return p, err
 	}

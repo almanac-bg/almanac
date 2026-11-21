@@ -12,8 +12,8 @@ func (g *game) dayOf(userID int64, day string, rights int) {
 	g.t.Helper()
 	at, _ := time.ParseInLocation(time.DateOnly, day, play.Bulgaria)
 	at = at.Add(10 * time.Hour)
-	if _, err := g.db.Write.Exec(`INSERT INTO runs (user_id, kind, day, questions, rights, ms, started_at, finished_at)
-		VALUES (?, 'day', ?, '[{"id":""}]', ?, 60000, ?, ?)`, userID, day, rights, at.UnixMilli(),
+	if _, err := g.db.Write.Exec(`INSERT INTO runs (user_id, kind, day, questions, rights, started_at, finished_at)
+		VALUES (?, 'day', ?, '[{"id":""}]', ?, ?, ?)`, userID, day, rights, at.UnixMilli(),
 		at.UnixMilli()); err != nil {
 		g.t.Fatal(err)
 	}

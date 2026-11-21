@@ -440,7 +440,7 @@ export const record = (won: number, lost: number, drawn: number) =>
   `${won} ${won === 1 ? "победа" : "победи"}, ${lost} ${lost === 1 ? "загуба" : "загуби"}` +
   (drawn ? `, ${drawn} ${drawn === 1 ? "равенство" : "равенства"}` : "");
 
-/** How a player shows to others: their avatar (shape-tone). */
+/** How a player shows to others: their avatar (a shape). */
 export interface Look {
   avatar?: string;
   /** The seal they wear beside their name (play.Seal), if any. */
@@ -467,15 +467,6 @@ export const shapeNames: Record<string, string> = {
   lynx: "Рис",
 };
 
-export const toneNames: Record<string, string> = {
-  gold: "злато",
-  lilac: "люляк",
-  sky: "небе",
-  rose: "роза",
-  mint: "мента",
-  natural: "естествени цветове",
-};
-
 const freeShapes = ["fox", "bear", "cat", "hare", "hedgehog", "dog", "deer", "stork", "frog"];
 
 /** An avatar for someone without one of their own: picked from their name, the same every time. */
@@ -486,10 +477,9 @@ function fromName(name: string): string {
 }
 
 /** An avatar: the drawn animal in its own colours, in a round medallion of its scene (DECISIONS.md: no tones). `id` is
- * "shape-tone", as the server sends a look; the tone a player chose before the edition is let be. For the eye: the
- * name is said in words nearby. */
+ * its shape, as the server sends a look. For the eye: the name is said in words nearby. */
 export function avatar(id: string | undefined, opts: { size?: "s" | "l"; name?: string } = {}) {
-  const shape = (id || fromName(opts.name ?? "")).split("-")[0] ?? "";
+  const shape = id || fromName(opts.name ?? "");
   // A chapter's art, the player's from the chapter's Страница: its glyph on a disc of its colour.
   if (topics.some((t) => t.id === shape))
     return h(

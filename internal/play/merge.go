@@ -40,8 +40,6 @@ var mergeSteps = []mergeStep{
 		SELECT user_id, ?1, since, asked FROM friends WHERE friend_id = ?2 AND user_id <> ?1
 			AND user_id IN (SELECT friend_id FROM friends WHERE user_id = ?1)`},
 	{sql: `DELETE FROM friends WHERE user_id = ?2 OR friend_id = ?2`},
-	// Duels against the guest count against the account.
-	{carries: []string{"runs.opponent_id"}, sql: `UPDATE runs SET opponent_id = ?1 WHERE opponent_id = ?2`},
 	// The guest's duels are the account's. One between the two goes with the guest: what's left of the guest's duels
 	// then.
 	{carries: []string{"duels.a_id", "duels.b_id"},
@@ -89,9 +87,9 @@ var mergeSteps = []mergeStep{
 	{carries: []string{"invites.user_id"}, sql: `UPDATE OR IGNORE invites SET user_id = ?1 WHERE user_id = ?2`},
 	// The questions the guest reported, still theirs.
 	{carries: []string{"reports.user_id"}, sql: `UPDATE reports SET user_id = ?1 WHERE user_id = ?2`},
-	// What the guest has been told, so that nothing is told twice: of Начало's lines, of their streak.
-	{carries: []string{"home_lines.user_id"},
-		sql: `INSERT OR IGNORE INTO home_lines (user_id, what, at) SELECT ?1, what, at FROM home_lines WHERE user_id = ?2`},
+	// What the guest has been told, so that nothing is told twice: of Днес's lines, of their streak.
+	{carries: []string{"today_lines.user_id"},
+		sql: `INSERT OR IGNORE INTO today_lines (user_id, what, at) SELECT ?1, what, at FROM today_lines WHERE user_id = ?2`},
 	{carries: []string{"users.streak_told"},
 		sql: `UPDATE users SET streak_told = CASE WHEN substr(g.streak_told, instr(g.streak_told, ':') + 1)
 			> substr(users.streak_told, instr(users.streak_told, ':') + 1) THEN g.streak_told ELSE users.streak_told END
@@ -139,7 +137,6 @@ const GoneName = "Изтрит играч"
 //
 //   - A duel not over yet goes, theirs or another's against their recording: nothing of it is played by both.
 //   - A duel only they had (against a recording, or the other gone before) goes.
-//   - Their name goes from others' games against them, or against their recordings.
 //   - Friend requests to their address go.
 //   - The days they played on (active_days, which has no reference to users: the retention counts keep a player who
 //     went, or those who never came back would drop out and make them look better) are kept as a tombstone, the id
@@ -152,12 +149,9 @@ func Forget(tx *sql.Tx, id int64) error {
 	}
 	for _, q := range []string{
 		`DELETE FROM duels WHERE ended_at IS NULL AND (a_id = ?1 OR b_id = ?1
-			OR ghost_run IN (SELECT id FROM runs WHERE user_id = ?1))`,
+			OR recording_run IN (SELECT id FROM runs WHERE user_id = ?1))`,
 		`DELETE FROM duels WHERE a_id = ?1 AND b_id IS NULL`,
 		`DELETE FROM duels WHERE b_id = ?1 AND a_id IS NULL`,
-		`UPDATE runs SET opponent = NULL WHERE opponent_id = ?1`,
-		`UPDATE runs SET opponent = NULL WHERE id IN (SELECT d.a_run FROM runs g JOIN duels d ON d.ghost_run = g.id
-			WHERE g.user_id = ?1)`,
 		`DELETE FROM friend_requests WHERE to_email = (SELECT email FROM users WHERE id = ?1)`,
 		`UPDATE OR REPLACE active_days SET user_id = -user_id WHERE user_id = ?1`,
 	} {

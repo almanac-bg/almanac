@@ -14,11 +14,13 @@ test("a streak that ended is said to have ended, once", async ({ page }) => {
   await expect(page.locator(".streak-notice")).toHaveCount(0);
 });
 
-test("Профил keeps the longest streak, and says what the week forgives", async ({ page }) => {
+test("Профил shows the streak as it is now, never an ended one's, and says what the week forgives", async ({
+  page,
+}) => {
   await page.goto("/");
   await daysPlayed(page, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 2, 1);
   await page.goto("/me");
-  await expect(page.locator(".me-longest .status-n")).toHaveText("12");
+  await expect(page.locator(".me-streak .status-n")).toHaveText("2");
   await expect(page.locator(".me-intro")).toContainText("До два пропуснати дни в седмицата не прекъсват серията.");
 });
 

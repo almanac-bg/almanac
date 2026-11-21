@@ -4,7 +4,7 @@
 
 export interface Boot {
   user: import("../state.ts").User | null;
-  /** The player's avatar ("shape-tone"), with the player. */
+  /** The player's avatar (a shape), with the player. */
   avatar?: string;
   /** The seal the player wears (play.SealOf), with the player once they have a rank. */
   seal?: { chapter: string; level: number };

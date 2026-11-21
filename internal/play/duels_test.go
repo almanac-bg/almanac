@@ -52,7 +52,7 @@ func (w *world) playSide(user, duelID int64, answers []func(int64, int) json.Raw
 func (w *world) recordingOf(duel int64) int64 {
 	w.t.Helper()
 	var run int64
-	if err := w.db.Read.QueryRow(`SELECT ghost_run FROM duels WHERE id = ?`, duel).Scan(&run); err != nil {
+	if err := w.db.Read.QueryRow(`SELECT recording_run FROM duels WHERE id = ?`, duel).Scan(&run); err != nil {
 		w.t.Fatal(err)
 	}
 	return run
@@ -159,14 +159,6 @@ func TestFriendDuel(t *testing.T) {
 	if _, err := w.g.DuelOf(ctx, cy, id); !errors.Is(err, ErrNoDuel) {
 		t.Fatalf("Cy saw their duel: %v", err)
 	}
-	// The games know whom they were against.
-	var opponent string
-	var against int64
-	_ = w.db.Read.QueryRow(`SELECT opponent, opponent_id FROM runs WHERE id = ?`, bRun).Scan(&opponent, &against)
-	if against != ana {
-		t.Fatalf("Bo's game against %q (%d)", opponent, against)
-	}
-
 	// A rematch: Bo sends one back, and wins it; the record has both.
 	w.wait(time.Minute)
 	re, err := w.g.DuelFriend(ctx, bo, ana)
@@ -415,9 +407,10 @@ func TestRecordingDuel(t *testing.T) {
 	}
 }
 
-// Played second, the other side's answers come with the run as far as the player has come, and no further: of the
-// question shown, only when they answered it; how it went for them, once the player's own answer is in; their score,
-// at the end. The one who plays first hears nothing of the other's (there's nothing yet).
+// Played second, the other side's answers come with the run as far as the player has come, and no further: nothing
+// of the question shown, not even when they answered it (a duel isn't a race); how it went for them, once the
+// player's own answer is in; their score, at the end. The one who plays first hears nothing of the other's (there's
+// nothing yet).
 func TestDuelTheOtherAsFarAsYouGo(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -439,7 +432,7 @@ func TestDuelTheOtherAsFarAsYouGo(t *testing.T) {
 	}
 	for n := range 3 {
 		s := w.show(bo, run)
-		if len(s.Against) != n+1 || s.Against[n] != (DuelMark{Ms: s.Against[n].Ms}) || s.Against[n].Ms == 0 {
+		if len(s.Against) != n {
 			t.Fatalf("question %d shown, the other's: %+v", n+1, s.Against)
 		}
 		w.wait(3 * time.Second)
@@ -447,7 +440,7 @@ func TestDuelTheOtherAsFarAsYouGo(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if a := res.State.Against; len(a) != n+1 || !a[n].Right || a[n].Ms == 0 {
+		if a := res.State.Against; len(a) != n+1 || !a[n].Right {
 			t.Fatalf("question %d answered, the other's: %+v", n+1, a)
 		}
 	}
@@ -517,8 +510,12 @@ func TestDuelEvenIsADraw(t *testing.T) {
 		}
 		w.playSide(ana, id, repeat(w.right, Length))
 		// Ana's game took ten minutes longer than Bo's will, her number `closer` nearer (in thousandths).
-		if _, err := w.db.Write.Exec(`UPDATE runs SET ms = ms + 600000, closeness = closeness + ?
+		if _, err := w.db.Write.Exec(`UPDATE runs SET closeness = closeness + ?
 			WHERE id = (SELECT a_run FROM duels WHERE id = ?)`, closer, id); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.db.Write.Exec(`UPDATE answers SET ms = ms + 60000
+			WHERE run_id = (SELECT a_run FROM duels WHERE id = ?)`, id); err != nil {
 			t.Fatal(err)
 		}
 		w.playSide(bo, id, repeat(w.right, Length))
@@ -575,9 +572,9 @@ func TestRecordingByLevel(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var ghost int64
+		var recording int64
 		var kept sql.NullString
-		if err := w.db.Read.QueryRow(`SELECT ghost_run, level FROM duels WHERE id = ?`, id).Scan(&ghost,
+		if err := w.db.Read.QueryRow(`SELECT recording_run, level FROM duels WHERE id = ?`, id).Scan(&recording,
 			&kept); err != nil {
 			t.Fatal(err)
 		}
@@ -587,7 +584,7 @@ func TestRecordingByLevel(t *testing.T) {
 		if _, err := w.db.Write.Exec(`DELETE FROM duels WHERE id = ?`, id); err != nil { // chosen again, fresh
 			t.Fatal(err)
 		}
-		return ghost, kept.String
+		return recording, kept.String
 	}
 	// Each the one nearest the level chosen, called by it only if it is that level.
 	if g, kept := got(Even); g != weakRun || (kept == Even) != weakEven || kept == Stronger {

@@ -38,7 +38,7 @@ func (g *Game) AcceptedOf(ctx context.Context, userID int64) (*Accepted, error) 
 	var a Accepted
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT f.friend_id, u.name FROM friends f JOIN users u ON u.id = f.friend_id
 		WHERE f.user_id = ?1 AND f.asked = 1 AND f.since >= ?2
-			AND NOT EXISTS (SELECT 1 FROM home_lines WHERE user_id = ?1 AND what = 'friend:' || f.friend_id)
+			AND NOT EXISTS (SELECT 1 FROM today_lines WHERE user_id = ?1 AND what = 'friend:' || f.friend_id)
 		ORDER BY f.since DESC LIMIT 1`, userID, store.Ms(g.Now().Add(-LinesRecent))).Scan(&a.ID, &a.Name)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -67,7 +67,7 @@ func (g *Game) Told(ctx context.Context, userID int64, line string) error {
 	if !ok {
 		return ErrNoLine
 	}
-	_, err := g.DB.Write.ExecContext(ctx, `INSERT OR IGNORE INTO home_lines (user_id, what, at) VALUES (?, ?, ?)`,
+	_, err := g.DB.Write.ExecContext(ctx, `INSERT OR IGNORE INTO today_lines (user_id, what, at) VALUES (?, ?, ?)`,
 		userID, line, store.Ms(g.Now()))
 	return err
 }

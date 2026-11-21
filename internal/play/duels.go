@@ -147,13 +147,12 @@ type DuelSide struct {
 // does.
 const TieNumber = "number"
 
-// DuelMark is how one question of a duel went for one side: right, or close („близо“: closeAnswer), how long it took,
-// and whether nothing was given (Missed: the time ran out).
+// DuelMark is how one question of a duel went for one side: right, or close („близо“: closeAnswer), and whether
+// nothing was given (Missed: the time ran out). Never how long it took: a duel isn't a race (time never counts).
 type DuelMark struct {
-	Right  bool  `json:"right"`
-	Close  bool  `json:"close,omitempty"`
-	Ms     int64 `json:"ms"`
-	Missed bool  `json:"missed,omitempty"`
+	Right  bool `json:"right"`
+	Close  bool `json:"close,omitempty"`
+	Missed bool `json:"missed,omitempty"`
 }
 
 // DuelNews is a duel news to another player, for the server to tell them (a push through notifyFrom): sent to them
@@ -305,7 +304,7 @@ func (g *Game) DuelRecording(ctx context.Context, userID int64, level string) (i
 		if rec.meets {
 			kept = &level
 		}
-		res, err := tx.Exec(`INSERT INTO duels (kind, questions, a_id, a_run, ghost_run, level, created_at, expires_at)
+		res, err := tx.Exec(`INSERT INTO duels (kind, questions, a_id, a_run, recording_run, level, created_at, expires_at)
 			VALUES ('recording', ?, ?, ?, ?, ?, ?, ?)`, string(data), userID, r.id, rec.id, kept,
 			store.Ms(now), store.Ms(now.Add(DuelFor)))
 		if err != nil {
@@ -611,7 +610,6 @@ func (g *Game) duelNews(ctx context.Context, n DuelNews) {
 func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 	type side struct {
 		id, run       int64
-		name          string
 		score         duelScore
 		done, present bool
 	}
@@ -622,18 +620,16 @@ func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		followed = nil
 		var bID, bRun sql.NullInt64
-		var bName sql.NullString
 		var bRights, bClose sql.NullInt64
 		var bDone sql.NullBool
-		err := tx.QueryRow(`SELECT d.kind, d.a_id, ua.name, ra.id, ra.rights, ra.closeness,
+		err := tx.QueryRow(`SELECT d.kind, d.a_id, ra.id, ra.rights, ra.closeness,
 				ra.finished_at IS NOT NULL,
-				rb.user_id, ub.name, rb.id, rb.rights, rb.closeness, rb.finished_at IS NOT NULL
+				rb.user_id, rb.id, rb.rights, rb.closeness, rb.finished_at IS NOT NULL
 			FROM duels d JOIN users ua ON ua.id = d.a_id JOIN runs ra ON ra.id = d.a_run
-			LEFT JOIN runs rb ON rb.id = CASE d.kind WHEN 'recording' THEN d.ghost_run ELSE d.b_run END
-			LEFT JOIN users ub ON ub.id = rb.user_id
+			LEFT JOIN runs rb ON rb.id = CASE d.kind WHEN 'recording' THEN d.recording_run ELSE d.b_run END
 			WHERE d.id = ? AND d.ended_at IS NULL`, duelID).
-			Scan(&kind, &a.id, &a.name, &a.run, &a.score.rights, &a.score.tie.closeness,
-				&a.done, &bID, &bName, &bRun, &bRights, &bClose, &bDone)
+			Scan(&kind, &a.id, &a.run, &a.score.rights, &a.score.tie.closeness,
+				&a.done, &bID, &bRun, &bRights, &bClose, &bDone)
 		if errors.Is(err, sql.ErrNoRows) {
 			settled = true // the other side's last answer settled it a moment ago: it's done
 			return nil
@@ -641,7 +637,7 @@ func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 		if err != nil {
 			return err
 		}
-		b = side{id: bID.Int64, run: bRun.Int64, name: bName.String, done: bDone.Bool, present: bRun.Valid,
+		b = side{id: bID.Int64, run: bRun.Int64, done: bDone.Bool, present: bRun.Valid,
 			score: duelScore{rights: int(bRights.Int64), tie: tiebreak{closeness: int(bClose.Int64)}}}
 		if !a.done || !b.present || !b.done {
 			settled = true // not played to its end yet: nothing to settle
@@ -655,19 +651,9 @@ func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 		case 1:
 			score = 0
 		}
-		outcomeOf := map[float64]string{1: DuelWon, 0: DuelLost, 0.5: DuelDraw}
-		// opponent_id is a player the game was against, never a recording's.
-		against := sql.NullInt64{Int64: b.id, Valid: !recording}
-		if _, err := tx.Exec(`UPDATE runs SET opponent = ?, opponent_id = ?, recorded = ?, outcome = ? WHERE id = ?`,
-			b.name, against, recording, outcomeOf[score], a.run); err != nil {
-			return err
-		}
+		// The result is the duel's (duels.outcome): a run keeps nothing of whom it was against.
 		followed = append(followed, a)
 		if !recording {
-			if _, err := tx.Exec(`UPDATE runs SET opponent = ?, opponent_id = ?, recorded = 0, outcome = ? WHERE id = ?`,
-				a.name, a.id, outcomeOf[1-score], b.run); err != nil {
-				return err
-			}
 			followed = append(followed, b)
 		}
 		for _, s := range followed {
@@ -872,10 +858,10 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, d.kind, d.mine, d.created_at, coalesce(d.ended_at, 0),
 			d.expires_at, d.sent_at IS NOT NULL, coalesce(d.outcome, ''),
 			coalesce(CASE WHEN d.mine THEN d.a_run ELSE d.b_run END, 0),
-			coalesce(CASE WHEN NOT d.mine THEN d.a_run WHEN d.kind = 'recording' THEN d.ghost_run ELSE d.b_run END, 0),
+			coalesce(CASE WHEN NOT d.mine THEN d.a_run WHEN d.kind = 'recording' THEN d.recording_run ELSE d.b_run END, 0),
 			coalesce(CASE WHEN NOT d.mine THEN d.a_id WHEN d.kind = 'recording'
-				THEN (SELECT user_id FROM runs WHERE id = d.ghost_run) ELSE d.b_id END, 0),
-			coalesce((SELECT category FROM runs WHERE id = d.ghost_run AND kind = 'topic' AND category <> ?3), ''),
+				THEN (SELECT user_id FROM runs WHERE id = d.recording_run) ELSE d.b_id END, 0),
+			coalesce((SELECT category FROM runs WHERE id = d.recording_run AND kind = 'topic' AND category <> ?3), ''),
 			coalesce(d.level, '')
 		FROM (SELECT *, coalesce(a_id = ?1, 0) AS mine FROM duels
 			WHERE (a_id = ?1 OR (b_id = ?1 AND sent_at IS NOT NULL)) AND (?2 = 0 OR id = ?2)) d
@@ -1053,7 +1039,7 @@ func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, erro
 
 // duelMarks is how each question of a run went, in order.
 func (g *Game) duelMarks(ctx context.Context, runID int64) ([]DuelMark, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT score, is_right, ms, given IS NULL FROM answers WHERE run_id = ?
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT score, is_right, given IS NULL FROM answers WHERE run_id = ?
 		ORDER BY n`, runID)
 	if err != nil {
 		return nil, err
@@ -1063,7 +1049,7 @@ func (g *Game) duelMarks(ctx context.Context, runID int64) ([]DuelMark, error) {
 	for rows.Next() {
 		var m DuelMark
 		var score float64
-		if err := rows.Scan(&score, &m.Right, &m.Ms, &m.Missed); err != nil {
+		if err := rows.Scan(&score, &m.Right, &m.Missed); err != nil {
 			return nil, err
 		}
 		m.Close = closeAnswer(score, m.Right)
@@ -1073,12 +1059,12 @@ func (g *Game) duelMarks(ctx context.Context, runID int64) ([]DuelMark, error) {
 }
 
 // duelAgainst is the other side's answers in a duel run played second (State.Against), as far as the player has come:
-// each of the at questions the player has answered; and, if the question at is shown, only when
-// the other answered it, if they did. Nothing while the other side hasn't finished (a friend's duel played first).
-func duelAgainst(tx *sql.Tx, runID int64, at int, shown bool) ([]DuelMark, error) {
+// each of the at questions the player has answered, and nothing of the one shown, not even whether or when they
+// answered it (a duel isn't a race). Nothing while the other side hasn't finished (a friend's duel played first).
+func duelAgainst(tx *sql.Tx, runID int64, at int) ([]DuelMark, error) {
 	var other int64
 	err := tx.QueryRow(`SELECT o.id FROM duels d
-		JOIN runs o ON o.id = CASE WHEN d.a_run = ?1 THEN CASE WHEN d.kind = 'recording' THEN d.ghost_run ELSE d.b_run END
+		JOIN runs o ON o.id = CASE WHEN d.a_run = ?1 THEN CASE WHEN d.kind = 'recording' THEN d.recording_run ELSE d.b_run END
 			ELSE d.a_run END
 		WHERE (d.a_run = ?1 OR d.b_run = ?1) AND o.finished_at IS NOT NULL`, runID).Scan(&other)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -1086,30 +1072,25 @@ func duelAgainst(tx *sql.Tx, runID int64, at int, shown bool) ([]DuelMark, error
 	} else if err != nil {
 		return nil, err
 	}
-	rows, err := tx.Query(`SELECT n, is_right, score, ms, given IS NULL FROM answers WHERE run_id = ? AND n <= ?
+	rows, err := tx.Query(`SELECT n, is_right, score, given IS NULL FROM answers WHERE run_id = ? AND n < ?
 		ORDER BY n`, other, at)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := make([]DuelMark, 0, at+1)
+	out := make([]DuelMark, 0, at)
 	for rows.Next() {
 		var n int
 		var m DuelMark
 		var score float64
-		if err := rows.Scan(&n, &m.Right, &score, &m.Ms, &m.Missed); err != nil {
+		if err := rows.Scan(&n, &m.Right, &score, &m.Missed); err != nil {
 			return nil, err
 		}
 		for len(out) < n { // a question with no answer of theirs (one that counts for nobody): nothing to say of it
 			out = append(out, DuelMark{Missed: true})
 		}
 		m.Close = closeAnswer(score, m.Right)
-		switch {
-		case n < at:
-			out = append(out, m)
-		case shown && !m.Missed: // the one shown: when they answered, nothing of how
-			out = append(out, DuelMark{Ms: m.Ms})
-		}
+		out = append(out, m)
 	}
 	return out, rows.Err()
 }

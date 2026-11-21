@@ -15,7 +15,7 @@ func TestInviteLink(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana, bo := w.user(), w.user()
-	if _, err := w.db.Write.Exec(`UPDATE users SET name = 'Ана', avatar = 'lynx-mint' WHERE id = ?`, ana); err != nil {
+	if _, err := w.db.Write.Exec(`UPDATE users SET name = 'Ана', avatar = 'lynx' WHERE id = ?`, ana); err != nil {
 		t.Fatal(err)
 	}
 	code, err := w.g.InviteOf(ctx, ana)
@@ -29,7 +29,7 @@ func TestInviteLink(t *testing.T) {
 		t.Fatal("two players, one link")
 	}
 	in, err := w.g.Invited(ctx, code, 0)
-	if err != nil || in.Name != "Ана" || in.Tag != "player1" || in.Avatar != "lynx-mint" || in.Mine || in.Friends {
+	if err != nil || in.Name != "Ана" || in.Tag != "player1" || in.Avatar != "lynx" || in.Mine || in.Friends {
 		t.Fatalf("opened by nobody: %+v %v", in, err)
 	}
 	if in, _ := w.g.Invited(ctx, code, ana); !in.Mine {

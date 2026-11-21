@@ -1,6 +1,6 @@
-// Another player's profile, by their tag (/players/tag): how they look, the seal they wear, their ranks by chapter and
-// the longest streak they've had (play/profile.go: no lifetime totals); and how you stand with them — ask to be
-// friends, or answer their asking.
+// Another player's profile, by their tag (/players/tag): how they look, the seal they wear and their ranks by chapter
+// (play/profile.go: no streak, no lifetime totals); and how you stand with them — ask to be friends, or answer their
+// asking.
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -21,8 +21,6 @@ let {
   chapterName,
   seal,
   worn,
-  illustration,
-  formatNumber,
   categories,
 } = {} as Kit;
 
@@ -42,8 +40,6 @@ interface Profile {
   since: number;
   seal?: Rank;
   ranks: Rank[];
-  /** The longest streak they've had. */
-  best: number;
   friend?: "yes" | "asked" | "asks";
   request?: number;
   record?: { won: number; lost: number; drawn: number };
@@ -68,8 +64,6 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
     chapterName,
     seal,
     worn,
-    illustration,
-    formatNumber,
     categories,
   } = kit);
   title(`@${tag}`);
@@ -99,7 +93,6 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
       p.me
         ? h("p", { class: "muted" }, "Така те виждат другите. ", h("a", { href: "/me" }, "Към твоя профил"))
         : actions(p, load),
-      numbers(p),
       ranks(p),
     ];
   });
@@ -196,23 +189,6 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
     const n = note();
     return n && h("p", { class: n.bad ? "bad" : "muted", role: n.bad ? "alert" : "status" }, n.text);
   });
-}
-
-/** Their longest streak, as Профил says the player's own. */
-function numbers(p: Profile): Child {
-  if (!p.best) return null;
-  return h(
-    "div",
-    { class: "streak-chip me-longest" },
-    illustration("flame", "streak-flame"),
-    h("b", { class: "status-n" }, formatNumber(p.best)),
-    h(
-      "span",
-      { class: "status-text" },
-      h("span", { class: "status-label" }, p.best === 1 ? "ден" : "дни"),
-      h("span", { class: "streak-note" }, "най-дълга серия"),
-    ),
-  );
 }
 
 /** Their seals, a chapter's each in the bank's order, the one worn ringed; before any, „Още няма печат.“ */

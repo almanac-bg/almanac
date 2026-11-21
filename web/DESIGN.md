@@ -167,7 +167,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   nothing ringed, no time on any of them: time never counts.
 - **Профил:** the avatar with the seal worn on its corner, the name; a guest's ways in one quiet line under it („Играта
   ти е само на това устройство. Запази я с имейл · Имаш профил? Влез · Как те виждат другите“, each opening its form
-  in the line's place); the longest streak and what the week forgives (that it's used up, only while a streak runs);
+  in the line's place); the streak as it is now (never an ended one's) and what the week forgives (that it's used up,
+  only while a streak runs);
   the seal worn on its ladder („Печатът на География“, its ink, Бележка to Летопис, the one reached ringed); the seals
   by chapter (only those earned), a view of the ranks: nothing to tap, none ringed (the one worn is the best, never
   chosen: on the avatar's corner and its ladder); the avatars (every animal, and a chapter's art from its Страница,
@@ -175,7 +176,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   на История става твоя при печата „Страница“: още 3 с мастило.“); the seals two to a row, one under 340px and with large text, a long name wrapping; the avatars chosen here,
   their one place (no page of their own); Настройки last; no list of past games (a game isn't gone over after its day). No
   duplicate avatar in the bar's corner on this page. Another player's page (`/players/<tag>`) is the same head,
-  streak and seals, with the way to be friends. Where no email may be asked for (an app's browser that reads what's
+  seals (no streak: none of it is another's to see), with the way to be friends. Where no email may be asked for (an app's browser that reads what's
   typed: `noEmail`), Профил and Настройки offer none, only the line that says so.
 
 ## Colour
