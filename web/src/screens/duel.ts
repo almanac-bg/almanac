@@ -13,7 +13,7 @@ import { duelResult } from "../kit.ts";
 import { type ApiError, api, errorText } from "../lib/api.ts";
 import { type Child, effect, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { backOut, byTap, go, hold, title } from "../lib/router.ts";
-import { withWord } from "../lib/words.ts";
+import { leftWords, withWord } from "../lib/words.ts";
 import { player, topics, user } from "../state.ts";
 import { back, failure, formatNumber, type Look, pageArt, who } from "../ui.ts";
 import { missing } from "./missing.ts";
@@ -109,19 +109,6 @@ export async function startDuel(to: To): Promise<DuelView | null> {
   await player();
   if ("friend" in to && !(await nameFirst())) return null;
   return shown((await api<{ duel: DuelView }>("POST", "/api/duels", to)).duel);
-}
-
-/** How long an open duel has left, in words, rounded up (a duel just sent has „още 7 дни“, not six and some hours):
- * „още 2 дни“, „още 5 часа“, „под час“. */
-export function leftWords(until: number, now = Date.now()): string {
-  const left = until - now;
-  if (left < 3_600_000) return "остава под час";
-  const hours = Math.ceil(left / 3_600_000);
-  if (hours > 24) {
-    const days = Math.ceil(hours / 24);
-    return `още ${days} ${days === 1 ? "ден" : "дни"}`;
-  }
-  return hours === 1 ? "още 1 час" : `още ${hours} часа`;
 }
 
 /** What broke a tie on even right answers (DuelView.tieBy), as a duel's row and its result say it: „равен брой верни ·
