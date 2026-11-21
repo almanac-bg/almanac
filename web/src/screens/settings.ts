@@ -559,17 +559,16 @@ function reminders(): Child {
           ? [
               h("p", { class: "muted" }, "Включени на това устройство. Избери за какво:"),
               () =>
+                // The section's own rows, spaced as Звук's switches are.
                 prefs()
-                  ? h(
-                      "div",
-                      null,
+                  ? [
                       kind("day", "Днешният брой", "Веднъж на ден, около часа, в който играеш, ако още те чака."),
                       kind("friends", "Приятели", "Покани за приятелство и дуели."),
-                    )
+                    ]
                   : null,
               // The night's quiet (server/pushes.go): what's due then comes at 8:00.
               h("p", { class: "muted" }, "От 22:00 до 8:00 не пращаме известия."),
-              h("button", { class: "link", onclick: toggle }, "Спри известията тук"),
+              h("button", { class: "link", onclick: toggle }, "Спри известията"),
             ]
           : [
               h("p", { class: "muted" }, "Днешният брой, приятели: ти избираш за какво."),

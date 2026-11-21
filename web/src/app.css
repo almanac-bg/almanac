@@ -1350,6 +1350,11 @@
     height: 100%;
   }
 
+  /* Straight on the tile, the glyph without its own tinted disc: else a близо's half reads as a pale ring round it. */
+  .tile:is(.near, .wrong) .pic .kt {
+    display: none;
+  }
+
   .tile.wrong .tile-pic {
     opacity: 0.6;
     filter: grayscale(0.5);
@@ -2724,13 +2729,6 @@
     top: 5px;
     right: 5px;
     background: var(--surface);
-  }
-
-  /* Its key, on a computer, in the picture's foot. */
-  .pic-frame > .key-hint {
-    position: absolute;
-    bottom: 6px;
-    left: 6px;
   }
 
   /* Its name, once answered: the card's whole width, a long one in more lines, never broken but at its syllables. */
@@ -6047,6 +6045,11 @@
     vertical-align: middle;
   }
 
+  /* The chapter's glyph stays with its name. */
+  .tomorrow-hard .nowrap {
+    white-space: nowrap;
+  }
+
   /* „Въпросите и фактите“: the rest of the day, a tap away. */
   .more {
     appearance: none;
@@ -7228,49 +7231,6 @@
        line) shows whole with them. */
     .run-question.answered .choices > .option:not(.dim) {
       min-height: 3.25rem;
-    }
-  }
-
-  /* A computer: the keys that play show on what they play (1–4 on the answers, Enter to go on). */
-  .key-hint {
-    display: none;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .key-hint {
-      display: inline-grid;
-      place-items: center;
-      min-width: 1.5rem;
-      height: 1.5rem;
-      padding: 0 6px;
-      border-radius: 2px;
-      background: var(--surface-2);
-      box-shadow: inset 0 -1px 0 var(--line-2);
-      color: var(--ink-3);
-      font: 800 0.75rem / 1 var(--font-sans);
-    }
-
-    .btn.primary .key-hint {
-      background: color-mix(in srgb, var(--bg) 12%, transparent);
-      box-shadow: none;
-      color: inherit;
-    }
-
-    /* An answer's key at its far end, beside the letter all screens mark it with; gone once the answer shows. */
-    .option:not(.tf) > .key-hint {
-      margin-left: auto;
-    }
-
-    .option:is(.right, .wrong, .dim) .key-hint,
-    .tight .key-hint {
-      display: none;
-    }
-
-    .up-next-label {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--space-2);
     }
   }
 

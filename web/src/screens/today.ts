@@ -785,8 +785,8 @@ const lastWords = [
   "Десетият",
 ];
 
-/** How many knew the day's tenth, its hard number: „На десетия въпрос вярно отговарят 14 %“ (the player among them, as the issue said it); before there's a crowd, that it's the
- * hardest today. */
+/** How many knew the day's tenth, its hard number: „На десетия въпрос вярно отговарят 14 %“ (the player among them, as
+ * the issue said it); nothing before there's a crowd (the tenth is always the hardest: saying so says nothing). */
 function tenthLine(review: Promise<Reviewed[]>): Child {
   const said = signal("");
   review.then(
@@ -797,11 +797,10 @@ function tenthLine(review: Promise<Reviewed[]>): Child {
       const which = lastWords[last.n] ?? "Последният";
       const c = last.reveal.crowd;
       // The share as the issue said it when it was answered (crowdLine): the player among them.
-      said.set(
-        c?.answers
-          ? `На ${which.slice(0, -1).toLowerCase()} въпрос вярно отговарят ${percent(withOwn(c, -1, last.right).right)}`
-          : `${which} въпрос е най-трудният днес`,
-      );
+      if (c?.answers)
+        said.set(
+          `На ${which.slice(0, -1).toLowerCase()} въпрос вярно отговарят ${percent(withOwn(c, -1, last.right).right)}`,
+        );
     },
     () => {},
   );
@@ -1150,7 +1149,12 @@ function tomorrow(
         () => {
           const hard = now().tomorrowHard;
           return hard
-            ? h("span", { class: "tomorrow-hard" }, glyph(hard, 22), ` Трудният въпрос е от ${chapterName(hard)}`)
+            ? h(
+                "span",
+                { class: "tomorrow-hard" },
+                "Трудният въпрос е от ",
+                h("span", { class: "nowrap" }, glyph(hard, 22), ` ${chapterName(hard)}`),
+              )
             : null;
         },
         () => {
