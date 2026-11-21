@@ -588,7 +588,9 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
-    padding: 8px max(12px, env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom))
+    /* Under the buttons, only what the phone's home bar needs: its safe area less what the bar's own gesture zone can
+       spare (a tap 22px up from the edge never meets the home bar), never the safe area and a gap on top of it. */
+    padding: 6px max(12px, env(safe-area-inset-right)) max(6px, calc(env(safe-area-inset-bottom) - 12px))
       max(12px, env(safe-area-inset-left));
     border-top: 1px solid var(--line);
     background: var(--surface);
