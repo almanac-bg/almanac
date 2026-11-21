@@ -44,6 +44,12 @@ read before players meet them, and fixed the same way:
 2. The steps below from 3 with `--judge days` (what lint flags about the days' questions joins in): each question of those days is judged whole
    by the questions skill, as FIX.md's **judge: days** says. A fix changes the question in place, so its day keeps it;
    one retired leaves its day, which the server draws again.
+3. **Keep the month that was read.** The server draws every day after tomorrow again when the live questions that
+   are dated or about Bulgaria change (`play.Ahead`'s rules hash `bank.Tail.On` and `BG`): a pre-check that retires,
+   adds or re-labels one of them throws away the month it read and deals one nobody read (21 Nov 2026: 243 of the 300
+   questions came new). So a pre-check changes such a question only in place, its `on` and `bg` as they were, and
+   replaces only a question with neither, by one with neither; `merge.py` warns of a batch that breaks it. After
+   `almanac-bank`, fetch `bank days -n 30` again and check that the days are the ones judged.
 
 ## The upkeep
 

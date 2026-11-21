@@ -52,6 +52,7 @@ for f in os.listdir(f"{bank}/questions"):
         p_, n = q["id"].rsplit("-", 1)
         last[p_] = max(last.get(p_, 0), int(n))
         have[q["id"]] = q
+bankq = dict(have)  # the bank as it is, by id (have is the waivers further down)
 # The dates are the day it goes in, which bank add checks, not the day an agent wrote it (a run can pass midnight):
 # a change is updated today, and changed today if the agent changed what it asks; a new question is added today.
 today = datetime.date.today().isoformat()
@@ -96,4 +97,13 @@ if new:
     with open(path, "w") as f:
         json.dump(have + new, f, ensure_ascii=False, indent=2)
         f.write("\n")
+# The days ahead are drawn again, all of them after tomorrow, when the live questions that are dated or about Bulgaria
+# change (play.Ahead hashes their ids, `on` and `bg`): a pre-check's batch that does so throws away the month it read.
+def tag(q):
+    return (tuple(q.get("on") or []), bool(q.get("bg"))) if not q.get("retired") else ((), False)
+moved = [q["id"] for lst in qs.values() for q in lst if tag(q) != tag(bankq.get(q["id"]) or {})]
+moved += [r["id"] for r in retire if tag(bankq.get(r["id"]) or {}) != ((), False)]
+if moved:
+    print(f"warning: the days' dated or Bulgarian questions change ({', '.join(sorted(set(moved)))}): the server will"
+          " draw every day after tomorrow again; a pre-check keeps them as they were")
 print(f"questions {sum(len(v) for v in qs.values())} ({len(renum)} new, numbered on), retired {len(retire)}, waivers {len(new)} new")
