@@ -49,7 +49,7 @@ import { byTap, go, goBack, rename, title } from "./lib/router.ts";
 import { feelKit, loadFeel, play, playAnswer, playCount, quietWhenSilent, setSound, soundOn } from "./lib/sound.ts";
 import { dateWords, issueWords, listWords, searchWords, weekday, withWord } from "./lib/words.ts";
 import { acceptedLine, type DuelView, duelLists, recordingName, startDuel, tieWords } from "./screens/duel.ts";
-import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
+import { keepGame, mailAsk } from "./screens/keep.ts";
 import { missing } from "./screens/missing.ts";
 import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
@@ -146,7 +146,6 @@ export const kit = {
   guardLeaving,
   h,
   hands,
-  haveProfile,
   illustration,
   issueWords,
   keepGame,

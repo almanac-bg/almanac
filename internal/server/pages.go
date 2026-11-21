@@ -34,6 +34,7 @@ var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/play/[a-z]+$`),
 	regexp.MustCompile(`^/almanac/[a-z]+$`),
 	regexp.MustCompile(`^/(me|friends|settings|almanac)$`),
+	regexp.MustCompile(`^/signin$`),
 	regexp.MustCompile(`^/duel/([0-9]{1,12}|new)$`),
 	regexp.MustCompile(`^/players/[A-Za-z0-9_]{3,20}$`),
 	sharePath, // a shared day (share.go)

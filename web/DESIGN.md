@@ -39,10 +39,17 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
 - **The frame** (`app.ts`): the bar holds the rosette and „АЛМАНАХ“ in spaced capitals (a way to Днес); on a big
   screen the three places as an icon and a word on pills (`.places`; Днес a calendar, Алманах a book, Приятели two
   people; every name bold); the avatar with the seal the player wears on its corner
-  (`.bar-me`), or „Вход“ (straight to the sign-in form). On a phone the places float at the foot (`.places-foot`): a
+  (`.bar-me`), or „Вход“ (the sign-in page, `/signin`). On a phone the places float at the foot (`.places-foot`): a
   pill clear of every edge, its icon over its name, the current one on a well, a dot on Приятели while something has come there since the player last looked (a request, a
-  duel sent, a duel's result), gone as it opens. The frame steps aside in a game
-  (`html.playing`) and on a new visitor's cover (`html.cover`, no places).
+  duel sent, a duel's result), gone as it opens. One frame, the same everywhere: the mark is always at the left. It
+  steps aside in a game (`html.playing`); on a new visitor's cover and on the sign-in page it is bare (`html.bare`):
+  the mark where it always is and no places, „Вход“ at the right on the cover, nothing at the right on the sign-in page.
+- **Вход** (`/signin`, `signInPage` in `screens/signin.ts`): under the bare frame, „Назад“ (to the page it was come
+  from, else Днес), „Влез в профила си“, and the form, nothing else: the email and „Прати ми код“, then the code
+  (`signIn`, the same steps and words as everywhere a code is asked for). Signed in, back to that page (Днес or Профил
+  says what came of it). Every way in by name points here: the bar's and the cover's „Вход“, Профил's „Имаш профил?
+  Влез“, a player's page's „Влез“. A player signed in already who opens it lands on Профил; Профил with nobody on the
+  device is this page. The forms that keep a guest's game with an email stay where they are asked.
 - **Днес** (`screens/today.ts`): the issue; its action; the streak.
   - The issue (`.issue`): a stack of ten sheets (`.stack-leaf`) in the colours of its ten chapters, the top one the
     first question's, its corner turned on the second's (`leaf(…, { next })`). On it „Брой N“ on an ink pill, the
@@ -155,8 +162,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   them in that order too: the next duel in sight under the result); its marks as the tiles (близо ◩),
   nothing ringed, no time on any of them: time never counts.
 - **Профил:** the avatar with the seal worn on its corner, the name; a guest's ways in one quiet line under it („Играта
-  ти е само на това устройство. Запази я с имейл · Имаш профил? Влез · Как те виждат другите“, each opening its form
-  in the line's place); the streak as it is now (never an ended one's) and what the week forgives (that it's used up,
+  ти е само на това устройство. Запази я с имейл · Имаш профил? Влез · Как те виждат другите“: the first opens its
+  form in the line's place, the second is the sign-in page); the streak as it is now (never an ended one's) and what the week forgives (that it's used up,
   only while a streak runs); „Печати“, one list on a card (`sealList()`), a row a chapter with a rank (only those
   earned), in the bank's order: its seal, its name, its rank's name with the pips towards the next, and its ink at the
   row's end („27 с мастило“, the book's count); a view of the ranks: nothing to tap, none ringed, no single chapter's

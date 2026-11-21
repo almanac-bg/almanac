@@ -136,7 +136,7 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
     body = [
       h("p", { class: "player-relation muted" }, "За да добавяш приятели, първо изиграй една игра или влез с имейл."),
       h("a", { class: "btn inline primary", href: "/" }, "Към днешния брой"),
-      h("a", { class: "btn inline", href: "/settings" }, "Влез"),
+      h("a", { class: "btn inline", href: "/signin" }, "Влез"),
     ];
   } else {
     body = [

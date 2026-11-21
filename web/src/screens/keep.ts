@@ -5,7 +5,8 @@
 // has one small line for a game kept there already (coverExit); a game brought there lands on the day's result, whose
 // action is then the ask to keep it and be reminded (handedIn). Where no notification can come, the day's reminder
 // by mail asks for the email instead (mailAsk), and keeps the game with it. On Профил, from the first game
-// (keepGame). And the way in for a player who has a profile already, a tap from Начало and Профил. Whichever way the
+// (keepGame), beside the way to the sign-in page for a profile from elsewhere; and that way in open on Днес for one
+// come from the streak's mail to a browser signed out (haveProfile). Whichever way the
 // code is put in, what came of it is said (lib/keep.ts, keptWords); in Meta's and TikTok's browsers no email or code
 // is asked for at all (signIn).
 
@@ -184,11 +185,11 @@ const told =
     queueMicrotask(signedIn);
   };
 
-/** Профил's line to a guest, from the first game, one quiet line: the game is only here, „Запази я с имейл“, „Имаш
- * профил? Влез“ (a profile from elsewhere), and `more` after them; a tap opens its form in the line's place (`signingIn`:
- * the way in open from the start). Once the code is in, `signedIn` draws Профил again as the profile has it, and it
- * says what came of it (notice). */
-export function keepGame(signedIn: () => void, signingIn = false, more: Child = null): Child {
+/** Профил's line to a guest, from the first game, one quiet line: the game is only here, „Запази я с имейл“ (a tap
+ * opens its form in the line's place), „Имаш профил? Влез“ (a profile from elsewhere: the sign-in page, signInPage),
+ * and `more` after them. Once the code is in, `signedIn` draws Профил again as the profile has it, and it says what
+ * came of it (notice). */
+export function keepGame(signedIn: () => void, more: Child = null): Child {
   // Where no email is asked for: no offer of one, only why not, and the way (the phone's browser).
   if (noEmail)
     return h(
@@ -197,52 +198,34 @@ export function keepGame(signedIn: () => void, signingIn = false, more: Child = 
       `Играта ти е само на това устройство. ${noEmailLine}`,
       more ? [" ", more] : null,
     );
-  const opened = signal<"" | "keep" | "in">(signingIn ? "in" : "");
-  const way = (label: string, to: "keep" | "in") =>
-    h("button", { class: "link", type: "button", onclick: () => opened.set(to) }, label);
-  return () => {
-    const o = opened();
-    if (o === "keep")
-      return h(
-        "section",
-        { class: "card keep-card" },
-        h("h2", { class: "card-title" }, "Запази играта си"),
-        signIn({ form: "keep-game", primary: false, note: keepNote, done: told(signedIn) }),
-      );
-    if (o === "in") return inCard(signedIn, false);
-    return h(
-      "p",
-      { class: "muted keep-line" },
-      "Играта ти е само на това устройство. ",
-      way("Запази я с имейл", "keep"),
-      " · ",
-      way("Имаш профил? Влез", "in"),
-      more ? [" · ", more] : null,
-    );
-  };
-}
-
-/** The form into a profile the player has, on a card of its own. */
-const inCard = (signedIn: () => void, primary: boolean): Child =>
-  h("section", { class: "card keep-card" }, h("h2", { class: "card-title" }, "Влез в профила си"), () =>
-    signIn({ form: "have-profile", primary, done: told(signedIn) }),
-  );
-
-/** The way in for a player who has a profile already (a new phone, another browser): a quiet line (`label`) that
- * opens the form in place (`open`: opened from the start). Signed in, `signedIn` draws the screen again, as the
- * profile has it, and the screen says what came of it (notice). `primary`: the form is the page's one action (Вход). */
-export function haveProfile(signedIn: () => void, label = "Имаш профил? Влез", open = false, primary = false): Child {
-  // Where no email is asked for, the way in is the phone's browser: said once, by keepGame or the page.
-  if (noEmail) return primary ? h("p", { class: "muted" }, noEmailLine) : null;
-  const opened = signal(open);
+  const keeping = signal(false);
   return () =>
-    opened()
-      ? inCard(signedIn, primary)
+    keeping()
+      ? h(
+          "section",
+          { class: "card keep-card" },
+          h("h2", { class: "card-title" }, "Запази играта си"),
+          signIn({ form: "keep-game", primary: false, note: keepNote, done: told(signedIn) }),
+        )
       : h(
           "p",
-          { class: "day-next" },
-          h("button", { class: "link", type: "button", onclick: () => opened.set(true) }, label),
+          { class: "muted keep-line" },
+          "Играта ти е само на това устройство. ",
+          h("button", { class: "link", type: "button", onclick: () => keeping.set(true) }, "Запази я с имейл"),
+          " · ",
+          h("a", { class: "link", href: "/signin" }, "Имаш профил? Влез"),
+          more ? [" · ", more] : null,
         );
+}
+
+/** The way in for a player who has a profile already, come from the streak's mail to a browser signed out (Днес):
+ * the form open, on a card of its own. Signed in, `signedIn` draws the screen again, as the profile has it, and the
+ * screen says what came of it (notice). None where no email is asked for: the way in is the phone's browser. */
+export function haveProfile(signedIn: () => void): Child {
+  if (noEmail) return null;
+  return h("section", { class: "card keep-card" }, h("h2", { class: "card-title" }, "Влез в профила си"), () =>
+    signIn({ form: "have-profile", primary: false, done: told(signedIn) }),
+  );
 }
 
 /** The menu that opens a page in the phone's own browser, as an app's browser has it, named: on an iPhone, Safari;

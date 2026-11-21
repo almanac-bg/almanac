@@ -75,8 +75,8 @@ export const setLook = (avatar: string) => avatarSaid.set(avatar);
  * aside. */
 export const cover = signal(false);
 
-/** What became of the profile just now, said once where the player lands, on Днес: deleted (Настройки), or a game
- * brought from another browser (screens/keep.ts). */
+/** What became of the profile just now, said once where the player lands, on Днес or Профил: deleted (Настройки), a
+ * game brought from another browser (screens/keep.ts), a profile signed in to (screens/signin.ts, signInPage). */
 export const notice = signal("");
 
 /** The seal the player wears (play.Seal), on the frame's avatar: as the page came with it, and as the server last

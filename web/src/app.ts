@@ -1,7 +1,8 @@
 // АЛМАНАХ's web client: the edition's frame — the bar (the rosette and the name, the three places on a big screen, the
 // player's avatar in the corner: Профил and Настройки), the double rule under it, the three places as words at the
 // foot of a phone's screen — and the screen the router puts under it. A game has the whole screen: the frame steps
-// aside while one is under way, and on a new visitor's cover (the day alone: screens/today.ts).
+// aside while one is under way. A new visitor's cover (the day alone: screens/today.ts) and the sign-in page
+// (`/signin`) have the frame bare: the mark where it always is, no places (and on the sign-in page no „Вход“).
 
 import { loadPictures } from "./art/picture.ts";
 import { keepFresh } from "./fresh.ts";
@@ -15,6 +16,7 @@ import { prepareSound } from "./lib/sound.ts";
 import { duelNew, duelOne } from "./screens/duel.ts";
 import { missing } from "./screens/missing.ts";
 import { topic } from "./screens/play.ts";
+import { signInPage } from "./screens/signin.ts";
 import { sharedDay, today } from "./screens/today.ts";
 import { cover, friendsNews, look, playing, user, watchNews, wornSeal } from "./state.ts";
 import { avatar, rosette } from "./ui.ts";
@@ -63,10 +65,11 @@ if (root) {
         h("a", { href: "/", class: "brand", "aria-label": "АЛМАНАХ, днешният брой" }, rosette(), "АЛМАНАХ"),
         h("nav", { class: "places", "aria-label": "Основна навигация" }, placeLinks()),
         // The player's avatar with the seal they wear: Профил, and Настройки in it (not on Профил itself, whose page
-        // has it). Without a profile yet (or on the cover, not signed in), the way in.
+        // has it). Without a profile yet (or on the cover, not signed in), the way in; on the way in itself, nothing.
         () => {
+          if (path() === "/signin") return null;
           const u = user();
-          if (!u || (cover() && !u.email)) return h("a", { class: "bar-in", href: "/me#signin" }, "Вход");
+          if (!u || (cover() && !u.email)) return h("a", { class: "bar-in", href: "/signin" }, "Вход");
           if (path() === "/me") return null;
           return h("a", { class: "bar-me", href: "/me", "aria-label": "Профил" }, () =>
             avatar(look(), { seal: wornSeal() }),
@@ -90,6 +93,7 @@ if (root) {
       { path: /^\/settings$/, view: later(() => import("./screens/settings.ts").then((m) => m.settings)) },
       { path: /^\/d\/([0-9]{1,5})-([a-z2-9]{8})$/, view: sharedDay },
       { path: /^\/me$/, view: later(() => import("./screens/me.ts").then((m) => m.me)) },
+      { path: /^\/signin$/, view: signInPage },
       {
         path: /^\/players\/([A-Za-z0-9_]{3,20})$/,
         view: later(() => import("./screens/player.ts").then((m) => m.playerProfile)),
@@ -97,10 +101,10 @@ if (root) {
     ],
     missing,
   );
-  // In a game the frame steps aside (app.css): the question gets the screen. On a new visitor's cover, the places too.
+  // In a game the frame steps aside (app.css): the question gets the screen.
   effect(() => document.documentElement.classList.toggle("playing", playing()));
-  // Днес is the cover at its own address.
-  effect(() => document.documentElement.classList.toggle("cover", cover() && path() === "/"));
+  // The frame bare, no places: a new visitor's cover (Днес at its own address), and the sign-in page.
+  effect(() => document.documentElement.classList.toggle("bare", (cover() && path() === "/") || path() === "/signin"));
   watchNews();
   prepareSound();
   preparePush();

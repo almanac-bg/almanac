@@ -664,13 +664,15 @@
     scroll-margin: var(--space-4) 0 calc(3rem + 17px + var(--space-4) + env(safe-area-inset-bottom));
   }
 
-  /* A game has the whole screen, and a new visitor's cover the day alone (app.ts). */
+  /* A game has the whole screen; a new visitor's cover and the sign-in page have the frame bare: the mark where it
+     always is, no places, on a phone or a big screen (app.ts). */
   .playing .places-foot,
-  .cover .places-foot {
+  .bare .places-foot,
+  .bare .bar .places {
     display: none;
   }
 
-  .cover #app {
+  .bare #app {
     padding-bottom: var(--space-7);
   }
 
@@ -986,10 +988,8 @@
     font-weight: 700;
   }
 
-  /* A link on its own line that's tapped, not read in a sentence: a finger's height. A way on in a line of its own
-     (`.day-next`: „Имаш профил? Влез“) is one too. */
-  .link.tap,
-  .day-next > :is(a, .link):only-child {
+  /* A link on its own line that's tapped, not read in a sentence: a finger's height. */
+  .link.tap {
     display: inline-flex;
     align-items: center;
     justify-self: start;
@@ -1229,13 +1229,6 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-3);
-  }
-
-  /* Quiet lines at a page's end (a way in, what the game brought), in one style. */
-  .day-next {
-    color: var(--ink-3);
-    font-size: 0.9375rem;
-    line-height: 1.375rem;
   }
 
   /* ---- The pips of a run: a bar a question, right filled in ink, близо half, wrong hollow, the one asked in its
@@ -5265,26 +5258,6 @@
 
   /* ---- Днес: the day's issue, and its result ---- */
 
-  /* A new visitor's cover: the mark and the name in the middle of the bar, „Вход“ in its corner. */
-  .cover .bar {
-    position: relative;
-    justify-content: center;
-  }
-
-  .cover .bar-in {
-    position: absolute;
-    right: 0;
-  }
-
-  /* Large text: the name and „Вход“ apart, each its side, never one over the other. */
-  .tight.cover .bar {
-    justify-content: space-between;
-  }
-
-  .tight.cover .bar-in {
-    position: static;
-  }
-
   .today,
   .result {
     align-items: start;
@@ -6279,11 +6252,6 @@
 
     .contents-issue {
       display: grid;
-    }
-
-    /* A new visitor's cover: the day alone, no places in the bar. */
-    .cover .bar .places {
-      display: none;
     }
 
     /* The result: the score and the day's entry on the left page, the friends, the action and tomorrow on the right;

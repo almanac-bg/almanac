@@ -663,17 +663,29 @@ for (const size of sizes)
             .locator(".duel-side .actions .btn")
             .evaluateAll((all) => all.map((b) => Math.round(b.getBoundingClientRect().width)));
           expect.soft(new Set(widths).size, `the duel's ways on${at}`).toBe(1);
-          // A new visitor's cover: the name and „Вход“ apart.
+          // A new visitor's cover: the mark where the bar always has it, the name and „Вход“ apart; the sign-in page
+          // the mark alone, its flaws none.
           const cover = await (
             await browser.newContext({ viewport: { width: size.width, height: size.height }, bypassCSP: true })
           ).newPage();
           if (big) await textAt(cover, percent);
+          const box = (s: string) => cover.locator(s).evaluate((el) => el.getBoundingClientRect().toJSON());
+          await cover.goto("/almanac");
+          await expect(cover.locator(".bar-in")).toBeVisible();
+          const always = await box(".brand");
           await cover.goto("/");
           await expect(cover.locator(".bar-in")).toBeVisible();
-          const [brand, signIn] = await Promise.all(
-            [".brand", ".bar-in"].map((s) => cover.locator(s).evaluate((el) => el.getBoundingClientRect().toJSON())),
-          );
+          const [brand, signIn] = await Promise.all([box(".brand"), box(".bar-in")]);
+          expect.soft(Math.round(brand.left), `the cover's mark moved${at}`).toBe(Math.round(always.left));
           expect.soft(brand.right, `the name runs into „Вход“${at}`).toBeLessThanOrEqual(signIn.left + 1);
+          await cover.locator(".bar-in").click();
+          await expect(cover).toHaveURL(/\/signin$/);
+          await expect(cover.getByLabel("Имейл")).toBeVisible();
+          expect
+            .soft(Math.round((await box(".brand")).left), `the sign-in page's mark moved${at}`)
+            .toBe(Math.round(always.left));
+          await settled(cover);
+          expect.soft(await byDayAndNight(cover, () => placeFlaws(cover)), `/signin${at}`).toEqual([]);
           await cover.context().close();
         }
       });

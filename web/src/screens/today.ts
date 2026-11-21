@@ -307,7 +307,7 @@ export function today() {
     const notices = [
       said ? h("p", { class: "notice", role: "status" }, said) : null,
       // Come from the streak's mail to a browser signed out: the way in comes first, open.
-      fromMail && !user.peek()?.email ? haveProfile(load, undefined, true) : null,
+      fromMail && !user.peek()?.email ? haveProfile(load) : null,
     ];
     // What came of the days just missed, once: under the streak, before the day is played. The result says the streak
     // in „Утре“, so there it's only kept as told. On an evening the streak ends at midnight without the day, the
