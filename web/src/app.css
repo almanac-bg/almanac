@@ -163,6 +163,7 @@
     --i-share: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 15V4M7.5 8.5L12 4l4.5 4.5'/%3E%3Cpath d='M5 13v6h14v-6'/%3E%3C/svg%3E");
     --i-nib: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.5c2.6 3 5 6.2 5 9.3 0 2-1.1 3.4-2.6 4.1V18H9.6v-2.1C8.1 15.2 7 13.8 7 11.8c0-3.1 2.4-6.3 5-9.3zm0 6.3a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM8.6 19.4h6.8v2.1H8.6z'/%3E%3C/svg%3E");
     --i-gear: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='3.2'/%3E%3Cpath d='M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M5.5 18.5l1.9-1.9M16.6 7.4l1.9-1.9'/%3E%3C/svg%3E");
+    --i-pencil: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17z'/%3E%3Cpath d='M13.5 8.5l2 2'/%3E%3C/svg%3E");
     --i-today: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='5' width='17' height='15.5' rx='3'/%3E%3Cpath d='M8 3v4M16 3v4M3.5 10h17'/%3E%3Ccircle cx='12' cy='15.25' r='1.75' fill='%23000' stroke='none'/%3E%3C/svg%3E");
     --i-book: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 18.5V5.5A2.5 2.5 0 0 1 7.5 3H19v14H7.5A2.5 2.5 0 0 0 5 19.5 1.5 1.5 0 0 0 6.5 21H19'/%3E%3Cpath d='M9 7.5h6'/%3E%3C/svg%3E");
     --i-friends: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='8' r='3.25'/%3E%3Cpath d='M3 19.5c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5'/%3E%3Cpath d='M15.5 4.9a3.25 3.25 0 0 1 0 6.2M17.5 14.3c2 .6 3.5 2.4 3.5 5.2'/%3E%3C/svg%3E");
@@ -490,6 +491,10 @@
 
   .i-gear {
     --i: var(--i-gear);
+  }
+
+  .i-pencil {
+    --i: var(--i-pencil);
   }
 
   .i-today {
@@ -1323,7 +1328,7 @@
      boards, a duel's marks; the share's ◩ and its card say it the same): the upper left half filled, cut on the
      diagonal, the lower right empty, so that it parts from a full one at a glance. Filled in --half: a tile's chapter
      colour, else ink. */
-  :is(.tile.near, .mini li.partial, .duel-pip.partial) {
+  :is(.tile.near, .mini > i.partial, .duel-pip.partial) {
     background-image: linear-gradient(to bottom right, var(--half, var(--ink)) 50%, transparent 50%);
   }
 
@@ -1380,23 +1385,20 @@
     flex: none;
     grid-template-columns: repeat(10, 10px);
     gap: 3px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
   }
 
-  .mini li {
+  .mini > i {
     width: 10px;
     height: 10px;
     border-radius: 2.5px;
     box-shadow: inset 0 0 0 1.8px var(--ink);
   }
 
-  .mini li.right {
+  .mini > i.right {
     background: var(--ink);
   }
 
-  .mini li.void {
+  .mini > i.void {
     box-shadow: inset 0 0 0 1.5px var(--line-2);
   }
 
@@ -4338,9 +4340,9 @@
   }
 
   button.me-avatar {
+    position: relative;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
     padding: 0;
     border: 0;
     border-radius: var(--r-3);
@@ -4350,13 +4352,33 @@
     cursor: pointer;
   }
 
-  .me-avatar-change {
-    text-decoration: underline;
-    text-decoration-thickness: 2px;
-    text-underline-offset: 4px;
+  /* The pencil on the avatar's top corner (the seal has the bottom one): on a phone always, on a big screen as the
+     pointer comes over the avatar or the keyboard reaches it. */
+  .me-avatar-edit {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border: 2px solid var(--bg);
+    border-radius: var(--radius-full);
+    background: var(--ink);
+    color: var(--bg);
+    font-size: 16px;
   }
 
   @media (hover: hover) and (pointer: fine) {
+    .me-avatar-edit {
+      opacity: 0;
+      transition: opacity 120ms ease;
+    }
+
+    button.me-avatar:is(:hover, :focus-visible) .me-avatar-edit {
+      opacity: 1;
+    }
+
     button.me-avatar:hover .avatar {
       box-shadow: 0 0 0 2px var(--line-2);
     }
@@ -5305,42 +5327,6 @@
     visibility: hidden;
   }
 
-  /* Numbers in a row (the profile's, the day's Bulgaria): each big, its words under it. */
-  .figures-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-    gap: var(--space-2);
-  }
-
-  /* On a phone, two across, an odd one out the row's width (the fewest knew's long words, not six lines of them). */
-  @media (max-width: 30rem) {
-    .figures-row {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .figures-row > .fig:last-child:nth-child(odd) {
-      grid-column: 1 / -1;
-    }
-  }
-
-  .fig {
-    display: grid;
-    align-content: start;
-    gap: 4px;
-    padding: 14px;
-    border-radius: var(--r-2);
-    background: var(--surface);
-  }
-
-  .fig-n {
-    font: 900 2.25rem / 0.9 var(--font-numeral);
-  }
-
-  .fig-label {
-    color: var(--ink-3);
-    font: 700 0.8125rem / 1.25 var(--font-sans);
-  }
-
   @media (min-width: 56.25rem) {
     .ways {
       max-width: 36rem;
@@ -6174,8 +6160,8 @@
     padding-top: var(--space-5);
   }
 
-  /* How all of България did, under „Въпросите и фактите“: eleven bars, 0 to 10, the player's in ink, the average a
-     thin line. */
+  /* How all of България did, on the day's board's България tab: eleven bars, 0 to 10, the player's in ink, the
+     average a thin line. */
   /* Over the bars, a row of its own for the average's label: „ти“ over the player's bar (as high as the tallest) never
      meets it, whatever the two counts. */
   .spread-chart {
@@ -6234,13 +6220,15 @@
     white-space: nowrap;
   }
 
+  /* Eleven labels across the phone's width: with large text no bigger than their columns hold („10“ beside „9“ at
+     320 px, never over it); the chart says its numbers to a screen reader in its own words. */
   .spread-ticks {
     display: grid;
     grid-template-columns: repeat(11, minmax(0, 1fr));
     gap: 4px;
     margin-top: 6px;
     color: var(--ink-3);
-    font: 700 0.9375rem / 1 var(--font-numeral);
+    font: 700 min(0.9375rem, 4.2vw) / 1 var(--font-numeral);
     text-align: center;
   }
 
@@ -6359,7 +6347,7 @@
       display: grid;
     }
 
-    /* The result: the score and the day's entry on the left page, the friends, the action and tomorrow on the right;
+    /* The result: the score and the day's entry on the left page, the action, tomorrow and the day's board on the right;
        what's under „Въпросите и фактите“ across both. */
     .result.spread > .result-main {
       grid-column: 1 / span 7;
@@ -6528,55 +6516,6 @@
     padding: var(--space-2) 0;
     color: var(--ink-2);
     font: 600 1rem / 1.45 var(--font-sans);
-  }
-
-  /* All of България: how many got each count, the player's bar in ink. */
-  .board-spread {
-    display: grid;
-    gap: 6px;
-    padding: 14px 16px 12px;
-    border-radius: var(--r-3);
-    background: var(--surface);
-  }
-
-  .board-bars {
-    display: grid;
-    grid-template-columns: repeat(11, minmax(0, 1fr));
-    align-items: end;
-    gap: 4px;
-    height: 72px;
-    border-bottom: 1px solid var(--ink);
-  }
-
-  .board-bars i {
-    display: block;
-    border-radius: 3px 3px 0 0;
-    background: var(--line);
-  }
-
-  .board-bars i.me {
-    background: var(--ink);
-  }
-
-  .board-ticks {
-    display: grid;
-    grid-template-columns: repeat(11, minmax(0, 1fr));
-    gap: 4px;
-    color: var(--ink-3);
-    font: 800 0.875rem / 1 var(--font-numeral);
-    text-align: center;
-  }
-
-  /* A label never wraps („10“ is one): wider than its column (large text at 320 px), it spills evenly into the gaps. */
-  .board-ticks > span {
-    display: flex;
-    justify-content: center;
-    white-space: nowrap;
-  }
-
-  .board-ticks .me {
-    color: var(--ink);
-    font-weight: 900;
   }
 
   /* The friends' head: its heading for a screen reader only (the page's own says it), „Премахни приятел“ at the right. */
@@ -6843,7 +6782,7 @@
     }
   }
 
-  /* Less motion: the device's setting until the player sets their own (Настройки → Достъпност, the .calm class). The
+  /* Less motion: the device's setting (prefers-reduced-motion, mirrored as the .calm class by prefs.ts). The
      timer and the count before a run still move: they are information. */
   @media (prefers-reduced-motion: reduce) {
     .btn,
@@ -6880,12 +6819,6 @@
     cursor: pointer;
     -webkit-user-select: none;
     user-select: none;
-  }
-
-  /* The text's size: its name and what „Обичаен“ is, the three sizes under them. */
-  .text-size {
-    display: grid;
-    gap: var(--space-3);
   }
 
   .switch-text {
@@ -7837,7 +7770,7 @@
   }
 
   /* ---- Large text on a phone ----
-     The text at up to twice its size (the player's „Размер на текста“, the phone's own size: prefs.ts) on a phone
+     The text at up to twice its size (the phone's own setting) on a phone
      320px wide: nothing scrolls sideways, nothing hides under another (e2e/layout.spec.ts). What has room wraps by
      itself; these are the rows that give way to columns once the page's column holds too few words across: `tight`
      on <html> under 17em, `tighter` under 13.5em (lib/prefs.ts measures it; at the text's usual size even the
@@ -7911,20 +7844,6 @@
 
   .tight .tomorrow-head > .tomorrow-sep {
     display: none;
-  }
-
-  /* Figures in a row: one under another. */
-  .tight .figures-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  /* The day's board's heading: „Брой 31“ a line of its own, no dot hung at the line's end. */
-  .tight .board-dot {
-    display: none;
-  }
-
-  .tight .board-issue {
-    display: block;
   }
 
   /* The issue's cover with large text: its display type held near its usual size (the date by the screen's height,

@@ -40,12 +40,13 @@ test("a topic's game never tells how well the topic is known, and the avatar is 
   await page.reload();
   await expect(page.getByRole("switch", { name: "Звуци" })).toHaveAttribute("aria-checked", "false");
 
-  // Достъпност: less motion and the text's size stay on this device too (the sizes: layout.spec.ts).
-  await page.getByRole("switch", { name: "По-малко движение" }).click();
-  await page.getByRole("radio", { name: "Едър", exact: true }).click();
-  await page.reload();
+  // Достъпност has no switches of the game's own: the text's size and less motion are the device's.
+  await expect(page.getByRole("switch", { name: "По-малко движение" })).toHaveCount(0);
+  await expect(page.getByRole("radiogroup", { name: "Размер на текста" })).toHaveCount(0);
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(page.locator("html")).toHaveClass(/calm/);
-  await expect(page.getByRole("radio", { name: "Едър", exact: true })).toHaveAttribute("aria-checked", "true");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expect(page.locator("html")).not.toHaveClass(/calm/);
 });
 
 // The day as the server would have it, the entry its right answers wrote told (as the server does) only once the day

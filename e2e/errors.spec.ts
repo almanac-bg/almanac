@@ -3,7 +3,7 @@
 import { expect, test } from "@playwright/test";
 import { answer, moveOn, openGame } from "./play.ts";
 
-test("Днес and the day's board that can't load try again, by a tap or as the line comes back", async ({ page }) => {
+test("Днес that can't load tries again, by a tap", async ({ page }) => {
   // Днес's page comes with the day in it: the day is asked for when Днес is opened from another screen. (A player:
   // a new visitor's cover has no places.)
   await page.goto("/");
@@ -17,16 +17,6 @@ test("Днес and the day's board that can't load try again, by a tap or as the
   await page.unroute("**/api/day");
   await page.getByRole("button", { name: "Опитай пак" }).click();
   await expect(page.locator(".issue")).toBeVisible();
-
-  // The day's board can't load, and comes by itself as the line comes back.
-  await page.route("**/api/day", (route) => route.abort("internetdisconnected"));
-  await page.goto("/board");
-  await expect(page.locator(".day-board").getByRole("button", { name: "Опитай пак" })).toBeVisible();
-  await page.context().setOffline(true);
-  await page.unroute("**/api/day");
-  await page.context().setOffline(false);
-  await expect(page.locator(".day-board").getByRole("button", { name: "Опитай пак" })).toBeHidden();
-  await expect(page.locator(".day-board .board-empty, .day-board .ranks").first()).toBeVisible();
 });
 
 test("a page that isn't there says so, with a way on", async ({ page }) => {

@@ -23,11 +23,7 @@ let {
   untracked,
   when,
   reportProblem,
-  textSize,
   schemeSwitch,
-  calm,
-  setTextSize,
-  setCalm,
   setTick,
   tickOn,
   needsHomeScreen,
@@ -48,7 +44,6 @@ let {
   signIn,
   noEmail,
   mailAsk,
-  segmented,
 } = {} as Kit;
 
 /** Signed out just now: said here, where it was done, and only here (Начало, next, doesn't say it again). */
@@ -70,11 +65,7 @@ export function settings(kit: Kit) {
     untracked,
     when,
     reportProblem,
-    textSize,
     schemeSwitch,
-    calm,
-    setTextSize,
-    setCalm,
     setTick,
     tickOn,
     needsHomeScreen,
@@ -95,7 +86,6 @@ export function settings(kit: Kit) {
     signIn,
     noEmail,
     mailAsk,
-    segmented,
   } = kit);
   title("Настройки");
   notice.set("");
@@ -116,7 +106,6 @@ export function settings(kit: Kit) {
           reminders(),
           looks(),
           sounds(),
-          access(),
           account(),
           h(
             "section",
@@ -151,7 +140,6 @@ export function settings(kit: Kit) {
           ),
           looks(),
           sounds(),
-          access(),
         ),
     ),
   );
@@ -367,40 +355,8 @@ function looks(): Child {
     "section",
     null,
     h("h2", null, "Изглед"),
-    h("p", { class: "muted" }, "Изгледът, звукът и достъпността важат за това устройство."),
+    h("p", { class: "muted" }, "Изгледът и звукът важат за това устройство."),
     schemeSwitch(),
-  );
-}
-
-/** Достъпност: less motion and the text's size, for this device. */
-function access(): Child {
-  return h(
-    "section",
-    null,
-    h("h2", null, "Достъпност"),
-    switchRow("По-малко движение", "Без анимации. Часовникът върви както винаги.", calm, setCalm),
-    h(
-      "div",
-      { class: "text-size" },
-      h(
-        "span",
-        { class: "switch-text", "aria-hidden": "true" },
-        h("b", null, "Размер на текста"),
-        h("span", { class: "muted" }, "„Обичаен“ е размерът от настройките на устройството."),
-      ),
-      segmented(
-        "Размер на текста",
-        [
-          ["normal", "Обичаен"],
-          ["big", "Едър"],
-          ["bigger", "Много едър"],
-        ],
-        textSize,
-        setTextSize,
-        false,
-        true,
-      ),
-    ),
   );
 }
 

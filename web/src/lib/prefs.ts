@@ -22,43 +22,17 @@ function keep(key: string, on: boolean): void {
   }
 }
 
-const osCalm = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+const calmQuery = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
 
-/** Less motion: no animations or transitions but the timer's. Follows the device's own setting until changed. */
-export const calm = signal(read("almanac.calm", osCalm));
+/** Less motion: no animations or transitions but the timer's. The device's own setting, and only it: the game asks
+ * nothing of its own (Настройки had a switch nobody used). */
+export const calm = signal(!!calmQuery?.matches);
+calmQuery?.addEventListener("change", (e) => {
+  calm.set(e.matches);
+  apply();
+});
 /** The clock's last seconds of a question (the other sounds have their own switch). */
 export const tickOn = signal(read("almanac.tick", true));
-
-/** The text's size, everywhere: as it comes, or a step or two larger. */
-export type TextSize = "normal" | "big" | "bigger";
-
-/** Each size as a share of the text as it comes: the browser's (or, in the app, the phone's) size times this. */
-export const textScales: Record<TextSize, number> = { normal: 1, big: 1.25, bigger: 1.5 };
-
-function readTextSize(): TextSize {
-  try {
-    const v = localStorage.getItem("almanac.text");
-    if (v === "big" || v === "bigger") return v;
-    // The one step there was before („По-едър текст“), on: the first of the steps now.
-    if (v === null && localStorage.getItem("almanac.big") === "on") return "big";
-  } catch {
-    // Storage refused: the text as it comes.
-  }
-  return "normal";
-}
-
-export const textSize = signal<TextSize>(readTextSize());
-
-export function setTextSize(size: TextSize): void {
-  textSize.set(size);
-  try {
-    localStorage.setItem("almanac.text", size);
-    localStorage.removeItem("almanac.big");
-  } catch {
-    // Not kept: the choice holds for this visit.
-  }
-  apply();
-}
 
 /** How the game looks on this device: as the device is set (Night or Day by its own setting), or Night or Day
  * whatever it's set to (a big screen in a lit room reads better by Day). On the page as `data-scheme` on <html>
@@ -88,8 +62,6 @@ function apply(): void {
   for (const m of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
     m.content = chosen === "device" ? barColour[m.media.includes("light") ? "day" : "night"] : barColour[chosen];
   }
-  const scale = textScales[textSize.peek()];
-  root.style.fontSize = scale === 1 ? "" : `${Math.round(scale * 1000) / 10}%`;
   measure();
 }
 
@@ -120,12 +92,6 @@ export function measure(): void {
   if (!(em > 0)) return; // not laid out (a page hidden at its start): as it was
   root.classList.toggle("tight", em < 17);
   root.classList.toggle("tighter", em < 13.5);
-}
-
-export function setCalm(on: boolean): void {
-  calm.set(on);
-  keep("almanac.calm", on);
-  apply();
 }
 
 export function setTick(on: boolean): void {

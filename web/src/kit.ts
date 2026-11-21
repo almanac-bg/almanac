@@ -1,7 +1,7 @@
 // app.js holds what a daily visit uses: Начало, a game, the screens a game leads to. A screen a daily visit doesn't
 // open loads on its own, the first time it's opened: a duel's result (outcome.ts), only for those who play there; and
-// Профил's places, the boards and the
-// friends (me, settings, avatar, almanac, board, friends, player). Each is handed the app's
+// Профил's places, the Алманах and the
+// friends (me, settings, avatar, almanac, friends, player). Each is handed the app's
 // pieces it uses from here, and imports nothing of the app but types: a module it imported would be one app.js
 // imports too, and esbuild would split every such module into a shared file that each page then loads first
 // (cmd/build fails if there is one). What only such a screen uses (lib/hash.ts, the boards') it imports itself. So a
@@ -43,7 +43,7 @@ import {
 } from "./lib/dom.ts";
 import { reportProblem } from "./lib/errors.ts";
 import { ordinal } from "./lib/ordinal.ts";
-import { calm, setCalm, setTextSize, setTick, textSize, tickOn } from "./lib/prefs.ts";
+import { calm, setTick, tickOn } from "./lib/prefs.ts";
 import { needsHomeScreen, pushable, pushOn, pushPrefs, setPushPref, turnOff, turnOn } from "./lib/push.ts";
 import { byTap, go, goBack, rename, title } from "./lib/router.ts";
 import { feelKit, loadFeel, play, playAnswer, playCount, quietWhenSilent, setSound, soundOn } from "./lib/sound.ts";
@@ -116,7 +116,6 @@ export const kit = {
   api,
   avatar,
   back,
-  textSize,
   board,
   boardRow,
   bulgaria,
@@ -205,8 +204,6 @@ export const kit = {
   seal,
   sealsSection,
   segmented,
-  setTextSize,
-  setCalm,
   setPushPref,
   setSound,
   setTick,

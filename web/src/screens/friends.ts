@@ -1,7 +1,7 @@
 // Приятели, one of the three places, in its budget's order (DESIGN.md, Places): the friends (who asks to be friends,
 // each friend with their day, the duels between you and a duel a tap away, and the one way to make more: by
 // потребителско име or email); and the duels (a friend's waiting for you, yours waiting for them, those played:
-// screens/duel.ts) and a new one. The day's board is Днес's (screens/board.ts).
+// screens/duel.ts) and a new one. The day's board is on Днес's result (today.ts, dayBoard).
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";

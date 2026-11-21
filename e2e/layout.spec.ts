@@ -1,6 +1,5 @@
 // The look fits (DESIGN.md, Fit and Large text), held in one place: at a 320 × 568 phone, Safari's 375 × 600 and
-// 390 × 664, and a 1366 × 900 laptop, at the usual text and at twice it (a phone's own setting, or the game's
-// „Размер на текста“ with it), each screen looked at by day and by night:
+// 390 × 664, and a 1366 × 900 laptop, at the usual text and at twice it (a phone's own setting), each screen looked at by day and by night:
 //
 // - Днес keeps its budget in the HTML's order and shows „Започни“ whole and high; the day's first question (its head
 //   has the issue and the clock), its answer and the day's result scroll nowhere sideways, the clock never over the count, the answer's panel never squeezed.
@@ -506,7 +505,7 @@ for (const size of sizes)
         expect(await byDayAndNight(page, () => sideways(page)), "the day's result").toEqual([]);
 
         // A new player's places, the day played.
-        for (const path of ["/almanac", "/me", "/board", "/friends", "/settings", "/duel/new"]) {
+        for (const path of ["/almanac", "/me", "/friends", "/settings", "/duel/new"]) {
           await page.goto(path);
           await expect(page.locator("main :is(h1, h2)").first()).toBeVisible();
           await settled(page);
@@ -615,7 +614,6 @@ for (const size of sizes)
           "/",
           "/me",
           `/players/${kept.tag}`,
-          "/board",
           "/friends",
           "/almanac",
           "/almanac/history",
@@ -635,9 +633,6 @@ for (const size of sizes)
             // The friend and the duels in, before what they look like is measured.
             if (path === "/friends" || path === "/duel/new")
               await expect(page.locator(".friend, .duel-pick").first()).toBeVisible();
-            // The day's board in, its rows (or why there are none).
-            if (path === "/board")
-              await expect(page.locator(".day-board :is(.rank-row, .board-empty)").first()).toBeVisible();
             if (path === "/") await textIs(page, percent);
             await settled(page);
             expect.soft(await byDayAndNight(page, () => placeFlaws(page)), `${path}${at}`).toEqual([]);
@@ -897,34 +892,12 @@ test.describe("turned", () => {
   });
 });
 
-test("„Размер на текста“: three sizes, kept on this device; the one switch before it becomes the first step", async ({
-  page,
-}) => {
-  // „По-едър текст“ on, as a player had it: the first of the larger sizes now.
-  await page.addInitScript(() => {
-    if (!localStorage.getItem("almanac.text")) localStorage.setItem("almanac.big", "on");
-  });
-  await page.goto("/settings");
-  const sizes = page.getByRole("radiogroup", { name: "Размер на текста" });
-  await expect(sizes.getByRole("radio", { name: "Едър", exact: true })).toHaveAttribute("aria-checked", "true");
-  await expect(page.locator("html")).toHaveCSS("font-size", "20px");
-  await sizes.getByRole("radio", { name: "Много едър" }).click();
-  await expect(page.locator("html")).toHaveCSS("font-size", "24px");
-  await page.reload();
-  await expect(sizes.getByRole("radio", { name: "Много едър" })).toHaveAttribute("aria-checked", "true");
-  await expect(page.locator("html")).toHaveCSS("font-size", "24px");
-  await sizes.getByRole("radio", { name: "Обичаен" }).click();
-  await expect(page.locator("html")).toHaveCSS("font-size", "16px");
-});
-
 test("a switch in Настройки is its whole row to tap, words and all", async ({ page }) => {
   await page.goto("/settings");
-  const calm = page.getByRole("switch", { name: "По-малко движение" });
-  const was = await calm.getAttribute("aria-checked");
-  await page.getByText("Без анимации. Часовникът върви както винаги.").click();
-  await expect(calm).not.toHaveAttribute("aria-checked", was ?? "");
-  // What it does is read with it.
-  await expect(calm).toHaveAccessibleDescription("Без анимации. Часовникът върви както винаги.");
+  const sounds = page.getByRole("switch", { name: "Звуци" });
+  const was = await sounds.getAttribute("aria-checked");
+  await sounds.locator("xpath=ancestor::label").locator(".switch-text").click();
+  await expect(sounds).not.toHaveAttribute("aria-checked", was ?? "");
 });
 
 /** Controls on their own (not a link inside a sentence) whose tap reaches them less than 44px high: tried by
