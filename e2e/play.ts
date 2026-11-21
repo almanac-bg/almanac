@@ -3,8 +3,12 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { type Browser, expect, type Page } from "@playwright/test";
+import { bankQuestions, type Q } from "./bank.ts";
 
-/** Answers the question showing: the first option; „Вярно“; a number on the game's pad; an order, dragging the first
+/** Answers the question showing: the first option; a true-or-not rightly (the one answer a test plays knowing it:
+ * every day's ten has one, so a day played is never none right, whatever ten a fresh database drew and in whatever
+ * order their options were dealt, and its result is the same kind of result on every run); a number on the game's
+ * pad; an order, dragging the first
  * item to the end (by a finger in Chromium) and tapping it back (which checks that both ways work); a match, joining each left to the right beside it (a line
  * for each); or a split, swiping the first thing left and sending the rest left too. */
 export async function answer(page: Page): Promise<void> {
@@ -64,11 +68,24 @@ export async function answer(page: Page): Promise<void> {
     await expect(q.locator(".split-pips b.done")).toHaveCount(1);
     for (let i = 1; i < 6; i++) await q.locator(".split-side").first().click();
   } else if (await q.locator(".tf-options").count()) {
-    await q.getByRole("button", { name: "Вярно", exact: true }).click();
+    const asked = plain(await q.locator(".ask").textContent());
+    const tf = trueOrNot().find((b) => plain(b.text) === asked);
+    if (!tf) throw new Error(`a true-or-not the tests' bank hasn't: ${asked}`);
+    await q.getByRole("button", { name: tf.answer === true ? "Вярно" : "Невярно", exact: true }).click();
   } else {
     await q.locator(".options .option").first().click();
   }
 }
+
+/** The tests' bank's true-or-not questions (read once). */
+let tfs: Q[] | undefined;
+const trueOrNot = () => {
+  tfs ??= bankQuestions().filter((q) => q.type === "truefalse");
+  return tfs;
+};
+
+/** A question's words as the bank has them, without what the screen adds to break them (soft hyphens). */
+const plain = (s: string | null) => (s ?? "").replaceAll("­", "").replace(/\s+/g, " ").trim();
 
 /** Rests a finger on a row of a list at (x, y0) till the row is taken up (a long press: as a player waits for it to
  * lift, however busy the phone), drags it straight down or up to y1 in steps, and lifts it: real touch events,
@@ -376,15 +393,18 @@ export async function cutOrOverlapping(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const out: string[] = [];
     const say = (el: Element) => `${el.className}: „${(el.textContent ?? "").trim().slice(0, 40)}“`;
-    // A name in a wide row whole: never clipped or ended with „…“.
+    // A name in a wide row whole: never clipped or ended with „…“. A name set inline (its words wrapping in its row)
+    // has no box of its own to be cut in: its row's box is the one measured (and an inline box's own widths are
+    // nothing to go by: Chromium has none, Firefox its words' run against a clientWidth of 0).
     for (const el of document.querySelectorAll(
       ".friend-name, .duel-name, .duel-row .who-label, .me-who h1, .rk-words b",
-    ))
-      if (
-        el.scrollWidth > el.clientWidth + 1 ||
-        (getComputedStyle(el).textOverflow === "ellipsis" && getComputedStyle(el).overflowX !== "visible")
-      )
+    )) {
+      let box: Element = el;
+      while (box.parentElement && getComputedStyle(box).display === "inline") box = box.parentElement;
+      const style = getComputedStyle(box);
+      if (box.scrollWidth > box.clientWidth + 1 || (style.textOverflow === "ellipsis" && style.overflowX !== "visible"))
         out.push(`cut ${say(el)}`);
+    }
     // A friend's @username only where two share a name.
     for (const el of document.querySelectorAll(".friend-tag:not(.same)"))
       if ((el as HTMLElement).offsetParent !== null) out.push(`a tag shown ${say(el)}`);
