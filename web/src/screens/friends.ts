@@ -349,6 +349,8 @@ function friendsCard(reloadBoard: () => void, played: () => boolean): Child {
         { class: "card sheet-panel stack" },
         h("h2", { id: "remove-title" }, `Премахваш ли ${f.name} от приятелите си?`),
         h("p", { class: "muted" }, "Незавършените дуели между вас свършват."),
+        // The player's link ends with the removal (play.Unfriend): said only to one who has one.
+        inviter.has() ? h("p", { class: "muted" }, "Връзката ти за покана спира да работи.") : null,
         h("button", { class: "btn danger big", type: "button", onclick: yes }, "Премахни"),
         h("button", { class: "link tap sheet-skip", type: "button", onclick: () => box.close() }, "Отказ"),
       ),
@@ -523,7 +525,7 @@ function friendsCard(reloadBoard: () => void, played: () => boolean): Child {
  * its place, and the old one ends: offered once there is one (`had`, as the server said, or one made here). The link is
  * asked for once, the first time it's sent, and again after a friend is removed (`forget`: the removal ended it,
  * play.Unfriend). */
-function inviteFriend(had: () => boolean): { view: Child; forget: () => void } {
+function inviteFriend(had: () => boolean): { view: Child; forget: () => void; has: () => boolean } {
   const note = signal<{ text: string; bad?: boolean } | null>(null);
   const confirming = signal(false);
   const busy = signal(false);
@@ -624,7 +626,8 @@ function inviteFriend(had: () => boolean): { view: Child; forget: () => void } {
         : h("p", { class: "small muted" }, "Който отвори връзката ти, става твой приятел с едно докосване.");
     },
   );
-  return { view, forget };
+  // Whether the player has a link: as the server said, or one made here.
+  return { view, forget, has: () => had() || made.peek() };
 }
 
 /** Asking someone to be friends: by their tag (@tag) or their email, on a line, „Добави“ beside it. */

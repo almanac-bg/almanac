@@ -720,7 +720,8 @@
       max-width: none;
     }
 
-    .screen.spread {
+    .screen.spread,
+    .summary.spread {
       display: grid;
       grid-template-columns: repeat(12, minmax(0, 1fr));
       column-gap: 40px;
@@ -1876,16 +1877,32 @@
     min-width: 0;
   }
 
-  /* An order answered: where its words and its value don't fit a line together, the value and the ✓ or ✕ go on a
-     line under the words, at the row's end, rather than squeeze the words to a word or two a line. */
-  .sortable-list > .option:has(> .value) {
+  /* An order answered: where its words and its value don't fit a line together, the value and the ✓ or ✕ (one box,
+     .row-end: never apart) go on a line under the words, at the row's end, rather than squeeze the words to a word or
+     two a line. */
+  .sortable-list > .option:has(> .row-end) {
     flex-wrap: wrap;
     justify-content: flex-end;
     row-gap: 2px;
   }
 
-  .sortable-list > .option:has(> .value) > .row-words {
+  .sortable-list > .option:has(> .row-end) > .row-words {
     flex: 1 1 auto;
+  }
+
+  .option > .row-end {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: center;
+    gap: var(--space-3);
+    min-width: 0;
+    max-width: min(48%, calc(5.5rem + 30px + var(--space-3)));
+    margin-left: auto;
+  }
+
+  .option > .row-end > .value {
+    max-width: none;
+    margin-left: 0;
   }
 
   /* An order's value at its row's end: a long one („179,4 млн. долара“) on two lines rather than squeeze the words
@@ -8004,22 +8021,22 @@
 
   /* An answer gone over: its words on the first line beside its letter, how it went (✓, ✕, the share who gave it,
      the place it had, an order's values) on a line under them, at the end. */
-  .tight .option:is(.right, .wrong, .dim, .amiss, .crowd, :has(> .value)):has(> .letter) {
+  .tight .option:is(.right, .wrong, .dim, .amiss, .crowd, :has(> .value, > .row-end)):has(> .letter) {
     flex-wrap: wrap;
     row-gap: var(--space-1);
   }
 
   .tight
-    .option:is(.right, .wrong, .dim, .amiss, .crowd, :has(> .value)):has(> .letter)
+    .option:is(.right, .wrong, .dim, .amiss, .crowd, :has(> .value, > .row-end)):has(> .letter)
     > span:nth-child(2):not(.sign) {
     flex-basis: calc(100% - 36px - var(--space-3));
   }
 
-  .tight .option:is(.right, .wrong, .dim, .amiss, .crowd, :has(> .value)):has(> .letter) > .sign {
+  .tight .option:is(.right, .wrong, .dim, .amiss, .crowd, :has(> .value, > .row-end)):has(> .letter) > .sign {
     margin-left: auto;
   }
 
-  .tight .option > .value {
+  .tight .option > :is(.value, .row-end) {
     max-width: none;
   }
 

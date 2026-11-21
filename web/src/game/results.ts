@@ -39,7 +39,7 @@ export function summary(
     hero.classList.add("page-1");
     return h(
       "section",
-      { class: "summary screen spread" },
+      { class: "summary spread" },
       hero,
       h("div", { class: "page-2 stack" }, steps, more),
       questions.list,

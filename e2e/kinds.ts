@@ -1,8 +1,8 @@
-// Every kind of question, as the tests' bank has it at its longest (the sample's, and the real bank's longest orders
-// and pairs where the real bank is here: bank.ts), answered as a test wants it (right, wrong or close), and what a
-// question's screen must never do whatever its size (layout.spec.ts, answer.spec.ts).
+// Every kind of question, as the tests' bank has it at its longest (the sample's, and beside them the real bank's
+// longest orders, pairs and choices where the real bank is here: bank.ts), answered as a test wants it (right, wrong or
+// close), and what a question's screen must never do whatever its size (layout.spec.ts, answer.spec.ts).
 import { expect, type Page } from "@playwright/test";
-import { bankQuestions, portrait, type Q, words } from "./bank.ts";
+import { bankQuestions, portrait, type Q, sampleIds, words } from "./bank.ts";
 
 export type { Q };
 
@@ -12,39 +12,57 @@ export type How = "right" | "wrong" | "close";
 /** Whether a kind of question can be answered close: a number, or a whole made of parts. */
 export const closeable = (q: Q) => ["number", "order", "match", "split"].includes(q.type);
 
-/** One question of each kind, the longest the tests' bank has: a choice, a choice of pictures, a choice under a
- * picture, „Вярно или невярно“, an order, pairs, groups, clues and a number; a choice under a portrait (the picture
- * at its tallest), where the bank has one; and of an order and of pairs, the one with the longest question too, where
- * that's another (a sheet of five lines over the rows); each named. */
+/** One question of each kind, the longest the sample has: a choice, a choice of pictures, a choice under a picture,
+ * „Вярно или невярно“, an order, pairs, groups, clues and a number; a choice under a portrait (the picture at its
+ * tallest), where the sample has one; and of an order and of pairs, the one with the longest question too, where
+ * that's another (a sheet of five lines over the rows); each named. Then, where the real bank is here, the longest of
+ * each kind it adds (bank.ts, named so: „order-real“): a run here covers all that a run on CI (the sample alone)
+ * does, and the real bank's extremes besides. */
 export function kinds(): { name: string; q: Q }[] {
   const all = bankQuestions().filter((q) => !q.retired);
+  const sample = sampleIds();
+  const own = longestOf(all.filter((q) => sample.has(q.id)));
+  const seen = new Set(own.map((k) => k.q.id));
+  const real = longestOf(
+    all.filter((q) => !sample.has(q.id)),
+    "-real",
+  ).filter((k) => !seen.has(k.q.id));
+  return [...own, ...real];
+}
+
+/** The longest of each kind among `qs`, each named (`suffix` after the name): every kind must be there, but for the
+ * real bank's additions (`suffix`), which are of a few kinds only. */
+function longestOf(qs: Q[], suffix = ""): { name: string; q: Q }[] {
+  const out: { name: string; q: Q }[] = [];
   const longest = (f: (q: Q) => boolean, size = words) => {
-    const q = all.filter(f).sort((a, b) => size(b) - size(a))[0];
-    if (!q) throw new Error("the bank has no such question");
+    const q = qs.filter(f).sort((a, b) => size(b) - size(a))[0];
+    if (!q && !suffix) throw new Error("the bank has no such question");
     return q;
+  };
+  const add = (name: string, q: Q | undefined) => {
+    if (q && !out.some((k) => k.q.id === q.id)) out.push({ name: `${name}${suffix}`, q });
   };
   const plain = (type: string) => (q: Q) => q.type === type && !q.image && !q.pictures;
   const asked = (q: Q) => q.text.length;
-  const order = longest(plain("order"));
-  const orderAsk = longest(plain("order"), asked);
-  const match = longest(plain("match"));
-  const matchAsk = longest(plain("match"), asked);
-  const picture = longest((q) => q.type === "choice" && !!q.image);
-  const tall = all.filter(portrait).sort((a, b) => words(b) - words(a))[0];
-  return [
-    { name: "choice", q: longest(plain("choice")) },
-    { name: "pictures", q: longest((q) => !!q.pictures) },
-    { name: "picture", q: picture },
-    ...(tall && tall.id !== picture.id ? [{ name: "portrait", q: tall }] : []),
-    { name: "truefalse", q: longest(plain("truefalse")) },
-    { name: "order", q: order },
-    ...(orderAsk.id === order.id ? [] : [{ name: "order-asked", q: orderAsk }]),
-    { name: "match", q: match },
-    ...(matchAsk.id === match.id ? [] : [{ name: "match-asked", q: matchAsk }]),
-    { name: "split", q: longest(plain("split")) },
-    { name: "clues", q: longest(plain("clues")) },
-    { name: "number", q: longest(plain("number")) },
-  ];
+  add("choice", longest(plain("choice")));
+  add(
+    "pictures",
+    longest((q) => !!q.pictures),
+  );
+  add(
+    "picture",
+    longest((q) => q.type === "choice" && !!q.image),
+  );
+  add("portrait", qs.filter(portrait).sort((a, b) => words(b) - words(a))[0]);
+  add("truefalse", longest(plain("truefalse")));
+  add("order", longest(plain("order")));
+  add("order-asked", longest(plain("order"), asked));
+  add("match", longest(plain("match")));
+  add("match-asked", longest(plain("match"), asked));
+  add("split", longest(plain("split")));
+  add("clues", longest(plain("clues")));
+  add("number", longest(plain("number")));
+  return out;
 }
 
 /** A cell's words as a player reads them (the soft hyphens a long word may break at left out). */
@@ -277,10 +295,9 @@ export async function panelFlaws(page: Page): Promise<string[]> {
           out.push(`under „Напред“ at ${Math.round(y)}: ${hit.tagName.toLowerCase()}.${hit.className}`);
       }
     // Scrolling, at its top: the fact's first two lines above the fade over the foot (unless the panel gave way to the
-    // player's row and the right one, right over it: DESIGN.md, Play).
+    // player's row and the right one, right over it: DESIGN.md, Play; run.ts, settle, sets --give on the question).
     const fact = after.querySelector<HTMLElement>(".fact p:last-child");
-    const rows = [...document.querySelectorAll("article.question button.option:is(.right, .wrong)")];
-    const gave = rows.length > 0 && Math.max(...rows.map((r) => r.getBoundingClientRect().bottom)) > p.top - 16;
+    const gave = !!document.querySelector<HTMLElement>("article.question")?.style.getPropertyValue("--give");
     if (!gave && fact && after.scrollHeight > after.clientHeight + 1 && getComputedStyle(after).position === "fixed") {
       after.scrollTop = 0;
       const lh = Number.parseFloat(getComputedStyle(fact).lineHeight) || 24;
@@ -293,12 +310,24 @@ export async function panelFlaws(page: Page): Promise<string[]> {
 }
 
 /** Where the answer ended, on a laptop: on the right page, under what answered it, never over the question's sheet
- * on the left; the verdict, the fact whole and „Напред“ in sight on the screen, nothing over them. */
+ * on the left; the verdict, the fact whole and „Напред“ in sight on the screen, nothing over them. The rows a choice
+ * keeps in sight (the player's, the right one) come first: moved as far as they let (run.ts, settle: at the head's
+ * foot), the page shows the fact's first line, the rest a scroll away, as on a tablet. */
 export async function beside(page: Page): Promise<string[]> {
   const at = await page.evaluate(() => {
     const box = (s: string) => document.querySelector(s)?.getBoundingClientRect();
     const seen = (s: string, x: number, y: number) =>
       y >= 0 && y <= innerHeight && !!document.elementFromPoint(x, y)?.closest(s);
+    const head = box(".question-top")?.bottom ?? 0;
+    const kept = [...document.querySelectorAll("article.question button.option:is(.right, .wrong)")].map((r) =>
+      r.getBoundingClientRect(),
+    );
+    const keptTop = Math.min(...kept.map((r) => r.top));
+    const atHead = kept.length > 0 && keptTop >= head - 1 && keptTop <= head + 16;
+    const line = document.querySelector<HTMLElement>(".after .fact p:last-child");
+    const lh = line ? Number.parseFloat(getComputedStyle(line).lineHeight) || 24 : 0;
+    const l = line?.getBoundingClientRect();
+    const firstLine = !!l && seen(".fact", l.left + 8, l.top + 4) && seen(".fact", l.left + 8, l.top + lh - 4);
     const fact = box(".after .fact");
     const go = box(".after .up-next-go");
     const verdict = box(".after .verdict");
@@ -314,7 +343,10 @@ export async function beside(page: Page): Promise<string[]> {
         panel.left >= answers.left - 1 &&
         panel.top >= answers.bottom - 1,
       verdict: !!verdict && seen(".verdict", verdict.left + 8, verdict.top + verdict.height / 2),
-      fact: !fact || (seen(".fact", fact.left + 8, fact.top + 4) && seen(".fact", fact.left + 8, fact.bottom - 4)),
+      fact:
+        !fact ||
+        (seen(".fact", fact.left + 8, fact.top + 4) && seen(".fact", fact.left + 8, fact.bottom - 4)) ||
+        (atHead && firstLine),
       go: !!go && seen(".up-next-go", go.left + go.width / 2, go.top + 4) && go.bottom <= innerHeight,
     };
   });

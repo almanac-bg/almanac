@@ -840,8 +840,13 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
                 ? h("small", { class: "match-gave" }, `при теб: ${ordinal(at + 1, "n")}`)
                 : null,
             ),
-            h("span", { class: "value" }, `${formatValue(reveal.values?.[item] ?? 0)}${unit}`),
-            how ? sign() : null,
+            // The value and the ✓ or ✕ in one box: under the words, where they don't fit beside them, together.
+            h(
+              "span",
+              { class: "row-end" },
+              h("span", { class: "value" }, `${formatValue(reveal.values?.[item] ?? 0)}${unit}`),
+              how ? sign() : null,
+            ),
           );
         }),
       );

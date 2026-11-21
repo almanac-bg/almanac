@@ -109,9 +109,10 @@ export function forgetOnSignOut(): void {
   });
 }
 
-/** The answers that end an invite for good: a link that isn't, one's own, the opener's list full. Anything else (no
- * line, the server for a moment, too many from here, the link's day spent, its player's list full) may pass. */
-const final = new Set(["no_invite", "self", "many_friends"]);
+/** The answers that end an invite for good: a link that isn't, one's own, the opener's list full, its player's list
+ * full (asked again for a week, it would only say so again). Anything else (no line, the server for a moment, too many
+ * from here, the link's day spent) may pass. */
+const final = new Set(["no_invite", "self", "many_friends", "inviter_full"]);
 const isFinal = (err: unknown) => err instanceof ApiError && final.has(err.code);
 
 /** What came of an invite taken after the player's first game, said once over Днес. */
@@ -158,10 +159,13 @@ export function takeWaitingOnce(): void {
 }
 
 /** The invite opened at the page (once: a later Днес is the day's alone), or what came of one taken after a game,
- * over Днес. */
-export function inviteCard(): Child {
-  const o = opened;
+ * over Днес (`played`: its result). Its tap kept for the player's first game is that game's to take: the card says
+ * it waits, and on the result what came of it is said instead (a reload mid-game, at the link). */
+export function inviteCard(played = false): Child {
+  let o = opened;
   opened = null;
+  const kept = !!o && "code" in o && waiting() === o.code;
+  if (kept && played) o = null;
   if (!o) {
     // Said once: gone as the screen goes.
     onCleanup(() => inviteSaid.set(""));
@@ -176,17 +180,29 @@ export function inviteCard(): Child {
   if (inv.mine || inv.friends) leaveInvite();
   // What the card says under the name, once there's something to say: the two are friends, or the add waits, or why
   // it can't be (`end`: for good).
+  const waits = `Първо изиграй днешния брой. След него ще сте приятели ${withWord(inv.name)}.`;
   const said = signal<{ text: string; bad?: boolean; done?: boolean; end?: boolean } | null>(
     inv.mine
       ? { text: "Това е твоята връзка. Който я отвори, може да те добави с едно докосване." }
       : inv.friends
         ? { text: `Вече сте приятели ${withWord(inv.name)}.`, done: true }
-        : null,
+        : kept
+          ? { text: waits }
+          : null,
   );
+  // The tap kept, taken as Днес opened (takeWaitingOnce: its game played on another visit): what came of it, in the
+  // card's line.
+  if (kept) {
+    effect(() => {
+      const text = inviteSaid();
+      if (text) said.set({ text });
+    });
+    onCleanup(() => inviteSaid.set(""));
+  }
   const busy = signal(false);
   const playFirst = () => {
     keepWaiting(inv.code);
-    said.set({ text: `Първо изиграй днешния брой. След него ще сте приятели ${withWord(inv.name)}.` });
+    said.set({ text: waits });
   };
   const add = async () => {
     // Not a player yet: nobody to be friends with until their first game.

@@ -141,7 +141,10 @@ for (const scheme of ["light", "dark"] as const) {
     await page.route("**/api/duels/1", (r) => r.fulfill({ json: { duel } }));
     await page.goto("/duel/1");
     await expect(page.getByRole("heading", { name: "Победа" })).toBeVisible();
-    await page.keyboard.press("Shift"); // the moment, to its end
+    // Whatever moves, at its end. Waited for, not cut short by a key: a key would be the page's first touch, which
+    // starts the audio and sends for the game's feel (lib/sound.ts) just as axe reads the page, and Firefox on CI's
+    // Linux crashed under that now and then. (A page's first result has no moment anyway: the feel isn't in yet.)
+    await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"));
     await expect(page.locator(".duel-record")).toBeVisible();
     await expect(page.locator(".duel-pip.partial, .duel-pip.right")).not.toHaveCount(0);
     await expect(page.locator(".duel-pip.fast, .duel-key")).toHaveCount(0); // speed only breaks a tie: no rings
