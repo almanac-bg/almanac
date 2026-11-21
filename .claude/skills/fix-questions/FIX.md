@@ -79,7 +79,10 @@ What the rules ask (the questions skill has the details):
   as a player meets it that day: the answer and every option right today under every source; the fact true and not
   restated; nothing stale; an easy true-or-not a common misconception, never a truism; the day's last number with an
   anchor a well-read player has, named in its text or fact; no twin or subject again within the week (`<work>/days.txt`
-  shows them); filed under the right topic. Nothing wrong: keep, and say the source.
+  shows them); filed under the right topic. Nothing wrong: keep, and say the source. Never retire, add, or change `on` or `bg` of a question that is dated or about Bulgaria in a pre-check:
+  the server would draw every day ahead again, and the month read would be gone. Change it in place, or leave it and say why;
+  replace only a question with neither, by one with neither.
+
 - **judge: easy-picture** (an easy choice with a picture, the day's second place): the picture must be the question
   (a place, a face, a species, a work, something people confuse), never "name this everyday object", and a quarter of
   Bulgarian adults still miss it. If it's trivial, replace it with a good one in the same cell; pictures as in
