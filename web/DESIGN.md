@@ -32,8 +32,8 @@ this file passes the rule for later (DECISIONS.md).
 
 ## Places and their budgets
 
-Three places: **Днес** (`/`), **Алманах** (`/almanac`), **Приятели** (`/friends`). Профил and Настройки open from the
-avatar in the bar (`/me`, `/settings`). Each screen holds its budget, in this order **in the HTML** (a big screen
+Three places: **Днес** (`/`, and the day's board, `/board`), **Алманах** (`/almanac`), **Приятели** (`/friends`).
+Профил and Настройки open from the avatar in the bar (`/me`, `/settings`). Each screen holds its budget, in this order **in the HTML** (a big screen
 places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/layout.spec.ts` holds Днес's).
 
 - **The frame** (`app.ts`): the bar holds the rosette and „АЛМАНАХ“ in spaced capitals (a way to Днес); on a big
@@ -95,9 +95,10 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      its seal, its name and where it stands (`standing()`: „Тетрадка · още 2 до „Книга““ over its bar); or ranks
      risen, their seals and one line, each rank once with its chapters, their names the links („Нови печати: „Страница“ в География и в Технологии и игри.“; one chapter's: its
      ladder under it).
-  4. Friends who played it, up to five (`.friends-day`), each a board's row as in Приятели (`scoreRow()`): their
+  4. Friends who played it, up to five (`.friends-day`), each a row as on the day's board (`scoreRow()`): their
      place among the player and their friends, the avatar with its seal, the name, and under it „7 от 10“ and their
      small squares. Never a friend who hasn't played, and never before the player has (the squares are the answers).
+     „Класация“ at the head's right: the day's board, among friends (`/board`).
   5. The action, past the first results: „Сподели“.
   6. Tomorrow: the next issue's date set big (over its words with large text), „Утре, неделя · Брой 32“ (a line each
      with large text, no dot), the chapter of its hard question with its
@@ -106,10 +107,25 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      action; three times at most, once a day). Yesterday's issue finished after midnight has today's in its place
      („Вече излезе.“, „Към днешния брой“).
 
-  Everything else is under „Въпросите и фактите“ (`.more`): how all of България spread (the average's label in a
-  row over the bars, clear of „ти“ over the player's; the question fewest knew named by its number, „най-малко от
-  десетте“, never „най-трудният“, which is the issue's tenth), and each question with its fact (its verdict never a
-  true-or-not's answer: „Точно“, „Грешно“).
+  Everything else is under „Въпросите и фактите“ (`.more`): how all of България spread („България днес“, at the
+  head's right „Класация“, the day's board of all България, `/board?tab=bulgaria`, as „Приятели днес“ has its own;
+  „Играха 53 души.“ a line under the head, never beside the link, where a dot would hang at a line's end; the
+  average's label in a row over the bars, clear of „ти“ over the player's; the question fewest knew named by its
+  number, „най-малко от десетте“, never „най-трудният“, which is the issue's tenth), and each question with its fact
+  (its verdict never a true-or-not's answer: „Точно“, „Грешно“).
+- **The day's board** (`/board`, `screens/board.ts`), a page of Днес's (Днес marked in the places): the way back to
+  Днес, „Класация · Брой 31“, and two tabs, Приятели and България (among friends by default once there are any;
+  `?tab=bulgaria` opens on all България, `?tab=friends` among friends). All България: its spread (the player's bar in
+  ink) and the player's place first („В България си на 20-о място от 53.“; with none right only „Днес играха 53
+  души.“), then the best twenty and the player's own row under them if further down. Among friends: each who played,
+  best first; with none, the player's own row and why it's alone (no friends yet: „Добави ги в Приятели“, a link
+  there). A row: the place (shared by those as many right and as close on the number, never told apart by time: 1,
+  2, 2, 4; the player first among their equals), then the row built as a friend's: the avatar with its seal, the name
+  with the row's width and „ти“ after it, and on one line under the name the score (a heavy numeral as a friend's,
+  never display-sized) and the small squares after it, under the score only where the line is too narrow (under 360
+  px; in large text, as a friend's day, the line runs under the place and the avatar too); the squares once the player
+  has played the day, on both tabs. Before that, all България says how many played and that the board comes with the
+  player's own result. One reading column on a big screen.
 - **Алманах:** its head (Микс and България as two ways to play, words only, no glyph: theirs would sit apart from the chapters'; no lifetime totals), then the chapters, each a folded
   card in its colour with its seal as the badge (40px), its ink („180 с мастило“) and its rank, what's left to the
   next under it („Тетрадка“, „още 15 до „Книга““: a line each, no dot to hang at a line's end); a counter at zero is hidden, and the head says once how ink is written; a
@@ -138,14 +154,10 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   chapters, „Към Алманаха“). On a big screen the result is a spread, as the day's: the sheet on the left page, the
   action, the ways on and that line on the right, „Прегледай въпросите“ under both in a reading column. Its start
   (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name.
-- **Приятели:** the board (friends by default, or all of България: its spread and the player's place first, then the
-  top rows: the place (shared by those as many right and as close on the number, never told apart by time: 1, 2, 2,
-  4; the player first among their equals), then the row built as a friend's: the avatar with its seal, the name with
-  the row's width and „ти“ after it, and on one line under the name the score (a heavy numeral as a friend's, never
-  display-sized) and the small squares after it, under the score only where the line is too narrow (under 360 px; in
-  large text, as a friend's day, the line runs under the place and the avatar too); the squares once the player has
-  played the day, on both boards); the friends (a row each: avatar with its seal, the name across the row, never cut, today's score and the duels between you „дуели 3 : 1“ under it; the column a third of a
-  big screen; a friend removed only after a sheet asks „Премахваш ли Иво от приятелите си?“, „Премахни“ in red and
+- **Приятели:** the people and the duels (the day's board is Днес's); the friends (their heading for a screen reader
+  only, right under the page's „Приятели“, „Премахни приятел“ at the right; a row each: avatar with its seal,
+  the name across the row, never cut, today's score and the duels between you „дуели 3 : 1“ under it; the column half
+  a big screen, the duels the other half; a friend removed only after a sheet asks „Премахваш ли Иво от приятелите си?“, „Премахни“ in red and
   „Отказ“, then at once, the duels open between them ending as if their time were up); the duels (shown once there
   are friends or duels, or the day is played: „Нов дуел“ against a recording needs no friend; „Твой ред“ the page's
   action, „Чакаш“, „Изиграни“: an open one how it stands under the name, „Изиграй същите десет въпроса · още 6 дни“,
@@ -335,7 +347,7 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
 - **What a tap brings up** under it (an ask, an answer: „Нова връзка“, „Добави“, „Изтрий профила“) is scrolled into
   sight whole, clear of a phone's places at the foot (`inSight()`).
 - **Rows of players:** `who()` (the avatar with its seal, and the name), `playerRow()` (a friend's
-  `.friend` and a board's `.rank-row`, one build: Приятели, and Днес's friends), `.duel-row`. **Avatars** (`avatar()`): the drawn animal
+  `.friend` and a board's `.rank-row`, one build: Приятели, the day's board, and Днес's friends), `.duel-row`. **Avatars** (`avatar()`): the drawn animal
   on a rounded tile of its scene, the seal worn on its corner. Only the fifteen animals: an avatar is a face.
 - **What went wrong** is never a dead end: `failure()` says what happened, offers „Опитай пак“ where it can help, and
   always a way on.

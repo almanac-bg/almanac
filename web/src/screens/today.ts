@@ -3,7 +3,8 @@
 // shared day's link, the score shared over the same ten). A new visitor has the cover alone; a player has beside it
 // the streak and this week, the friends' day, and the way to their book. Once the day is played, the issue is its
 // result (as it lands, and on every later visit): the score and its shape, how it went among everyone, sharing it
-// (game/share.ts, in a sheet with its card and its text), how all of България did with it, one entry its right answers
+// (game/share.ts, in a sheet with its card and its text), how all of България did with it (the whole day's board a page
+// of its own, `/board`: screens/board.ts), one entry its right answers
 // wrote in the book (the rarest, once enough others played the day), and tomorrow (when the next issue comes, the streak it makes, the reminder's ask). A wrong game is
 // never celebrated. Topics are played from their chapter in the Алманах, duels from Приятели (a friend's duel waiting
 // is its dot, a friend's yes its line). Once, under the streak: what came of the days just missed. Once, over the day:
@@ -800,7 +801,7 @@ function tenthLine(review: Promise<Reviewed[]>): Child {
   return () => (said() ? h("p", { class: "tenth" }, said()) : null);
 }
 
-/** The friends who have played the day, best first, up to five, each a board's row as Приятели draws it (scoreRow):
+/** The friends who have played the day, best first, up to five, each a row as the day's board draws it (scoreRow):
  * their place among the player and their friends, the avatar with its seal, the name, and under it the score and
  * their small squares; nothing while none has (no line asking for friends: the day's result isn't the place). Only
  * on the result: the squares come once the player has finished the day (play.FriendsBoard). */
@@ -814,7 +815,7 @@ function friendsDay(t: Today): Child {
       "div",
       { class: "sect-head" },
       h("h2", null, "Приятели днес"),
-      h("a", { class: "sect-note", href: "/friends" }, "Класация"),
+      h("a", { class: "sect-note", href: "/board" }, "Класация"),
     ),
     h(
       "ol",
@@ -855,11 +856,14 @@ function bulgariaToday(t: Today, run: State, review: Promise<Reviewed[]>): Child
       "div",
       { class: "sect-head" },
       h("h2", null, "България днес"),
-      h(
-        "span",
-        { class: "sect-note" },
-        t.board.players === 1 ? "игра 1\u00a0човек" : `играха ${formatNumber(t.board.players)}\u00a0души`,
-      ),
+      // The whole board of all България, a page of Днес's (screens/board.ts), as „Приятели днес“ has its own.
+      h("a", { class: "sect-note", href: "/board?tab=bulgaria" }, "Класация"),
+    ),
+    // How many played: a line of its own, so that no dot hangs at a line's end beside the link (large text).
+    h(
+      "p",
+      { class: "sect-lead" },
+      t.board.players === 1 ? "Игра 1\u00a0човек." : `Играха ${formatNumber(t.board.players)}\u00a0души.`,
     ),
     h(
       "div",

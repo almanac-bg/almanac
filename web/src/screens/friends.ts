@@ -1,10 +1,8 @@
-// Приятели, one of the three places, in its budget's order (DESIGN.md, Places): the day's board (among friends, or all
-// of България: its spread and the player's place first, then the top rows); the friends (who asks to be friends, each
-// friend with their day, the duels between you and a duel a tap away, and the one way to make more: by потребителско
-// име or email); and the duels (a friend's waiting for you, yours waiting for them, those played: screens/duel.ts)
-// and a new one.
+// Приятели, one of the three places, in its budget's order (DESIGN.md, Places): the friends (who asks to be friends,
+// each friend with their day, the duels between you and a duel a tap away, and the one way to make more: by
+// потребителско име or email); and the duels (a friend's waiting for you, yours waiting for them, those played:
+// screens/duel.ts) and a new one. The day's board is Днес's (screens/board.ts).
 
-import type { Board, Score } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
 import type { Look } from "../ui.ts";
@@ -30,17 +28,13 @@ let {
   player,
   user,
   failure,
-  formatNumber,
-  ordinal,
   profileHref,
   record,
   rightsOf,
-  segmented,
   withWord,
   who,
   inSight,
   playerRow,
-  scoreRow,
 } = {} as Kit;
 
 interface Friend {
@@ -73,18 +67,6 @@ interface Friends {
   accepted?: Accepted | null;
 }
 
-/** The day's boards, as /api/day has them. */
-interface Day {
-  day: string;
-  issue?: number;
-  board: Board;
-  /** The player's day: the board of everyone names its players only to one who has finished it (server/game.go). */
-  run?: { done: boolean } | null;
-  friends?: Score[] | null;
-  /** No friend has played: whether the player has any at all. */
-  befriended?: boolean;
-}
-
 export function friends(kit: Kit): Child {
   ({
     acceptedLine,
@@ -104,177 +86,30 @@ export function friends(kit: Kit): Child {
     player,
     user,
     failure,
-    formatNumber,
-    ordinal,
     profileHref,
     record,
     rightsOf,
-    segmented,
     withWord,
     who,
     inSight,
     playerRow,
-    scoreRow,
   } = kit);
   title("Приятели");
   // Opened: what has come here is seen, on every device, and the dot on Приятели goes.
   if (user.peek()) sawFriends();
-  const board = dayBoard();
-  return h(
-    "section",
-    { class: "screen friends-page spread" },
-    h("h1", null, "Приятели"),
-    board.view,
-    friendsCard(board.load, board.played),
-  );
-}
-
-/** The day's board: among the player and their friends (first, once they have any), or all of България. A row says
- * what places it: the right answers („8 от 10“; a tie between them broken as play/board.go says, never by time:
- * those still equal share a place, the server's); the player's own row washed, „ти“ after the name, and under the best twenty if further down. */
-function dayBoard(): { view: Child; load: () => void; played: () => boolean } {
-  const day = signal<Day | null>(null);
-  const failed = signal<unknown>(null);
-  const among = signal<"friends" | "all" | null>(null);
-  let chosen = false; // the player chose where to look
-  const load = () =>
-    api<Day>("GET", "/api/day").then(
-      (d) => {
-        failed.set(null);
-        day.set(d);
-        // Among friends once there are any (a first one just accepted too), unless the player chose.
-        if (!chosen) among.set(d.friends?.length || d.befriended ? "friends" : "all");
-      },
-      (err) => failed.set(err),
+  // Whether the player has finished the day: a duel against a recording needs no friend, only the day played.
+  const played = signal(false);
+  if (user.peek())
+    api<{ run?: { done: boolean } | null }>("GET", "/api/day").then(
+      (d) => played.set(!!d.run?.done),
+      () => {},
     );
-  load();
-  const view = h(
-    "section",
-    { class: "sect day-board page-1" },
-    h(
-      "div",
-      { class: "sect-head" },
-      h("h2", null, () => {
-        const d = day();
-        return d?.issue ? `Класация ·\u00a0Брой\u00a0${d.issue}` : "Класация";
-      }),
-    ),
-    () =>
-      day()
-        ? segmented<"friends" | "all">(
-            "Класация сред",
-            [
-              ["friends", "Приятели"],
-              ["all", "България"],
-            ],
-            () => among() ?? "friends",
-            (v) => {
-              chosen = true;
-              among.set(v);
-            },
-          )
-        : null,
-    (): Child => {
-      const d = day();
-      if (!d) return failed() ? failure(failed(), () => void load(), null) : h("p", { class: "muted" }, "…");
-      return among() === "all" ? everyone(d) : ofFriends(d);
-    },
-  );
-  return { view, load: () => void load(), played: () => !!day()?.run?.done };
-}
-
-/** The day among the player's friends: each who played, best first, and who hasn't yet, in a line. */
-function ofFriends(d: Day): Child {
-  const rows = d.friends ?? [];
-  if (!rows.length) {
-    // No friend has played yet: the player's own day on the board all the same, once played, and why it's alone.
-    const mine = d.run?.done ? (d.board.mine ?? d.board.top.find((s) => s.me)) : undefined;
-    return [
-      mine ? h("ol", { class: "rows ranks" }, scoreRow({ ...mine, me: true }, 1)) : null,
-      h(
-        "p",
-        { class: "board-empty" },
-        d.befriended === false
-          ? "Още нямаш приятели тук. Добави някого и сравнявайте резултатите си всеки ден."
-          : "Още никой от приятелите ти не е играл днес.",
-      ),
-    ];
-  }
-  return h(
-    "ol",
-    { class: "rows ranks" },
-    rows.map((s, i) => scoreRow(s, s.place ?? i + 1)),
-  );
-}
-
-/** The day among everyone who played it: the best twenty, and the player's own place under them if further down; to
- * one who hasn't played it, how many have (the names come with their own result). */
-function everyone(d: Day): Child {
-  const b = d.board;
-  if (!d.run?.done)
-    return h(
-      "p",
-      { class: "board-empty" },
-      b.players
-        ? `${b.players === 1 ? "Днес игра 1\u00a0човек" : `Днес играха ${formatNumber(b.players)}\u00a0души`}. Изиграй днешния брой и ще видиш класацията.`
-        : "Още никой не е играл днешния брой.",
-    );
-  if (!b.top.length) return h("p", { class: "board-empty" }, "Още никой не е играл днешния брой.");
-  const mine = b.mine && b.place && !b.top.some((s) => s.me) ? b.mine : null;
-  return [
-    // First how all of България did and where the player stands (alone on the board, a place says nothing; with none
-    // right, it would only rub the day in: how many played instead); then the top rows.
-    spreadOf(b),
-    b.players < 2
-      ? null
-      : b.place && b.mine?.rights
-        ? h(
-            "p",
-            { class: "board-note" },
-            `В България си на ${ordinal(b.place, "n")} място от ${formatNumber(b.players)}.`,
-          )
-        : h("p", { class: "board-note" }, `Днес играха ${formatNumber(b.players)}\u00a0души.`),
-    h(
-      "ol",
-      { class: "rows ranks" },
-      b.top.map((s, i) => scoreRow(s, s.place ?? i + 1)),
-      mine && b.place ? scoreRow(mine, b.place, b.place > b.top.length + 1) : null,
-    ),
-  ];
-}
-
-/** How all of България did with the day: how many got each count of right answers, 0 to 10, the player's in ink.
- * From ten players (play.Board.Spread). */
-function spreadOf(b: Board): Child {
-  const spread = b.spread;
-  if (!spread?.length) return null;
-  const most = Math.max(1, ...spread);
-  const mine = b.mine ? Math.min(b.mine.rights, spread.length - 1) : -1;
-  return h(
-    "div",
-    {
-      class: "board-spread",
-      role: "img",
-      "aria-label": `Колко играчи имат по колко верни отговора: най-много имат ${spread.indexOf(Math.max(...spread))}.${mine >= 0 ? ` Ти: ${mine}.` : ""}`,
-    },
-    h(
-      "div",
-      { class: "board-bars" },
-      spread.map((n, i) =>
-        h("i", { class: i === mine ? "me" : undefined, style: { height: `${Math.max(2, (100 * n) / most)}%` } }),
-      ),
-    ),
-    h(
-      "div",
-      { class: "board-ticks", "aria-hidden": "true" },
-      spread.map((_, i) => h("span", { class: i === mine ? "me" : undefined }, String(i))),
-    ),
-  );
+  return h("section", { class: "screen friends-page spread" }, h("h1", null, "Приятели"), friendsCard(played));
 }
 
 /** The friends: who asks to be friends, each friend with their day and the duels between you (and, while changing
  * the list, removing them), the one field to add more, and the requests that wait for an answer. */
-function friendsCard(reloadBoard: () => void, played: () => boolean): Child {
+function friendsCard(played: () => boolean): Child {
   const data = signal<Friends | null>(null);
   const duels = signal<Duels | null>(null);
   const error = signal("");
@@ -289,10 +124,6 @@ function friendsCard(reloadBoard: () => void, played: () => boolean): Child {
     try {
       const [f, d] = await Promise.all([api<Friends>("GET", "/api/friends"), api<Duels>("GET", "/api/duels")]);
       failed.set(null);
-      // The friends changed (one accepted, one removed): the board among them is another now.
-      const was = data.peek();
-      const ids = (x: Friends) => x.friends.map((y) => y.id).join(",");
-      if (was && ids(was) !== ids(f)) reloadBoard();
       data.set(f);
       duels.set(d);
       if (f.accepted && !yes.peek()) yes.set(acceptedLine(f.accepted));
@@ -389,8 +220,9 @@ function friendsCard(reloadBoard: () => void, played: () => boolean): Child {
   function friendsList(): Child {
     return h(
       "section",
-      { class: "sect friends page-mid" },
-      h("div", { class: "sect-head" }, h("h2", null, "Приятели"), () => {
+      { class: "sect friends page-1" },
+      // Its heading for a screen reader only: right under the page's own „Приятели“ it would say it twice.
+      h("div", { class: "sect-head friends-head" }, h("h2", { class: "sr" }, "Приятели"), () => {
         const n = data()?.friends.length ?? 0;
         return n
           ? h(

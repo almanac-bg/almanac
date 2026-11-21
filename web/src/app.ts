@@ -22,9 +22,10 @@ import { cover, friendsNews, look, playing, user, watchNews, wornSeal } from "./
 import { avatar, rosette } from "./ui.ts";
 
 /** The three places (DECISIONS.md, „The redesign“): where each goes, its name, and which paths are part of it. A game
- * of the day is played on Днес, a topic's from its chapter in the Алманах; a duel is the friends'. */
+ * of the day is played on Днес, and its board is Днес's (`/board`); a topic's from its chapter in the Алманах; a duel
+ * is the friends'. */
 const places: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
-  ["/", "Днес", "today", (p) => p === "/"],
+  ["/", "Днес", "today", (p) => p === "/" || p === "/board"],
   ["/almanac", "Алманах", "book", (p) => /^\/(almanac|play)(\/|$)/.test(p)],
   ["/friends", "Приятели", "friends", (p) => /^\/(friends|duel|players)(\/|$)/.test(p)],
 ];
@@ -89,6 +90,7 @@ if (root) {
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
       { path: /^\/almanac$/, view: later(() => import("./screens/almanac.ts").then((m) => m.almanac)) },
       { path: /^\/almanac\/([a-z]+)$/, view: later(() => import("./screens/almanac.ts").then((m) => m.chapter)) },
+      { path: /^\/board$/, view: later(() => import("./screens/board.ts").then((m) => m.board)) },
       { path: /^\/friends$/, view: later(() => import("./screens/friends.ts").then((m) => m.friends)) },
       { path: /^\/settings$/, view: later(() => import("./screens/settings.ts").then((m) => m.settings)) },
       { path: /^\/d\/([0-9]{1,5})-([a-z2-9]{8})$/, view: sharedDay },
