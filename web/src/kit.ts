@@ -81,6 +81,7 @@ import {
   failure,
   formatNumber,
   glyph,
+  inSight,
   ladder,
   leaf,
   meter,
@@ -103,11 +104,13 @@ import {
   toneOf,
   topicMark,
   verdict,
+  who,
   worn,
 } from "./ui.ts";
 
 export const kit = {
   acceptedLine,
+  inSight,
   answered,
   answering,
   ApiError,
@@ -240,6 +243,7 @@ export const kit = {
   weekday,
   when,
   withWord,
+  who,
   worn,
 };
 

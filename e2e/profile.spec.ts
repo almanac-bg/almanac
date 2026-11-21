@@ -1,5 +1,27 @@
 import { expect, test } from "@playwright/test";
-import { playedBefore, playRun } from "./play.ts";
+import { playedBefore, playRun, ranked } from "./play.ts";
+
+test("Профил: one tap on a seal wears it, no mode to choose in first", async ({ page }) => {
+  await page.goto("/");
+  await ranked(page);
+  await page.goto("/me");
+  const cards = page.locator(".me-seals .seal-list button.rk");
+  await expect(cards).toHaveCount(10);
+  // No „избери друг“ to open first: every earned seal is a button already, the worn one pressed.
+  await expect(page.locator(".me-seals")).not.toContainText("избери");
+  await expect(cards.and(page.locator('[aria-pressed="true"]'))).toHaveCount(1);
+  const pressed = await cards.evaluateAll((all) => all.map((b) => b.getAttribute("aria-pressed")));
+  const other = cards.nth(pressed.indexOf("false"));
+  const chapter = (await other.locator(".rk-words b").textContent()) ?? "";
+  await other.click();
+  await expect(other).toHaveAttribute("aria-pressed", "true");
+  await expect(cards.and(page.locator('[aria-pressed="true"]'))).toHaveCount(1);
+  await expect(page.locator(".me-seals .seal-worn")).toHaveText(`Носиш печата на глава „${chapter}“.`);
+  // Kept: worn still after a reload, and on its ladder.
+  await page.reload();
+  await expect(page.locator(".me-seals button.rk[aria-pressed='true'] .rk-words b")).toHaveText(chapter);
+  await expect(page.locator(".me-ladder h2")).toHaveText(`Печатът на ${chapter}`);
+});
 
 test("a player's profile: asked to be friends from it, and friends there", async ({ browser }) => {
   test.setTimeout(120_000);

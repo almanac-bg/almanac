@@ -258,8 +258,8 @@ export function inviteCard(played = false): Child {
       return h(
         "button",
         { class: "btn inline", type: "button", disabled: busy, onclick: add, "aria-label": "Добави като приятел" },
-        "Добави",
-        h("span", { class: "invite-more" }, " като приятел"),
+        // One run of words: the button's gap never inside „Добави като приятел“.
+        h("span", null, "Добави", h("span", { class: "invite-more" }, " като приятел")),
       );
     },
   );

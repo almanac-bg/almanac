@@ -377,7 +377,7 @@ export async function keptPlayer(page: Page, browser: Browser): Promise<{ tag: s
       to,
     );
   await name(page, "Константинова-Христозова");
-  await name(other, "Радостина Хаджиниколова");
+  await name(other, "Maximilian von Bulgarien");
   const friend = await other.evaluate(
     async () => (await (await fetch("/api/me")).json()).user as { id: number; tag: string },
   );
@@ -390,6 +390,17 @@ export async function keptPlayer(page: Page, browser: Browser): Promise<{ tag: s
   await givenUp(other, theirs);
   await other.context().close();
   return { tag: friend.tag, duel: duel.id };
+}
+
+/** A player's name as a link, one rule everywhere (web/src/app.css, .name-words): never underlined at rest, as no
+ * row of players is. A link's underline never reaches a word held whole (an inline block), so an underlined name was
+ * underlined only in part („Таралеж 840“ with „840“ alone underlined). Each such link, named. */
+export async function linkedNames(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll("a")]
+      .filter((a) => a.querySelector(".name-words") && getComputedStyle(a).textDecorationLine !== "none")
+      .map((a) => `a name underlined: „${(a.textContent ?? "").replaceAll("­", "").trim()}“`),
+  );
 }
 
 /** What of a page is cut or runs into its neighbour: a name clipped where its row has room, a word past its card, the
@@ -432,6 +443,25 @@ export async function cutOrOverlapping(page: Page): Promise<string[]> {
       for (const b of seals.slice(i + 1))
         if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1)
           out.push("two seals over each other");
+    // A ladder of ranks: its names apart („СтраницаТетрадка“ once), each inside the ladder, and the reached seal's
+    // ring (5.5px outside it) inside its own column, clear of the next seal.
+    for (const ladder of document.querySelectorAll(".ladder")) {
+      const box = ladder.getBoundingClientRect();
+      const named = [...ladder.querySelectorAll(".ladder-name")]
+        .filter((n) => getComputedStyle(n).visibility !== "hidden")
+        .map((n) => ({ n, r: n.getBoundingClientRect() }));
+      for (const [i, a] of named.entries()) {
+        if (a.r.left < box.left - 1 || a.r.right > box.right + 1) out.push(`a rank's name past its ladder ${say(a.n)}`);
+        for (const b of named.slice(i + 1))
+          if (a.r.left < b.r.right + 2 && b.r.left < a.r.right + 2 && a.r.top < b.r.bottom && b.r.top < a.r.bottom)
+            out.push(`two ranks' names run together: „${a.n.textContent}${b.n.textContent}“`);
+      }
+      const now = ladder.querySelector(".now");
+      const ring = now?.querySelector(".seal")?.getBoundingClientRect();
+      const column = now?.getBoundingClientRect();
+      if (ring && column && (ring.left - 5.5 < column.left - 0.5 || ring.right + 5.5 > column.right + 0.5))
+        out.push("the reached seal's ring past its column");
+    }
     return out;
   });
 }

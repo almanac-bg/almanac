@@ -634,6 +634,12 @@
     }
   }
 
+  /* What a tap brings up, scrolled into sight (ui.ts, inSight): its foot clear of the places over the page's foot
+     (their 3rem, 17px of padding and line, and the phone's own inset), with room to spare. */
+  .in-sight {
+    scroll-margin: var(--space-4) 0 calc(3rem + 17px + var(--space-4) + env(safe-area-inset-bottom));
+  }
+
   /* A game has the whole screen, and a new visitor's cover the day alone (app.ts). */
   .playing .places-foot,
   .cover .places-foot {
@@ -704,6 +710,10 @@
 
     .places-foot {
       display: none;
+    }
+
+    .in-sight {
+      scroll-margin-bottom: var(--space-4);
     }
 
     #app {
@@ -3529,7 +3539,38 @@
     color: var(--ink-3);
   }
 
-  /* A played duel's score at the row's end, a heavy numeral under its word („Победа“). */
+  /* A played duel's end at the row's end: its chip, the score beside it (under it where the row is narrow). */
+  .duel-row-end:has(> .duel-chip) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px 8px;
+  }
+
+  /* Победа, Загуба, Равенство told apart at a glance, by fill and line, never by red or green: a win filled in ink
+     with its ✓ (right is ink, filled), a loss outlined and quiet, a draw outlined in ink. */
+  .duel-chip {
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+    color: var(--ink-3);
+    font: 800 0.8125rem / 1.25rem var(--font-sans);
+    white-space: nowrap;
+    box-shadow: inset 0 0 0 1.5px var(--line-2);
+  }
+
+  .duel-chip.won {
+    background: var(--ink);
+    color: var(--bg);
+    box-shadow: none;
+  }
+
+  .duel-chip.draw {
+    color: var(--ink);
+    box-shadow: inset 0 0 0 1.5px var(--ink);
+  }
+
+  /* A played duel's score at the row's end, a heavy numeral beside its chip. */
   .duel-row-score {
     color: var(--ink);
     font: 900 1.75rem / 1 var(--font-numeral);
@@ -3550,9 +3591,13 @@
     text-align: left;
   }
 
+  /* „Дуел“ at a friend's row's end: the link's look it has on Приятели (.link), one look for one action. */
   .duel-invite {
     color: var(--ink);
-    font-weight: 900;
+    font-weight: 800;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 4px;
   }
 
   /* A friend's duel just played first: sent, and how long the friend has (screens/duel.ts). */
@@ -3715,9 +3760,13 @@
     gap: 3px;
   }
 
-  /* A player who links to their profile: the row's look, the name underlined on hover. */
+  /* A player's name as a link (a row of players, a board's, a request sent, a duel's faces: ui.ts, nameWords' one
+     span): one rule for all, never underlined at rest, where its place says it's a player's; under a pointer, the
+     whole name, its words held whole too (an inline block takes no line from its link: „Таралеж 840“ was underlined
+     only under „840“). */
   a.who,
-  a.friend-name {
+  a.friend-name,
+  a:has(> .name-words) {
     color: inherit;
     text-decoration: none;
   }
@@ -3725,7 +3774,8 @@
   @media (hover: hover) and (pointer: fine) {
     a.who:hover .who-name,
     a.friend-name:hover,
-    :is(a.who, a.friend-name, .duel-row):hover .whole-word {
+    a:hover > .name-words,
+    :is(a.who, a.friend-name, .duel-row, a:has(> .name-words)):hover .whole-word {
       text-decoration: underline;
     }
   }
@@ -4332,11 +4382,6 @@
     margin-bottom: 10px;
     color: var(--ink-2);
     font: 700 0.9375rem / 1.4 var(--font-sans);
-  }
-
-  /* „· избери друг“ on one line: the dot never at a line's end. */
-  .seal-choose {
-    white-space: nowrap;
   }
 
   .rk-words {
@@ -5136,6 +5181,17 @@
     gap: var(--space-2);
   }
 
+  /* On a phone, two across, an odd one out the row's width (the fewest knew's long words, not six lines of them). */
+  @media (max-width: 30rem) {
+    .figures-row {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .figures-row > .fig:last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+    }
+  }
+
   .fig {
     display: grid;
     align-content: start;
@@ -5775,8 +5831,11 @@
   }
 
   /* The ladder of a chapter's ranks (ui.ts, ladder): each seal and its name, the one reached ringed in ink, those to
-     come faded. Under 23.75rem only the reached one is named; every seal stays. */
+     come faded. Six equal columns, each seal and its ring inside its own (a seal shrinks before its ring would touch
+     the next); sized by the ladder's own width (it's a container), wherever it stands: under 24rem, where six names
+     can't stand apart, only the reached one is named, over its neighbours' empty room, inside the ladder at its ends. */
   .ladder {
+    container: ladder / inline-size;
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 4px;
@@ -5790,14 +5849,20 @@
 
   .ladder > li {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     justify-items: center;
     gap: 6px;
     min-width: 0;
     text-align: center;
   }
 
+  /* The ring is 5.5px outside the seal (2.5px and 3px off it): the seal leaves it that room in its column. */
+  .ladder .seal {
+    max-width: calc(100% - 12px);
+    height: auto;
+  }
+
   .ladder-name {
-    max-width: 100%;
     color: var(--ink-3);
     font: 700 0.75rem / 1.15 var(--font-sans);
     letter-spacing: -0.01em;
@@ -5835,33 +5900,33 @@
     outline-color: #16132b;
   }
 
-  @media (max-width: 26.875rem) {
-    .ladder {
-      gap: 2px;
-      padding-inline: 4px;
-    }
-  }
-
-  @media (max-width: 23.75rem) {
-    .ladder > :not(.now) .ladder-name {
-      visibility: hidden;
-    }
-  }
-
-  /* Large text: the ladder in two rows of three, the reached one's name on as many lines as it takes. */
+  /* Large text: the ladder in two rows of three. */
   .tight .ladder {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     row-gap: 10px;
   }
 
-  .tight .ladder > :not(.now) .ladder-name {
-    visibility: hidden;
-  }
+  /* A narrow ladder (six of the widest name, „Страница“, and room between them: 24rem): only the reached rank named,
+     centred under its seal, over its neighbours' empty room where it's wider than its column; at a row's end, where
+     that would run past the ladder, from the ladder's edge inwards (`safe`: a row's last step aligns from the right). */
+  @container ladder (width < 24rem) {
+    .ladder > :not(.now) .ladder-name {
+      visibility: hidden;
+    }
 
-  .tight .ladder-name {
-    white-space: normal;
-    overflow-wrap: break-word;
-    hyphens: auto;
+    .ladder > .now:is(:first-child, :last-child) .ladder-name,
+    .tight .ladder > .now:is(:nth-child(3n + 1), :nth-child(3n)) .ladder-name {
+      justify-self: safe center;
+    }
+
+    .ladder > .now:last-child,
+    .tight .ladder > .now:nth-child(3n) {
+      direction: rtl;
+    }
+
+    .ladder > .now .ladder-name {
+      direction: ltr;
+    }
   }
 
   /* The friends who played the day: a row each, the name, their small squares under it (127px whatever the text: beside
@@ -5959,6 +6024,11 @@
     align-self: start;
   }
 
+  /* On the page, not a sheet: the faded glyph keeps its white disc, so it holds on the night's dark page too. */
+  .miss > .tile.wrong .tile-pic {
+    background: #fff;
+  }
+
   .miss-q,
   .miss-a,
   .miss-f {
@@ -6033,7 +6103,7 @@
   .result-links {
     display: flex;
     flex-wrap: wrap;
-    gap: 0 var(--space-5);
+    gap: var(--space-2) var(--space-5);
   }
 
   .result-review {
@@ -6731,11 +6801,20 @@
     box-shadow: inset 0 0 0 2px var(--line);
   }
 
-  /* The seal beside the name of who asks, in the line's text. */
-  .invitation .seal {
-    display: inline-block;
-    margin-inline: 4px 0;
-    vertical-align: middle;
+  /* Who asks, a row of players' look, and what they ask under the name, on the name's edge (the avatar's 28px and
+     the row's 10px gap in). */
+  .invitation-who {
+    display: grid;
+    flex: 1 1 12rem;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .invitation-line {
+    margin: 0;
+    padding-left: 38px;
+    color: var(--ink-2);
+    font: 600 0.9375rem / 1.35 var(--font-sans);
   }
 
   .invitation-actions {
@@ -6766,12 +6845,6 @@
   .settings > form {
     display: grid;
     gap: var(--space-4);
-  }
-
-  /* The sign-in's code step, scrolled into sight as it comes (signin.ts): clear of the bar over it and of the places
-     at a phone's foot under it. */
-  .code-step {
-    scroll-margin: 72px 0 calc(88px + env(safe-area-inset-bottom));
   }
 
   /* ---- The server's own pages (privacy) ---- */

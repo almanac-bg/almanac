@@ -15,6 +15,7 @@ import { embedded, handMark, handToken, outsideLink } from "../lib/embedded.ts";
 import { askToKeep } from "../lib/keep.ts";
 import { fragment } from "../lib/router.ts";
 import { notice, type User, user } from "../state.ts";
+import { emailWords } from "../ui.ts";
 import { invitePath } from "./invite.ts";
 import { noEmail, noEmailLine, signIn } from "./signin.ts";
 
@@ -124,7 +125,9 @@ export function mailAsk({
     h(
       "p",
       { class: "muted" },
-      `Да ти пишем${to ? ` на ${to}` : ""}, ако броят още те чака? Веднъж на ден, около часа, в който играеш.`,
+      // The address broken after its @ or before a dot, never at any letter (twice the text on a narrow phone).
+      to ? ["Да ти пишем на ", emailWords(to), ", ако"] : "Да ти пишем, ако",
+      " броят още те чака? Веднъж на ден, около часа, в който играеш.",
     );
   const nope = () => (no ? h("button", { class: "link tap", type: "button", onclick: no }, "Не сега") : null);
   return [
@@ -243,8 +246,10 @@ export function haveProfile(signedIn: () => void, label = "Имаш профил
         );
 }
 
-/** The menu that opens a page in the phone's own browser, as an app's browser has it, named: on an iPhone, Safari. */
-const menuWay = () => (app?.platform === "ios" ? "··· → Отвори в Safari" : "··· → Отвори в браузъра");
+/** The menu that opens a page in the phone's own browser, as an app's browser has it, named: on an iPhone, Safari;
+ * on one line, never broken at its arrow. */
+const menuWay = () =>
+  app?.platform === "ios" ? "···\u00a0→\u00a0Отвори\u00a0в\u00a0Safari" : "···\u00a0→\u00a0Отвори\u00a0в\u00a0браузъра";
 
 /** How often a page left on screen asks for a new link: well within a link's half hour (account.HandoffTTL), so that
  * the one in the address doesn't die while it's being opened. */

@@ -233,7 +233,7 @@ var mailOffPage = template.Must(template.New("off").Parse(`{{if .Done}}
 <p>Пишем ти веднъж на ден, около часа, в който играеш, ако броят на деня още те чака.</p>
 <form method="post"><button class="btn" type="submit">Спри писмата</button></form>
 {{else}}
-<p>Пращаме ти писмо, когато прекъсне твоя серия от поне {{.From}} дни – и само ако не получаваш известия.</p>
+<p>Пращаме ти писмо, когато прекъсне твоя серия от поне {{.From}} дни — и само ако не получаваш известия.</p>
 <form method="post"><button class="btn" type="submit">Спри писмата</button></form>
 {{end}}`))
 

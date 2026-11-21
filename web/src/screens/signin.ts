@@ -9,7 +9,7 @@ import { embedded } from "../lib/embedded.ts";
 import { keptWords } from "../lib/keep.ts";
 import { pushable, pushOn } from "../lib/push.ts";
 import { type User, user } from "../state.ts";
-import { emailWords } from "../ui.ts";
+import { emailWords, inSight } from "../ui.ts";
 
 export interface SignInOptions {
   /** Which form it is, of the game's („settings“, „remind-mail“…): a code it sent is kept by it, for a reload to come
@@ -115,7 +115,9 @@ export function signIn({
       h(
         "form",
         {
-          class: "stack code-step",
+          class: "stack",
+          // The whole step in sight, „Потвърди“ clear of the places at a phone's foot.
+          ref: inSight,
           onsubmit: (e: SubmitEvent) => {
             e.preventDefault();
             if (code.peek().length !== digits.peek()) return missing(`Кодът е от ${digits.peek()} цифри.`, codeField);
@@ -152,11 +154,7 @@ export function signIn({
             },
             ref: (el) => {
               codeField = el as HTMLInputElement;
-              queueMicrotask(() => {
-                el.focus({ preventScroll: true });
-                // The whole step in sight, „Потвърди“ clear of the places at a phone's foot (app.css, .code-step).
-                el.closest("form")?.scrollIntoView({ block: "nearest" });
-              });
+              queueMicrotask(() => el.focus({ preventScroll: true }));
             },
           }),
         ),

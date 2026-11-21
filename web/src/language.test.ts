@@ -82,6 +82,27 @@ test("a thing is called by its one name", () => {
 });
 
 /**
+ * To one player, gender-neutral (web/DESIGN.md, Copy): never a past participle after „си“, which is a man's or a
+ * woman's („си играл“, „си влязла“): „дните, в които броят на деня е изигран“, not „в които си играл броя на деня“.
+ */
+test("no „си“ with a man's or a woman's participle", () => {
+  const gendered = /(?<!\p{L})[сС]и\s+\p{L}+[ъяаиеуо]ла?(?!\p{L})/u;
+  const found: string[] = [];
+  for (const place of ["web/src", "web/public", "internal", "cmd"]) {
+    for (const path of files(place)) {
+      if (path.startsWith("internal/assets/dist") || /(\.test\.ts|_test\.go)$/.test(path)) continue;
+      readFileSync(join(root, path), "utf8")
+        .split("\n")
+        .forEach((line, i) => {
+          const m = line.match(gendered);
+          if (m) found.push(`${path}:${i + 1}: „${m[0]}“ is a man's or a woman's; say it of the thing`);
+        });
+    }
+  }
+  assert.deepEqual(found, []);
+});
+
+/**
  * A chapter's name is in quotes only right after the word „глава“ („в глава „История““); standing alone it's bare
  * („Трудният въпрос е от История“, „Печат: История“): web/DESIGN.md, Copy.
  */

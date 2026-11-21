@@ -52,10 +52,11 @@ export function report(id: string): Child {
               },
             }),
           ),
+          // Under the field it's about. Its own child: read by the form, an error would draw the form again and lose
+          // what was typed.
+          () => error() && h("p", { class: "bad", role: "alert" }, error()),
           h("button", { class: "btn" }, "Прати"),
           h("button", { type: "button", class: "link", onclick: () => state.set("closed") }, "Отказ"),
-          // Its own child: read by the form, an error would draw the form again and lose what was typed.
-          () => error() && h("p", { class: "bad", role: "alert" }, error()),
         );
     }
   };
