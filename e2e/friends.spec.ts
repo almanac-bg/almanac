@@ -106,6 +106,21 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await b.goto("/friends");
   await b.locator(".friends").getByRole("button", { name: "Добави приятел" }).click();
   await expect(b.getByText("Още нямаш приятели тук. Добави ги по потребителско име или имейл.")).toBeVisible();
+  // The field's hint is whole at every width: the button goes under the field before the hint is cut.
+  const field = b.getByLabel("Потребителско име или имейл на приятел");
+  for (const width of [320, 390, 430, 1366]) {
+    await b.setViewportSize({ width, height: 800 });
+    const room = await field.evaluate((el: HTMLInputElement) => {
+      const s = getComputedStyle(el);
+      const hint = getComputedStyle(el, "::placeholder");
+      const ctx = document.createElement("canvas").getContext("2d");
+      if (!ctx) return 0;
+      ctx.font = `${hint.fontWeight} ${hint.fontSize} ${hint.fontFamily}`;
+      const inner = el.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight);
+      return inner - ctx.measureText(el.placeholder).width;
+    });
+    expect(room, `the hint at ${width}px`).toBeGreaterThanOrEqual(0);
+  }
   // Nothing typed: said in the game's words, the cursor in the field.
   await b.getByRole("button", { name: "Добави", exact: true }).click();
   await expect(b.getByRole("alert")).toHaveText("Въведи потребителско име или имейл.");
