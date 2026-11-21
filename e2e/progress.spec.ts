@@ -14,10 +14,9 @@ test("a topic's game never tells how well the topic is known, and the avatar is 
   await expect(page.locator(".summary")).toBeVisible();
   await expect(page.locator(".summary")).not.toContainText(/XP|[Нн]иво \d|[Пп]остижени|оценка|Познавач|Новак/);
 
-  // The avatar, on Профил: every animal, none locked; each chapter's art, the player's from its Страница.
+  // The avatar, on Профил: every animal, none locked, and nothing else (a seal is worn on it, never as it).
   await page.goto("/me");
-  await expect(page.locator(".pick:not(.locked)")).toHaveCount(15);
-  await expect(page.locator(".pick.locked")).toHaveCount(10);
+  await expect(page.locator(".pick")).toHaveCount(15);
   await page.getByRole("button", { name: "Рис", exact: true }).click();
   await expect(page.getByRole("button", { name: "Рис", exact: true })).toHaveAttribute("aria-pressed", "true");
   // Avatars are pictures (art/pictures.ts), loaded after the first screen: the lynx is drawn on its tile.

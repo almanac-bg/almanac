@@ -37,17 +37,23 @@ test("every avatar is drawn and named, and the choice offers no other", () => {
     assert.match(ui, new RegExp(`\\n  ${s}: "`), `${s} has no name in ui.ts shapeNames`);
     assert.match(
       css,
-      new RegExp(`\\.tone-natural\\.sh-${s} > \\.avatar-pic \\{`),
+      new RegExp(`\\.tone-natural\\.sh-${s} \\.avatar-pic \\{`),
       `${s} has no natural colours in app.css`,
     );
     // A part's own colour is an ink with a name (ka, kb; la the first as a stroke), set with the shape's others.
-    const inks = new RegExp(`\\.tone-natural\\.sh-${s} > \\.avatar-pic \\{([^}]*)\\}`).exec(css)?.[1] ?? "";
+    const inks = new RegExp(`\\.tone-natural\\.sh-${s} \\.avatar-pic \\{([^}]*)\\}`).exec(css)?.[1] ?? "";
     for (const [ink, uses] of [
       ["ka", /class="[kl]a"/],
       ["kb", /class="kb"/],
     ] as const)
       if (uses.test(pictures[s] ?? "")) assert.match(inks, new RegExp(`--${ink}: #`), `${s} paints with ${ink}`);
   }
+  // Each animal on a tile of its own colour, none repeated, so that two players' faces never share a ground.
+  const tiles = animals.map(
+    (s) => new RegExp(`\\.tone-natural\\.sh-${s} \\{\\s*--tone: (#[0-9a-f]{6});`).exec(css)?.[1],
+  );
+  for (const [i, s] of animals.entries()) assert.ok(tiles[i], `${s} has no tile colour of its own in app.css`);
+  assert.equal(new Set(tiles).size, animals.length, `the animals' tiles repeat a colour: ${tiles.join(" ")}`);
   // Never by a part's place among the picture's layers: the next change to the drawing would colour another part.
   assert.doesNotMatch(css, /avatar-pic\s*>\s*:nth-/, "an avatar's part is coloured by its ink, not by :nth-child");
   const named = ui.slice(ui.indexOf("export const shapeNames"), ui.indexOf("const freeShapes"));

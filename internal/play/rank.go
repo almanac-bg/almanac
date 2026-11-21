@@ -13,7 +13,8 @@ import (
 // The seal (DECISIONS.md, „The direction“, as the Fable review amended it): a player's seal in a chapter says how much
 // of it their book holds in ink (ink.go). Its states are named for the book, not the person: Бележка at 1, Страница
 // at 5, Тетрадка at 15, Книга at 40, Том at 100, Летопис at 250, then „Летопис · 2“ at 350 and another for each
-// further 100 (RankAt). Beside a name only the seal shows, never its word: the word is the Алманах's and a rank-up's.
+// further 100 (RankAt). With a player only the seal shows, on their avatar's corner, never its word: the word is the
+// Алманах's and a rank-up's.
 // The seals are the only levels, titles and unlocks the game has. In code a seal's state is its rank.
 //
 // A rank is kept, never worked out on view (ranks): it's counted as a day's issue is finished (afterRun: only the
@@ -22,10 +23,10 @@ import (
 // between ranks. There's no check of guessing: a tapper climbs as slowly as their ink does.
 //
 // A rank risen is told once, with the game's news (NewsOf: Rose), several at once as one; Бележка, the first, never.
-// At Страница a chapter's art becomes the player's to wear as their avatar (progress.go: SetAvatar); the animals are
-// everyone's. The player wears their best seal beside their name, never chosen (sealOf: the highest rank, the more ink
-// on a tie, then the chapter whose rank came first). It goes with their look (progress.go: Look) wherever others see
-// their name (boards, friends, requests, duels, the profile), read from the ranks kept like all of this.
+// A seal's reward is the seal itself: it unlocks nothing (an avatar is an animal: progress.go, SetAvatar). The player
+// wears their best seal on their avatar's corner, never chosen (sealOf: the highest rank, the more ink on a tie, then
+// the chapter whose rank came first). It goes with their look (progress.go: Look) wherever others see their name
+// (boards, friends, requests, duels, the profile), read from the ranks kept like all of this.
 
 // Rank is a step of the ladder: its name, and the ink it starts at.
 type Rank struct {
@@ -38,12 +39,8 @@ var Ranks = []Rank{
 	{"Бележка", 1}, {"Страница", 5}, {"Тетрадка", 15}, {"Книга", 40}, {"Том", 100}, {"Летопис", 250},
 }
 
-const (
-	// LetopisEvery is how much more ink each „Летопис · N“ past the first takes.
-	LetopisEvery = 100
-	// RankArt is the level whose chapter's art the player may wear (Страница).
-	RankArt = 2
-)
+// LetopisEvery is how much more ink each „Летопис · N“ past the first takes.
+const LetopisEvery = 100
 
 // RankAt is the level a chapter's ink makes: 0 none, 1 Бележка … 6 Летопис, 7 „Летопис · 2“ and on.
 func RankAt(ink int) int {
@@ -201,7 +198,7 @@ func (g *Game) RanksOf(ctx context.Context, userID int64) ([]ChapterRank, error)
 	return ranks, nil
 }
 
-// Worn is a seal as it shows beside a player's name to others (Look): its chapter and level, no more (its word is
+// Worn is a seal as it shows on a player's avatar to others (Look): its chapter and level, no more (its word is
 // the Алманах's, never beside a name; its quarters show from 32px, on the player's own pages).
 type Worn struct {
 	Chapter string `json:"chapter"`
@@ -237,17 +234,8 @@ func sealOf(ranks []ChapterRank) *Seal {
 	return best
 }
 
-// HasArt is whether a player may wear a chapter's art as their avatar: their rank there is RankArt or more.
-func (g *Game) HasArt(ctx context.Context, userID int64, chapter string) (bool, error) {
-	var has bool
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM ranks WHERE user_id = ? AND chapter = ?
-		AND level >= ?)`, userID, chapter, RankArt).Scan(&has)
-	return has, err
-}
-
 // Rose is the ranks risen since the player was last told, told once as one (News.Rose): each chapter's from and to,
-// whether it brings its art (Art: Страница reached), and whether the player's best rank rose with them (Best: the
-// one big moment).
+// and whether the player's best rank rose with them (Best: the one big moment).
 type Rose struct {
 	Ranks []RankUp `json:"ranks"`
 	Best  bool     `json:"best,omitempty"`
@@ -261,7 +249,6 @@ type RankUp struct {
 	To      int    `json:"to"`
 	Name    string `json:"name"`
 	Ink     int    `json:"ink"`
-	Art     bool   `json:"art,omitempty"`
 }
 
 // roseOf tells the ranks risen since last told, and marks them told: nil if none worth telling (Бележка alone is
@@ -282,8 +269,7 @@ func roseOf(tx *sql.Tx, userID int64) (*Rose, error) {
 		}
 		before, after = max(before, min(told, level)), max(after, level)
 		if level > told && level > 1 {
-			r.Ranks = append(r.Ranks, RankUp{Chapter: chapter, From: told, To: level, Name: RankName(level),
-				Ink: ink, Art: told < RankArt && level >= RankArt})
+			r.Ranks = append(r.Ranks, RankUp{Chapter: chapter, From: told, To: level, Name: RankName(level), Ink: ink})
 		}
 	}
 	rows.Close()
@@ -340,9 +326,4 @@ func (g *Game) StepOf(ctx context.Context, userID int64) (*Step, error) {
 		}
 	}
 	return best, nil
-}
-
-// chapterOfArt is the chapter whose art an avatar's shape is, if it's one (a chapter's id: SetAvatar).
-func chapterOfArt(b *bank.Bank, shape string) (string, bool) {
-	return shape, slices.ContainsFunc(b.Categories, func(c bank.Category) bool { return c.ID == shape })
 }

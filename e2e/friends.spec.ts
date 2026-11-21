@@ -37,8 +37,8 @@ test("friends on the day: who has played it, and how each went", async ({ browse
   await expect(friends.locator(".rank-row").filter({ hasText: ana }).locator(".rank-score")).toHaveText(
     /^\d+\sот\s10$/,
   );
-  // Beside each name, the seal its player wears, as the server says it (none before a rank: her ink is her right
-  // answers'), in her chapter's colour.
+  // On each avatar's corner, the seal its player wears, as the server says it (none before a rank: her ink is her right
+  // answers'), in her chapter's colour; never after the name.
   const seal = await b.evaluate(
     async () =>
       ((await (await fetch("/api/friends")).json()).friends[0].seal ?? null) as {
@@ -46,8 +46,10 @@ test("friends on the day: who has played it, and how each went", async ({ browse
         level: number;
       } | null,
   );
-  const worn = friends.locator(".rank-row").filter({ hasText: ana }).locator(".rank-name .seal");
+  const row = friends.locator(".rank-row").filter({ hasText: ana });
+  const worn = row.locator(".avatar > .seal");
   await expect(worn).toHaveCount(seal ? 1 : 0);
+  await expect(row.locator(".rank-name .seal")).toHaveCount(0);
   if (seal) {
     await expect(worn).toHaveClass(new RegExp(`t-${seal.chapter}`));
     // Read out as a seal and its chapter: never the rank's word, which is the Алманах's.

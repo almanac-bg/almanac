@@ -563,24 +563,13 @@
     margin-left: auto;
   }
 
-  /* The player's avatar, with the seal they wear on its corner (ui.ts, worn). */
+  /* The player's avatar, with the seal they wear on its corner (ui.ts, avatar). */
   .bar-me {
-    position: relative;
     display: grid;
     place-items: center;
     min-width: 44px;
     min-height: 44px;
     margin-right: -2px;
-  }
-
-  /* The seal on the avatar's lower corner, on a ring of the page, as on Профил (.me-avatar > .seal). */
-  .bar-me > .seal {
-    position: absolute;
-    right: -4px;
-    bottom: -2px;
-    border-radius: 50%;
-    background: var(--bg);
-    box-shadow: 0 0 0 2px var(--bg);
   }
 
   .bar-in {
@@ -1332,7 +1321,7 @@
     place-items: center;
     width: 74%;
     height: 74%;
-    border-radius: 50%;
+    border-radius: 28%;
     background: #fff;
   }
 
@@ -1348,9 +1337,9 @@
     outline-offset: -2.5px;
   }
 
-  /* Близо: the left half in the chapter's colour, the right half empty, outlined the same. */
+  /* Близо: the upper left half in the chapter's colour, the lower right empty (◩), outlined the same. */
   .tile.near {
-    background: linear-gradient(90deg, var(--tv) 50%, transparent 50%);
+    background: linear-gradient(to bottom right, var(--tv) 50%, transparent 50%);
     box-shadow: inset 0 0 0 2.5px var(--td);
   }
 
@@ -1417,7 +1406,7 @@
   }
 
   .mini li.partial {
-    background: linear-gradient(90deg, var(--ink) 50%, transparent 50%);
+    background: linear-gradient(to bottom right, var(--ink) 50%, transparent 50%);
   }
 
   .mini li.void {
@@ -1523,11 +1512,17 @@
     box-shadow: none;
   }
 
-  /* Art drawn on white (a glyph's disc, a tile's, the seal's core) keeps the day's inks by night too. */
+  /* Art drawn on white (a glyph's tile, a tile's, the seal's core) keeps the day's inks by night too. */
   :is(.seal, .glyph, .tile-pic, .chip) .pic {
     --k4: color-mix(in srgb, var(--tone) 72%, #fff);
     --k5: color-mix(in srgb, var(--tone) 32%, #fff);
     --kt: 0.26;
+  }
+
+  /* On a glyph's rounded tile (and a tile's), the picture without its round ground: the tile is its ground. The seal,
+     round, keeps it. */
+  :is(.glyph, .tile-pic) .pic {
+    --kt: 0;
   }
 
   /* ---- A question: the head (the way out, what's played, the count), the pips and the clock; the question on its
@@ -1794,7 +1789,7 @@
     place-items: center;
     width: var(--g, 28px);
     height: var(--g, 28px);
-    border-radius: 50%;
+    border-radius: 28%;
     background: #fff;
   }
 
@@ -3717,7 +3712,7 @@
     margin: 0;
   }
 
-  /* The name whole, never cut: on a second line rather than an ellipsis, the seal and „ти“ after its last word. */
+  /* The name whole, never cut: on a second line rather than an ellipsis, „ти“ after its last word. */
   .who-name {
     display: block;
     min-width: 0;
@@ -3737,7 +3732,7 @@
   }
 
   /* A word held whole (ui.ts, textWords and nameWords): to the next line whole where it fits there, broken at its
-     syllables only where it's wider than its line. What follows a name (the seal, „ти“) stays on its last word's line. */
+     syllables only where it's wider than its line. What follows a name („ти“) stays on its last word's line. */
   .whole-word {
     display: inline-block;
     max-width: 100%;
@@ -3747,12 +3742,6 @@
 
   .name-end {
     white-space: nowrap;
-  }
-
-  .name-end > .seal {
-    display: inline-block;
-    margin-left: 6px;
-    vertical-align: -6px;
   }
 
   .you {
@@ -4081,18 +4070,24 @@
     stroke-linejoin: round;
   }
 
-  /* ---- Avatars: the drawn animal in its own colours, in a round medallion of its scene ---- */
+  /* ---- Avatars: the drawn animal in its own colours, on a rounded tile of its scene (a card's corner, 28% of its
+     size: glyphs have it too), the seal worn on its lower right corner ---- */
 
   .avatar {
     --size: 40px;
     position: relative;
     display: inline-grid;
     flex: none;
-    place-items: center;
     width: var(--size);
     height: var(--size);
+    border-radius: 28%;
+  }
+
+  .avatar-tile {
+    position: absolute;
+    inset: 0;
     overflow: hidden;
-    border-radius: 50%;
+    border-radius: inherit;
     background: var(--tone, var(--surface-2));
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent);
   }
@@ -4102,6 +4097,30 @@
     inset: 6%;
     width: 88%;
     height: 88%;
+  }
+
+  /* The seal worn, on the tile's lower right corner, 45% of the avatar (no less than 14px: it reads on a 28px one), on
+     a ring of what's around it (the page; a card's surface where it's on one: --ring), so it stands off the picture.
+     One rule wherever a player shows: the bar, the boards, friends, duels, requests, Профил. */
+  .avatar > .seal {
+    --seal: max(14px, calc(var(--size) * 0.45));
+    position: absolute;
+    right: calc(var(--seal) * -0.2);
+    bottom: calc(var(--seal) * -0.2);
+    width: var(--seal);
+    height: var(--seal);
+    border-radius: 50%;
+    background: var(--ring, var(--bg));
+    box-shadow: 0 0 0 max(1.5px, calc(var(--seal) * 0.07)) var(--ring, var(--bg));
+  }
+
+  /* What's around a seal on a card: the card's surface; on the player's own row, its well. */
+  :is(.card, .rows, .invitation, .duel-row) {
+    --ring: var(--surface);
+  }
+
+  .rank-row.me {
+    --ring: var(--surface-2);
   }
 
   .bar-me .avatar {
@@ -4118,30 +4137,30 @@
   }
 
   .tone-natural.sh-fox {
-    --tone: #a7d99b;
+    --tone: #75caf2;
   }
 
-  .tone-natural.sh-fox > .avatar-pic {
+  .tone-natural.sh-fox .avatar-pic {
     --k1: #a3461c;
     --k2: #ea7a2c;
     --k5: #fff5e8;
   }
 
   .tone-natural.sh-bear {
-    --tone: #9fd0f2;
+    --tone: #abd2fe;
   }
 
-  .tone-natural.sh-bear > .avatar-pic {
+  .tone-natural.sh-bear .avatar-pic {
     --k1: #5a3a22;
     --k2: #8d5b34;
     --k4: #d4a877;
   }
 
   .tone-natural.sh-cat {
-    --tone: #f3d593;
+    --tone: #c8b9f9;
   }
 
-  .tone-natural.sh-cat > .avatar-pic {
+  .tone-natural.sh-cat .avatar-pic {
     --k1: #c4651f;
     --k2: #f29a45;
     --k4: #f6c1a6;
@@ -4151,10 +4170,10 @@
   }
 
   .tone-natural.sh-hare {
-    --tone: #a7d99b;
+    --tone: #f6b9d7;
   }
 
-  .tone-natural.sh-hare > .avatar-pic {
+  .tone-natural.sh-hare .avatar-pic {
     --k1: #7d6048;
     --k2: #b08d6e;
     --k4: #f2c2c2;
@@ -4163,10 +4182,10 @@
   }
 
   .tone-natural.sh-hedgehog {
-    --tone: #a7d99b;
+    --tone: #eedc84;
   }
 
-  .tone-natural.sh-hedgehog > .avatar-pic {
+  .tone-natural.sh-hedgehog .avatar-pic {
     --k1: #4f3c2e;
     --k2: #86684f;
     --k4: #f0a39a;
@@ -4174,10 +4193,10 @@
   }
 
   .tone-natural.sh-dog {
-    --tone: #9fd0f2;
+    --tone: #7bdada;
   }
 
-  .tone-natural.sh-dog > .avatar-pic {
+  .tone-natural.sh-dog .avatar-pic {
     --k1: #7a4a26;
     --k2: #d99b5c;
     --k5: #fff6ea;
@@ -4185,10 +4204,10 @@
   }
 
   .tone-natural.sh-deer {
-    --tone: #a7d99b;
+    --tone: #c0de8d;
   }
 
-  .tone-natural.sh-deer > .avatar-pic {
+  .tone-natural.sh-deer .avatar-pic {
     --k1: #7a4f2e;
     --k2: #b8784a;
     --k4: #f4e7d4;
@@ -4196,19 +4215,19 @@
   }
 
   .tone-natural.sh-stork {
-    --tone: #9fd0f2;
+    --tone: #9adaa3;
   }
 
-  .tone-natural.sh-stork > .avatar-pic {
+  .tone-natural.sh-stork .avatar-pic {
     --k5: #fbfbfd;
     --ka: #e14a2c;
   }
 
   .tone-natural.sh-frog {
-    --tone: #8fd3cf;
+    --tone: #d9a5e1;
   }
 
-  .tone-natural.sh-frog > .avatar-pic {
+  .tone-natural.sh-frog .avatar-pic {
     --k1: #2a7a36;
     --k2: #55b84f;
     --k4: #f1a3a0;
@@ -4216,10 +4235,10 @@
   }
 
   .tone-natural.sh-mouse {
-    --tone: #f3d593;
+    --tone: #f9c197;
   }
 
-  .tone-natural.sh-mouse > .avatar-pic {
+  .tone-natural.sh-mouse .avatar-pic {
     --k1: #6b6f78;
     --k2: #9aa0aa;
     --k4: #f2a7b4;
@@ -4227,10 +4246,10 @@
   }
 
   .tone-natural.sh-squirrel {
-    --tone: #a7d99b;
+    --tone: #7bceb4;
   }
 
-  .tone-natural.sh-squirrel > .avatar-pic {
+  .tone-natural.sh-squirrel .avatar-pic {
     --k1: #8a3b14;
     --k2: #c8642a;
     --k4: #e89a5c;
@@ -4238,20 +4257,20 @@
   }
 
   .tone-natural.sh-sheep {
-    --tone: #a7d99b;
+    --tone: #e99989;
   }
 
-  .tone-natural.sh-sheep > .avatar-pic {
+  .tone-natural.sh-sheep .avatar-pic {
     --k1: #4a3d38;
     --k2: #a38a7d;
     --k5: #f7f3ea;
   }
 
   .tone-natural.sh-turtle {
-    --tone: #9fd0f2;
+    --tone: #fba0b0;
   }
 
-  .tone-natural.sh-turtle > .avatar-pic {
+  .tone-natural.sh-turtle .avatar-pic {
     --k1: #5f7a3c;
     --k2: #8fa65a;
     --k4: #c3d48a;
@@ -4260,20 +4279,20 @@
   }
 
   .tone-natural.sh-badger {
-    --tone: #a7d99b;
+    --tone: #ebbb6e;
   }
 
-  .tone-natural.sh-badger > .avatar-pic {
+  .tone-natural.sh-badger .avatar-pic {
     --k1: #3f3d4a;
     --k2: #7d7f86;
     --k5: #f5f3ee;
   }
 
   .tone-natural.sh-lynx {
-    --tone: #c3d0ee;
+    --tone: #a6b7f5;
   }
 
-  .tone-natural.sh-lynx > .avatar-pic {
+  .tone-natural.sh-lynx .avatar-pic {
     --k1: #6b4a2b;
     --k2: #c99a5e;
     --k4: #f0dcbc;
@@ -4306,23 +4325,14 @@
     gap: 18px;
   }
 
-  /* The avatar, the seal worn on its corner, on a ring of the page so it stands off the picture. */
+  /* The avatar, the seal worn on its corner (.avatar > .seal). */
   .me-avatar {
-    position: relative;
+    display: flex;
     flex: none;
   }
 
   .me-avatar .avatar.l {
     --size: 96px;
-  }
-
-  .me-avatar > .seal {
-    position: absolute;
-    right: -8px;
-    bottom: -6px;
-    border-radius: 50%;
-    background: var(--bg);
-    box-shadow: 0 0 0 3px var(--bg);
   }
 
   .me-who {
@@ -4367,37 +4377,27 @@
     gap: var(--space-2) var(--space-5);
   }
 
-  /* The seals: a chapter's each, its rank's name under it, the one worn ringed in ink; a tap wears another. */
+  /* The seals (ui.ts, sealList): one list on a card, a row a chapter between hairlines: the seal, the chapter's name
+     over its rank and the pips towards the next, the ink at the row's end. */
   .seal-list {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
     margin: 0;
-    padding: 0;
+    padding: 2px 16px;
+    border-radius: var(--r-3);
+    background: var(--surface);
     list-style: none;
   }
 
-  /* One to a row where half the column can't hold a chapter's longest word beside its seal: under 340px, and with
-     large text (.tight, below). */
-  @media (max-width: 21.25rem) {
-    .seal-list {
-      grid-template-columns: minmax(0, 1fr);
-    }
+  .seal-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    min-height: 64px;
+    padding: 10px 0;
   }
 
-  .rk {
-    appearance: none;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    min-height: 64px;
-    padding: 10px 12px;
-    border: 0;
-    border-radius: var(--r-2);
-    background: var(--surface);
-    color: var(--ink);
-    text-align: left;
+  .seal-row + .seal-row {
+    border-top: 1px solid var(--line);
   }
 
   .seal-worn {
@@ -4406,27 +4406,48 @@
     font: 700 0.9375rem / 1.4 var(--font-sans);
   }
 
-  .rk-words {
+  .seal-row-words {
     display: grid;
-    gap: 2px;
+    gap: 3px;
     min-width: 0;
   }
 
-  .rk > .seal {
-    flex: none;
-  }
-
   /* A long name („Изкуство и литература“) wraps, and a word wider than its room breaks where Bulgarian breaks it. */
-  .rk-words b {
+  .seal-row-words b {
     font: 900 0.9375rem / 1.15 var(--font-sans);
     text-wrap: balance;
     overflow-wrap: break-word;
     hyphens: auto;
   }
 
-  .rk-words span {
+  /* The rank's name, the pips towards the next beside it (onto a line of their own where they don't fit). */
+  .seal-row-rank {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 8px;
     color: var(--ink-3);
     font: 700 0.8125rem / 1.2 var(--font-sans);
+  }
+
+  .seal-row-rank > .seal-pips {
+    width: 3.75rem;
+    margin: 0;
+  }
+
+  /* The ink, a numeral over its words, at the row's end. */
+  .seal-row-ink {
+    display: grid;
+    justify-items: end;
+    color: var(--ink-3);
+    font: 700 0.75rem / 1.1 var(--font-sans);
+    text-align: right;
+  }
+
+  .seal-row-ink > .num {
+    color: var(--ink);
+    font-size: 1.5rem;
+    line-height: 1;
   }
 
   /* Настройки, last: a row to its page. */
@@ -4624,9 +4645,7 @@
   }
 
   .pick .avatar {
-    width: 56px;
-    height: 56px;
-    border-radius: var(--radius-full);
+    --size: 56px;
   }
 
   .pick[aria-pressed="true"] {
@@ -4634,6 +4653,7 @@
     font-weight: 700;
   }
 
+  /* The one worn ringed in ink, the ring following the tile's corners. */
   .pick[aria-pressed="true"] .avatar {
     box-shadow:
       0 0 0 3px var(--bg),
@@ -4644,47 +4664,6 @@
     .pick:hover:not([aria-pressed="true"]) .avatar {
       box-shadow: 0 0 0 2px var(--line-2);
     }
-  }
-
-  /* A chapter's art as an avatar: its glyph on white, on a disc of its colour. Not the player's yet: hollow, a solid
-     grey ring, the art faded. */
-  .avatar.chart {
-    display: inline-grid;
-    place-items: center;
-    background: var(--tv);
-  }
-
-  .chart-disc {
-    display: grid;
-    place-items: center;
-    width: 84%;
-    height: 84%;
-    border-radius: 50%;
-    background: #fff;
-  }
-
-  .chart-disc .avatar-pic {
-    width: 88%;
-    height: 88%;
-  }
-
-  /* Art not the player's yet: when it opens under its name; a tap says how far it is. */
-  .pick-when {
-    margin-top: -4px;
-    color: var(--ink-3);
-    font: 700 0.75rem / 1rem var(--font-sans);
-    text-align: center;
-  }
-
-  .pick.locked .avatar.chart {
-    background: transparent;
-    box-shadow: inset 0 0 0 3px var(--line-2);
-  }
-
-  /* The art faded on its white disc, which by night keeps it in sight on the dark page. */
-  .pick.locked .chart-disc {
-    opacity: 0.55;
-    filter: grayscale(1);
   }
 
   /* ---- Алманах: the book's head, its chapters as cards in their colours; a chapter's page ---- */
@@ -5447,7 +5426,7 @@
   }
 
   .issue-leaf .tile.near {
-    background-image: linear-gradient(90deg, var(--tv) 50%, transparent 50%);
+    background-image: linear-gradient(to bottom right, var(--tv) 50%, transparent 50%);
   }
 
   .issue-meta {
@@ -5616,7 +5595,7 @@
   }
 
   .score-leaf .tile.near {
-    background-image: linear-gradient(90deg, var(--tv) 50%, transparent 50%);
+    background-image: linear-gradient(to bottom right, var(--tv) 50%, transparent 50%);
   }
 
   /* A right tile of the sheet's own chapter would melt into it: every right one on the sheet has a rim of ink. */
@@ -5830,7 +5809,6 @@
     font: 700 1rem / 1.4 var(--font-sans);
   }
 
-  .rankup-art,
   .rankup-more {
     font: 700 0.9375rem / 1.35 var(--font-sans);
   }
@@ -6241,7 +6219,7 @@
     border-radius: var(--r-2);
     background: var(--surface-2);
     font: 600 1rem / 1.5 var(--font-sans);
-    /* The squares (■ ◧ □), which our faces don't have, from one face that has all three, so they're one size. */
+    /* The squares (■ ◩ □), which our faces don't have, from one face that has all three, so they're one size. */
     font-family: "Sofia Sans", "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols 2", sans-serif;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
@@ -7929,11 +7907,6 @@
 
   .tight .tomorrow-head > .tomorrow-sep {
     display: none;
-  }
-
-  /* Профил's seals, one to a row. */
-  .tight .seal-list {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   /* Figures in a row: one under another. */

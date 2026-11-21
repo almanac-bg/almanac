@@ -34,7 +34,6 @@ let {
   trail,
   tieWords,
   withWord,
-  worn,
 } = {} as Kit;
 
 /** How many questions a duel has. */
@@ -69,7 +68,6 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
     trail,
     tieWords,
     withWord,
-    worn,
   } = kit);
   const steps = again && typeof again === "object" && "main" in again ? again : null;
   const next = steps ? steps.main : (again as Child);
@@ -153,7 +151,7 @@ function face(s: Side, label: string, tag: string, won: boolean): Child {
   return h(
     "div",
     { class: won ? "duel-face win" : "duel-face" },
-    h("span", { class: "duel-avatar" }, avatar(look.avatar, { size: "l", name: s.name }), worn(look.seal)),
+    avatar(look.avatar, { name: s.name, seal: look.seal }),
     tag
       ? h("a", { class: "duel-name", href: profileHref(tag) }, nameWords(label))
       : h("strong", { class: "duel-name" }, nameWords(label)),

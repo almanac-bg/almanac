@@ -4,8 +4,9 @@
 //
 //   - a shared day's card (Draw), the picture a shared day's link shows and the browser shares as the day is shared
 //     (web/src/game/share.ts, cardFile): the mark and the name, „Брой“ and the issue's number big with its date,
-//     almanac.bg, and the ten tiles two rows of five, each its chapter's colour with its glyph, filled right, the left
-//     half filled близо, dashed and hollow wrong (so that they part in grey too), dashed and empty one that counts for
+//     almanac.bg, and the ten tiles two rows of five, each its chapter's colour with its glyph, filled right (the glyph
+//     on a white tile), the upper left half filled близо (◩), dashed and hollow wrong (so that they part in grey too),
+//     dashed and empty one that counts for
 //     nobody. Never an answer, never a name, never the score in figures (the link's title says it: server/pages.go);
 //   - the site's own picture (Site, /og.png): the mark and the name, „Десет въпроса на ден, едни и същи за цяла
 //     България.“, a day's ten tiles and almanac.bg.
@@ -231,12 +232,23 @@ func (p *picture) tiles(topics []string, shape string) error {
 		switch {
 		case right:
 			box(p.img, x, y, x+size, y+size, r, tone)
-			circle(p.img, x+size/2, y+size/2, size*0.37, surf)
+			// The glyph on a white tile of its own, rounded as the client's (app.css, .tile-pic: 74%, 28% corners).
+			in := size * 0.37
+			box(p.img, x+size/2-in, y+size/2-in, x+size/2+in, y+size/2+in, 2*in*0.28, surf)
 		case near:
-			// The left half in the chapter's colour: the tile's shape, cut at its middle.
+			// The upper left half in the chapter's colour (◩): the tile's shape, cut on its diagonal, so that it
+			// parts from a full one at a glance, in grey too.
 			half := image.NewRGBA(image.Rect(0, 0, int(size), int(size)))
 			box(half, 0, 0, size, size, r, tone)
-			draw.Draw(p.img, image.Rect(int(x), int(y), int(x+size/2), int(y+size)), half, image.Point{}, draw.Over)
+			cut := image.NewAlpha(half.Bounds())
+			z := vector.NewRasterizer(int(size), int(size))
+			z.MoveTo(0, 0)
+			z.LineTo(float32(size), 0)
+			z.LineTo(0, float32(size))
+			z.ClosePath()
+			z.Draw(cut, cut.Bounds(), image.Opaque, image.Point{})
+			draw.DrawMask(p.img, image.Rect(int(x), int(y), int(x+size), int(y+size)), half, image.Point{}, cut,
+				image.Point{}, draw.Over)
 		}
 		if !right {
 			// A void one's dashes in the page's grey: it counts for nobody, nothing of its chapter.
@@ -332,13 +344,6 @@ func box(dst draw.Image, x0, y0, x1, y1, r float64, c color.Color) {
 			z.LineTo(float32(p.x-ox), float32(p.y-oy))
 		}
 		z.ClosePath()
-	})
-}
-
-// circle fills a circle.
-func circle(dst draw.Image, cx, cy, r float64, c color.Color) {
-	shape(dst, cx-r, cy-r, cx+r, cy+r, c, func(z *vector.Rasterizer, ox, oy float64) {
-		disc(z, pt{cx - ox, cy - oy}, r)
 	})
 }
 

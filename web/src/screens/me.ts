@@ -1,11 +1,12 @@
 // Профил: who you are in the game, in its budget's order (DESIGN.md, Places): your avatar with the seal you wear on its
-// corner, your name and tag; the streak as it is now; the seal you wear on its ladder of ranks; your seals, a
-// chapter's each, a view of them (the one worn is the best: never chosen); the avatars (every animal yours, a chapter's art yours from its
-// Страница); and Настройки, last. A guest is asked to keep their game, and the way in for a profile from elsewhere is
-// apart from it. No lifetime totals.
+// corner, your name and tag; the streak as it is now; your seals, one list, a row a chapter with its rank, its
+// progress to the next and its ink (the one worn is the best: never chosen); the avatars (every animal yours); and
+// Настройки, last. A guest is asked to keep their game, and the way in for a profile from elsewhere is apart from it.
+// No lifetime totals.
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
+import type { ChapterRank } from "../ui.ts";
 import type { Stats } from "./stats.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
@@ -28,22 +29,9 @@ let {
   keepGame,
   loadStats,
   formatNumber,
-  categories,
-  chapterName,
-  ladder,
-  seal,
-  worn,
+  sealList,
   illustration,
 } = {} as Kit;
-
-/** A chapter's rank, as the book has it (play.ChapterRank). */
-interface Rank {
-  chapter: string;
-  level: number;
-  name: string;
-  /** The facts in the chapter in ink. */
-  ink?: number;
-}
 
 export function me(kit: Kit) {
   ({
@@ -64,11 +52,7 @@ export function me(kit: Kit) {
     keepGame,
     loadStats,
     formatNumber,
-    categories,
-    chapterName,
-    ladder,
-    seal,
-    worn,
+    sealList,
     illustration,
   } = kit);
   title("Профил");
@@ -84,21 +68,21 @@ export function me(kit: Kit) {
       () => user(),
       () => {
         const data = signal<Stats | null>(null);
-        const ranks = signal<Rank[] | null>(null);
+        const ranks = signal<ChapterRank[] | null>(null);
         // Профил that couldn't load (no line): said, with the way to try again (the whole page, afresh).
         const failed = signal<unknown>(null);
         loadStats().then(data.set, failed.set);
         // The ranks, as others see them on the player's page (not the book's: opening it is counted as opening the book).
         const tag = user.peek()?.tag;
         if (tag)
-          api<{ ranks?: Rank[] }>("GET", `/api/players/${encodeURIComponent(tag)}`).then(
+          api<{ ranks?: ChapterRank[] }>("GET", `/api/players/${encodeURIComponent(tag)}`).then(
             (p) => ranks.set(p.ranks ?? []),
             () => ranks.set([]),
           );
         else ranks.set([]);
         // The avatars: their own part (screens/avatar.ts), loaded with the page.
         const picker = signal<Child>(null);
-        import("./avatar.ts").then((m) => picker.set(m.picker(kit, () => ranks() ?? [])));
+        import("./avatar.ts").then((m) => picker.set(m.picker(kit)));
         return [
           h(
             "div",
@@ -111,13 +95,12 @@ export function me(kit: Kit) {
             // the profile has it.
             () => (user()?.email ? null : keepGame(() => go("/me", true), signingIn, theirView(user()?.tag))),
             () => streakNow(data()),
-            () => wornLadder(data()),
+            () => seals(ranks(), data()),
             () => (user()?.email && user()?.tag ? h("p", { class: "me-links" }, theirView(user()?.tag)) : null),
           ),
           h(
             "div",
             { class: "me-side page-2" },
-            () => seals(ranks()),
             h(
               "section",
               { class: "sect me-avatars" },
@@ -164,12 +147,7 @@ function head(data: () => Stats | null): Child {
   return h(
     "div",
     { class: "me-head" },
-    h(
-      "span",
-      { class: "me-avatar" },
-      () => avatar(look(), { size: "l", name: user.peek()?.name }),
-      () => worn(data()?.seal, 48),
-    ),
+    h("span", { class: "me-avatar" }, () => avatar(look(), { size: "l", name: user.peek()?.name, seal: data()?.seal })),
     h(
       "div",
       { class: "me-who" },
@@ -218,58 +196,23 @@ function streakNow(s: Stats | null): Child {
   ];
 }
 
-/** The seal worn, on its ladder: „Печатът на География“, its ink (as the book has it, the number its Алманах card
- * shows), and the ranks from Бележка to Летопис, the one reached ringed. Nothing before a first seal. */
-function wornLadder(s: Stats | null): Child {
-  const w = s?.seal;
-  if (!w?.chapter || w.level < 1) return null;
-  const ink = s?.ink;
-  return h(
-    "section",
-    { class: "sect me-ladder" },
-    h(
-      "div",
-      { class: "sect-head" },
-      h("h2", null, `Печатът на ${chapterName(w.chapter)}`),
-      ink ? h("span", { class: "sect-note" }, `${formatNumber(ink)} с мастило`) : null,
-    ),
-    ladder(w.chapter, w.level),
-  );
-}
-
-/** The seals: a chapter's each, once it has a rank, its name under it: a view of the ranks, no choice (the one worn
- * beside the name is the best: play.sealOf). Before any: what brings the first. */
-function seals(ranks: Rank[] | null): Child {
+/** The seals: one list, a row a chapter with a rank (ui.ts, sealList), its ink as the book has it now (the number its
+ * Алманах card shows: Stats.ink); a view, no choice (the one worn on the avatar is the best: play.sealOf). Before any:
+ * what brings the first. */
+function seals(ranks: ChapterRank[] | null, s: Stats | null): Child {
   if (!ranks) return null;
-  const had = categories.map((c) => ranks.find((r) => r.chapter === c.id)).filter((r): r is Rank => !!r && r.level > 0);
+  const list = sealList(ranks.map((r) => ({ ...r, ink: s?.ink?.[r.chapter] ?? r.ink })));
   return h(
     "section",
     { class: "sect me-seals" },
     h("div", { class: "sect-head" }, h("h2", null, "Печати")),
-    had.length
-      ? h(
-          "ul",
-          { class: "seal-list" },
-          had.map((r) =>
-            h(
-              "li",
-              null,
-              h(
-                "span",
-                { class: "rk" },
-                seal(r.chapter, r.level, 40),
-                h("span", { class: "rk-words" }, h("b", null, chapterName(r.chapter)), h("span", null, r.name)),
-              ),
-            ),
-          ),
-        )
-      : [
-          h("p", { class: "seal-worn" }, "Още нямаш печат."),
-          h(
-            "p",
-            { class: "small" },
-            "Печат на глава получаваш с първия ѝ факт с мастило — при верен отговор в броя на деня.",
-          ),
-        ],
+    list ?? [
+      h("p", { class: "seal-worn" }, "Още нямаш печат."),
+      h(
+        "p",
+        { class: "small" },
+        "Печат на глава получаваш с първия ѝ факт с мастило — при верен отговор в броя на деня.",
+      ),
+    ],
   );
 }

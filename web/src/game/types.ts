@@ -223,7 +223,7 @@ export interface Score {
   avatar?: string;
   /** How each of the ten went: on the friends' board, once the viewer has finished the day. */
   trail?: Mark[];
-  /** The seal they wear beside their name (play.Seal): a chapter and its rank. */
+  /** The seal they wear on their avatar's corner (play.Seal): a chapter and its rank. */
   seal?: { chapter: string; level: number };
 }
 

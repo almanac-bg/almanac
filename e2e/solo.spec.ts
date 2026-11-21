@@ -34,10 +34,10 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.locator(".day-board .lv, .day-board .who-title")).toHaveCount(0);
   await page.goto("/me");
   await expect(page.locator(".me-seals")).toBeVisible();
-  // The seal worn, on its ladder from Бележка to Летопис, the one reached marked.
-  if (await page.locator(".me-seals .rk").count()) {
-    await expect(page.locator(".me-ladder .ladder > li")).toHaveCount(6);
-    await expect(page.locator(".me-ladder .ladder > li.now")).toHaveCount(1);
+  // The seals one list, a row a chapter with a rank, and the best of them worn on the avatar's corner.
+  if (await page.locator(".me-seals .seal-row").count()) {
+    await expect(page.locator(".me-avatar .avatar > .seal")).toHaveCount(1);
+    await expect(page.locator(".me-seals .seal-row").first().locator(".seal-pips")).toBeVisible();
   }
 
   await openGame(page, "/play/history");

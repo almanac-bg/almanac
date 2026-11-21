@@ -9,8 +9,8 @@ export interface Stats {
   avatar: string;
   /** The seal they wear (play.Seal): a chapter's rank. */
   seal?: { chapter: string; level: number; name: string; quarter: number };
-  /** The worn seal's chapter's ink, as the book has it (its Алманах card's number). */
-  ink?: number;
+  /** Each chapter's ink, as the book has it (its Алманах card's number): Профил's seals say it. */
+  ink?: Record<string, number>;
   streak: number;
   week: boolean[];
   /** This week's day missed that the streak forgave, Monday first. */

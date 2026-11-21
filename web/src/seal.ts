@@ -19,10 +19,6 @@
 /** The six ranks a chapter's ink reaches, in order (DECISIONS.md, the direction). */
 export const rankNames = ["Бележка", "Страница", "Тетрадка", "Книга", "Том", "Летопис"];
 
-/** The ink a chapter's art becomes the player's at: its Страница's (play.RankFrom(play.RankArt): TestArtFromTheClient
- * holds them equal). */
-export const artFrom = 5;
-
 /** A rank's name: 1–6 by the list, then „Летопис · 2“ and on for each further hundred. */
 export function rankName(rank: number): string {
   return rank <= 6 ? (rankNames[rank - 1] ?? "") : `Летопис · ${rank - 5}`;

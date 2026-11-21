@@ -52,28 +52,10 @@
     min-width: 0;
   }
 
-  .duel-avatar {
-    position: relative;
-  }
-
+  /* The avatar, the seal worn on its corner on a ring of the card (app.css, .avatar > .seal). */
   .duel-face .avatar {
-    width: 44px;
-    height: 44px;
-  }
-
-  /* The seal worn, on the avatar's corner nearer the name (the other's mirrored), on a ring of the card. */
-  .duel-avatar > .seal {
-    position: absolute;
-    right: -8px;
-    bottom: -6px;
-    border-radius: 50%;
-    background: var(--surface);
-    box-shadow: 0 0 0 2px var(--surface);
-  }
-
-  .duel-face:last-child .duel-avatar > .seal {
-    right: auto;
-    left: -8px;
+    --size: 44px;
+    --ring: var(--surface);
   }
 
   /* The name whole, on two lines rather than cut: broken between its words (a one-word name at its syllables:
@@ -148,7 +130,7 @@
   }
 
   .duel-pip.partial {
-    background: linear-gradient(90deg, var(--ink) 50%, transparent 50%);
+    background: linear-gradient(to bottom right, var(--ink) 50%, transparent 50%);
     box-shadow: inset 0 0 0 1.5px var(--ink);
   }
 

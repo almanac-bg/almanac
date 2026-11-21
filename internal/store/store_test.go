@@ -907,3 +907,27 @@ func TestDuelsOwnTime(t *testing.T) {
 	}
 	db.Close()
 }
+
+// Animal avatars only (0113): a chapter's art chosen as an avatar goes, kept with its tone or without, and the player
+// has the animal the game gives them (NULL); every animal stays as it was.
+func TestAnimalAvatars(t *testing.T) {
+	db := openBefore(t, filepath.Join(t.TempDir(), "game.db"), "0113_animal_avatars.sql")
+	_, err := db.Write.Exec(`INSERT INTO users (id, name, tag, created_at, seen_at, avatar) VALUES
+		(1, 'А', 'a', 1, 1, 'history-natural'), (2, 'Б', 'b', 1, 1, 'geography'), (3, 'В', 'c', 1, 1, 'lynx-natural'),
+		(4, 'Г', 'd', 1, 1, 'fox'), (5, 'Д', 'e', 1, 1, NULL), (6, 'Е', 'f', 1, 1, 'hedgehog-gold')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.migrateTo(migrationsThrough("0113_animal_avatars.sql")); err != nil {
+		t.Fatal(err)
+	}
+	want := map[int]string{1: "", 2: "", 3: "lynx-natural", 4: "fox", 5: "", 6: "hedgehog-gold"}
+	for id, w := range want {
+		var got sql.NullString
+		_ = db.Read.QueryRow(`SELECT avatar FROM users WHERE id = ?`, id).Scan(&got)
+		if got.String != w || got.Valid != (w != "") {
+			t.Errorf("player %d: %v, want %q", id, got, w)
+		}
+	}
+	db.Close()
+}

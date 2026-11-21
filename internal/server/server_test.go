@@ -1245,7 +1245,7 @@ func TestAvatarChosen(t *testing.T) {
 		out["avatar"] != "lynx" {
 		t.Fatalf("a lynx: %d %v", status, out)
 	}
-	// A chapter's art is earned at its Страница (play/rank.go).
+	// A chapter's art is never an avatar, whatever its rank: a seal is worn on the avatar (play/progress.go).
 	for _, bad := range []string{"crown", "fox-gold", "fox/ring", "", "history"} {
 		if status, out := p.call("PATCH", "/api/me/look", map[string]any{"avatar": bad}); status != 400 ||
 			out["error"] != "no_avatar" {
