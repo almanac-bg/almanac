@@ -73,10 +73,15 @@ export const portrait = (q: Q) => q.type === "choice" && !!q.image && q.image.h 
 
 /** The real bank's questions the tests add to the sample: of an order and of pairs, the one with the most words and
  * the one with the longest question (often one question); the choice with the most words, and the one under a
- * portrait with the most; each with its chapter's file. None without the real bank. */
+ * portrait with the most; the clues, the number and the groups with the most; each with its chapter's file. None
+ * without the real bank. */
 function picks(): [file: string, q: Q][] {
   if (!real) return [];
-  const all = [...files(real)].flatMap(([f, qs]) => qs.filter((q) => !q.retired).map((q) => [f, q] as [string, Q]));
+  // Not a question of a date (its own `on`): here it waits for a day far ahead instead, which its date's line would
+  // no longer match.
+  const all = [...files(real)].flatMap(([f, qs]) =>
+    qs.filter((q) => !q.retired && !(q as { on?: unknown }).on).map((q) => [f, q] as [string, Q]),
+  );
   const out = new Map<string, [string, Q]>();
   const most = (kind: (q: Q) => boolean, size: (q: Q) => number) => {
     const best = all.filter(([, q]) => kind(q)).sort(([, a], [, b]) => size(b) - size(a))[0];
@@ -86,6 +91,7 @@ function picks(): [file: string, q: Q][] {
     for (const size of [words, (q: Q) => q.text.length]) most((q) => q.type === type, size);
   most((q) => q.type === "choice" && !q.image && !q.pictures, words);
   most(portrait, words);
+  for (const type of ["clues", "number", "split"]) most((q) => q.type === type && !q.image, words);
   return [...out.values()];
 }
 
@@ -101,8 +107,10 @@ export function testBank(make: boolean): string {
     const ids = new Set([...qs.values()].flat().map((q) => q.id));
     // Each waiting for a day far ahead (bank.Tail.On; play's `waiting`): dealt to a test by its id, never drawn by the
     // game, into a day's issue, a topic's game or a duel, so that whatever the tests play by chance is the sample's,
-    // here as on CI.
-    for (const [f, q] of add) if (!ids.has(q.id)) qs.set(f, [...(qs.get(f) ?? []), { ...q, on: ["2999-01-01"] } as Q]);
+    // here as on CI. Its day far ahead has no line of its own (bank's rule „dated“): kept a warning, as for a question
+    // added before the rules were strict, whenever it was added.
+    for (const [f, q] of add)
+      if (!ids.has(q.id)) qs.set(f, [...(qs.get(f) ?? []), { ...q, on: ["2999-01-01"], added: "2026-01-01" } as Q]);
     for (const [f, list] of qs) writeFileSync(resolve(served, "questions", f), JSON.stringify(list, null, 2));
     // A picture's files with it, each width the program offers (its name, and -600, -900).
     const stems = new Set(add.flatMap(([, q]) => (q.image ? [q.image.file.replace(/\.[a-z]+$/, "")] : [])));

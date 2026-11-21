@@ -196,12 +196,18 @@ export async function flaws(page: Page): Promise<string[]> {
       }
 
     // A row's sign (✓, ✕) and its value never on a line of their own: each beside something else of its row (the
-    // words, the letter, the value), or set in its corner.
-    for (const mark of document.querySelectorAll(".option .sign, .option > .value")) {
-      if (!shown(mark) || getComputedStyle(mark).position === "absolute") continue;
+    // words, the letter, the value, what's with it at the row's end: .row-end), or set in its corner.
+    for (const mark of document.querySelectorAll(".option .sign, .option > .value, .option > .row-end > .value")) {
+      const set = (e: Element | null) => !!e && getComputedStyle(e).position === "absolute";
+      if (!shown(mark) || set(mark) || (mark.parentElement?.matches(".row-end") && set(mark.parentElement))) continue;
       const r = mark.getBoundingClientRect();
       const mid = r.top + r.height / 2;
-      const others = [...(mark.parentElement?.children ?? [])].filter((e) => e !== mark && shown(e));
+      const near = (box: Element | null | undefined, not: Element) =>
+        [...(box?.children ?? [])].filter((e) => e !== not && shown(e));
+      let others = near(mark.parentElement, mark);
+      // Alone at the row's end: beside the row's own parts, then.
+      if (!others.length && mark.parentElement?.matches(".row-end"))
+        others = near(mark.closest(".option"), mark.parentElement);
       if (
         !others.some((e) => {
           const o = e.getBoundingClientRect();

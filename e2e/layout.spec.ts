@@ -5,8 +5,9 @@
 // - Днес keeps its budget in the HTML's order and shows „Започни“ whole and high; the day's first question (its head
 //   has the issue and the clock), its answer and the day's result scroll nowhere sideways, the clock never over the count, the answer's panel never squeezed.
 // - Every kind of question (the longest the tests' bank has, the real bank's orders, pairs, choices and a portrait
-//   where it's here: kinds.ts, bank.ts), answered right, wrong and close: at the usual
-//   text what answers it and its action whole in sight, nothing under the action; once answered the player's row,
+//   where it's here: kinds.ts, bank.ts), answered right, wrong and close: from 375 × 600 at the usual
+//   text what answers it and its action whole in sight, nothing under the action (at 320 × 568 every control a
+//   scroll away, the first answer in sight; a picture never under 120px); once answered the player's row,
 //   the right one and „Напред“, nothing under „Напред“ (on a laptop, the answer under what answered it, beside the
 //   question); the question's words with their spaces, however it's cut; at twice the
 //   text every control a scroll away; a row's sign, a punctuation mark or a short word never on a line of its own.
@@ -144,7 +145,35 @@ async function spaced(page: Page, q: Q): Promise<string[]> {
     .first()
     .evaluate((e) => (e as HTMLElement).innerText);
   const plain = (s: string) => s.replaceAll("\u00ad", "").replace(/\s+/g, " ").trim();
-  return plain(shown) === plain(q.text) ? [] : [`the question reads „${plain(shown)}“`];
+  const [says, all] = [plain(shown), plain(q.text)];
+  if (says === all) return [];
+  // Cut to leave its rows room (answering.ts, clamp): its first words, whole, and „…“.
+  const head = says.endsWith("…") ? says.slice(0, -1) : null;
+  const whole = head !== null && all.startsWith(head) && /^[\s,;:—–-]/.test(all.slice(head.length));
+  return whole ? [] : [`the question reads „${says}“`];
+}
+
+/** On the smallest phone, where the page may scroll (DESIGN.md, Play): what answers a question starts in sight (its
+ * first answer, row, cell or key whole on the first screen, under the head), and a picture over a question is still a
+ * picture (120px tall at the least), at every size. */
+async function startsInSight(page: Page, scrolls: boolean): Promise<string[]> {
+  return page.evaluate((scrolls) => {
+    const out: string[] = [];
+    const pic = document.querySelector("article.question > .picture")?.getBoundingClientRect();
+    if (pic && pic.height < 119) out.push(`the picture shrunk to ${Math.round(pic.height)}px`);
+    if (!scrolls) return out;
+    const head = document.querySelector(".question-top")?.getBoundingClientRect().bottom ?? 0;
+    const first = document.querySelector(
+      `article.question .answering :is(.options > .option, .keypad .key, .match-item, .split-card.top, .tf-options > .option)`,
+    );
+    const r = first?.getBoundingClientRect();
+    if (!r) out.push("nothing that answers it");
+    else if (r.top < head - 1 || r.bottom > innerHeight + 0.5)
+      out.push(
+        `its first answer off the first screen: ${first?.className} [${Math.round(r.top)}–${Math.round(r.bottom)}]`,
+      );
+    return out;
+  }, scrolls);
 }
 
 /** What of `selector` can't be seen whole at any scroll of `scroller` (the page, or a box that may scroll on its own:
@@ -316,6 +345,8 @@ for (const size of sizes)
         ...(laptop ? { isMobile: false, hasTouch: false } : {}),
       });
       const big = text !== 100;
+      // The smallest phone: the page may scroll there (DESIGN.md, Play).
+      const small = size.width < 375;
 
       test("Днес, the day's first question and its result, and a new player's places", async ({ page }) => {
         test.setTimeout(150_000);
@@ -436,7 +467,10 @@ for (const size of sizes)
               ...(await flaws(page)),
               ...(await brokenWords(page, cells)),
               ...(await crowded(page)),
-              ...(big ? await outOfReach(page, controls) : await unseenAnswers(page)),
+              // From 375 × 600 up the question and what answers it fit; on a 320 × 568 phone (and at twice the
+              // text) the page may scroll, nothing under anything, what answers it starting in sight.
+              ...(big || small ? await outOfReach(page, controls) : await unseenAnswers(page)),
+              ...(await startsInSight(page, small && !big)),
             ]);
             expect.soft(asked, `${where}, asked`).toEqual([]);
 
@@ -559,12 +593,17 @@ async function answerInPlace(page: Page, type: string): Promise<string[]> {
     }
     const parts = [
       ...document.querySelectorAll(
-        "article.question > :is(.q-leaf, .picture), article.question .answering .options > *",
+        "article.question > :is(.q-leaf, .picture), article.question .answering :is(.options > *, .clues > *, .clues-next)",
       ),
     ].map((el) => ({ el, r: el.getBoundingClientRect() }));
     for (const { el, r } of parts)
       if (r.height && r.top < head - 1 && r.bottom > head + 1 && !rows.includes(el))
         out.push(`a scrap under the head: ${el.className} [${Math.round(r.top)}–${Math.round(r.bottom)}]`);
+    // The docked panel ends what's over it at an edge: never across a row (an order's, pairs', groups', a choice's).
+    if (getComputedStyle(after).position === "fixed")
+      for (const { el, r } of parts)
+        if (r.height && r.top < foot - 1 && r.bottom > foot + 1 && el.closest(".answering"))
+          out.push(`a row cut by the panel: ${el.className} [${Math.round(r.top)}–${Math.round(r.bottom)}]`);
     const leaf = document.querySelector("article.question .q-leaf");
     if (!leaf) out.push("no question's sheet (.q-leaf)");
     else if (type === "choice" || type === "clues") {
@@ -772,3 +811,32 @@ test.describe("a finger's room", () => {
     }
   });
 });
+
+// An invite opened on a phone, by a stranger: the invite one row over the day's cover, „Започни“ whole on the first
+// screen, over the places' bar where there is one (DESIGN.md, Днес).
+for (const size of sizes.filter((s) => s.width < 1000))
+  test(`${size.width}×${size.height}: an invite opened keeps „Започни“ on the first screen`, async ({ browser }) => {
+    const ana = await (await browser.newContext()).newPage();
+    await ana.goto("/");
+    await daysPlayed(ana, 1);
+    const url = await ana.evaluate(
+      async () => (await (await fetch("/api/invite", { method: "POST" })).json()).url as string,
+    );
+    const bo = await (await browser.newContext({ viewport: { width: size.width, height: size.height } })).newPage();
+    await bo.goto(new URL(url).pathname);
+    await expect(bo.locator(".invite-card")).toBeVisible();
+    await settled(bo);
+    if (process.env.FIT_SHOTS)
+      await bo.screenshot({ path: `${process.env.FIT_SHOTS}/invite-${size.width}x${size.height}.png` });
+    const at = await bo.evaluate(() => {
+      const box = (s: string) => document.querySelector(s)?.getBoundingClientRect();
+      const bar = box(".places-foot");
+      return {
+        card: box(".invite-card")?.height ?? 0,
+        go: box(".issue-go")?.bottom ?? Number.POSITIVE_INFINITY,
+        foot: bar?.height ? bar.top : innerHeight,
+      };
+    });
+    expect(at.card, "the invite, one row").toBeLessThanOrEqual(96);
+    expect(at.go, "„Започни“ whole on the first screen").toBeLessThanOrEqual(Math.min(at.foot, size.go));
+  });

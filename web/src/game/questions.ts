@@ -98,7 +98,7 @@ function crowdOnAll(buttons: HTMLElement[], crowd: Crowd | undefined, mine: numb
     if (!c || x === undefined) return [];
     const share = h("span", { class: "value crowd-share unseen" }, percent(x));
     // After the words (and „ти“), before the ✓ or ✕ at the row's end.
-    const sign = b.querySelector(":scope > .sign");
+    const sign = b.querySelector(":scope > .row-end > .sign, :scope > .sign");
     if (sign) sign.before(share);
     else (b.querySelector(".pic-frame") ?? b).append(share);
     return [{ b, share, x }];
@@ -129,7 +129,7 @@ export function ask(
     case "choice":
       return choice(view, submit, locked, display);
     case "number":
-      return number(view, submit, locked);
+      return number(view, submit, locked, display);
     case "order":
       return order(view, submit, locked, display);
     case "truefalse":
@@ -184,9 +184,9 @@ export function answerWords(view: View, reveal: Reveal): string {
   }
 }
 
-/** The least a question's picture is drawn at, however little room the screen has; on a short screen (under 620px)
- * less, so the picture gives way before an answer goes under the screen's foot. */
-const pictureFloor = () => (innerHeight < 620 ? 48 : 80);
+/** The least a question's picture is drawn at, however little room the screen has: still a picture to look at (a
+ * short phone, twice the text, scrolls rather than shrink it to a stamp: DESIGN.md, Play). */
+const pictureFloor = 120;
 
 /** The picture over a question. While it's asked (fit), it's kept low enough that the question, the picture and the
  * whole answering part under it fit on the screen, down to a floor on a screen too small for that, and kept so as
@@ -217,7 +217,7 @@ export function picture(view: View, fit = false): Child {
       const gap = Number.parseFloat(getComputedStyle(img.parentElement ?? img).rowGap) || 0;
       const spare = Math.max(0, under.top - box.bottom - gap);
       const end = under.bottom + scrollY - box.height - spare;
-      img.style.setProperty("--fit", `${Math.max(pictureFloor(), Math.floor(innerHeight - end - 16))}px`);
+      img.style.setProperty("--fit", `${Math.max(pictureFloor, Math.floor(innerHeight - end - 16))}px`);
     };
     requestAnimationFrame(size);
     listen(window, "resize", size);
@@ -339,8 +339,12 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
           if (cell) append(cell, [wholeWords(name)]);
           b.setAttribute("aria-label", `${letters[i]}: ${name}`);
         }
-        if (how === "wrong") names[i] ? names[i].append("\u00a0", yours()) : b.append(yours());
-        if (how !== "dim") (b.querySelector(".pic-frame") ?? b).append(sign());
+        // A choice's words' \u201e\u0442\u0438\u201c, share and \u2713 or \u2715 in one box at the row's end: beside the words, or together under
+        // them (app.css). A picture's in its corners and under its name.
+        const end = () =>
+          b.querySelector(":scope > .row-end") ?? b.appendChild(h("span", { class: "row-end" }) as HTMLElement);
+        if (how === "wrong") names[i] ? names[i].append("\u00a0", yours()) : end().append(yours());
+        if (how !== "dim") (b.querySelector(".pic-frame") ?? end()).append(sign());
       };
       const own = buttons[mine];
       if (own) mark(own, mine);
@@ -381,7 +385,7 @@ function keys(view: NumberView): string[] {
 }
 
 /** A number, typed on a pad of its own (no phone keyboard over the question) or on a computer's keys. */
-function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<boolean>): Asked {
+function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<boolean>, display = false): Asked {
   const decimals = (String(view.step).split(".")[1] ?? "").length;
   const typed = signal(""); // digits, and a comma once decimals are allowed: "1878", "6,5"
   const negative = signal(false);
@@ -498,9 +502,10 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
         mine === null || mine === answer ? null : scale(answer, mine, how, view),
         h("p", { class: "number-answer" }, "Верният отговор: ", h("strong", null, `${said(answer)}${unit}`), "."),
       ]);
-      // Everyone's guesses take their room at once, and show on their beat.
+      // Everyone's guesses, gone over (a review's): they take their room at once, and show on their beat. In a game
+      // the scale is enough, and how everyone did is said under the verdict (DESIGN.md, Play).
       const guesses = reveal.crowd?.guesses;
-      if (!guesses) return;
+      if (!guesses || !display) return;
       const all = spread(guesses, answer, mine, view);
       all.classList.add("unseen");
       result.append(all);
@@ -1057,7 +1062,8 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
           const gave = mine[i] ?? -1;
           return h(
             "li",
-            { class: ok ? "option right" : "option amiss" },
+            // Nothing given: right, but none of it the player's (a ✓ in a ring, not a solid one: app.css).
+            { class: !given ? "option right untaken" : ok ? "option right" : "option amiss" },
             h(
               "span",
               { class: "match-pair" },
@@ -1250,7 +1256,8 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
           const ok = !given || gave === group; // nothing given: the right groups alone, as for pairs
           return h(
             "li",
-            { class: ok ? "option right" : "option amiss" },
+            // Nothing given: right, but none of it the player's (a ✓ in a ring, not a solid one: app.css).
+            { class: !given ? "option right untaken" : ok ? "option right" : "option amiss" },
             h(
               "span",
               { class: "split-pair" },
@@ -1356,8 +1363,12 @@ function clues(
         const how = i === reveal.pick ? "right" : i === mine ? "wrong" : "dim";
         b.classList.add(how);
         if (i === mine) b.classList.add("mine");
-        if (how === "wrong") b.append(yours());
-        if (how !== "dim") b.append(sign());
+        // „ти“, the share and the ✓ or ✕ in one box at the row's end, as a choice's (choice).
+        if (how === "dim") return;
+        const end = h("span", { class: "row-end" }) as HTMLElement;
+        if (how === "wrong") end.append(yours());
+        end.append(sign());
+        b.append(end);
       };
       const own = buttons[mine];
       if (own) mark(own, mine);

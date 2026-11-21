@@ -246,7 +246,13 @@ export function inviteCard(played = false): Child {
     () => {
       const s = said();
       if (inv.mine || s?.done || s?.end || (s && !s.bad)) return null;
-      return h("button", { class: "btn inline", type: "button", disabled: busy, onclick: add }, "Добави като приятел");
+      // On a phone the card is one row: „Добави“ alone on its button (app.css), its name whole for a screen reader.
+      return h(
+        "button",
+        { class: "btn inline", type: "button", disabled: busy, onclick: add, "aria-label": "Добави като приятел" },
+        "Добави",
+        h("span", { class: "invite-more" }, " като приятел"),
+      );
     },
   );
 }
