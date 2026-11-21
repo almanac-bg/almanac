@@ -589,7 +589,13 @@ export function who(name: Child, look: Look = {}, extra: Child = null, plainName
       "span",
       { class: "who-text" },
       // The name gives way (an ellipsis) so that what's beside it (the seal, „ти“) always shows whole.
-      h("span", { class: "who-name" }, h("span", { class: "who-label" }, name), worn(look.seal), extra),
+      h(
+        "span",
+        { class: "who-name" },
+        h("span", { class: "who-label" }, typeof name === "string" ? nameWords(name) : name),
+        worn(look.seal),
+        extra,
+      ),
     ),
   );
 }

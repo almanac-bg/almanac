@@ -324,7 +324,15 @@ func TestRecordingDuel(t *testing.T) {
 		len(d.Opponent.Marks) != 0 || d.You.Started {
 		t.Fatalf("against a recording: %+v %v", d, err)
 	}
-	run := w.playSide(gal, id, repeat(w.wrong, Length))
+	// Its first question shown (its time then run out, say): begun, though nothing is answered.
+	run := w.playSide(gal, id, nil)
+	if _, err := w.g.Show(ctx, gal, run); err != nil {
+		t.Fatal(err)
+	}
+	if d, _ = w.g.DuelOf(ctx, gal, id); !d.You.Started {
+		t.Fatalf("its first question shown, not begun: %+v", d.You)
+	}
+	run = w.playSide(gal, id, repeat(w.wrong, Length))
 	if !slices.Equal(w.picks(run), w.picks(s.ID)) {
 		t.Fatal("not the recording's ten")
 	}

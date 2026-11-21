@@ -38,8 +38,8 @@ test("a duel with a friend: played first and sent, played back when they can, th
   await expect(a.locator(".duel-sent")).toContainText("ще изиграе същите десет въпроса");
   await a.goto("/friends");
   await expect(a.locator(".duels")).toContainText("Чакаш");
-  // Her row says her score and how long he has: „Ти: 7 · Бо има още 7 дни“.
-  await expect(a.locator(".duels .duel-row.s-theirs")).toContainText(/Ти: \d+ · .+ има още 7\sдни/);
+  // Her row says her score and how long he has: „Ти: 7 · още 7 дни“ (his name over it).
+  await expect(a.locator(".duels .duel-row.s-theirs")).toContainText(/Ти: \d+ · още 7\sдни/);
 
   // Bo: a dot on Приятели (nothing over the day: Днес is the issue and the streak), the duel his to play there, a tap
   // away.
@@ -80,13 +80,19 @@ test("against a recording: a real game's ten, its player named, its answers as t
   await countIn(a);
   await playRun(a);
   await playedFair(a);
-  const owner = await a.evaluate(async () => (await (await fetch("/api/me")).json()).user.name as string);
 
   const c = await (await browser.newContext()).newPage();
   await c.goto("/duel/new");
   await expect(c.getByText("Още нямаш приятели тук.")).toBeVisible();
   await c.getByRole("button", { name: "По-силен запис" }).click();
   await countIn(c);
+  // Whose game it drew: Ана's, or another real game the tests running beside this one played meanwhile (the server
+  // is theirs too). Named from the start, whoever it is.
+  await expect(c).toHaveURL(/\/duel\/\d+$/);
+  const owner = await c.evaluate(
+    async (id) => (await (await fetch(`/api/duels/${id}`)).json()).duel.opponent.name as string,
+    new URL(c.url()).pathname.split("/").pop(),
+  );
   await expect(c.locator(".question-head .versus")).toContainText(owner);
   await playSecond(c, owner);
   await expect(c.getByRole("heading", { level: 1, name: /^(Победа|Загуба|Равенство)$/ })).toBeVisible({

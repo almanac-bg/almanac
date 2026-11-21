@@ -125,14 +125,14 @@ export function friends(kit: Kit): Child {
     { class: "screen friends-page spread" },
     h("h1", null, "Приятели"),
     board.view,
-    friendsCard(board.load),
+    friendsCard(board.load, board.played),
   );
 }
 
 /** The day's board: among the player and their friends (first, once they have any), or all of България. A row says
  * what places it: the right answers big („8 от 10“; a tie between them broken as play/board.go says); the player's own
  * row washed, „ти“ after the name, and under the best twenty if further down. */
-function dayBoard(): { view: Child; load: () => void } {
+function dayBoard(): { view: Child; load: () => void; played: () => boolean } {
   const day = signal<Day | null>(null);
   const failed = signal<unknown>(null);
   const among = signal<"friends" | "all" | null>(null);
@@ -180,7 +180,7 @@ function dayBoard(): { view: Child; load: () => void } {
       return among() === "all" ? everyone(d) : ofFriends(d);
     },
   );
-  return { view, load: () => void load() };
+  return { view, load: () => void load(), played: () => !!day()?.run?.done };
 }
 
 /** The day among the player's friends: each who played, best first, and who hasn't yet, in a line. */
@@ -285,7 +285,7 @@ const scoreRow = (s: Score, place: number, gap = false) =>
 
 /** The friends: who asks to be friends, each friend with their day and the duels between you (and, while changing
  * the list, removing them), the one field to add more, and the requests that wait for an answer. */
-function friendsCard(reloadBoard: () => void): Child {
+function friendsCard(reloadBoard: () => void, played: () => boolean): Child {
   const data = signal<Friends | null>(null);
   const duels = signal<Duels | null>(null);
   const error = signal("");
@@ -383,11 +383,12 @@ function friendsCard(reloadBoard: () => void): Child {
 
   return [
     friendsList(),
-    // The duels: theirs to play first; a new one a tap away once there are friends to play.
+    // The duels: theirs to play first; a new one a tap away once there are friends to play, or the day is played (a
+    // recording of a real game is there to play without a friend).
     () => {
       const d = duels();
       const any = d && d.yours.length + d.theirs.length + d.played.length > 0;
-      if (!d || (!any && !data()?.friends.length)) return null;
+      if (!d || (!any && !data()?.friends.length && !played())) return null;
       return h(
         "section",
         { class: "sect duels page-2" },
@@ -425,7 +426,9 @@ function friendsCard(reloadBoard: () => void): Child {
             h(
               "p",
               null,
-              r.tag ? h("a", { href: profileHref(r.tag) }, h("strong", null, r.name)) : h("strong", null, r.name),
+              r.tag
+                ? h("a", { href: profileHref(r.tag) }, h("strong", null, nameWords(r.name ?? "")))
+                : h("strong", null, nameWords(r.name ?? "")),
               worn(r.look?.seal),
               h("span", { class: "muted" }, ` @${r.tag}`),
               " иска да сте приятели.",
@@ -500,7 +503,9 @@ function friendsCard(reloadBoard: () => void): Child {
                   h(
                     "li",
                     null,
-                    r.email ? h("span", null, r.email) : h("a", { href: profileHref(r.tag ?? "") }, r.name),
+                    r.email
+                      ? h("span", null, emailWords(r.email))
+                      : h("a", { href: profileHref(r.tag ?? "") }, nameWords(r.name ?? "")),
                     h("button", { class: "link muted", type: "button", onclick: () => drop(r) }, "Отмени"),
                   ),
                 ),
@@ -741,4 +746,9 @@ function row(f: Friend, remove: () => void, challenge: () => void, editing: () =
             "Дуел",
           ),
   );
+}
+
+/** An email address as a narrow line holds it: broken after its @ or before a dot, never inside a word. */
+function emailWords(email: string): Child[] {
+  return email.split(/(?<=@)|(?=\.)/).flatMap((part, i) => (i ? [h("wbr"), part] : [part]));
 }

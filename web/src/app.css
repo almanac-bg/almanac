@@ -3502,6 +3502,18 @@
     color: var(--ink-3);
   }
 
+  /* What broke a tie, under a played duel's row: the row's whole width, from the left. */
+  .duel-row:has(> .duel-tie) {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .duel-tie {
+    flex-basis: 100%;
+    font: 600 0.8125rem / 1.35 var(--font-sans);
+    text-align: left;
+  }
+
   .duel-invite {
     color: var(--ink);
     font-weight: 900;
@@ -6226,6 +6238,18 @@
     display: flex;
   }
 
+  /* On the narrowest phones the score and the small squares don't fit one line under the name: the squares go on a
+     line of their own under the score. */
+  @media (max-width: 339.98px) {
+    .friends-page .rank-end {
+      flex-wrap: wrap;
+    }
+
+    .friends-page .rank-aside {
+      flex-basis: 100%;
+    }
+  }
+
   /* The player's own row: on a well. */
   .rank-row.me {
     margin: 0 -8px;
@@ -7757,6 +7781,27 @@
 
   .tight .friend-act {
     grid-row: 2;
+  }
+
+  /* Приятели's board row: the score and the small squares under the place and the avatar too, the squares on a line
+     of their own, wrapping if even that is too narrow. */
+  .tight .friends-page .rank-end {
+    flex-wrap: wrap;
+    padding-left: 0;
+  }
+
+  .tight .friends-page .rank-aside {
+    flex-basis: 100%;
+  }
+
+  .tight .friends-page .mini {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  /* A friend's day: their score and the duels between you, one under the other. */
+  .tight .friend-day {
+    flex-direction: column;
   }
 
   /* The streak: the flame and the number on a line, its words under them, whole. */

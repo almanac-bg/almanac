@@ -206,6 +206,40 @@ func TestFriendsBoardTrails(t *testing.T) {
 	}
 }
 
+// The board of all of България shows how each of the best went, and the viewer's own, once the viewer has finished the
+// day: never before, nor to nobody signed in.
+func TestBoardTrails(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo := w.user(), w.user()
+	today := w.g.Today()
+	s, _ := w.g.StartDay(ctx, ana)
+	w.play(ana, s.ID, append(repeat(w.right, 4), repeat(w.wrong, Length-4)...)...)
+	for _, viewer := range []int64{0, bo} {
+		b, err := w.g.BoardOf(ctx, today, viewer)
+		if err != nil || len(b.Top) != 1 || b.Top[0].Trail != nil {
+			t.Fatalf("the board to %d before playing: %+v %v", viewer, b, err)
+		}
+	}
+	s, _ = w.g.StartDay(ctx, bo)
+	w.play(bo, s.ID, repeat(w.right, Length)...)
+	b, err := w.g.BoardOf(ctx, today, bo)
+	if err != nil || len(b.Top) != 2 || b.Mine == nil || len(b.Mine.Trail) != Length {
+		t.Fatalf("the board once Bo played: %+v %v", b, err)
+	}
+	for _, row := range b.Top {
+		if len(row.Trail) != Length {
+			t.Fatalf("a row without its trail: %+v", row)
+		}
+	}
+	if ana := b.Top[1]; !ana.Trail[0].Right || ana.Trail[Length-1].Right {
+		t.Fatalf("Ana's trail: %+v", ana.Trail)
+	}
+	if b2, _ := w.g.BoardOf(ctx, today, 0); b2.Top[0].Trail != nil {
+		t.Fatal("a trail to nobody signed in")
+	}
+}
+
 // A player's day as a board tells it: nothing before it's finished; its right answers after, to anyone; a game
 // played at a script's speed to its player alone.
 func TestDayRights(t *testing.T) {

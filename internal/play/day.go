@@ -1,11 +1,13 @@
 package play
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"strconv"
+	"strings"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
@@ -267,6 +269,54 @@ func (g *Game) passVoid(tx *sql.Tx, r *run) error {
 type markAt struct {
 	n int
 	m Mark
+}
+
+// trailsOf reads the trails of a day's runs, in one read of their answers: by run.
+func trailsOf(ctx context.Context, q interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}, day string, runs []int64,
+) (map[int64][]Mark, error) {
+	out := map[int64][]Mark{}
+	if len(runs) == 0 {
+		return out, nil
+	}
+	// The day's questions say which count for nobody (day.go), the same in every run of the day.
+	var stored string
+	var picks []Pick
+	if err := q.QueryRowContext(ctx, `SELECT questions FROM days WHERE day = ?`, day).Scan(&stored); err == nil {
+		_ = json.Unmarshal([]byte(stored), &picks)
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+	ids := make([]any, len(runs))
+	for i, r := range runs {
+		ids[i] = r
+	}
+	rows, err := q.QueryContext(ctx, `SELECT run_id, n, score, is_right FROM answers
+		WHERE run_id IN (`+strings.Repeat("?, ", len(ids)-1)+`?) ORDER BY run_id, n`, ids...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	of := map[int64][]markAt{}
+	for rows.Next() {
+		var run int64
+		var a markAt
+		var score float64
+		if err := rows.Scan(&run, &a.n, &score, &a.m.Right); err != nil {
+			return nil, err
+		}
+		a.m.Close = closeAnswer(score, a.m.Right)
+		of[run] = append(of[run], a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for _, r := range runs {
+		out[r] = trailOf(picks, len(picks), of[r])
+	}
+	return out, nil
 }
 
 // trailOf is a run's trail from its answers' marks (in order): each answer's, and, in its place, a question that

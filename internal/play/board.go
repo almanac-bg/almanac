@@ -43,7 +43,8 @@ type Score struct {
 	Ms int64 `json:"ms"`
 	Me bool  `json:"me,omitempty"`
 	Look
-	// Trail is how each of the ten went, on the friends' board once the viewer has finished the day (FriendsBoard).
+	// Trail is how each of the ten went, on either board once the viewer has finished the day (FriendsBoard,
+	// BoardOf): the first BoardTop rows' and the viewer's own.
 	Trail []Mark `json:"trail,omitempty"`
 
 	tie tiebreak
@@ -84,6 +85,7 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 	}
 	for i, s := range d.top {
 		s.Me = d.users[i] == viewer
+		s.Trail = nil // until the viewer has finished the day: then, as counted
 		b.Top[i] = s
 	}
 	if viewer == 0 {
@@ -104,6 +106,15 @@ func (g *Game) BoardOf(ctx context.Context, day string, viewer int64) (Board, er
 		return b, err
 	}
 	mine.Me, mine.Look = true, g.lookOf(viewer, avatar)
+	// Finished: how each of the others' went, as counted, and the viewer's own.
+	for i := range b.Top {
+		b.Top[i].Trail = d.top[i].Trail
+	}
+	trails, err := trailsOf(ctx, g.DB.Read, day, []int64{r.id})
+	if err != nil {
+		return b, err
+	}
+	mine.Trail = trails[r.id]
 	b.Mine = &mine
 	r.rights, r.ms = mine.Rights, mine.Ms
 	// Their place: after everyone ahead of them in the count, which has them already, or not yet: finished since, or
@@ -180,7 +191,7 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	rows, err = tx.QueryContext(ctx, `SELECT u.id, u.name, u.tag, r.rights, `+countedOf("r.questions")+`, r.ms,
+	rows, err = tx.QueryContext(ctx, `SELECT r.id, u.id, u.name, u.tag, r.rights, `+countedOf("r.questions")+`, r.ms,
 			`+lookColumns+`
 		FROM runs r JOIN users u ON u.id = r.user_id
 		WHERE r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND `+othersSee("r")+`
@@ -189,18 +200,28 @@ func (g *Game) countBoard(ctx context.Context, day string) (*countedBoard, error
 		return nil, err
 	}
 	defer rows.Close()
+	var runs []int64 // each of top's game
 	for rows.Next() {
-		var id int64
+		var run, id int64
 		var s Score
 		var avatar string
-		if err := rows.Scan(&id, &s.Name, &s.Tag, &s.Rights, &s.Of, &s.Ms, &avatar); err != nil {
+		if err := rows.Scan(&run, &id, &s.Name, &s.Tag, &s.Rights, &s.Of, &s.Ms, &avatar); err != nil {
 			return nil, err
 		}
 		s.Look = g.lookOf(id, avatar)
-		d.top, d.users = append(d.top, s), append(d.users, id)
+		d.top, d.users, runs = append(d.top, s), append(d.users, id), append(runs, run)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+	rows.Close()
+	// How each of the best went, counted with them (BoardOf shows it to a viewer who has finished the day).
+	trails, err := trailsOf(ctx, tx, day, runs)
+	if err != nil {
+		return nil, err
+	}
+	for i, run := range runs {
+		d.top[i].Trail = trails[run]
 	}
 	d.counted, d.took = time.Now(), time.Since(start)
 	return d, nil
