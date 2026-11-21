@@ -14,9 +14,11 @@
 # until a release goes out that changes what failed (or someone deploys one by hand), and a session is told as it
 # starts (.claude/hooks/main-red.sh).
 #
-# A release is published only once main, as merged, passes the checks a pull request does, the server's (vet, tests
-# with the race detector) and the client's (types, lint, unit tests): each pull request passed them on its own base,
-# but two that pass apart can break together, and the client is bundled without its types checked.
+# A release is published only once main, as merged, passes the server's checks (vet, tests) and the client's (types,
+# lint, unit tests): each pull request passed them on its own base, but two that pass apart can break together, and the
+# client is bundled without its types checked. The race detector is CI's (ci.yml, on every pull request and on main
+# itself): run here too it made every release wait about five minutes more, for a combination of two passing pull
+# requests that only a race could break, which main's own CI run still catches minutes later.
 #
 # The jobs hold only what they need, and code from the repository never runs where a key is: the plan, the tests and
 # the build read the repository (and nothing more); the release runs nothing of the repository's, only GitHub's own
@@ -118,7 +120,7 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go run ./cmd/build
-      - run: go vet ./... && go test -race ./...
+      - run: go vet ./... && go test ./...
 
   client:
     name: Tested (the client)
