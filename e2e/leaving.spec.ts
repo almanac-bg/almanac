@@ -99,15 +99,13 @@ test("a topic counts in only after a tap; a reload goes back to its question, an
   await expect(page.locator(".summary .score-n")).toHaveText(score);
 });
 
-test("„Откажи“ on the count of a topic opened from outside comes back to its start, not to Начало", async ({
-  page,
-}) => {
+test("„Отказ“ on the count of a topic opened from outside comes back to its start, not to Начало", async ({ page }) => {
   await page.goto("/play/history");
   const begin = page.getByRole("button", { name: "Започни", exact: true });
   for (const out of ["click", "Escape"]) {
     await begin.click();
     await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
-    if (out === "click") await page.getByRole("button", { name: "Откажи" }).click();
+    if (out === "click") await page.getByRole("button", { name: "Отказ", exact: true }).click();
     else await page.keyboard.press("Escape");
     await expect(begin).toBeVisible();
     await expect(page.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);

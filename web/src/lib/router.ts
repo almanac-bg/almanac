@@ -301,7 +301,7 @@ export function goBack(fallback: string): void {
   else go(fallback, true);
 }
 
-/** Backs out of a game's count („Откажи“): back where the screen was come to from (goBack); a game holding an entry of
+/** Backs out of a game's count („Отказ“): back where the screen was come to from (goBack); a game holding an entry of
  * its own (hold: a page opened from outside the app, Начало under it) gives it back instead, and its screen's start
  * shows again in place (`stay`), not Начало. */
 export function backOut(fallback: string, stay: () => void): void {

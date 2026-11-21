@@ -376,7 +376,7 @@ test("a page put back where it was stops being held there once another screen op
   assert.equal(resized, null);
 });
 
-test("„Откажи“ on a game's count: back where it was come from; opened from outside, its start again in place", async () => {
+test("„Отказ“ on a game's count: back where it was come from; opened from outside, its start again in place", async () => {
   const from = location.pathname;
   router.go("/play/history");
   router.hold(); // come to by a tap: nothing held

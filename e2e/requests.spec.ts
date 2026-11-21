@@ -73,7 +73,7 @@ test("each screen asks the server for each thing once a visit, and a deploy load
     await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   });
   await once(page, "a chapter, the count backed out of", async () => {
-    await page.getByRole("button", { name: "Откажи" }).click();
+    await page.getByRole("button", { name: "Отказ", exact: true }).click();
     await expect(page).toHaveURL(/\/almanac\/history$/);
   });
   await once(page, "a topic, loaded", () => page.goto("/play/music"));

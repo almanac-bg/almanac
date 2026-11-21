@@ -6,7 +6,7 @@ import { errorText, passing } from "./lib/api.ts";
 import { hourInBulgaria } from "./lib/day.ts";
 import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
 import { type Scheme, scheme, setScheme } from "./lib/prefs.ts";
-import { formatNumber, formatValue, hyphenate, stakeWords } from "./lib/words.ts";
+import { formatNumber, formatValue, hyphenate, keepNumbers, stakeWords } from "./lib/words.ts";
 import { glyphBox, rankName, rankNames, sealParts } from "./seal.ts";
 import { topics } from "./state.ts";
 
@@ -89,7 +89,7 @@ export function fact(text?: string, day?: string): Child {
       class: day ? (text ? "fact dated" : "fact dated alone") : "fact",
       "aria-label": text ? "Знаеше ли?" : "На този ден",
     },
-    day ? h("div", { class: "fact-day" }, h("h2", null, "На този ден"), h("p", null, day)) : null,
+    day ? h("div", { class: "fact-day" }, h("h2", null, "На този ден"), h("p", null, textWords(day))) : null,
     text ? [h("h2", null, "Знаеше ли?"), h("p", null, textWords(text))] : null,
   );
 }
@@ -594,7 +594,9 @@ const wholeWord = (word: string): Child => {
  * question's): it breaks between its words, a word only where it's wider than its line, at its syllables, with a
  * hyphen, never at any letter (large text at 320 px). */
 export function textWords(text: string): Child {
-  return text.split(/(\s+)/).map((part, i) => (i % 2 ? part : wholeWord(part)));
+  return keepNumbers(text)
+    .split(/(\s+)/)
+    .map((part, i) => (i % 2 ? part : wholeWord(part)));
 }
 
 /** A player's name as a line holds it (DESIGN.md, Names): it breaks between its words first, each word held whole,

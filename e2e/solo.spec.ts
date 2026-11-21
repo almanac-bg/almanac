@@ -182,7 +182,7 @@ test("a topic's count can be backed out of, or cut short", async ({ page }) => {
   await page.goto("/almanac/history");
   await page.getByRole("link", { name: "Игра на главата" }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
-  await page.getByRole("button", { name: "Откажи" }).click();
+  await page.getByRole("button", { name: "Отказ", exact: true }).click();
   await expect(page).toHaveURL(/\/almanac\/history$/);
   // Nothing started behind it.
   await page.waitForTimeout(3500);
@@ -203,7 +203,7 @@ test("the day's count can be backed out of, and nothing starts; let run, it star
   const day = page.locator(".issue");
   await page.getByRole("button", { name: "Започни", exact: true }).click();
   await expect(page.locator(".get-ready .kicker")).toHaveText("Днешният брой");
-  await page.getByRole("button", { name: "Откажи" }).click();
+  await page.getByRole("button", { name: "Отказ", exact: true }).click();
   await expect(day).toContainText("Десет въпроса за днес");
   // Nothing started behind it: the day is still unplayed, after a reload too.
   await page.waitForTimeout(3500);
