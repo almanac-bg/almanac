@@ -4,7 +4,7 @@
 import { append, type Child, effect, h, listen, onCleanup, type Signal, signal } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { play } from "../lib/sound.ts";
-import { hyphenate, withWord } from "../lib/words.ts";
+import { hyphenate, listWords, withWord } from "../lib/words.ts";
 import { formatNumber, formatValue, type VerdictKind } from "../ui.ts";
 import { percent, rare, withOwn } from "./numbers.ts";
 import { optionSizes, overSizes } from "./sizes.ts";
@@ -49,7 +49,7 @@ export interface Asked {
 /** A cell's words (a pair, a thing to sort, a group): each that may break (hyphenate) held whole in a `.word`, so that
  * it goes to the next line whole where it fits there („Ангел / Каралийчев“, not „Ангел Каралий-/чев“), and breaks, at
  * its syllables, only where it's wider than the cell itself. */
-function wholeWords(text: string): Child {
+export function wholeWords(text: string): Child {
   return hyphenate(text)
     .split(/(\S*­\S*)/)
     .map((part, i) => (i % 2 ? h("span", { class: "word" }, part) : part));
@@ -96,7 +96,7 @@ function crowdOnAll(buttons: HTMLElement[], crowd: Crowd | undefined, mine: numb
     const x = c?.picks?.[i];
     if (!c || x === undefined) return [];
     const share = h("span", { class: "value crowd-share unseen" }, percent(x));
-    b.append(share);
+    (b.querySelector(".pic-frame") ?? b).append(share);
     return [{ b, share, x }];
   });
   return () => {
@@ -205,7 +205,8 @@ export function picture(view: View, fit = false): Child {
     // answering part is set at the screen's foot (a run on a phone), the room between them is the picture's too.
     const size = () => {
       const below = img.nextElementSibling;
-      if (!img.isConnected || !below) return;
+      // Answered, the answer sizes it (run.ts, room).
+      if (!img.isConnected || !below || img.closest(".answered")) return;
       const box = img.getBoundingClientRect();
       const under = below.getBoundingClientRect();
       const gap = Number.parseFloat(getComputedStyle(img.parentElement ?? img).rowGap) || 0;
@@ -264,6 +265,9 @@ function answerKeys(buttons: HTMLElement[], locked: Signal<boolean>): void {
 /** The ✓ or ✕ on a revealed answer (its colour and words say the same). */
 const sign = () => h("span", { class: "sign", "aria-hidden": "true" });
 
+/** „ти“ on the player's own wrong answer, after its words (held to the last of them). */
+const yours = (): [string, HTMLElement] => ["\u00a0", h("span", { class: "yours" }, "ти")];
+
 function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<boolean>, display: boolean): Asked {
   const pictures = view.pictures;
   const names = pictures?.map(() => h("span", { class: "pic-name" })) ?? [];
@@ -285,27 +289,29 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
       typeof option === "string"
         ? [
             h("span", { class: "letter", "aria-hidden": "true" }, letters[i]),
-            h("span", { class: "option-words" }, option),
+            h("span", { class: "option-words" }, wholeWords(option)),
             display ? null : keyHint(String(i + 1)),
           ]
         : [
-            h("img", {
-              class: "pic-option-img",
-              src: option.src,
-              srcset: option.srcset,
-              sizes: optionSizes(option),
-              width: option.w,
-              height: option.h,
-              alt: "",
-              decoding: "async",
-            }),
+            // The picture, its letter in one corner (its key in another, on a computer), its ✓ or ✕ in the other
+            // once answered, and how many chose it at its foot; its name under it, the card's whole width.
             h(
               "span",
-              { class: "pic-foot" },
+              { class: "pic-frame" },
+              h("img", {
+                class: "pic-option-img",
+                src: option.src,
+                srcset: option.srcset,
+                sizes: optionSizes(option),
+                width: option.w,
+                height: option.h,
+                alt: "",
+                decoding: "async",
+              }),
               h("span", { class: "letter pic-letter", "aria-hidden": "true" }, letters[i]),
-              names[i],
               display ? null : keyHint(String(i + 1)),
             ),
+            names[i],
           ],
     ),
   );
@@ -323,10 +329,12 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
         if (i === mine) b.classList.add("mine");
         const name = reveal.names?.[i];
         if (name) {
-          names[i]?.replaceChildren(name);
+          const cell = names[i];
+          if (cell) append(cell, [wholeWords(name)]);
           b.setAttribute("aria-label", `${letters[i]}: ${name}`);
         }
-        if (how !== "dim") (b.querySelector(".pic-foot") ?? b).append(sign());
+        if (how === "wrong") (names[i] ?? b.querySelector(".option-words"))?.append(...yours());
+        if (how !== "dim") (b.querySelector(".pic-frame") ?? b).append(sign());
       };
       const own = buttons[mine];
       if (own) mark(own, mine);
@@ -615,7 +623,7 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
         "aria-describedby": how,
       },
       h("span", { class: "letter", "aria-hidden": "true" }),
-      h("span", null, text),
+      h("span", null, wholeWords(text)),
       display ? null : h("span", { class: "grip", "aria-hidden": "true" }),
     ),
   );
@@ -806,16 +814,16 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
       list.replaceChildren(
         ...(reveal.order ?? []).map((item, place) => {
           const at = mine ? mine.indexOf(item) : -1;
-          const how = !mine ? "" : at === place ? " right" : " missed";
+          const how = !mine ? "" : at === place ? " right" : " amiss";
           return h(
             "li",
             { class: `option${how}` },
             h("span", { class: "letter" }, String(place + 1)),
             h(
               "span",
-              null,
-              view.items[item] ?? "",
-              how === " missed" && at >= 0
+              { class: "row-words" },
+              wholeWords(view.items[item] ?? ""),
+              how === " amiss" && at >= 0
                 ? h("small", { class: "match-gave" }, `при теб: ${ordinal(at + 1, "n")}`)
                 : null,
             ),
@@ -850,7 +858,7 @@ function truefalse(
         "aria-disabled": locked,
         onclick: () => pick(truth),
       },
-      h("span", null, truth ? "Вярно" : "Невярно"),
+      h("span", { class: "tf-line" }, h("span", { class: "tf-word" }, truth ? "Вярно" : "Невярно")),
       display ? null : keyHint(truth ? "1" : "2"),
     );
   const yes = button(true);
@@ -864,13 +872,18 @@ function truefalse(
   return {
     node: h("div", { class: "tf-options" }, yes, no),
     pending: () => null,
-    // No ✓ or ✕ here: on „Вярно“ and „Невярно“ they read as the answers' own words. The verdict under them says it.
+    // As every answer is marked: the right one's ✓ (solid if it was the player's), the player's wrong one's ✕ and
+    // „ти“, beside the word.
     reveal(reveal, given, at = atOnce) {
       const mine = given && "truth" in given ? given.truth : null;
       const mark = (b: HTMLElement, truth: boolean) => {
         b.classList.remove("picked");
-        b.classList.add(truth === reveal.truth ? "right" : truth === mine ? "wrong" : "dim");
+        const how = truth === reveal.truth ? "right" : truth === mine ? "wrong" : "dim";
+        b.classList.add(how);
         if (truth === mine) b.classList.add("mine");
+        const line = b.querySelector(".tf-line");
+        if (how !== "dim") line?.append(sign());
+        if (how === "wrong") line?.after(h("span", { class: "yours" }, "ти"));
       };
       if (mine !== null) mark(mine ? yes : no, mine);
       let crowd = () => {};
@@ -888,6 +901,7 @@ function truefalse(
  * joined one tapped again comes apart. */
 function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<boolean>, display: boolean): Asked {
   const pairs = signal<number[]>(view.left.map(() => -1)); // for each left, its right (-1: none yet)
+  const stack = h("div", { class: "stack" });
   const chosen = signal<{ side: "left" | "right"; i: number } | null>(null);
   const said = h("p", { class: "sr", "aria-live": "polite" });
   const leftOf = (j: number) => pairs().indexOf(j);
@@ -907,6 +921,7 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
     const joined = side === "left" ? pairs.peek()[i] !== -1 : pairs.peek().includes(i);
     if (joined) pairs.update((p) => p.map((r, k) => (side === "left" ? (k === i ? -1 : r) : r === i ? -1 : r)));
     chosen.set({ side, i });
+    stack.classList.add("touched");
     play("tap");
   };
 
@@ -1004,10 +1019,12 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
   );
   const result = h("ol", { class: "options match-result", hidden: true });
   const decoy = h("p", { class: "hint match-decoy", hidden: true });
+  append(stack, [hint, grid, said, display ? null : done, result, decoy]);
   return {
-    node: h("div", { class: "stack" }, hint, grid, said, display ? null : done, result, decoy),
+    node: stack,
     pending: () => (pairs.peek().some((j) => j !== -1) ? { pairs: [...pairs.peek()] } : null),
     reveal(reveal, given) {
+      stack.classList.remove("touched");
       hint.replaceChildren("Верните двойки:");
       hint.hidden = false;
       grid.hidden = true;
@@ -1022,13 +1039,13 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
           const gave = mine[i] ?? -1;
           return h(
             "li",
-            { class: ok ? "option right" : "option missed" },
+            { class: ok ? "option right" : "option amiss" },
             h(
               "span",
               { class: "match-pair" },
-              h("strong", null, left),
+              h("strong", null, wholeWords(left)),
               " — ",
-              view.right[j] ?? "",
+              wholeWords(view.right[j] ?? ""),
               ok
                 ? null
                 : h("small", { class: "match-gave" }, gave >= 0 ? `при теб: ${view.right[gave]}` : "без двойка"),
@@ -1094,13 +1111,10 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
         "aria-label": `Към „${view.groups[side]}“`,
         onclick: () => send(side),
       },
-      h(
-        "span",
-        { class: "split-label" },
-        side === 0 ? h("span", { class: "split-arrow", "aria-hidden": "true" }, "← ") : null,
-        wholeWords(view.groups[side] ?? ""),
-        side === 1 ? h("span", { class: "split-arrow", "aria-hidden": "true" }, " →") : null,
-      ),
+      // The arrow beside the group's name, on its side, never wrapped away from it.
+      side === 0 ? h("span", { class: "split-arrow", "aria-hidden": "true" }, "←") : null,
+      h("span", { class: "split-label" }, wholeWords(view.groups[side] ?? "")),
+      side === 1 ? h("span", { class: "split-arrow", "aria-hidden": "true" }, "→") : null,
     );
   const undo = h("button", { class: "link split-back", type: "button", onclick: back }, "Върни последното");
   // Lays the deck: the next thing on top, the one after it under it.
@@ -1218,13 +1232,13 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
           const ok = !given || gave === group; // nothing given: the right groups alone, as for pairs
           return h(
             "li",
-            { class: ok ? "option right" : "option missed" },
+            { class: ok ? "option right" : "option amiss" },
             h(
               "span",
               { class: "split-pair" },
-              h("strong", null, text),
+              h("strong", null, wholeWords(text)),
               " — ",
-              view.groups[group] ?? "",
+              wholeWords(view.groups[group] ?? ""),
               ok
                 ? null
                 : h("small", { class: "match-gave" }, gave >= 0 ? `при теб: ${view.groups[gave]}` : "без отговор"),
@@ -1258,16 +1272,24 @@ function clues(
     h("li", { class: "clue" }, h("span", { class: "clue-worth" }, String(i + 1)), h("span", { class: "clue-text" })),
   );
   const list = h("ol", { class: "clues" }, rows);
+  // The clues still to come, in one line under those out: „Още 2 подсказки: след 10 с и 20 с“.
+  const coming = h("p", { class: "clues-next" });
   const paint = (all?: string[]) => {
     const out = all ?? now.clues;
     const elapsed = performance.now() - born;
+    const when: string[] = [];
     rows.forEach((row, i) => {
       const text = out[i];
-      row.className = `clue${text === undefined ? " locked" : !all && i === out.length - 1 ? " now" : all ? "" : " past"}`;
+      row.hidden = text === undefined;
+      row.className = `clue${!all && i === out.length - 1 ? " now" : all ? "" : " past"}`;
+      (row.lastChild as HTMLElement).textContent = text ?? "";
+      if (text !== undefined) return;
       const left = Math.ceil(((now.stepsMs[i] ?? 0) - elapsed) / 1000);
-      (row.lastChild as HTMLElement).textContent =
-        text ?? (left > 0 ? `Подсказка ${i + 1} идва след ${left}\u00a0с` : `Подсказка ${i + 1} идва след миг…`);
+      when.push(left > 0 ? `${left}\u00a0с` : "миг");
     });
+    const n = when.length;
+    coming.hidden = n === 0;
+    coming.textContent = `Още ${n === 1 ? "1 подсказка" : `${n} подсказки`}: след ${listWords(when)}`;
   };
   paint();
   // Shown only (display), the clues still come: it's never locked out of them by an answer of its own.
@@ -1291,13 +1313,13 @@ function clues(
         },
       },
       h("span", { class: "letter", "aria-hidden": "true" }, letters[i]),
-      h("span", { class: "option-words" }, text),
+      h("span", { class: "option-words" }, wholeWords(text)),
       display ? null : keyHint(String(i + 1)),
     ),
   );
   if (!display) answerKeys(buttons, locked);
   return {
-    node: h("div", { class: "stack" }, list, said, h("div", { class: "options choices" }, buttons)),
+    node: h("div", { class: "stack" }, list, coming, said, h("div", { class: "options choices" }, buttons)),
     pending: () => null,
     update(next) {
       if (next.type !== "clues" || next.clues.length <= now.clues.length || !open()) return;
@@ -1316,6 +1338,7 @@ function clues(
         const how = i === reveal.pick ? "right" : i === mine ? "wrong" : "dim";
         b.classList.add(how);
         if (i === mine) b.classList.add("mine");
+        if (how === "wrong") b.querySelector(".option-words")?.append(...yours());
         if (how !== "dim") b.append(sign());
       };
       const own = buttons[mine];

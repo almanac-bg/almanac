@@ -263,23 +263,33 @@ under it.
 - **The clock** (`.timer`): a bar under the pips, the seconds at its end; ink and heavier for the last ten seconds;
   gone once answered. Its sound: silent until ten seconds are left.
 - **The sheet** (`.q-leaf`, no corner): the chip (and on the day's last question „Най-трудният: число“ beside it), then the
-  question. Under 620px of height the chip is the glyph alone. A picture over the question takes at most 30% of the
-  height; a choice of pictures is two by two.
+  question. Under 620px of height the sheet is the question with the chapter's glyph beside it (on the day's last, the
+  chip's glyph alone beside its tag) and an answer is 52px. A picture over the question takes at most 30% of the
+  height; on a laptop, once answered, it gives the panel under it the room to show whole. A choice of pictures is two
+  by two, the letter and (answered) the ✓ or ✕ in the picture's corners, its name under it across the card.
+- **A cell's words** (`wholeWords()`): a long word breaks only at its syllables (soft hyphens, `lib/words.ts`) and only
+  where it's wider than its cell; a punctuation mark stays with its word. Never `break-all`.
 - **Answers** (`.option`): white, a 2px `--line-2` frame, the letter in a box (А–Г, keys 1–4 on a computer).
 - **Answered:** the player's own right answer is ink — a dark fill with white text by day, a light fill with dark
   text by night — and a solid ✓; the right one they didn't give has a 3px ink outline and a ✓ in a ring; their wrong
   one is hollow and dashed with a ✕ in a dashed ring and „ти“. The rest shrink to a 36px line of their own words, so
   that the player's row and the right row are right under the question; the page doesn't move, so the question stays
   whole under the head (only if the panel at its least would cover the right row). The crowd's shares fill in behind
-  each answer.
-- **Each kind:** true-or-not, two side by side; order, rows of 48px picked up and put down or dragged by their grip,
-  answered as the right order — a row in place with a solid ✓, one out of place hollow and dashed with „ти: 3-ти“;
-  match, two columns, the left lettered А–Г and a right one joined taking its left one's letter (never colour);
-  split, a card sent left or right; clues, coming out as their time does; number, typed on the game's own pad (keys
+  each answer. A row's ✓ or ✕ (and an order's value) stays at its end, on a line with its words, never wrapped.
+- **Each kind:** true-or-not, two side by side, answered with the ✓ or ✕ beside the word and „ти“ under the player's
+  wrong one; order, rows of 48px picked up and put down or dragged by their grip, answered as the right order — a row
+  in place with a solid ✓, one out of place hollow and dashed with „при теб: 3-то“ under its words, its value and ✕
+  at its end; match, two columns from their tops, the left lettered А–Г and a right one joined taking its left one's
+  letter (never colour), each letter on its cell's edge where the line joins it (with few words to a line, one column
+  over the other, the letters beside the words, no lines); split, a card sent left or right, each group's arrow beside
+  its name; clues, coming out as their time does, those still to come in one line („Още 2 подсказки: след 10 с и
+  20 с“); number, typed on the game's own pad (keys
   44px at the least), answered as what was said, the answer, and both on a scale (the answer a filled square; „ти, вярно“ a filled disc,
   „ти, близо“ half filled, „ти“ hollow).
 - **The answer** (`.after`): docked at a phone's foot, a surface over the answers, at most what leaves the player's
-  row and the right one in sight; a longer fact scrolls in it, fading out above „Напред“. In it, the verdict, a choice
+  row and the right one in sight, and at least the fact's first two lines; a longer fact scrolls in it, fading out
+  above „Напред“, which stands on a foot of the panel's colour down to its edge (`.after-foot`): nothing shows under
+  it. In it, the verdict, a choice
   missed its right answer in words („Вярно е: Съединението.“), how many got it, „Записано с мастило · глава История“
   for ink, „Знаеше ли?“ and the fact, and „Напред“ (the one action).
 - **Verdicts** are a fixed set, never an answer's own word: „Точно!“, „Вярно!“ (a number near enough to count, not
@@ -289,9 +299,11 @@ under it.
 
 ## Fit and large text
 
-- **Fit** (`e2e/fit.spec.ts`, at 320 × 568, 375 × 600, 390 × 664 and 1366 × 900, by day and by night): nothing
-  scrolls sideways; Днес shows „Започни“ whole and high; a question shows every answer or its pad and action; once
-  answered, the player's row, the right one and „Напред“ are in sight.
+- **Fit** (`e2e/fit.spec.ts`, at 320 × 568, 375 × 600, 390 × 664 and 1366 × 900, by day and by night; every kind of
+  question at its longest in the sample bank, answered right, wrong and close: `e2e/kinds.ts`): nothing scrolls
+  sideways; Днес shows „Започни“ whole and high; a question shows every answer or its pad and its action whole,
+  nothing under the action; once answered, the player's row, the right one and „Напред“ are in sight, nothing under
+  „Напред“; a row's sign never on a line of its own, nor a punctuation mark.
 - **Large text:** the text grows with the browser's setting and with „Размер на текста“ (up to twice). Everything is
   in rem from `<html>`; display type grows at half the rate (half px, half rem) and a big numeral is capped by the
   screen's width or height. One-column grids are `minmax(0, 1fr)`; a row of things wraps. `lib/prefs.ts` puts `tight`

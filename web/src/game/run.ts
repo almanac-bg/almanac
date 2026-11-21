@@ -31,7 +31,7 @@ import {
   verdictSays,
 } from "../ui.ts";
 import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
-import { answered, answerWords, beats, crowdLine, picture, picturesIn, type Stage } from "./questions.ts";
+import { answered, answerWords, beats, crowdLine, picture, picturesIn, type Stage, wholeWords } from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Reveal, Shown, State, TheirMark, View } from "./types.ts";
 
 /** Where the run whose question this tab showed last is kept (this tab's, for as long as it's open). */
@@ -199,7 +199,7 @@ function givenUp(g: GivenUp, total: number, on: () => void): Child {
     { class: "question given-up" },
     h("p", { class: "kicker" }, `Въпрос ${g.n + 1} от ${total} · ${topicName(g.category)}`),
     h("p", { class: "muted" }, "Излезе, без да отговориш. Ето верния отговор."),
-    h("h1", { class: "ask" }, g.view.text),
+    h("h1", { class: "ask" }, wholeWords(g.view.text)),
     picture(g.view),
     answered(g.view, g.reveal, null),
     fact(g.reveal.fact, g.reveal.day),
@@ -578,8 +578,27 @@ function question(
   };
   document.addEventListener("visibilitychange", moveOn);
   // The room the answer's panel takes at the screen's foot on a phone (app.css), kept under the question, so that
-  // what's above it can always be seen.
-  const room = () => page.style.setProperty("--after", `${after.offsetHeight}px`);
+  // what's above it can always be seen. Docked there, the least it's ever drawn at shows the fact's first two lines
+  // over the fade above „Напред“ (--least; a longer fact scrolls in it). On a laptop, under the question's picture,
+  // the picture gives it the room to show whole under it.
+  const room = () => {
+    page.style.setProperty("--after", `${after.offsetHeight}px`);
+    const place = getComputedStyle(after).position;
+    const fact = after.querySelector<HTMLElement>(".fact p:last-child");
+    const foot = after.querySelector<HTMLElement>(".after-foot");
+    if (place === "fixed" && fact && foot && fact.offsetParent === after) {
+      const line = Number.parseFloat(getComputedStyle(fact).lineHeight) || 24;
+      page.style.setProperty("--least", `${Math.ceil(fact.offsetTop + 2 * line + fade + foot.offsetHeight)}px`);
+    }
+    const pic = page.querySelector<HTMLElement>(":scope > .picture");
+    if (pic && place === "sticky" && !after.hidden) {
+      // Where it's laid out on the page, not where it's drawn as the answer comes into place (settle moves it).
+      let top = 0;
+      for (let el: HTMLElement | null = pic; el; el = el.offsetParent as HTMLElement | null) top += el.offsetTop;
+      const gap = Number.parseFloat(getComputedStyle(page).rowGap) || 0;
+      pic.style.setProperty("--fit", `${Math.max(80, Math.floor(innerHeight - top - after.offsetHeight - 2 * gap))}px`);
+    }
+  };
   const sized = new ResizeObserver(room);
   sized.observe(after);
   onCleanup(() => {
@@ -678,17 +697,22 @@ function question(
         fact(res.reveal.fact, res.reveal.day),
         res.reveal.credit ? credit(res.reveal.credit) : null,
         upNext(lasts, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} идва след малко…`, true),
+        // „Напред“ on a foot of its own, opaque to the panel's edge: what scrolls in the panel never shows under it.
         h(
-          "button",
-          {
-            class: "btn up-next-go",
-            type: "button",
-            onclick: () => {
-              clearTimeout(advance);
-              moveOn();
+          "div",
+          { class: "after-foot" },
+          h(
+            "button",
+            {
+              class: "btn up-next-go",
+              type: "button",
+              onclick: () => {
+                clearTimeout(advance);
+                moveOn();
+              },
             },
-          },
-          res.state.done ? "Към резултата" : "Напред",
+            res.state.done ? "Към резултата" : "Напред",
+          ),
         ),
       ].map(waiting);
       // The verdict is said once, in plain words, through the run's live region (not its own, made already full, nor
@@ -823,6 +847,9 @@ function rightSaid(view: View, reveal: Reveal, kind: VerdictKind): Child {
 
 /** How long what the player chose stays chosen before the answer shows, however quick the line. */
 const holdMs = 280;
+
+/** How far over „Напред“'s foot what scrolls in the answer's panel fades out, in px (app.css, .after-foot). */
+const fade = 32;
 
 /** A part of the answer's panel, in its place but not shown yet; and shown. */
 function waiting<T extends Child>(part: T): T {
