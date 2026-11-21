@@ -17,7 +17,8 @@ import (
 )
 
 // The days ahead are drawn as far as each place has a question that fits it just so, never a question twice; none of
-// their questions reaches another game; and a day ahead whose question leaves the bank is drawn again.
+// their questions reaches another game; and a day ahead whose question leaves the bank has it replaced in its place,
+// the rest of the day kept: what Днес said of tomorrow („Трудният въпрос е от История“) stays true.
 func TestDaysAhead(t *testing.T) {
 	w := setup(t)
 	w.use(biggerSample(t, 20))
@@ -64,26 +65,57 @@ func TestDaysAhead(t *testing.T) {
 			}
 		}
 	}
-	// A question of a day ahead leaves the bank: that day is drawn again with the next bank, the others stay.
+	// Two questions of tomorrow can't be dealt on it, its first and a hard one (due for review by then: as a question
+	// retired, but the bank's Bulgarian questions stay as they were, and so the days after tomorrow): each is replaced
+	// in its own place, by another of its topic and kind, the rest of the day as it was; the days after stay too.
 	var ahead string
 	for day := range days {
 		if day > today && (ahead == "" || day < ahead) {
 			ahead = day
 		}
 	}
-	gone := days[ahead][0].ID
+	was := days[ahead]
 	b2, _ := bank.Load(w.b.Dir)
-	q, _ := b2.Get(gone)
-	q.Extra().Retired = true
+	gone := map[int]bool{0: true, Length - 2: true}
+	for i := range gone {
+		q, _ := b2.Get(was[i].ID)
+		q.Extra().ReviewBy = ahead
+	}
 	w.swap(b2)
 	if err := w.g.EnsureDays(ctx); err != nil {
 		t.Fatal(err)
 	}
 	var s string
-	if err := w.db.Read.QueryRow(`SELECT questions FROM days WHERE day = ?`, ahead).Scan(&s); err == nil {
-		for _, p := range mustPicks(t, s) {
-			if p.ID == gone {
-				t.Fatalf("%s kept %s, which left the bank", ahead, gone)
+	if err := w.db.Read.QueryRow(`SELECT questions FROM days WHERE day = ?`, ahead).Scan(&s); err != nil {
+		t.Fatal(err)
+	}
+	now := mustPicks(t, s)
+	if len(now) != Length {
+		t.Fatalf("%s has %d questions", ahead, len(now))
+	}
+	for i, p := range now {
+		if !gone[i] {
+			if p != was[i] {
+				t.Fatalf("%s's question %d changed: %v, was %v", ahead, i, p, was[i])
+			}
+			continue
+		}
+		if seen[p.ID] {
+			t.Fatalf("%s's question %d is %s, another day's (or the one gone)", ahead, i, p.ID)
+		}
+		q, _ := b2.Get(p.ID)
+		o, _ := b2.Get(was[i].ID)
+		if q.Extra().Retired || overdue(q, ahead) || q.Base().Category != o.Base().Category || q.Base().Type != o.Base().Type ||
+			q.Base().Difficulty != o.Base().Difficulty || bank.HasPictures(q) != bank.HasPictures(o) ||
+			o.Extra().BG && !q.Extra().BG || q.Base().Type == "number" && !b2.Estimate(q) {
+			t.Fatalf("%s's question %d: %s in the place of %s", ahead, i, p.ID, was[i].ID)
+		}
+	}
+	for day, picks := range days {
+		if day > ahead {
+			if err := w.db.Read.QueryRow(`SELECT questions FROM days WHERE day = ?`, day).Scan(&s); err != nil ||
+				!slices.Equal(mustPicks(t, s), picks) {
+				t.Fatalf("%s changed with tomorrow (%v)", day, err)
 			}
 		}
 	}

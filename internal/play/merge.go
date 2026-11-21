@@ -141,7 +141,7 @@ func (g *Game) Merge(tx *sql.Tx, from, to int64) error {
 			return err
 		}
 	}
-	return rewriteBook(context.Background(), tx, g.Bank(), to, g.Today())
+	return rewriteBook(context.Background(), tx, g.Bank(), to, g.Now())
 }
 
 // GoneName is how a player who's gone (deleted, or a guest cleared) shows in others' history.

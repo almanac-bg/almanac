@@ -9,6 +9,8 @@ export interface Stats {
   avatar: string;
   /** The seal they wear (play.Seal): a chapter's rank. */
   seal?: { chapter: string; level: number; name: string; quarter: number };
+  /** The worn seal's chapter's ink, as the book has it (its Алманах card's number). */
+  ink?: number;
   streak: number;
   /** The longest streak the player has had. */
   best: number;

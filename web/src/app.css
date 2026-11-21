@@ -3013,7 +3013,7 @@
     font-weight: 900;
   }
 
-  /* Where a right answer's fact went: „Записано с мастило · глава История“, on a well, the nib before it. */
+  /* Where a right answer's fact went: „Записано с мастило · глава „История““, on a well, the nib before it. */
   .filed {
     display: flex;
     align-items: center;

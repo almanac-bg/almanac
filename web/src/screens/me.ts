@@ -113,7 +113,7 @@ export function me(kit: Kit) {
                 ? null
                 : [keepGame(() => go("/me", true)), haveProfile(() => go("/me", true), "Имаш профил? Влез", signingIn)],
             () => longest(data()),
-            () => wornLadder(data(), ranks()),
+            () => wornLadder(data()),
             () =>
               user()?.tag
                 ? h(
@@ -221,12 +221,12 @@ function longest(s: Stats | null): Child {
   ];
 }
 
-/** The seal worn, on its ladder: „Печатът на География“, its ink, and the ranks from Бележка to Летопис, the one
- * reached ringed. Nothing before a first seal. */
-function wornLadder(s: Stats | null, ranks: Rank[] | null): Child {
+/** The seal worn, on its ladder: „Печатът на География“, its ink (as the book has it, the number its Алманах card
+ * shows), and the ranks from Бележка to Летопис, the one reached ringed. Nothing before a first seal. */
+function wornLadder(s: Stats | null): Child {
   const w = s?.seal;
   if (!w?.chapter || w.level < 1) return null;
-  const ink = ranks?.find((r) => r.chapter === w.chapter)?.ink;
+  const ink = s?.ink;
   return h(
     "section",
     { class: "sect me-ladder" },

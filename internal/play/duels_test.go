@@ -500,6 +500,10 @@ func TestRecordingByLevel(t *testing.T) {
 			&kept); err != nil {
 			t.Fatal(err)
 		}
+		// The level asked for is kept apart, met or not: another duel from this one's end asks for it again.
+		if v, err := w.g.duelsOf(ctx, gal, id); err != nil || len(v) != 1 || v[0].Asked != level || v[0].Level != kept.String {
+			t.Fatalf("the duel asked %q: %+v %v", level, v, err)
+		}
 		if _, err := w.db.Write.Exec(`DELETE FROM duels WHERE id = ?`, id); err != nil { // chosen again, fresh
 			t.Fatal(err)
 		}

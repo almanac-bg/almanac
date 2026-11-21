@@ -331,6 +331,9 @@ flat shapes with depth, lit from the top left, no outlines, painted from one ton
 - **The nouns are a closed list** (DECISIONS.md): Брой, близо, серия, Алманах (глави, факти, мастило), печат, игра на
   главата (Микс, България), приятели, класация, дуел (запис), споделяне, профил, напомняне. A rank's six names are the
   seal's states; „звание“ is not a word the game uses.
+- **A chapter's name is in quotes only right after the word „глава“:** „в глава „История““, „Носиш печата на глава
+  „Наука““. Standing alone it's bare: „Трудният въпрос е от История“, „Печат: История“, „Печатът на История“
+  (`language.test.ts`).
 - **Copy promises nothing the game doesn't do:** ink is „вярно отговорени“ in the issue, never „знаеш“; a counter at
   zero is hidden; an ended streak's number is never named.
 - **Numbers the Bulgarian way** (`formatNumber()`): a space between thousands from 10 000; a decimal comma; „38 %“

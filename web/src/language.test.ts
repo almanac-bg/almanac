@@ -80,3 +80,24 @@ test("a thing is called by its one name", () => {
   }
   assert.deepEqual(found, []);
 });
+
+/**
+ * A chapter's name is in quotes only right after the word „глава“ („в глава „История““); standing alone it's bare
+ * („Трудният въпрос е от История“, „Печат: История“): web/DESIGN.md, Copy.
+ */
+test("a chapter's name is quoted after „глава“ and only there", () => {
+  const name = String.raw`\$\{(?:chapterName|nameOf|topicName)\(`;
+  const alone = new RegExp(String.raw`(?<!глава )„${name}`, "u");
+  const bare = new RegExp(String.raw`глава ${name}`, "u");
+  const found: string[] = [];
+  for (const path of files("web/src")) {
+    if (path.endsWith(".test.ts")) continue;
+    readFileSync(join(root, path), "utf8")
+      .split("\n")
+      .forEach((line, i) => {
+        if (alone.test(line)) found.push(`${path}:${i + 1}: a chapter's name standing alone is bare`);
+        if (bare.test(line)) found.push(`${path}:${i + 1}: a chapter's name after „глава“ is in quotes`);
+      });
+  }
+  assert.deepEqual(found, []);
+});

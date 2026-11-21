@@ -13,7 +13,7 @@ import { duelResult } from "../kit.ts";
 import { type ApiError, api, errorText } from "../lib/api.ts";
 import { type Child, effect, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { backOut, byTap, go, hold, title } from "../lib/router.ts";
-import { withWord } from "../lib/words.ts";
+import { leftWords, withWord } from "../lib/words.ts";
 import { player, topics, user } from "../state.ts";
 import { back, failure, formatNumber, type Look, pageArt, who } from "../ui.ts";
 import { missing } from "./missing.ts";
@@ -56,6 +56,8 @@ export interface DuelView {
   recorded?: boolean;
   /** Against a recording: as it was chosen, as strong as the player („равен“) or stronger („по-силен“). */
   level?: Level;
+  /** Against a recording, the level asked for (play.DuelView.Asked), met or not: another one asks for it again. */
+  asked?: Level;
   /** Against a recording of one topic's game: the topic. */
   topic?: string;
   /** The player played first (sent it). */
@@ -109,19 +111,6 @@ export async function startDuel(to: To): Promise<DuelView | null> {
   await player();
   if ("friend" in to && !(await nameFirst())) return null;
   return shown((await api<{ duel: DuelView }>("POST", "/api/duels", to)).duel);
-}
-
-/** How long an open duel has left, in words, rounded up (a duel just sent has „още 7 дни“, not six and some hours):
- * „още 2 дни“, „още 5 часа“, „под час“. */
-export function leftWords(until: number, now = Date.now()): string {
-  const left = until - now;
-  if (left < 3_600_000) return "остава под час";
-  const hours = Math.ceil(left / 3_600_000);
-  if (hours > 24) {
-    const days = Math.ceil(hours / 24);
-    return `още ${days} ${days === 1 ? "ден" : "дни"}`;
-  }
-  return hours === 1 ? "още 1 час" : `още ${hours} часа`;
 }
 
 /** What broke a tie on even right answers (DuelView.tieBy), as a duel's row and its result say it: „равен брой верни ·
@@ -494,7 +483,7 @@ export function duelOne(params: string[]) {
       d.friend && d.them
         ? again("Реванш", { friend: d.them })
         : d.recorded
-          ? again("Още един дуел срещу запис", { recording: true, level: d.level ?? "even" })
+          ? again("Още един дуел срещу запис", { recording: true, level: d.asked ?? d.level ?? "even" })
           : null;
     screen.show(() =>
       duelResult(

@@ -235,7 +235,8 @@ func TestRecordingsWords(t *testing.T) {
 }
 
 // A duel against a recording keeps the level it was chosen at, „равен“ or „по-силен“ (anything else is „равен“), and
-// says it (DuelView.Level): „По-силен запис · Краси“. A friend's duel has none.
+// says it (DuelView.Level): „По-силен запис · Краси“; played to its end, another follows, a new one. A friend's duel
+// has none.
 func TestRecordingLevel(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -262,7 +263,12 @@ func TestRecordingLevel(t *testing.T) {
 	}
 	w.play(two, s.ID, append(repeat(w.right, even), repeat(w.wrong, Length-even)...)...)
 	w.wait(time.Minute)
-	for _, c := range []struct{ chosen, level string }{{Stronger, Stronger}, {Even, Even}, {"", Even}, {"hard", Even}} {
+	for i, c := range []struct{ chosen, level string }{{Stronger, Stronger}, {Even, Even}, {"", Even}, {"hard", Even}} {
+		// Each chosen by a new player as Ana was (no answers yet: her level); Ana herself the first.
+		ana := ana
+		if i > 0 {
+			ana = w.user()
+		}
 		id, err := w.g.DuelRecording(ctx, ana, c.chosen)
 		if err != nil {
 			t.Fatal(err)
@@ -279,12 +285,21 @@ func TestRecordingLevel(t *testing.T) {
 		if err != nil || len(list.Yours) == 0 || list.Yours[0].Level != c.level {
 			t.Fatalf("chosen %q, in the list: %+v %v", c.chosen, list.Yours, err)
 		}
-		// Gone, with Ana's side, so the next is chosen afresh: a new one, by the same Ana, none of its questions seen.
-		if _, err := w.db.Write.Exec(`DELETE FROM duels WHERE id = ?`, id); err != nil {
-			t.Fatal(err)
+		// Asked again before it's played: the same one, gone on with.
+		if again, err := w.g.DuelRecording(ctx, ana, c.chosen); err != nil || again != id {
+			t.Fatalf("chosen %q again while it's open: %d %v, want %d", c.chosen, again, err, id)
 		}
-		if _, err := w.db.Write.Exec(`DELETE FROM runs WHERE id = ?`, d.RunID); err != nil {
-			t.Fatal(err)
+		// Played to its end: the next is a new one, not this one.
+		w.playSide(ana, id, repeat(w.wrong, Length))
+		if d, err := w.g.DuelOf(ctx, ana, id); err != nil || d.State == DuelYours {
+			t.Fatalf("chosen %q, played to its end: %+v %v", c.chosen, d, err)
+		}
+		next, err := w.g.DuelRecording(ctx, ana, c.chosen)
+		if err != nil || next == id {
+			t.Fatalf("chosen %q after one played: %d %v, want a new one (not %d)", c.chosen, next, err, id)
+		}
+		if d, err := w.g.DuelOf(ctx, ana, next); err != nil || d.State != DuelYours || d.Asked != c.level {
+			t.Fatalf("chosen %q, the one after: %+v %v", c.chosen, d, err)
 		}
 	}
 	friendly := w.duel(ana, bo, repeat(w.right, Length), repeat(w.wrong, Length))

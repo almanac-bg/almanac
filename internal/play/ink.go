@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"strconv"
+	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
@@ -52,12 +53,12 @@ var factsRule = `WITH met AS (
 // (countRanksIn), on the day it's done: a rank never falls, and one risen by it is told with the next news, as any
 // is. Whatever writes a book again does it so, so that a chapter's seal is never behind its ink („15 с мастило ·
 // Страница“), but for the ink of a day's issue still being played: it counts as that issue finishes, as any issue's
-// does (ranks change only then: the privacy page says so).
-func rewriteBook(ctx context.Context, tx *sql.Tx, b *bank.Bank, userID int64, day string) error {
+// does, or once its day is over (ranks change only then: the privacy page says so).
+func rewriteBook(ctx context.Context, tx *sql.Tx, b *bank.Bank, userID int64, now time.Time) error {
 	if err := rewriteFacts(tx, userID); err != nil {
 		return err
 	}
-	return countRanksIn(ctx, tx, tx, b, userID, day, false)
+	return countRanksIn(ctx, tx, tx, b, userID, dayOf(now), now, false)
 }
 
 // rewriteFacts writes a player's book again from their answers, by the whole rule (factsRule); rewriteBook counts
@@ -119,26 +120,33 @@ type written struct {
 
 // written calls fn with every fact in a player's book that it shows (writtenShows), in the order they were written.
 func (g *Game) written(ctx context.Context, userID int64, fn func(q bank.Question, w written)) error {
-	return writtenIn(ctx, g.DB.Read, g.Bank(), userID, false, fn)
+	return writtenIn(ctx, g.DB.Read, g.Bank(), userID, time.Time{}, fn)
 }
 
 // writtenIn is written, read by db (a transaction that has just written the book again, or the database) by bank b;
-// finished, only what finished games wrote (a game still being played writes as it goes).
-func writtenIn(ctx context.Context, db querier, b *bank.Bank, userID int64, finished bool,
+// with a time (asOf), only what was written by games that can't be played on then: finished, or left (an issue past
+// its day: dayOver), not a game still being played, which writes as it goes. An issue left unfinished counts once its
+// day is over, as its answers stay (it counts for nothing else: the streak, the board).
+func writtenIn(ctx context.Context, db querier, b *bank.Bank, userID int64, asOf time.Time,
 	fn func(q bank.Question, w written)) error {
 	rows, err := db.QueryContext(ctx, `SELECT f.question_id, f.ink, f.at, coalesce(r.kind, ''),
-			coalesce(r.day, '')
+			coalesce(r.day, ''), r.id IS NULL OR r.finished_at IS NOT NULL, r.shown_at
 		FROM facts f LEFT JOIN runs r ON r.id = f.run_id
-		WHERE f.user_id = ?1 AND (NOT ?2 OR r.id IS NULL OR r.finished_at IS NOT NULL)
-		ORDER BY f.at, f.question_id`, userID, finished)
+		WHERE f.user_id = ?1
+		ORDER BY f.at, f.question_id`, userID)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var w written
-		if err := rows.Scan(&w.id, &w.ink, &w.at.at, &w.at.kind, &w.at.day); err != nil {
+		var r run
+		if err := rows.Scan(&w.id, &w.ink, &w.at.at, &w.at.kind, &w.at.day, &r.finished, &r.shownAt); err != nil {
 			return err
+		}
+		r.kind, r.day = w.at.kind, w.at.day
+		if !asOf.IsZero() && !r.finished && (r.kind != "day" || !r.dayOver(asOf)) {
+			continue
 		}
 		if q, ok := b.Get(w.id); ok && writtenShows(q) {
 			fn(q, w)
@@ -153,14 +161,14 @@ func writtenShows(q bank.Question) bool { return q.Extra().Fact != "" && !q.Extr
 // InkOf is how many facts a player's book has in ink in each chapter: the bank's topics, „Микс“ (all of them) and
 // „България“ (the questions about Bulgaria).
 func (g *Game) InkOf(ctx context.Context, userID int64) (map[string]int, error) {
-	return inkIn(ctx, g.DB.Read, g.Bank(), userID, false)
+	return inkIn(ctx, g.DB.Read, g.Bank(), userID, time.Time{})
 }
 
-// inkIn is InkOf, read by db by bank b; finished, only the ink of finished games (what ranks are counted from: an
-// issue still being played counts as it finishes).
-func inkIn(ctx context.Context, db querier, b *bank.Bank, userID int64, finished bool) (map[string]int, error) {
+// inkIn is InkOf, read by db by bank b; with a time (asOf), only the ink of games that can't be played on then (what
+// ranks are counted from: an issue still being played counts as it finishes, or once its day is over: writtenIn).
+func inkIn(ctx context.Context, db querier, b *bank.Bank, userID int64, asOf time.Time) (map[string]int, error) {
 	ink := map[string]int{}
-	err := writtenIn(ctx, db, b, userID, finished, func(q bank.Question, w written) {
+	err := writtenIn(ctx, db, b, userID, asOf, func(q bank.Question, w written) {
 		if w.ink {
 			countIn(ink, q)
 		}

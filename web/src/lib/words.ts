@@ -143,3 +143,16 @@ export function stakeWords(days: number, spare: boolean, hour: number): string {
     ? "Без днешния брой серията прекъсва в полунощ."
     : `С днешния брой серията ти става ${days + 1}.`;
 }
+
+/** How long an open duel has left, in words, rounded up (a duel just sent has „още 7 дни“, not six and some hours):
+ * „още 2 дни“, „още 5 часа“, „по-малко от час“; each reads after a row's „·“, after „Иво има“ and „има време“. */
+export function leftWords(until: number, now = Date.now()): string {
+  const left = until - now;
+  if (left < 3_600_000) return "по-малко от час";
+  const hours = Math.ceil(left / 3_600_000);
+  if (hours > 24) {
+    const days = Math.ceil(hours / 24);
+    return `още ${days} ${days === 1 ? "ден" : "дни"}`;
+  }
+  return hours === 1 ? "още 1 час" : `още ${hours} часа`;
+}
