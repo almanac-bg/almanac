@@ -817,6 +817,7 @@ function entryOfDay(r?: DayEntry | null): Child {
 /** Sharing as a quiet link beside the tiles, where the result's action is another (the first results): the same sheet
  * as „Сподели“. */
 function shareLink(run: State, t: Today, streak: () => number, known: () => boolean): Child {
+  cardKit().catch(() => {});
   return h(
     "button",
     {
@@ -830,7 +831,19 @@ function shareLink(run: State, t: Today, streak: () => number, known: () => bool
   );
 }
 
+/** The card's drawing (game/card.ts, a file of its own), sent for as the way to share it shows, so that a tap on it
+ * doesn't wait for the file to come. */
+let cardFile: Promise<typeof import("../game/card.ts")> | null = null;
+const cardKit = () => {
+  cardFile ??= import("../game/card.ts").catch((err) => {
+    cardFile = null; // tried again by the next
+    throw err;
+  });
+  return cardFile;
+};
+
 function shareButton(run: State, t: Today, streak: () => number, known: () => boolean): Child {
+  cardKit().catch(() => {});
   const open = () => shareSheet(run, t, streak());
   return h(
     "button",
@@ -864,7 +877,7 @@ function shareSheet(run: State, t: Today, streak: number): void {
     sheet.remove();
   };
   shareText(run.id, day).then(text.set, (err) => said.set(errorText(err)));
-  Promise.all([import("../game/card.ts"), loadPictures()])
+  Promise.all([cardKit(), loadPictures()])
     .then(([m, pictures]) => m.drawCard(issue, dateWords(t.day), run.trail, t.topics ?? [], pictures))
     .then(
       (file) => {
