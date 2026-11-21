@@ -19,10 +19,6 @@ recorded game). The streak is the habit and forgives two missed days a week. The
 else adds up but ink and the streak. DECISIONS.md, „The direction“, is final: it lists the player's nouns and the rule
 every later change passes.
 
-**Being built (from 20 Nov 2026).** The server's part has landed (no points, ink and pencil, ranks and the seal,
-mastery hidden, two forgiven days a week, freshness); the client still has „the edition“ look until the mockups are
-approved; don't extend it.
-
 ## Direction
 
 The day's ten questions are the heart of the game: the habit a player comes back for. Everything
@@ -114,8 +110,8 @@ client, the server or the sample bank. It catches only what it knows: reading th
 
 ## Built to hold
 
-What two independent reviews (November 2026, `../review-2026-11-17/`, `../review-2026-11-18/`) kept finding. Where a
-check holds a rule, the check is named; the rest is judgement, so weigh every change against it.
+What two independent reviews of the code (November 2026) kept finding. Where a check holds a rule, the check is
+named; the rest is judgement, so weigh every change against it.
 
 - **Abuse is cheap.** A limit by address counts the network and its site (`allowFrom`/`guardFrom`:
   `TestLimitsByAddressCountTheSite`), never a first-come global cap that a few networks fill to lock everyone out,

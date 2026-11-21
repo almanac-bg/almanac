@@ -79,7 +79,7 @@ packages' doc comments; this file holds only what must not drift.
     never by new tracking: that ink from the issue alone is enough progress (D30 of the players whose games are only
     the day's); that the seals are wanted (players who chose the seal they wear, or a chapter's art as their avatar);
     that the share brings players (new players beside the days shared, day by day).
-  The decisions below that this replaces are gone from this file; the code follows as each part lands.
+  The decisions below that this replaces are gone from this file.
 - **The day's ten questions are the heart;** everything else serves them or stays out of the way. A new system replaces
   one or proves it's needed (CLAUDE.md, Direction).
 - **For everyone, not for a group.** The game is made for any player, not tailored to one audience (children,

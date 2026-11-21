@@ -214,37 +214,6 @@ func problemsSubject(n int) string {
 	return fmt.Sprintf("АЛМАНАХ: %d нови проблема", n)
 }
 
-// place is a player's place among others, said of the place so that it reads the same to everyone: „3-то място от 12“.
-func place(n, of int) string { return fmt.Sprintf("%s място от %d", ordinal(n, ordNeuter), of) }
-
-// The endings of an ordinal's word (ordinal): a neuter one („място“: 1-во), a feminine one („седмица“: 1-ва), and a
-// masculine one with its article („на 1-вия ден“).
-const (
-	ordNeuter    = "о"
-	ordFeminine  = "а"
-	ordMasculine = "ия"
-)
-
-// ordinal is n as an ordinal in digits, as Bulgarian writes it, with its word's ending (ordNeuter and the others): the
-// letters after the number's own stem, 1-во, 2-ро, 3-то, 4-то, 5-о … 11-о … 21-во, 100-тно, 1000-но; 1-ва, 5-а;
-// 1-вия, 2-рия, 5-ия.
-func ordinal(n int, end string) string {
-	switch tens := n % 100; {
-	case n > 0 && n%1000 == 0:
-		end = "н" + end
-	case n > 0 && tens == 0:
-		end = "тн" + end
-	case tens >= 11 && tens <= 19:
-	case n%10 == 1:
-		end = "в" + end
-	case n%10 == 2:
-		end = "р" + end
-	case n%10 == 3, n%10 == 4:
-		end = "т" + end
-	}
-	return fmt.Sprintf("%d-%s", n, end)
-}
-
 // pushKey is what a browser subscribes with (empty: no notifications here).
 func (s *Server) pushKey() string {
 	if s.push == nil {

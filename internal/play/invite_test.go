@@ -152,6 +152,44 @@ func TestInviteBounds(t *testing.T) {
 	}
 }
 
+// One removed doesn't come back by the link that made them friends: removing a friend ends the remover's link (its
+// day's count kept), and a new one takes its place. One who has no link gets none by removing.
+func TestUnfriendEndsTheLink(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo := w.user(), w.user()
+	old, _ := w.g.InviteOf(ctx, ana)
+	if _, err := w.g.TakeInvite(ctx, old, bo); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.g.Unfriend(ctx, ana, bo); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.g.TakeInvite(ctx, old, bo); !errors.Is(err, ErrNoInvite) {
+		t.Fatalf("Bo taps the old link: %v", err)
+	}
+	if _, err := w.g.Friend(ctx, ana, bo); !errors.Is(err, ErrNotFriends) {
+		t.Fatalf("Bo back: %v", err)
+	}
+	code, _ := w.g.InviteOf(ctx, ana)
+	if code == old {
+		t.Fatal("Ana's link the same after")
+	}
+	if n := w.count(`SELECT took FROM invites WHERE user_id = ?`, ana); n != 1 {
+		t.Fatalf("the day's count: %d, want 1", n)
+	}
+	cy := w.user()
+	if _, err := w.g.TakeInvite(ctx, code, cy); err != nil {
+		t.Fatalf("the new link: %v", err)
+	}
+	if err := w.g.Unfriend(ctx, cy, ana); err != nil {
+		t.Fatal(err)
+	}
+	if has, _ := w.g.HasInvite(ctx, cy); has {
+		t.Fatal("a link made by removing")
+	}
+}
+
 // A suspended player's link is no link while they are; a deleted player's goes with them.
 func TestInviteGoesWithItsPlayer(t *testing.T) {
 	w := setup(t)

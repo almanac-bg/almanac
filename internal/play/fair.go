@@ -3,6 +3,7 @@ package play
 import (
 	"context"
 	"database/sql"
+	"strconv"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
@@ -42,11 +43,11 @@ const (
 // on the whole page, the same that its days played are (retention.go, personDays). Not one at a script's speed
 // (ShadowScript), nor an admin's (whoever keeps the game, trying it). A guest's day brought to an account
 // (ShadowGuest) was a person's, and counts, once: only one game of a day is ever an account's.
-const People = personRun + ` AND user_id NOT IN (SELECT id FROM users WHERE admin)`
+var People = personRun + ` AND user_id NOT IN (SELECT id FROM users WHERE admin)`
 
-// personRun is People without the admins: the shadow that isn't a person's game (1: ShadowScript; TestPeopleShadows
-// holds the number).
-const personRun = `shadow <> 1`
+// personRun is People without the admins: not the shadow that isn't a person's game (ShadowScript; TestPeopleDays
+// holds that a script's day isn't counted).
+var personRun = `shadow <> ` + strconv.Itoa(ShadowScript)
 
 // Floor is the least time a person takes to answer a question of its kind, as the server times it (from when it
 // showed the question to when the answer came, so the trip to the server and back is in it too). Seeing four options

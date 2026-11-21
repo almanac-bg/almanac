@@ -47,7 +47,7 @@ type limiter struct {
 const (
 	limitShards = 16
 	// limitKeys is how many keys are counted at most: about 100 bytes each, 25 MB in all. An hour of the game's
-	// traffic needs a few for each player (a page, a guest, a tally): this is room for tens of thousands at once.
+	// traffic needs a few for each player (a page, a guest, a write): this is room for tens of thousands at once.
 	limitKeys = 1 << 18
 	// limitSample is how many windows are looked at to pick the one to push out, when a shard is full.
 	limitSample = 8

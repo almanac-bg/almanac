@@ -29,7 +29,7 @@ const personLeeway = time.Hour
 // personDay is the SQL condition (on a.user_id, and the day's bounds b.s and b.e in ms) that a day in active_days
 // counts as a person's: one gone (a tombstone, judged as they went) or, for a player who isn't an admin, a game played
 // as a person (personRun) that day.
-const personDay = `(a.user_id < 0 OR (NOT EXISTS (SELECT 1 FROM users u WHERE u.id = a.user_id AND u.admin)
+var personDay = `(a.user_id < 0 OR (NOT EXISTS (SELECT 1 FROM users u WHERE u.id = a.user_id AND u.admin)
 	AND EXISTS (SELECT 1 FROM runs r WHERE r.user_id = a.user_id AND r.started_at >= b.s AND r.started_at < b.e
 		AND r.at > 0 AND r.` + personRun + `)))`
 
@@ -110,29 +110,6 @@ func (g *Game) Activity(ctx context.Context, from string) (*Activity, error) {
 		a.before[id] = true
 	}
 	return a, rows.Err()
-}
-
-// index is a day's place from From, or -1 outside.
-func (a *Activity) index(day string) int {
-	d := daysBetween(a.From, day)
-	if d < 0 || d > daysBetween(a.From, a.Today) {
-		return -1
-	}
-	return d
-}
-
-// On is how many played on a day.
-func (a *Activity) On(day string) int {
-	d, n := a.index(day), 0
-	if d < 0 {
-		return 0
-	}
-	for _, p := range a.played {
-		if p[d] {
-			n++
-		}
-	}
-	return n
 }
 
 // first is a player's first day played, if it's within the days read ("" if they played before them).

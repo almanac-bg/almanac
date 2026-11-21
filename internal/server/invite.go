@@ -16,17 +16,21 @@ import (
 // keeps the tap and takes the link after their first game.
 //
 // What it costs if one /48 calls it all day: a link is looked up (its page, GET /api/invites/{code}, or a tap) at most
-// invitesNet an hour from a network and invitesSite from its site, in the guard's limiter, 7,200 a day: against 2^50
-// codes, a guess finds no link in a lifetime, and what one shows (a name, an avatar, a seal) is on its player's profile
-// anyway. A tap befriends at most befriendsNet an hour from a network (befriendsSite its site), each from a player who
-// has finished a game, into lists of MaxFriends, InviteADay a day from one link; each is a row of friends and one write
-// to the link's count. Making links is per player (invitesNew a day for a new one) and per network.
+// invitesNet an hour from a network and invitesSite from its site, in the guard's limiter: the guests' scale, so that a
+// class, an office or a carrier's shared address all opening one link posted in their group are let in. That is 43,200
+// guesses a day from a site, 16 million a year: against 2^50 codes, with a million links made, a year of it finds one
+// at odds of about 1 in 70, and what it finds (a name, an avatar, a seal) is on its player's profile anyway; a tap on
+// it makes the guesser one friend, whom the player can remove. A tap befriends at most befriendsNet an hour from a
+// network (befriendsSite its site), each from a player who has finished a game (asked before the budget is spent, so a
+// guest told to play first loses none of it), into lists of MaxFriends, InviteADay a day from one link; each is a row of
+// friends and one write to the link's count. Making links is per player (invitesNew a day for a new one) and per
+// network. Past the budget, a link's page says so (errInviteBusy), not that the link is gone.
 
 const (
-	invitesNet    = 60
-	invitesSite   = 300
-	befriendsNet  = 30
-	befriendsSite = 150
+	invitesNet    = 360
+	invitesSite   = 5 * invitesNet
+	befriendsNet  = 120
+	befriendsSite = 5 * befriendsNet
 	invitesMade   = 120
 	invitesNew    = 10
 )
@@ -79,15 +83,15 @@ func (s *Server) invited(r *http.Request, code string, viewer int64) (play.Invit
 	return s.game.Invited(r.Context(), code, viewer)
 }
 
-// inviteOf is the page's link (/f/<code>), as its opener sees it: ok false for a path that isn't one, or a link that
-// isn't (or one past the network's budget, which the page says as gone).
-func (s *Server) inviteOf(r *http.Request, viewer int64) (play.Invite, bool) {
+// inviteOf is the page's link (/f/<code>), as its opener sees it: ok false for a path that isn't one; err the lookup's
+// (play.ErrNoInvite: a link that isn't, or is no more; errInviteBusy: the network past its budget).
+func (s *Server) inviteOf(r *http.Request, viewer int64) (in play.Invite, ok bool, err error) {
 	m := invitePath.FindStringSubmatch(r.URL.Path)
 	if m == nil {
-		return play.Invite{}, false
+		return play.Invite{}, false, nil
 	}
-	in, err := s.invited(r, m[1], viewer)
-	return in, err == nil
+	in, err = s.invited(r, m[1], viewer)
+	return in, true, err
 }
 
 // inviteOne is a link as its opener sees it (GET /api/invites/{code}): for a page that came to it without one in its
@@ -116,10 +120,6 @@ func (s *Server) takeInvite(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	if !s.allowFrom(r, "befriend", befriendsNet, befriendsSite, time.Hour) ||
-		!s.guardFrom(r, "invites", invitesNet, invitesSite, time.Hour) {
-		return errTooMany
-	}
 	if u.Email == "" {
 		played, err := s.game.Played(r.Context(), u.ID)
 		if err != nil {
@@ -128,6 +128,10 @@ func (s *Server) takeInvite(w http.ResponseWriter, r *http.Request) error {
 		if !played {
 			return errPlayFirst
 		}
+	}
+	if !s.allowFrom(r, "befriend", befriendsNet, befriendsSite, time.Hour) ||
+		!s.guardFrom(r, "invites", invitesNet, invitesSite, time.Hour) {
+		return errTooMany
 	}
 	t, err := s.game.TakeInvite(r.Context(), r.PathValue("code"), u.ID)
 	if err != nil {

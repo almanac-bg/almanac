@@ -107,11 +107,73 @@ func TestInvitesLookedUpWithinBudget(t *testing.T) {
 			t.Fatalf("guess %d: %d", i, status)
 		}
 	}
-	if status, out := p.call("GET", "/api/invites/abcdefghij", nil); status != http.StatusTooManyRequests {
+	if status, out := p.call("GET", "/api/invites/abcdefghij", nil); status != http.StatusTooManyRequests ||
+		out["error"] != "too_many" {
 		t.Fatalf("past the budget: %d %v", status, out)
 	}
-	// The page, past it, says the link is gone, and its boot nothing of whose it'd be.
-	if status, _, _ := p.get("/f/abcdefghij", browserUA); status != http.StatusNotFound {
+	// The page, past it, says too many from here (busy, not gone), and its boot nothing of whose it'd be.
+	if status, _, _ := p.get("/f/abcdefghij", browserUA); status != http.StatusTooManyRequests {
 		t.Fatalf("the page past the budget: %d", status)
+	}
+	in, _ := bootOf(t, p, "/f/abcdefghij")["invite"].(map[string]any)
+	if in["error"] != errInviteBusy.message || in["gone"] != nil || in["name"] != nil {
+		t.Fatalf("the boot past the budget: %v", in)
+	}
+}
+
+// A guest told to play first spends none of the network's budget of taps: a class of guests tapping one link before
+// their first games are each still let in after them.
+func TestPlayFirstSpendsNoBudget(t *testing.T) {
+	g := start(t)
+	ana, _ := g.guest()
+	played(ana)
+	_, out := ana.call("POST", "/api/invite", nil)
+	code := strings.TrimPrefix(out["url"].(string), g.url+"/f/")
+	// Two friends already spend all but one of the network's taps (each tap counts, a friend's too).
+	cy, _ := g.guest()
+	dee, _ := g.guest()
+	played(cy)
+	played(dee)
+	for i := range befriendsNet - 1 {
+		p := []*player{cy, dee}[i%2]
+		if status, out := p.call("POST", "/api/invites/"+code, nil); status != http.StatusOK {
+			t.Fatalf("tap %d: %d %v", i, status, out)
+		}
+	}
+	bo, _ := g.guest()
+	for i := range 5 {
+		if status, out := bo.call("POST", "/api/invites/"+code, nil); status != http.StatusForbidden || out["error"] != "play_first" {
+			t.Fatalf("tap %d before a game: %d %v", i, status, out)
+		}
+	}
+	played(bo)
+	if status, out := bo.call("POST", "/api/invites/"+code, nil); status != http.StatusOK || out["name"] == nil {
+		t.Fatalf("after the game: %d %v", status, out)
+	}
+}
+
+// Removing a friend ends the remover's link: the one removed is not back by a tap on it.
+func TestUnfriendEndsTheLinkOverHTTP(t *testing.T) {
+	g := start(t)
+	ana, _ := g.guest()
+	played(ana)
+	_, out := ana.call("POST", "/api/invite", nil)
+	link, _ := out["url"].(string)
+	code := strings.TrimPrefix(link, g.url+"/f/")
+	bo, _ := g.guest()
+	played(bo)
+	if status, out := bo.call("POST", "/api/invites/"+code, nil); status != http.StatusOK {
+		t.Fatalf("Bo takes it: %d %v", status, out)
+	}
+	_, list := ana.call("GET", "/api/friends", nil)
+	boID := list["friends"].([]any)[0].(map[string]any)["id"]
+	if status, out := ana.call("DELETE", fmt.Sprintf("/api/friends/%v", boID), nil); status != http.StatusOK {
+		t.Fatalf("Ana removes Bo: %d %v", status, out)
+	}
+	if status, out := bo.call("POST", "/api/invites/"+code, nil); status != http.StatusNotFound || out["error"] != "no_invite" {
+		t.Fatalf("Bo taps the old link: %d %v", status, out)
+	}
+	if _, fresh := ana.call("POST", "/api/invite", nil); fresh["url"] == link || fresh["url"] == nil {
+		t.Fatalf("Ana's link after: %v", fresh)
 	}
 }

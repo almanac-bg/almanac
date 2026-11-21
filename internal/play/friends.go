@@ -281,12 +281,23 @@ func (g *Game) Asked(ctx context.Context, from, to int64) (bool, error) {
 
 // Unfriend ends a friendship, for both, and the duels open between them with it: their time is up now, and each ends
 // as one whose time ran out does (SettleDue: a side left half-way counts as it stood, one never started lapses, one
-// never sent goes), so that neither is left a „Твой ред“ that can't be played. The record between them stays.
+// never sent goes), so that neither is left a „Твой ред“ that can't be played. The record between them stays. The
+// remover's link, if they have one, ends with it (a new one takes its place, its day's count kept): else the one
+// removed would be back with a tap on it.
 func (g *Game) Unfriend(ctx context.Context, userID, friendID int64) error {
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		if _, err := tx.Exec(`DELETE FROM friends WHERE (user_id = ?1 AND friend_id = ?2)
 			OR (user_id = ?2 AND friend_id = ?1)`, userID, friendID); err != nil {
 			return err
+		}
+		var linked bool
+		if err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM invites WHERE user_id = ?)`, userID).Scan(&linked); err != nil {
+			return err
+		}
+		if linked {
+			if _, err := g.newInviteIn(tx, userID); err != nil {
+				return err
+			}
 		}
 		_, err := tx.Exec(`UPDATE duels SET expires_at = min(expires_at, ?3) WHERE kind = 'person' AND ended_at IS NULL
 			AND ((a_id = ?1 AND b_id = ?2) OR (a_id = ?2 AND b_id = ?1))`, userID, friendID, store.Ms(g.Now()))

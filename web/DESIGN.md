@@ -95,8 +95,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      action; three times at most, once a day). Yesterday's issue finished after midnight has today's in its place
      („Вече излезе.“, „Към днешния брой“).
 
-  Everything else is under „Въпросите и фактите“ (`.more`): how others played the player's recordings, how all of
-  България spread, and each question with its fact (its verdict never a true-or-not's answer: „Точно“, „Грешно“).
+  Everything else is under „Въпросите и фактите“ (`.more`): how all of България spread, and each question with its
+  fact (its verdict never a true-or-not's answer: „Точно“, „Грешно“).
 - **Алманах:** its head (Микс and България as two ways to play, no lifetime totals), then the chapters, each a folded
   card in its colour with its seal as the badge (40px), its ink („180 с мастило“) and its rank with what's left to the
   next („Тетрадка · още 15 до „Книга““); a counter at zero is hidden, and the head says once how ink is written; a

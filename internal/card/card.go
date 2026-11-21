@@ -180,8 +180,7 @@ func newPicture() (*picture, error) {
 	rosette(p.img, 64, 58, 52)
 	name := p.face("sofia-sans-900", 34)
 	m := name.Metrics()
-	// Set on its middle at 86, as the canvas's textBaseline "middle" sets it: half-way between the face's ascent and
-	// its descent.
+	// Set on its middle at 86: half-way between the face's ascent and its descent.
 	p.write(name, ink, 134, 86+float64(m.Ascent-m.Descent)/64/2, Name, 7)
 	p.write(p.face("sofia-sans-800", 34), ink3, 64, 590, Address, 0)
 	return p, nil
@@ -307,8 +306,8 @@ func shape(dst draw.Image, x0, y0, x1, y1 float64, c color.Color, trace func(z *
 	z.Draw(dst, r, image.NewUniform(c), image.Point{})
 }
 
-// rounded is a rectangle with corners rounded by r as points, clockwise from the top edge's left end (where the
-// canvas's roundRect starts, so that dashes begin where a browser's do).
+// rounded is a rectangle with corners rounded by r as points, clockwise from the top edge's left end (where its dashes
+// begin).
 func rounded(x0, y0, x1, y1, r float64) []pt {
 	out := []pt{{x0 + r, y0}}
 	corner := func(cx, cy, from float64) {

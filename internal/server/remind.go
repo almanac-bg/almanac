@@ -245,13 +245,6 @@ func (s *Server) lastReminder(ctx context.Context, userID int64) push.Message {
 	return push.Message{Title: "Спираме напомнянията, докато не играеш пак", Body: s.stepWords(ctx, userID), URL: "/", Kind: "stop"}
 }
 
-// dayGap is how many days `to` is after `from` (YYYY-MM-DD).
-func dayGap(from, to string) int {
-	a, _ := time.Parse(time.DateOnly, from)
-	b, _ := time.Parse(time.DateOnly, to)
-	return int(b.Sub(a).Hours() / 24)
-}
-
 // reminder is the day's word to a player who hasn't played the day's questions: the best of their friends who have
 // played, and their streak; or, while none of their friends has, just the streak.
 func (s *Server) reminder(ctx context.Context, today string, userID int64) push.Message {

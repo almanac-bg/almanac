@@ -10,7 +10,7 @@
 # The ranges below are the @font-face rules' unicode-range in app.css, word for word: change both together.
 #
 # And the faces of the pictures a link shows (internal/card: a shared day's card, the site's own), which the server
-# draws itself, in the weights card.ts sets them in (Sofia Sans 800 and 900, the numeral 900): it reads
+# draws itself, in the weights internal/card sets them in (Sofia Sans 800 and 900, the numeral 900): it reads
 # TrueType only and applies no font features, so each is a static cut of the one weight the card sets it in, cut to
 # the letters a card can show (card=). Sofia Sans draws the Bulgarian letter forms by default (its locl is for
 # Russian), so the card has them without the feature.

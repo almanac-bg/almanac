@@ -29,10 +29,7 @@ func (p *player) get(path, ua string) (int, http.Header, string) {
 	return res.StatusCode, res.Header, string(body)
 }
 
-const (
-	browserUA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1"
-	previewUA = "facebookexternalhit/1.1"
-)
+const browserUA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1"
 
 // A finished day is shared as its score and shape with a link of its own, made once; the link opens the day (as long
 // as it lasts) with the card in its preview, says nothing of whose it was, and goes with the player; the shares and
