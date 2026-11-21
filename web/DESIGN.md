@@ -438,7 +438,7 @@ to show it whole; nothing over the question.
   whole; at 320 × 568 every control is a scroll away, under nothing, the first answer in sight; a picture never under
   120px; once answered, the player's row, the right one, the verdict and „Напред“ are in sight, nothing under „Напред“,
   nothing under the panel nor a scrap under the head, the panel packed; a row's sign never on a line of its own, nor a punctuation mark.
-- **Large text:** the text grows with the browser's setting and with „Размер на текста“ (up to twice). Everything is
+- **Large text:** the text grows with the browser's or the phone's setting (up to twice); the game has no size setting of its own. Everything is
   in rem from `<html>`; display type grows at half the rate (half px, half rem) and a big numeral is capped by the
   screen's width or height. One-column grids are `minmax(0, 1fr)`; a row of things wraps. `lib/prefs.ts` puts `tight`
   and `tighter` on `<html>` when the column holds few words, and rows give way to columns there. With `tighter`, an
@@ -455,8 +455,8 @@ to show it whole; nothing over the question.
   answer comes into place in one movement (240ms, `settle`); a pip lands (200ms).
 - **A result lands, once** (`feel.ts`): the tiles fill one by one with a pluck on the scale for each right one, and
   the score lands; a tap jumps to the end; never again on a reload.
-- **No ambient motion,** no confetti. **Less motion** („По-малко движение“, following `prefers-reduced-motion` until
-  set): the pops, shakes and steps stop; the clock and the count before a run still move, as they are information.
+- **No ambient motion,** no confetti. **Less motion** (the device's `prefers-reduced-motion`, and only it: the game
+  has no switch of its own): the pops, shakes and steps stop; the clock and the count before a run still move, as they are information.
 
 ## Sound
 

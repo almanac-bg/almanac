@@ -6797,7 +6797,7 @@
     }
   }
 
-  /* Less motion: the device's setting until the player sets their own (Настройки → Достъпност, the .calm class). The
+  /* Less motion: the device's setting (prefers-reduced-motion, mirrored as the .calm class by prefs.ts). The
      timer and the count before a run still move: they are information. */
   @media (prefers-reduced-motion: reduce) {
     .btn,
@@ -6834,12 +6834,6 @@
     cursor: pointer;
     -webkit-user-select: none;
     user-select: none;
-  }
-
-  /* The text's size: its name and what „Обичаен“ is, the three sizes under them. */
-  .text-size {
-    display: grid;
-    gap: var(--space-3);
   }
 
   .switch-text {
@@ -7791,7 +7785,7 @@
   }
 
   /* ---- Large text on a phone ----
-     The text at up to twice its size (the player's „Размер на текста“, the phone's own size: prefs.ts) on a phone
+     The text at up to twice its size (the phone's own setting) on a phone
      320px wide: nothing scrolls sideways, nothing hides under another (e2e/layout.spec.ts). What has room wraps by
      itself; these are the rows that give way to columns once the page's column holds too few words across: `tight`
      on <html> under 17em, `tighter` under 13.5em (lib/prefs.ts measures it; at the text's usual size even the
