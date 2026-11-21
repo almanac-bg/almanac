@@ -752,16 +752,17 @@ export function playerRow(
 }
 
 /** A day's row on a board (Приятели's, Днес's friends), built as a friend's (`playerRow`): its place before the
- * avatar, „ти“ after the player's own name (their row washed), and under the name the score, the day's small squares
- * after it (only where the server sends them: once the viewer has finished the day). */
-export const scoreRow = (s: Score, place: number, gap = false) =>
+ * avatar (none on Днес, whose list leaves the player out, so places would skip), „ти“ after the player's own name
+ * (their row washed), and under the name the score, the day's small squares after it (only where the server sends
+ * them: once the viewer has finished the day). */
+export const scoreRow = (s: Score, place: number | null, gap = false) =>
   playerRow(
-    ["rank-row", s.me && "me", gap && "gap"].filter(Boolean).join(" "),
+    ["rank-row", s.me && "me", gap && "gap", place === null && "unplaced"].filter(Boolean).join(" "),
     s,
     s.tag,
     nameWords(s.name, s.me ? h("span", { class: "rank-you" }, " ти") : null),
     [h("span", { class: "rank-score" }, rightsOf(s.rights, s.of)), s.trail?.length ? mini(s.trail) : null],
-    h("span", { class: "rank-place" }, String(place)),
+    place === null ? null : h("span", { class: "rank-place" }, String(place)),
   );
 
 /** A screen that couldn't load, never a dead end: what went wrong (lib/api.ts, errorText); „Опитай пак“ where trying

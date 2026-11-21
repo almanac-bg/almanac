@@ -29,7 +29,8 @@ test("friends on the day: who has played it, and how each went", async ({ browse
   await playRun(b);
   const hers = b.locator(".friends-day .rank-row").filter({ hasText: ana });
   await expect(hers.locator(".rank-score")).toHaveText(/^\d+\sот\s10$/);
-  await expect(hers.locator(".rank-place")).toHaveText(/^\d+$/);
+  // No place on Днес: the list leaves the player out, so places would skip (1, 3, 4).
+  await expect(hers.locator(".rank-place")).toHaveCount(0);
   await expect(hers.locator(".mini")).toHaveCount(1);
   await expect(b.locator(".friends-day .rank-row.me")).toHaveCount(0);
   await expect(b.locator(".tomorrow")).toBeVisible();
