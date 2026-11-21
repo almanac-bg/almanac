@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 )
 
 const sample = "../../bank/sample"
@@ -474,49 +473,7 @@ func TestTrueFalseGrading(t *testing.T) {
 	}
 }
 
-func TestMatchGrading(t *testing.T) {
-	q := &Match{Head: Head{Type: "match", Text: "Свържи:"}, Pairs: []MatchPair{
-		{"Франция", "Париж"}, {"Италия", "Рим"}, {"Испания", "Мадрид"}, {"Гърция", "Атина"},
-	}}
-	for seed := range uint64(20) {
-		d := q.Deal(seed).(*dealtMatch)
-		var view struct{ Left, Right []string }
-		_ = json.Unmarshal(mustJSON(d.View()), &view)
-		// The right answer, worked out from the view the way a player would.
-		capital := map[string]string{"Франция": "Париж", "Италия": "Рим", "Испания": "Мадрид", "Гърция": "Атина"}
-		right := make([]int, 4)
-		for i, l := range view.Left {
-			right[i] = slices.Index(view.Right, capital[l])
-		}
-		if g := grade(t, d, string(mustJSON(MatchAnswer{Pairs: right}))); !g.Right || g.Score != 1 {
-			t.Fatalf("seed %d: all right graded %+v", seed, g)
-		}
-		var rev struct{ Pairs []int }
-		_ = json.Unmarshal(mustJSON(d.Reveal(nil)), &rev)
-		if !slices.Equal(rev.Pairs, right) {
-			t.Fatalf("seed %d: revealed %v, right %v", seed, rev.Pairs, right)
-		}
-		// Two swapped: two right, less two wrong at a third each; one left out: three of four, nothing taken.
-		swapped := slices.Clone(right)
-		swapped[0], swapped[1] = swapped[1], swapped[0]
-		if g := grade(t, d, string(mustJSON(MatchAnswer{Pairs: swapped}))); g.Right || math.Abs(g.Score-1.0/3) > 1e-9 {
-			t.Fatalf("seed %d: two swapped graded %+v", seed, g)
-		}
-		partial := slices.Clone(right)
-		partial[3] = -1
-		if g := grade(t, d, string(mustJSON(MatchAnswer{Pairs: partial}))); g.Right || g.Score != 0.75 {
-			t.Fatalf("seed %d: one left out graded %+v", seed, g)
-		}
-	}
-	d := q.Deal(1)
-	for _, bad := range []string{`{"pairs":[0,0,1,2]}`, `{"pairs":[0,1,2]}`, `{"pairs":[0,1,2,4]}`, `{"pairs":[0,1,2,-2]}`, `{}`} {
-		if _, err := d.Grade(json.RawMessage(bad)); err == nil {
-			t.Errorf("%s was graded", bad)
-		}
-	}
-}
-
-// Luck earns little: an order or a match put down at random is worth next to nothing on average.
+// Luck earns little: an order put down at random is worth next to nothing on average.
 func TestLuckTakenOut(t *testing.T) {
 	perms := [][]int{}
 	var permute func([]int, int)
@@ -532,239 +489,12 @@ func TestLuckTakenOut(t *testing.T) {
 		}
 	}
 	permute([]int{0, 1, 2, 3}, 0)
-	var order, match float64
+	var order float64
 	for _, p := range perms {
 		order += orderScore(p, []int{0, 1, 2, 3})
-		right := 0
-		for i, v := range p {
-			if i == v {
-				right++
-			}
-		}
-		match += matchScore(right, 4-right, 4, 4)
 	}
-	order, match = order/float64(len(perms)), match/float64(len(perms))
-	if math.Abs(order-7.0/36) > 1e-9 || math.Abs(match-0.125) > 1e-9 {
-		t.Errorf("at random: an order is worth %v, a match %v", order, match)
-	}
-	// With a decoy: the four lefts joined at random to four of five rights.
-	decoy, n := 0.0, 0
-	for _, p := range injections(4, 5) {
-		right := 0
-		for i, v := range p {
-			if i == v {
-				right++
-			}
-		}
-		decoy += matchScore(right, 4-right, 4, 5)
-		n++
-	}
-	if decoy /= float64(n); math.Abs(decoy-53.0/480) > 1e-9 {
-		t.Errorf("at random: a match with a decoy is worth %v", decoy)
-	}
-}
-
-// injections lists every way to give each of k things a different one of n.
-func injections(k, n int) [][]int {
-	if k == 0 {
-		return [][]int{{}}
-	}
-	var out [][]int
-	for _, p := range injections(k-1, n) {
-		for v := range n {
-			if !slices.Contains(p, v) {
-				out = append(out, append(slices.Clone(p), v))
-			}
-		}
-	}
-	return out
-}
-
-func TestMatchDecoy(t *testing.T) {
-	q := &Match{Head: Head{Type: "match", Text: "Свържи:"}, Pairs: []MatchPair{
-		{"Австралия", "Канбера"}, {"Канада", "Отава"}, {"Турция", "Анкара"}, {"Нигерия", "Абуджа"},
-	}, Decoy: "Сидни"}
-	capital := map[string]string{"Австралия": "Канбера", "Канада": "Отава", "Турция": "Анкара", "Нигерия": "Абуджа"}
-	for seed := range uint64(20) {
-		d := q.Deal(seed)
-		var view struct{ Left, Right []string }
-		_ = json.Unmarshal(mustJSON(d.View()), &view)
-		if len(view.Left) != 4 || len(view.Right) != 5 || !slices.Contains(view.Right, "Сидни") {
-			t.Fatalf("seed %d: dealt %v / %v", seed, view.Left, view.Right)
-		}
-		right := make([]int, 4)
-		for i, l := range view.Left {
-			right[i] = slices.Index(view.Right, capital[l])
-		}
-		if g := grade(t, d, string(mustJSON(MatchAnswer{Pairs: right}))); !g.Right || g.Score != 1 {
-			t.Fatalf("seed %d: all right graded %+v", seed, g)
-		}
-		var rev struct {
-			Pairs []int
-			Decoy *int
-		}
-		_ = json.Unmarshal(mustJSON(d.Reveal(nil)), &rev)
-		if !slices.Equal(rev.Pairs, right) || rev.Decoy == nil || view.Right[*rev.Decoy] != "Сидни" {
-			t.Fatalf("seed %d: revealed %+v", seed, rev)
-		}
-		// Three right and the fourth on the decoy: three quarters, less a quarter of one.
-		trap := slices.Clone(right)
-		trap[0] = *rev.Decoy
-		g := grade(t, d, string(mustJSON(MatchAnswer{Pairs: trap})))
-		if g.Right || math.Abs(g.Score-(3-0.25)/4) > 1e-9 {
-			t.Fatalf("seed %d: three and the decoy graded %+v", seed, g)
-		}
-		// The log keeps the decoy as the place past the pairs, whatever the deal.
-		var given MatchAnswer
-		_ = json.Unmarshal(g.Given, &given)
-		if !slices.Contains(given.Pairs, 4) {
-			t.Fatalf("seed %d: logged %v", seed, given.Pairs)
-		}
-	}
-	if p := (&Match{Pairs: q.Pairs, Decoy: "Отава"}).check(); len(p) == 0 {
-		t.Error("a decoy that is one of the rights passed")
-	}
-	if _, err := q.Deal(1).Grade(json.RawMessage(`{"pairs":[0,1,2,5]}`)); err == nil {
-		t.Error("a right past the column was graded")
-	}
-}
-
-func TestSplitGrading(t *testing.T) {
-	q := &Split{Head: Head{Type: "split", Text: "Бозайник ли е?"}, Groups: [2]string{"Бозайник", "Не е бозайник"},
-		Items: []SplitItem{{"Делфин", 0}, {"Прилеп", 0}, {"Кит", 0}, {"Пингвин", 1}, {"Акула", 1}, {"Костенурка", 1}}}
-	if p := q.check(); len(p) > 0 {
-		t.Fatal(p)
-	}
-	group := map[string]int{"Делфин": 0, "Прилеп": 0, "Кит": 0, "Пингвин": 1, "Акула": 1, "Костенурка": 1}
-	for seed := range uint64(20) {
-		d := q.Deal(seed)
-		var view struct{ Items []string }
-		_ = json.Unmarshal(mustJSON(d.View()), &view)
-		right := make([]int, len(view.Items))
-		for i, it := range view.Items {
-			right[i] = group[it]
-		}
-		if g := grade(t, d, string(mustJSON(SplitAnswer{Sides: right}))); !g.Right || g.Score != 1 {
-			t.Fatalf("seed %d: all right graded %+v", seed, g)
-		}
-		var rev struct{ Sides []int }
-		_ = json.Unmarshal(mustJSON(d.Reveal(nil)), &rev)
-		if !slices.Equal(rev.Sides, right) {
-			t.Fatalf("seed %d: revealed %v, right %v", seed, rev.Sides, right)
-		}
-		// One sent wrong: five right less one; one left where it is: five of six, nothing taken.
-		wrong := slices.Clone(right)
-		wrong[0] = 1 - wrong[0]
-		if g := grade(t, d, string(mustJSON(SplitAnswer{Sides: wrong}))); g.Right || math.Abs(g.Score-4.0/6) > 1e-9 {
-			t.Fatalf("seed %d: one wrong graded %+v", seed, g)
-		}
-		left := slices.Clone(right)
-		left[5] = -1
-		g := grade(t, d, string(mustJSON(SplitAnswer{Sides: left})))
-		if g.Right || math.Abs(g.Score-5.0/6) > 1e-9 {
-			t.Fatalf("seed %d: one left graded %+v", seed, g)
-		}
-		// The log keeps the bank's order, whatever the deal.
-		var given SplitAnswer
-		_ = json.Unmarshal(g.Given, &given)
-		for b, it := range q.Items {
-			if given.Sides[b] != -1 && given.Sides[b] != it.Group {
-				t.Fatalf("seed %d: logged %v", seed, given.Sides)
-			}
-		}
-	}
-	for _, bad := range []string{`{"sides":[0,1,0,1,0]}`, `{"sides":[0,1,0,1,0,2]}`, `{}`} {
-		if _, err := q.Deal(1).Grade(json.RawMessage(bad)); err == nil {
-			t.Errorf("%s was graded", bad)
-		}
-	}
-	lone := *q
-	lone.Items = slices.Clone(q.Items)
-	lone.Items[3].Group, lone.Items[4].Group = 0, 0
-	if p := lone.check(); len(p) == 0 {
-		t.Error("a split with one item in a group passed")
-	}
-	// Six items sent at random: worth 5/32 on average.
-	sum := 0.0
-	for mask := range 64 {
-		right := 0
-		for i := range 6 {
-			if mask>>i&1 == 1 {
-				right++
-			}
-		}
-		sum += splitScore(right, 6-right, 6)
-	}
-	if math.Abs(sum/64-5.0/32) > 1e-9 {
-		t.Errorf("at random a split is worth %v", sum/64)
-	}
-}
-
-func TestClues(t *testing.T) {
-	q := &Clues{Head: Head{Type: "clues", Text: "Кой е този човек?"},
-		Clues:  []string{"Като млад става йеродякон.", "Създава мрежа от тайни комитети.", "Обесен е край София през 1873 г."},
-		Answer: "Васил Левски", Wrong: []string{"Христо Ботев", "Георги Раковски", "Любен Каравелов"}}
-	if p := q.check(); len(p) > 0 {
-		t.Fatal(p)
-	}
-	d := q.Deal(3)
-	var view struct {
-		Clues   []string
-		Choices []string
-	}
-	shown := func(since time.Duration) []string {
-		_ = json.Unmarshal(mustJSON(ViewAt(d, since)), &view)
-		return view.Clues
-	}
-	// A clue shows only once its time has come: never before, not even in what the server sends.
-	for since, want := range map[time.Duration]int{0: 1, ClueEvery - time.Millisecond: 1, ClueEvery: 2, 2*ClueEvery + time.Second: 3, time.Hour: 3} {
-		if got := shown(since); len(got) != want || got[0] != q.Clues[0] {
-			t.Errorf("after %v: %v", since, got)
-		}
-	}
-	if s := mustJSON(d.View()); strings.Contains(string(s), "1873") {
-		t.Error("the first view gave the last clue away")
-	}
-	if NextStep(d, 0) != ClueEvery || NextStep(d, ClueEvery+time.Second) != ClueEvery-time.Second || NextStep(d, time.Hour) != 0 {
-		t.Error("the next clue's time")
-	}
-	right := slices.Index(view.Choices, "Васил Левски")
-	pick := string(mustJSON(ChoiceAnswer{Pick: right}))
-	// A right answer is worth less with each clue it took; a wrong one nothing.
-	for took, want := range map[time.Duration]float64{
-		3 * time.Second: 1, ClueEvery + 2*time.Second: 0.6, 25 * time.Second: 0.3, time.Hour: 0.3,
-	} {
-		g, err := GradeAt(d, json.RawMessage(pick), took)
-		if err != nil || !g.Right || g.Score != want {
-			t.Errorf("right after %v: %+v %v", took, g, err)
-		}
-	}
-	// What's shown and what's paid agree to the millisecond: an answer that came once the next clue was sent is worth
-	// that clue's, never the one before (a script that read it at once and answered in its trip's second was paid
-	// the first's: review 2026-11-18, S27).
-	worth := []float64{1, 0.6, 0.3}
-	for _, since := range []time.Duration{ClueEvery - time.Millisecond, ClueEvery, ClueEvery + 500*time.Millisecond,
-		ClueEvery + 999*time.Millisecond, 2*ClueEvery - time.Millisecond, 2 * ClueEvery, 2*ClueEvery + 900*time.Millisecond} {
-		g, _ := GradeAt(d, json.RawMessage(pick), since)
-		if out := len(shown(since)); g.Score != worth[out-1] {
-			t.Errorf("after %v: %d clues shown, paid %v", since, out, g.Score)
-		}
-	}
-	if g, _ := GradeAt(d, mustJSON(ChoiceAnswer{Pick: (right + 1) % 4}), time.Second); g.Right || g.Score != 0 {
-		t.Errorf("a wrong one: %+v", g)
-	}
-	var rev struct {
-		Pick  int
-		Clues []string
-	}
-	_ = json.Unmarshal(mustJSON(d.Reveal(nil)), &rev)
-	if rev.Pick != right || len(rev.Clues) != 3 {
-		t.Errorf("revealed %+v", rev)
-	}
-	// Other kinds aren't paced: their view is the same whenever.
-	c := &Choice{Head: Head{Type: "choice", Text: "?"}, Answer: "а", Wrong: []string{"б", "в", "г"}}
-	if dc := c.Deal(1); NextStep(dc, 0) != 0 || string(mustJSON(ViewAt(dc, time.Hour))) != string(mustJSON(dc.View())) {
-		t.Error("a choice was paced")
+	if order /= float64(len(perms)); math.Abs(order-7.0/36) > 1e-9 {
+		t.Errorf("at random: an order is worth %v", order)
 	}
 }
 
@@ -833,7 +563,6 @@ func TestAnswerTextIsBulgarian(t *testing.T) {
 		{&Number{Answer: 6.5, Step: 0.1, Unit: "млн."}, "6,5 млн."},
 		{&Number{Answer: -273.15, Step: 0.01}, "−273,15"},
 		{&Number{Answer: 1876, Step: 1}, "1876"},
-		{&Match{Pairs: []MatchPair{{Left: "Франция", Right: "Париж"}}, Decoy: "Сидни"}, "Франция — Париж"},
 	} {
 		if got := AnswerText(c.q); got != c.want {
 			t.Errorf("%T: %q, want %q", c.q, got, c.want)
@@ -849,15 +578,13 @@ func TestAnswerTextIsBulgarian(t *testing.T) {
 // answer of one word or number has none.
 func TestAnswerLines(t *testing.T) {
 	o := &Order{Unit: "млн. км²", Items: []OrderItem{{Text: "Европа", Value: 10.18}, {Text: "Азия", Value: 44.6}}, Direction: "desc"}
-	s := &Split{Groups: [2]string{"Шекспир", "Молиер"}, Items: []SplitItem{{"Просперо", 0}, {"Тартюф", 1}, {"Миранда", 0}}}
-	m := &Match{Pairs: []MatchPair{{Left: "Франция", Right: "Париж"}, {Left: "Италия", Right: "Рим"}}, Decoy: "Сидни"}
+
 	for _, c := range []struct {
 		q    Question
 		want []string
 	}{
 		{o, []string{"Азия (44,6 млн. км²)", "Европа (10,18 млн. км²)"}},
-		{s, []string{"Шекспир: Просперо, Миранда", "Молиер: Тартюф"}},
-		{m, []string{"Франция — Париж", "Италия — Рим"}},
+
 		{&Number{Answer: 1876, Step: 1}, nil},
 		{&TrueFalse{Answer: true}, nil},
 	} {

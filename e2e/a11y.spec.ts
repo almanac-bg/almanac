@@ -53,7 +53,7 @@ for (const scheme of ["light", "dark"] as const) {
         if (path === "/play/geography") {
           await page.getByRole("button", { name: "Започни", exact: true }).click();
           await page.getByRole("button", { name: "Започни сега" }).click();
-          await expect(page.locator(".split, .options, .keypad, .tf-options, .match").first()).toBeVisible();
+          await expect(page.locator(".options, .keypad, .tf-options").first()).toBeVisible();
           await check();
         }
       });

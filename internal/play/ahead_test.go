@@ -140,8 +140,8 @@ func TestDaysAhead(t *testing.T) {
 }
 
 // biggerSample is the sample bank with each question copied n times more (new ids, the text marked), each copy in
-// the next topic round, so that every topic has every kind; its splits made medium too: enough of every place of a
-// day for days ahead, whichever topics a day gives them.
+// the next topic round, so that every topic has every kind: enough of every place of a day for days ahead, whichever
+// topics a day gives them.
 func biggerSample(t *testing.T, n int) *bank.Bank {
 	t.Helper()
 	dir := t.TempDir()
@@ -170,9 +170,7 @@ func biggerSample(t *testing.T, n int) *bank.Bank {
 				c := maps.Clone(q)
 				c["id"] = fmt.Sprintf("%s-%d%03d%02d", prefixes[to], k+1, j, i)
 				c["text"] = fmt.Sprintf("%d. %s", k+1, q["text"])
-				if c["type"] == "split" {
-					c["difficulty"] = "medium"
-				}
+
 				out[to] = append(out[to], c)
 			}
 		}

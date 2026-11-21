@@ -12,8 +12,8 @@ import (
 	"github.com/almanac-bg/almanac/internal/bank"
 )
 
-// Versions: a question changes now and then while it's in play (its answer fixed, an option reworded, a decoy added,
-// its picture swapped), and the bank is reloaded while players are in the middle of it. A play is graded against
+// Versions: a question changes now and then while it's in play (its answer fixed, an option reworded, its picture
+// swapped), and the bank is reloaded while players are in the middle of it. A play is graded against
 // exactly what it showed all the same: as a question goes on screen, its run keeps which version it is (Pick.V,
 // bank.Version), and dealing the pick again (to grade it, to show it after a refresh, to go over it after the game)
 // deals that version, from the bank in play while it's still that, else as the game kept it. The game keeps every
@@ -175,7 +175,10 @@ func (g *Game) deal(p Pick) (bank.Dealt, bool) {
 // bank has it now. False if it can't be.
 func (g *Game) Deal(p Pick) (bank.Dealt, bool) { return g.deal(p) }
 
-// pastVersion is a version of a question no longer in the bank, as the game kept it.
+// pastVersion is a version of a question no longer in the bank, as the game kept it. A version of a retired kind
+// (bank.RetiredKinds) is none, quietly: every path that meets one (a run in play as the kind left, a duel against an
+// older recording, a review) goes on as for a question gone from the bank, and the answers kept to it count for no
+// version the bank has now (Counted).
 func (g *Game) pastVersion(id, version string) (bank.Question, bool) {
 	key := versionKey{id, version}
 	v := &g.versions
@@ -183,7 +186,7 @@ func (g *Game) pastVersion(id, version string) (bank.Question, bool) {
 	q, ok := v.past[key]
 	v.mu.Unlock()
 	if ok {
-		return q, true
+		return q, q != nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -197,7 +200,9 @@ func (g *Game) pastVersion(id, version string) (bank.Question, bool) {
 		return nil, false
 	}
 	q, err = bank.Decode([]byte(body), category)
-	if err != nil || bank.Version(q) != version {
+	if errors.Is(err, bank.ErrRetiredKind) {
+		q = nil // expected of a version from before its kind retired: kept as none, so it isn't read again
+	} else if err != nil || bank.Version(q) != version {
 		slog.Error("a question's past version can't be read back", "question", id, "version", version, "err", err)
 		return nil, false
 	}
@@ -207,7 +212,7 @@ func (g *Game) pastVersion(id, version string) (bank.Question, bool) {
 	}
 	v.past[key] = q
 	v.mu.Unlock()
-	return q, true
+	return q, q != nil
 }
 
 // versionOf is the row of a pick's version, as answers keep it (nil when it isn't known: not shown, or not kept).

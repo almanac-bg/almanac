@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -47,7 +48,26 @@ type Bank struct {
 	byID      map[string]Question
 	// waived are the rules the bank's waivers lift, by question: [id, rule].
 	waived map[[2]string]bool
+	// left are the questions of a retired kind the bank's files still have (RetiredKinds): not loaded, never dealt,
+	// but written back where they were (Write).
+	left map[string]leftover
 }
+
+// leftover is a question of a retired kind as its file has it: its category, the id of the question before it in the
+// file ("" for none), and itself as it is.
+type leftover struct {
+	category, after string
+	raw             json.RawMessage
+}
+
+// RetiredKinds are the kinds the game no longer has (21 Nov 2026: „Подсказки“, „Свържи“, „Раздели“; with the score
+// only right or wrong, clues were waiting, and pairs or groups bundled four answers into one). Each question of them
+// became a choice or a true-or-not, by the same id. One a bank's file still has loads with a warning (RuleKind) and
+// is left out, as if it weren't there: never dealt, not dropped (Dropped), and kept as it was by the tools that write
+// the bank's files (Write). A day whose ten pinned it plays it as void that day (play: day.go), the accepted cost; a
+// day ahead deals another in its place. A version of one the game kept from before reads back as ErrRetiredKind
+// (Decode).
+var RetiredKinds = []string{"clues", "match", "split"}
 
 // Of is a bank of these questions as they are (read with Decode), unchecked: a fixture a test builds in code, where
 // Load would want every rule of a real bank met (pictures on disk, sources, facts).
@@ -57,6 +77,19 @@ func Of(categories []Category, questions []Question) *Bank {
 		b.byID[q.Base().ID] = q
 	}
 	return b
+}
+
+// Left lists the questions of a retired kind the bank's files still have (RetiredKinds), by id, in order.
+func (b *Bank) Left() []string {
+	ids := slices.Collect(maps.Keys(b.left))
+	slices.Sort(ids)
+	return ids
+}
+
+// isLeft is whether the bank's files have a question of a retired kind by this id (RetiredKinds).
+func (b *Bank) isLeft(id string) bool {
+	_, ok := b.left[id]
+	return ok
 }
 
 // Get finds a question by id, retired ones too (history keeps pointing at them).
@@ -108,7 +141,7 @@ func Types() []string {
 // Load reads and checks the bank in dir. Errors (any Problem that isn't a warning) mean the bank must not be played:
 // Load then returns a nil Bank with the problems. A server keeps playing the bank it has while a new one is broken.
 func Load(dir string) (*Bank, []Problem) {
-	b := &Bank{Dir: dir, byID: map[string]Question{}}
+	b := &Bank{Dir: dir, byID: map[string]Question{}, left: map[string]leftover{}}
 	var problems []Problem
 	fail := func(file string, line int, id, msg string) {
 		problems = append(problems, Problem{File: file, Line: line, ID: id, Msg: msg})
@@ -158,7 +191,15 @@ func Load(dir string) (*Bank, []Problem) {
 			fail(file, 0, "", "missing: every category has its file (an empty one is [])")
 			continue
 		}
-		qs, err := decodeFile(data, c.ID, func(line int, id, msg string) { fail(file, line, id, msg) })
+		qs, err := decodeFile(data, c.ID, func(line int, id, msg string) { fail(file, line, id, msg) }, func(line int, id, after string, raw json.RawMessage) {
+			warn(file, line, id, RuleKind, "a question of a retired kind: make it a choice or a true-or-not, by the same id")
+			if first, dup := where[id]; dup || id == "" {
+				fail(file, line, id, fmt.Sprintf("the id is taken (%s:%d)", first.File, first.Line))
+				return
+			}
+			where[id] = Problem{File: file, Line: line}
+			b.left[id] = leftover{category: c.ID, after: after, raw: raw}
+		})
 		if err != nil {
 			fail(file, 0, "", err.Error())
 			continue
@@ -234,8 +275,10 @@ type located struct {
 }
 
 // decodeFile reads a category's questions: one JSON array, each question decoded strictly by its type, with the line
-// it starts on (for the bank's keepers).
-func decodeFile(data []byte, category string, fail func(line int, id, msg string)) ([]located, error) {
+// it starts on (for the bank's keepers). A question of a retired kind is told to left as it is, with the id of the
+// question before it (RetiredKinds), and not decoded.
+func decodeFile(data []byte, category string, fail func(line int, id, msg string), left func(line int, id, after string, raw json.RawMessage)) ([]located, error) {
+	after := ""
 	dec := json.NewDecoder(bytes.NewReader(data))
 	if tok, err := dec.Token(); err != nil || tok != json.Delim('[') {
 		return nil, errors.New("must be a JSON array of questions")
@@ -253,6 +296,12 @@ func decodeFile(data []byte, category string, fail func(line int, id, msg string
 		}
 		_ = json.Unmarshal(raw, &probe)
 		newQuestion, ok := types[probe.Type]
+		if !ok && slices.Contains(RetiredKinds, probe.Type) {
+			left(line, probe.ID, after, raw)
+			after = probe.ID
+			continue
+		}
+		after = probe.ID
 		if !ok {
 			fail(line, probe.ID, fmt.Sprintf("unknown type %q (known: %s)", probe.Type, strings.Join(Types(), ", ")))
 			continue

@@ -138,7 +138,8 @@ func serve([]string) error {
 		}
 		slog.Error("bank: BANK_DIR has errors, so the last good copy is played", "refused", commit, "played", b.Commit)
 	}
-	slog.Info("bank", "dir", b.Dir, "commit", b.Commit, "questions", len(b.Questions), "live", len(b.Live("", "")), "overdue", overdue(b))
+	slog.Info("bank", "dir", b.Dir, "commit", b.Commit, "questions", len(b.Questions), "live", len(b.Live("", "")), "overdue", overdue(b),
+		"retiredKinds", leftOut(b))
 	banks.prune(b)
 
 	backups, err := backupStore()
@@ -254,7 +255,8 @@ func reloadOnHangup(ctx context.Context, hup <-chan os.Signal, banks keptBanks, 
 				continue
 			}
 			srv.OfferBank(b)
-			slog.Info("bank reloaded", "commit", b.Commit, "questions", len(b.Questions), "live", len(b.Live("", "")), "overdue", overdue(b))
+			slog.Info("bank reloaded", "commit", b.Commit, "questions", len(b.Questions), "live", len(b.Live("", "")), "overdue", overdue(b),
+				"retiredKinds", leftOut(b))
 			banks.prune(srv.Bank())
 		}
 	}
@@ -291,6 +293,16 @@ func overdue(b *bank.Bank) int {
 	ids := play.Overdue(b, today())
 	if len(ids) > 0 {
 		slog.Warn("bank: questions due for review are left out of every game until they're checked", "ids", ids)
+	}
+	return len(ids)
+}
+
+// leftOut says how many questions of a retired kind the bank's files still have (bank.RetiredKinds): never dealt until
+// they're made a kind the game has. A warning names them.
+func leftOut(b *bank.Bank) int {
+	ids := b.Left()
+	if len(ids) > 0 {
+		slog.Warn("bank: questions of a retired kind are left out of every game until they're made another", "ids", ids)
 	}
 	return len(ids)
 }

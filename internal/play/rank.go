@@ -107,11 +107,9 @@ func chapterRank(chapter string, level, quarter, ink int) ChapterRank {
 }
 
 // rightChance is the chance a guess at a question of each kind is right (not its score: calibrate.go's chance): one of
-// four options; one of two; an order of four, one of 24; four pairs, one of 24; a split of four or five, about one
-// of 16; a number typed blind, next to none. What a recording is expected to be, by a player's mastery
-// (expectedRights), counts the guesses so.
-var rightChance = map[string]float64{"choice": 0.25, "clues": 0.25, "truefalse": 0.5, "order": 1.0 / 24,
-	"match": 1.0 / 24, "split": 1.0 / 16, "number": 0.02}
+// four options; one of two; an order of four, one of 24; a number typed blind, next to none. What a recording is
+// expected to be, by a player's mastery (expectedRights), counts the guesses so.
+var rightChance = map[string]float64{"choice": 0.25, "truefalse": 0.5, "order": 1.0 / 24, "number": 0.02}
 
 // keptRank is a chapter's rank as the ranks table keeps it.
 type keptRank struct {

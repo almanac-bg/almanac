@@ -168,52 +168,47 @@
   },
   {
     "id": "sci-962",
-    "type": "match",
+    "type": "choice",
     "difficulty": "medium",
-    "text": "Свържи химичния знак с елемента:",
-    "pairs": [
-      {"left": "Fe", "right": "Желязо"},
-      {"left": "Au", "right": "Злато"},
-      {"left": "Ag", "right": "Сребро"},
-      {"left": "Na", "right": "Натрий"}
-    ],
-    "decoy": "Калий",
-    "fact": "Au идва от латинското aurum — злато.",
+    "text": "Кой химичен елемент има знак Ag?",
+    "answer": "Сребро",
+    "wrong": ["Злато", "Желязо", "Калий"],
+    "fact": "Ag идва от латинското argentum — сребро; от него идва и името на Аржентина.",
     "added": "2026-11-13",
-    "updated": "2026-11-14"
+    "changed": "2026-11-21",
+    "updated": "2026-11-21",
+    "checked": "2026-11-21",
+    "checkedBy": "retire-kinds opus-5.5",
+    "sources": ["https://en.wikipedia.org/wiki/Silver", "https://en.wikipedia.org/wiki/Argentina"]
   },
   {
     "id": "sci-963",
-    "type": "split",
+    "type": "choice",
     "difficulty": "easy",
-    "text": "Метал ли е елементът?",
-    "groups": ["Метал", "Неметал"],
-    "items": [
-      {"text": "Желязо", "group": 0},
-      {"text": "Сяра", "group": 1},
-      {"text": "Живак", "group": 0},
-      {"text": "Въглерод", "group": 1},
-      {"text": "Натрий", "group": 0},
-      {"text": "Кислород", "group": 1}
-    ],
+    "text": "Кой от тези елементи е метал?",
+    "answer": "Живак",
+    "wrong": ["Сяра", "Въглерод", "Кислород"],
     "fact": "Живакът е единственият метал, който е течен при стайна температура.",
     "added": "2026-11-14",
-    "updated": "2026-11-14"
+    "changed": "2026-11-21",
+    "updated": "2026-11-21",
+    "checked": "2026-11-21",
+    "checkedBy": "retire-kinds opus-5.5",
+    "sources": ["https://en.wikipedia.org/wiki/Mercury_(element)"]
   },
   {
     "id": "sci-964",
-    "type": "clues",
+    "type": "choice",
     "difficulty": "easy",
-    "text": "Кой учен е това?",
-    "clues": [
-      "Открива два химични елемента и кръщава единия на родината си.",
-      "Единственият човек с Нобелова награда в две природни науки.",
-      "Родена е във Варшава и работи заедно с мъжа си Пиер."
-    ],
+    "text": "Кой е единственият човек с Нобелови награди в две различни природни науки?",
     "answer": "Мария Кюри",
     "wrong": ["Лиза Майтнер", "Розалинд Франклин", "Ада Лъвлейс"],
     "fact": "Записките на Мария Кюри и днес са радиоактивни и се пазят в оловни кутии.",
     "added": "2026-11-14",
-    "updated": "2026-11-14"
+    "changed": "2026-11-21",
+    "updated": "2026-11-21",
+    "checked": "2026-11-21",
+    "checkedBy": "retire-kinds opus-5.5",
+    "sources": ["https://en.wikipedia.org/wiki/Marie_Curie"]
   }
 ]

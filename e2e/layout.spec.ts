@@ -4,7 +4,7 @@
 //
 // - Днес keeps its budget in the HTML's order and shows „Започни“ whole and high; the day's first question (its head
 //   has the issue and the clock), its answer and the day's result scroll nowhere sideways, the clock never over the count, the answer's panel never squeezed.
-// - Every kind of question (the longest the tests' bank has, the real bank's orders, pairs, choices and a portrait
+// - Every kind of question (the longest the tests' bank has, the real bank's orders, choices and a portrait
 //   where it's here: kinds.ts, bank.ts), answered right, wrong and close: from 375 × 600 at the usual
 //   text what answers it and its action whole in sight, nothing under the action (at 320 × 568 every control a
 //   scroll away, the first answer in sight; a picture never under 120px); once answered the player's row,
@@ -165,7 +165,7 @@ async function startsInSight(page: Page, scrolls: boolean): Promise<string[]> {
     if (!scrolls) return out;
     const head = document.querySelector(".question-top")?.getBoundingClientRect().bottom ?? 0;
     const first = document.querySelector(
-      `article.question .answering :is(.options > .option, .keypad .key, .match-item, .split-card.top, .tf-options > .option)`,
+      `article.question .answering :is(.options > .option, .keypad .key, .tf-options > .option)`,
     );
     const r = first?.getBoundingClientRect();
     if (!r) out.push("nothing that answers it");
@@ -254,22 +254,13 @@ async function placeFlaws(page: Page): Promise<string[]> {
  * the screen's foot over what scrolls under them, which a player scrolls past and a test's click won't. */
 async function answerAnyhow(page: Page): Promise<void> {
   const q = page.locator("article.question");
-  await expect(q.locator(".split, .options, .keypad, .tf-options, .match").first()).toBeVisible();
+  await expect(q.locator(".options, .keypad, .tf-options").first()).toBeVisible();
   const tap = (l: ReturnType<Page["locator"]>) => l.dispatchEvent("click");
   if (await q.locator(".keypad").count()) {
     for (const k of "1900") await tap(q.locator(".keypad").getByRole("button", { name: k, exact: true }));
     await tap(q.getByRole("button", { name: "Отговори" }));
   } else if (await q.locator(".sortable-list").count()) {
     await tap(q.getByRole("button", { name: "Готово" }));
-  } else if (await q.locator(".match").count()) {
-    const [left, right] = [q.locator(".match-col").first(), q.locator(".match-col").last()];
-    for (let i = 0; i < 4; i++) {
-      await tap(left.locator(".match-item").nth(i));
-      await tap(right.locator(".match-item").nth(i));
-    }
-    await tap(q.getByRole("button", { name: "Готово" }));
-  } else if (await q.locator(".split").count()) {
-    for (let i = 0; i < 6; i++) await tap(q.locator(".split-side").first());
   } else if (await q.locator(".tf-options").count()) {
     await tap(q.getByRole("button", { name: "Вярно", exact: true }));
   } else {
@@ -421,7 +412,7 @@ for (const size of sizes)
       });
 
       // Every kind, at its longest, each with its fact as the bank's questions have; close only where an answer can
-      // be (a number, an order, pairs, groups).
+      // be (a number, an order).
       for (const how of ["right", "wrong", "close"] as const)
         test(`every kind of question, answered ${how}: what answers it, then the answer and „Напред“`, async ({
           page,
@@ -448,9 +439,8 @@ for (const size of sizes)
                 fullPage: big,
               });
           };
-          const cells = "article.question :is(.options .option, .match-item, .split-side, .split-card.top)";
-          const controls = `article.question :is(.keypad button, .match-item, .split-side, .split-back:not([hidden]),
-            .options .option, .answering .btn)`;
+          const cells = "article.question .options .option";
+          const controls = "article.question :is(.keypad button, .options .option, .answering .btn)";
           for (const [n, { name, q }] of all.entries()) {
             const where = `${name} (${q.id})`;
             await expect(page.locator(".question-head")).toContainText(`${n + 1} от ${all.length}`, {
@@ -587,7 +577,7 @@ async function landed(page: Page): Promise<string[]> {
     const box = (s: string) => document.querySelector(s)?.getBoundingClientRect();
     const head = box(".question-top")?.bottom ?? 0;
     for (const el of document.querySelectorAll(
-      "article.question > :is(.q-leaf, .picture), article.question .answering :is(.option, .hint, .clues > *, .clues-next)",
+      "article.question > :is(.q-leaf, .picture), article.question .answering :is(.option, .hint)",
     )) {
       const r = el.getBoundingClientRect();
       if (r.height && r.top < head - 1 && r.bottom > head + 1)
@@ -627,20 +617,20 @@ async function answerInPlace(page: Page, type: string): Promise<string[]> {
     }
     const parts = [
       ...document.querySelectorAll(
-        "article.question > :is(.q-leaf, .picture), article.question .answering :is(.options > *, .clues > *, .clues-next)",
+        "article.question > :is(.q-leaf, .picture), article.question .answering .options > *",
       ),
     ].map((el) => ({ el, r: el.getBoundingClientRect() }));
     for (const { el, r } of parts)
       if (r.height && r.top < head - 1 && r.bottom > head + 1 && !rows.includes(el))
         out.push(`a scrap under the head: ${el.className} [${Math.round(r.top)}–${Math.round(r.bottom)}]`);
-    // The docked panel ends what's over it at an edge: never across a row (an order's, pairs', groups', a choice's).
+    // The docked panel ends what's over it at an edge: never across a row (an order's, a choice's).
     if (getComputedStyle(after).position === "fixed")
       for (const { el, r } of parts)
         if (r.height && r.top < foot - 1 && r.bottom > foot + 1 && el.closest(".answering"))
           out.push(`a row cut by the panel: ${el.className} [${Math.round(r.top)}–${Math.round(r.bottom)}]`);
     const leaf = document.querySelector("article.question .q-leaf");
     if (!leaf) out.push("no question's sheet (.q-leaf)");
-    else if (type === "choice" || type === "clues") {
+    else if (type === "choice") {
       const bottom = Math.max(...rows.map((r) => r.getBoundingClientRect().bottom));
       const edge = parts.some(({ r }) => r.height && Math.abs(r.bottom - head) <= 2);
       if (leaf.getBoundingClientRect().top < head - 1 && !(bottom > foot - 24) && !edge)
@@ -653,7 +643,7 @@ async function answerInPlace(page: Page, type: string): Promise<string[]> {
 /** A miss of a choice says the right answer in words, in the panel right under the verdict and how many got it (when
  * that's said); not where the question names it, nor under a choice of pictures, each named under it. */
 async function rightSaid(page: Page, q: Q): Promise<void> {
-  if (q.type !== "choice" && q.type !== "clues") return;
+  if (q.type !== "choice") return;
   const word = String(q.answer).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const named = new RegExp(`(?<!\\p{L})${word}(?!\\p{L})`, "iu").test(q.text);
   const said = page.locator(".after .right-said");
@@ -738,7 +728,7 @@ test.describe("on a laptop, 1366 × 650", () => {
         await expect(page.locator(".question-head")).toContainText(`${n + 1} от ${all.length}`, { timeout: 10_000 });
         await expect(page.locator("article.question .answering")).toBeVisible();
         await settled(page);
-        if (["number", "order", "match"].includes(q.type)) {
+        if (["number", "order"].includes(q.type)) {
           const box = await page.locator(".answering .btn.primary").first().boundingBox();
           expect.soft(box && box.y + box.height, `${where}: its action below the screen`).toBeLessThanOrEqual(650);
         }

@@ -2044,7 +2044,7 @@
     color: var(--ink);
   }
 
-  /* A part of the answer the player didn't have („Подреди“, „Свържи“, „Раздели“): the row is the right answer; it's
+  /* A part of the answer the player didn't have (an order's row in the wrong place): the row is the right answer; it's
      dashed, with a ✕ in a dashed ring and „ти: …“ under its words for what the player gave instead. */
   .option.amiss {
     padding-block: var(--space-2);
@@ -2065,12 +2065,12 @@
     height: 13px;
   }
 
-  /* In a list (an order, pairs, groups), a row the player had right: outlined in ink, a solid ✓. */
-  :is(.sortable-list, .match-result, .split-result) > .option.right {
+  /* In an order, a row the player had right: outlined in ink, a solid ✓. */
+  .sortable-list > .option.right {
     border-width: 2px;
   }
 
-  :is(.sortable-list, .match-result, .split-result) > .option.right:not(.untaken) .sign {
+  .sortable-list > .option.right:not(.untaken) .sign {
     background: var(--ink);
     box-shadow: none;
     color: var(--bg);
@@ -2607,10 +2607,6 @@
     vertical-align: -1px;
   }
 
-  .match-decoy {
-    color: var(--ink-3);
-  }
-
   /* ---- A choice of pictures: two by two, each picture with its letter, and its name once answered ---- */
   .pic-options {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2696,286 +2692,6 @@
     margin-top: var(--space-2);
   }
 
-  /* ---- „Подсказки“: the clues out one under another, each with its number, and those to come in a line ---- */
-  .clues {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .clue {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    min-height: 3.5rem;
-    padding: 10px 14px 10px 10px;
-    border-radius: var(--r-2);
-    background: var(--surface);
-    box-shadow: inset 0 0 0 2px var(--line);
-    transition:
-      background-color 200ms ease,
-      box-shadow 200ms ease;
-  }
-
-  .clue-worth {
-    flex: none;
-    width: 1.25rem;
-    color: var(--ink);
-    font: 900 1.375rem / 1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-    text-align: right;
-  }
-
-  .clue-text {
-    flex: 1;
-    min-width: 0;
-    font-weight: 700;
-    line-height: 1.375rem;
-  }
-
-  /* The last clue out. */
-  .clue.now {
-    box-shadow: inset 0 0 0 2.5px var(--ink);
-  }
-
-  .clue.past .clue-worth {
-    color: var(--ink-3);
-    text-decoration: line-through;
-  }
-
-  /* The clues still to come, in one line under those out: „Още 2 подсказки: след 10 с и 20 с“. */
-  .clues-next {
-    margin-top: calc(-1 * var(--space-1));
-    color: var(--ink-3);
-    font: 700 0.875rem / 1.25 var(--font-sans);
-  }
-
-  /* ---- „Раздели“: the things one by one on a card, sent left or right; the two groups under them ---- */
-  .split {
-    display: grid;
-    gap: var(--space-3);
-  }
-
-  .split-deck {
-    position: relative;
-    display: grid;
-    place-items: center;
-    height: 11rem;
-    touch-action: pan-y;
-  }
-
-  .split-card {
-    position: absolute;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    place-items: center;
-    width: 82%;
-    min-height: 9rem;
-    padding: var(--space-5) var(--space-4);
-    border-radius: var(--r-3);
-    background: var(--surface);
-    box-shadow:
-      inset 0 0 0 2px var(--line-2),
-      var(--lift);
-    font-size: 1.375rem;
-    line-height: 1.75rem;
-    font-weight: 900;
-    text-align: center;
-    text-wrap: balance;
-    overflow-wrap: break-word;
-    user-select: none;
-    touch-action: none;
-    cursor: grab;
-    transition:
-      transform 220ms ease,
-      opacity 220ms ease;
-  }
-
-  .split-card.under {
-    transform: translateY(10px) scale(0.94);
-    opacity: 0.5;
-    cursor: default;
-  }
-
-  .split-card.dragging {
-    cursor: grabbing;
-    transition: none;
-  }
-
-  .split-card.gone {
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .split-card.went-left {
-    transform: translateX(-130%) rotate(-14deg);
-  }
-
-  .split-card.went-right {
-    transform: translateX(130%) rotate(14deg);
-  }
-
-  /* While dragged far enough, the card names the group it's going to. One shows at a time, so each may take the
-     card's width: at half of it, a group's words held together („1878 г.“) broke at twice the text on a small phone. */
-  .split-lean {
-    position: absolute;
-    top: var(--space-3);
-    max-width: calc(100% - 2 * var(--space-3));
-    padding: 4px 10px;
-    border-radius: var(--radius-full);
-    background: var(--ink);
-    color: var(--bg);
-    font: 900 0.75rem / 1.2 var(--font-sans);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    opacity: 0;
-    transition: opacity 120ms ease;
-  }
-
-  .split-lean.on-left {
-    left: var(--space-3);
-  }
-
-  .split-lean.on-right {
-    right: var(--space-3);
-  }
-
-  .split-card.lean-left .split-lean.on-left,
-  .split-card.lean-right .split-lean.on-right {
-    opacity: 1;
-  }
-
-  .split-text {
-    justify-self: center;
-    text-align: center;
-  }
-
-  .split-sides {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-
-  .option.split-side {
-    justify-content: center;
-    gap: var(--space-2);
-    padding: 10px var(--space-3);
-    font-weight: 900;
-    text-align: center;
-  }
-
-  .option.split-side > span.split-label {
-    flex: 0 1 auto;
-    min-width: 0;
-  }
-
-  .option.split-side > span.split-arrow {
-    flex: none;
-    color: var(--ink-3);
-  }
-
-  .split-foot {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    min-height: 2rem;
-  }
-
-  .split-pips {
-    display: flex;
-    gap: 6px;
-  }
-
-  /* „Върни последното“: a link to look at, a thumb's room to tap (44px), the foot's height kept. */
-  .split-back {
-    display: inline-flex;
-    align-items: center;
-    min-height: 44px;
-    margin: -6px calc(-1 * var(--space-2)) -6px 0;
-    padding-inline: var(--space-2);
-  }
-
-  .split-pips b {
-    width: 20px;
-    height: 8px;
-    border-radius: 3px;
-    background: var(--line);
-    box-shadow: inset 0 0 0 1.5px var(--line-2);
-  }
-
-  .split-pips b.done {
-    background: var(--ink);
-    box-shadow: none;
-  }
-
-  .split-result {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .split-pair {
-    flex: 1;
-    min-width: 0;
-  }
-
-  /* ---- „Свържи“: two columns, and a line for each pair joined, in the pair's own colour with its number. A long
-     word breaks by its syllables (lib/words.ts) ---- */
-  .match {
-    position: relative;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-    column-gap: 40px;
-  }
-
-  .match-col {
-    display: grid;
-    align-content: start;
-    gap: var(--space-2);
-  }
-
-  .match-lines {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-    pointer-events: none;
-  }
-
-  .match-lines line {
-    stroke: var(--ink);
-    stroke-width: 3;
-    stroke-linecap: round;
-  }
-
-  .option.match-item {
-    min-height: 3.25rem;
-    padding: 6px 10px;
-    overflow: visible;
-    font-size: 1rem;
-    line-height: 1.25rem;
-  }
-
-  .match-col:first-of-type > .option.match-item {
-    padding-right: 18px;
-  }
-
-  .match-col:last-of-type > .option.match-item {
-    padding-left: 18px;
-  }
-
-  .option.match-item > span:nth-child(2) {
-    min-width: 0;
-    overflow-wrap: break-word;
-  }
-
   /* A word of a cell that may break (questions.ts, wholeWords): to the next line whole where it fits there, broken at
      its syllables only where it's wider than the cell. */
   .word {
@@ -2984,61 +2700,7 @@
     hyphens: auto;
   }
 
-  /* The letter on the cell's edge the line joins: a left one's always, a right one's once joined (its left one's). */
-  .option.match-item .letter {
-    position: absolute;
-    top: 50%;
-    z-index: 1;
-    width: 26px;
-    height: 26px;
-    border-radius: 8px;
-    box-shadow: 0 0 0 2px var(--line-2);
-    background: var(--surface);
-    font-size: 0.8125rem;
-    translate: 0 -50%;
-  }
-
-  .match-col:first-of-type .option.match-item .letter {
-    right: -15px;
-  }
-
-  .match-col:last-of-type .option.match-item .letter {
-    left: -15px;
-  }
-
-  .option.match-item .letter:empty {
-    display: none;
-  }
-
-  .option.match-item.chosen {
-    border-color: var(--ink);
-    box-shadow: inset 0 0 0 1px var(--ink);
-    background: var(--surface-2);
-  }
-
-  /* Joined: the right one takes its left one's letter, in ink. */
-  .option.match-item.joined {
-    border-color: var(--ink);
-  }
-
-  .option.match-item.joined .letter {
-    box-shadow: none;
-    background: var(--ink);
-    color: var(--bg);
-  }
-
-  .match-result {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .match-pair {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .match-gave {
+  .row-gave {
     display: block;
     color: var(--ink-2);
     font-size: 0.8125rem;
@@ -5938,7 +5600,7 @@
     overflow-wrap: break-word;
   }
 
-  /* An order, a match, a split: a line each, a size down. */
+  /* An order: a line each, a size down. */
   .miss-lines {
     display: grid;
     gap: 2px;
@@ -6829,7 +6491,6 @@
     .btn,
     .option,
     .option.crowd,
-    .split-card,
     .topic,
     .chip {
       transition: none;
@@ -7016,9 +6677,9 @@
       box-shadow: 0 -12px 28px rgb(22 19 43 / 0.16);
     }
 
-    /* An order, pairs or groups: the panel opens at its least (the verdict, how everyone did and the fact's first two
-       lines over „Напред“), so that the rows shown right stay in sight over it; the rest of the fact scrolls in it. */
-    .run-question:has(.sortable-list, .match, .split) .after {
+    /* An order: the panel opens at its least (the verdict, how everyone did and the fact's first two lines over
+       „Напред“), so that the rows shown right stay in sight over it; the rest of the fact scrolls in it. */
+    .run-question:has(.sortable-list) .after {
       min-height: var(--cover, 0px);
       max-height: max(var(--least, 10rem), var(--cover, 0px));
     }
@@ -7210,13 +6871,13 @@
     /* Начало's cards (tomorrow and its reminder, keeping the game): their buttons a hand's width too. */
 
     /* In a game: the question and its answers bigger, read from further away; a choice's answers two by two. A
-       list stays one column: things put in order (dragged up and down), and the rows of pairs and groups shown. */
+       list stays one column: things put in order (dragged up and down). */
     .playing .ask {
       font-size: 2rem;
       line-height: 2.5rem;
     }
 
-    .playing .options:not(.pic-options, .sortable-list, .match-result, .split-result) {
+    .playing .options:not(.pic-options, .sortable-list) {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
@@ -7226,8 +6887,8 @@
       line-height: 1.75rem;
     }
 
-    /* Rows of a list (things put in order, pairs, groups) stay a phone's height: all of them and „Готово“ in sight. */
-    .playing :is(.sortable-list, .match, .match-result, .split-result) .option {
+    /* Rows of a list (things put in order) stay a phone's height: all of them and „Готово“ in sight. */
+    .playing .sortable-list .option {
       min-height: 3.5rem;
       font-size: 1.125rem;
       line-height: 1.5rem;
@@ -7246,7 +6907,7 @@
       line-height: 1.75rem;
     }
 
-    .playing .options:not(.pic-options, .sortable-list, .match-result, .split-result) {
+    .playing .options:not(.pic-options, .sortable-list) {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
@@ -7258,7 +6919,7 @@
 
     /* Rows of a list too (more specific from 48rem, above). */
     .playing .option,
-    .playing :is(.sortable-list, .match, .match-result, .split-result) .option {
+    .playing .sortable-list .option {
       min-height: 3rem;
       padding-block: 6px;
       font-size: 1.0625rem;
@@ -7299,17 +6960,6 @@
 
     .playing .option.tf > .tf-line {
       flex: 0 1 auto;
-    }
-
-    .playing .clues {
-      gap: var(--space-1);
-    }
-
-    /* Each clue a line's height: three of them and two rows of answers start on the screen, a row with an answer of
-       two lines too („Волфганг Амадеус Моцарт“ beside the room kept at its end). */
-    .playing .clue {
-      min-height: 2rem;
-      padding-block: 4px;
     }
 
     /* The answer's panel as wide as the question, its lines longer, fewer of them; how everyone answered and
@@ -7662,19 +7312,11 @@
       display: inline-grid;
       --g: 32px;
     }
-
-    /* „Свържи“: its cells 44px, the right column's five and „Готово“ under the question. */
-    .run-question .option.match-item {
-      min-height: 2.75rem;
-      padding-block: 3px;
-      font-size: 0.9375rem;
-      line-height: 1.125rem;
-    }
   }
 
   /* Under 620px of height (a 320 × 568 phone, Safari's 375 × 600): the sheet is the question with its chapter's glyph
      beside it (beside „Трудното число“ on the day's last: the chip's glyph alone), the question a size smaller; a
-     choice's answers 52px; „Свържи“'s line on how to answer gone once a cell is tapped. */
+     choice's answers 52px. */
   @media (max-width: 47.99rem) and (max-height: 38.75rem) {
     .run-question .q-leaf {
       gap: 8px;
@@ -7701,10 +7343,6 @@
 
     .run-question .q-leaf:not(:has(.hard-tag)) .ask {
       padding: 0;
-    }
-
-    .run-question .touched > .hint {
-      display: none;
     }
 
     .run-question .chip {
@@ -7760,21 +7398,21 @@
     }
   }
 
-  /* Under 680px of height (a 320 × 568 phone, Safari's 375 × 600 and 390 × 664), an order or pairs while asked: every
-     row and „Готово“ fit the screen. The sheet is the question beside its chapter's glyph, a size smaller and at most
-     three lines (a tap on it reads the rest: answering.ts, clamp); the rows and the cells 44px. */
+  /* Under 680px of height (a 320 × 568 phone, Safari's 375 × 600 and 390 × 664), an order while asked: every row and
+     „Готово“ fit the screen. The sheet is the question beside its chapter's glyph, a size smaller and at most three
+     lines (a tap on it reads the rest: answering.ts, clamp); the rows 44px. */
   @media (max-width: 47.99rem) and (max-height: 42.5rem) {
-    .run-question:not(.answered):has(.sortable-list, .match) {
+    .run-question:not(.answered):has(.sortable-list) {
       gap: 10px;
     }
 
     /* The rows right under the question, „Готово“ under them: no room left empty between the question and what it
        asks to put in place. */
-    .run-question:not(.answered):has(.sortable-list, .match) .answering {
+    .run-question:not(.answered):has(.sortable-list) .answering {
       margin-top: 0;
     }
 
-    .run-question:not(.answered):has(.sortable-list, .match) .q-leaf {
+    .run-question:not(.answered):has(.sortable-list) .q-leaf {
       grid-template-columns: auto minmax(0, 1fr);
       align-items: center;
       gap: 10px;
@@ -7783,17 +7421,17 @@
       border-radius: var(--r-2);
     }
 
-    .run-question:not(.answered):has(.sortable-list, .match) .q-leaf > .q-tags {
+    .run-question:not(.answered):has(.sortable-list) .q-leaf > .q-tags {
       display: none;
     }
 
-    .run-question:not(.answered):has(.sortable-list, .match) .q-leaf > .q-mini {
+    .run-question:not(.answered):has(.sortable-list) .q-leaf > .q-mini {
       display: inline-grid;
       --g: 32px;
     }
 
     /* Cut, where its rows need the room, at a whole word with „…“ (answering.ts, clamp), the same in every engine. */
-    .run-question:not(.answered):has(.sortable-list, .match) .ask {
+    .run-question:not(.answered):has(.sortable-list) .ask {
       --clamp: on;
       padding: 0;
       font-size: 1rem;
@@ -7804,7 +7442,7 @@
       cursor: pointer;
     }
 
-    .run-question:not(.answered):has(.sortable-list, .match) .hint {
+    .run-question:not(.answered):has(.sortable-list) .hint {
       font-size: 0.8125rem;
       line-height: 1.3;
     }
@@ -7818,32 +7456,6 @@
       padding-block: 3px;
       font-size: 0.9375rem;
       line-height: 1.2;
-    }
-
-    /* The right column holds one cell more than the left (the one left without a pair): it has more of the width,
-       so that the two come out about as tall. The letters on the cells' edges still clear each other (2 × 15px). */
-    .run-question .match {
-      grid-template-columns: minmax(0, 4fr) minmax(0, 5fr);
-      column-gap: 32px;
-    }
-
-    .run-question .match-col {
-      gap: 6px;
-    }
-
-    .run-question .option.match-item {
-      min-height: 2.75rem;
-      padding: 3px 8px;
-      font-size: 0.875rem;
-      line-height: 1.0625rem;
-    }
-
-    .run-question .match-col:first-of-type > .option.match-item {
-      padding-right: 14px;
-    }
-
-    .run-question .match-col:last-of-type > .option.match-item {
-      padding-left: 14px;
     }
   }
 
@@ -8239,41 +7851,15 @@
     text-align: left;
   }
 
-  /* „Раздели“: the two groups one over the other, each the column's width; „Върни последното“ under the pips. */
-  .tight .split-sides {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  /* An order or pairs with few words to a line: the line on how to answer is read, not shown (the rows' grips and
-     letters say it), so that the first rows show over „Готово“ as the question opens. */
-  .tighter .run-question:not(.answered):has(.sortable-list, .match) .answering .hint {
+  /* An order with few words to a line: the line on how to answer is read, not shown (the rows' grips say it), so that
+     the first rows show over „Готово“ as the question opens. */
+  .tighter .run-question:not(.answered):has(.sortable-list) .answering .hint {
     position: absolute;
     width: 1px;
     height: 1px;
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
-  }
-
-  /* „Свържи“ with fewer words still to a line: the things on the left over those on the right, a cell the column's
-     width (a word whole in it), its letter beside its words; the letters say the pairs, with no lines. */
-  .tighter .match {
-    grid-template-columns: minmax(0, 1fr);
-    row-gap: var(--space-4);
-  }
-
-  .tighter .match-lines {
-    display: none;
-  }
-
-  .tighter .match-col > .option.match-item {
-    gap: var(--space-2);
-    padding-inline: 10px;
-  }
-
-  .tighter .option.match-item .letter {
-    position: static;
-    translate: none;
   }
 
   /* A choice answered, with few words to a line: its words keep the row's width, and what the answer brings goes in

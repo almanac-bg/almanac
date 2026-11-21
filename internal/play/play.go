@@ -71,17 +71,13 @@ const SlowReading = 12.0
 
 // limits are each kind's base and floor (Limit). The floors are set from the answer times the game keeps, so that
 // under 2% of people's answers run out of time (the Fable review, 20 Nov 2026; /admin shows the share by kind): a
-// true-or-not 20 s, a choice (a choice of pictures among them) or a number 35 s, an order, a match or a split (four
-// taps or more after reading) 60 s. Clues come bank.ClueEvery apart, the last 20 s in, then a choice: 60 s. A quick
-// player loses nothing: nothing is paid for speed.
+// true-or-not 20 s, a choice (a choice of pictures among them) or a number 35 s, an order (four taps or more after
+// reading) 60 s. A quick player loses nothing: nothing is paid for speed.
 var limits = map[string]struct{ base, floor time.Duration }{
 	"truefalse": {8 * time.Second, 20 * time.Second},
 	"choice":    {12 * time.Second, 35 * time.Second},
 	"number":    {15 * time.Second, 35 * time.Second},
 	"order":     {28 * time.Second, 60 * time.Second},
-	"match":     {28 * time.Second, 60 * time.Second},
-	"split":     {28 * time.Second, 60 * time.Second},
-	"clues":     {20 * time.Second, 60 * time.Second},
 }
 
 // LongestLimit is the longest any question is shown (Limit).
@@ -275,8 +271,6 @@ type Shown struct {
 	View     any    `json:"view"`
 	LimitMs  int64  `json:"limitMs"`
 	LeftMs   int64  `json:"leftMs"`
-	// MoreMs is how soon more of the question shows (the next clue): look again then. 0 for nothing more.
-	MoreMs int64 `json:"moreMs,omitempty"`
 	// StartsMs is how soon its time starts by itself, while it waits for its pictures: the screen starts it sooner
 	// (Start), once they're in. 0 once it runs.
 	StartsMs int64 `json:"startsMs,omitempty"`
@@ -333,13 +327,13 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 			limit := Limit(d.Question())
 			since := g.Now().Sub(time.UnixMilli(r.shownAt.Int64))
 			s.Question = &Shown{
-				N: r.at, Category: d.Question().Base().Category, View: bank.ViewAt(d, max(0, since)),
+				N: r.at, Category: d.Question().Base().Category, View: d.View(),
 				LimitMs: limit.Milliseconds(), LeftMs: max(0, min(limit, limit-since).Milliseconds()),
-				MoreMs: bank.NextStep(d, max(0, since)).Milliseconds(), StartsMs: max(0, -since.Milliseconds()),
+				StartsMs:  max(0, -since.Milliseconds()),
 				OnThisDay: r.dealtOn() != "" && d.Question().Extra().OnDay(r.dealtOn()),
 			}
 			if since < 0 { // waiting for its pictures: those only, until its time runs
-				s.Question.View, s.Question.MoreMs = bank.PicturesView(d), 0
+				s.Question.View = bank.PicturesView(d)
 			}
 		}
 	}
@@ -653,7 +647,7 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 			res.TimedOut = true
 		case len(answer) == 0 || string(answer) == "null":
 		default:
-			if gr, err = bank.GradeAt(d, answer, since); err != nil {
+			if gr, err = d.Grade(answer); err != nil {
 				return ErrBadAnswer
 			}
 		}
@@ -720,7 +714,7 @@ func (g *Game) again(tx *sql.Tx, r *run, n int) (Result, bank.Dealt, error) {
 	took := time.Duration(ms) * time.Millisecond
 	if given.Valid {
 		res.Given = json.RawMessage(shown.String)
-		if gr, err := bank.GradeAt(d, json.RawMessage(given.String), took); err == nil {
+		if gr, err := d.Grade(json.RawMessage(given.String)); err == nil {
 			res.Exact = gr.Exact
 		}
 	} else {

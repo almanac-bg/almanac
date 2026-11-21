@@ -11,6 +11,7 @@ import (
 // every keepEvery.
 func TestCountsKeptOverARestart(t *testing.T) {
 	w := setup(t)
+	w.askedSinceBefore()
 	ctx := t.Context()
 	w.g.CrowdMin = 1
 	ana := w.user()

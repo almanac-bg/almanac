@@ -21,15 +21,15 @@ never edit it), `<work>` (this pass's folder) and your chunk's name.
 ## For each item, decide one
 
 - **change**: fix it in place when it still asks the same thing, better. Set `updated` to today; set `changed` to
-  today too if what it asks changed (text, answer, options, items, pairs, decoy, clues, groups, picture, tolerance,
-  unit, step, scale, direction), and leave `changed` as it was if only the fact, the `day` line or a label changed.
+  today too if what it asks changed (text, answer, options, items, picture, tolerance, unit, step, scale,
+  direction), and leave `changed` as it was if only the fact, the `day` line or a label changed.
   Keep `added`. Update `sources`: the pages you read for the fix (keep the old ones that still hold).
 - **replace**: when the fix would ask something else (another subject or answer), or the question can't be saved:
   retire it (`why`: wrong, stale, weak, twin, giveaway or rule) and write a new question **in the same cell** (same
   category, kind, difficulty, with a picture if it had one), with the next id from your chunk's `ids`, `added` and
   `updated` today, `sources`, a fact, `day` if dated. Rule `estimate` is the exception: a small count becomes a
   **choice** about the same subject, in the same difficulty.
-- **waive** a hint's false alarm: `answer-giveaway`, `pair-giveaway` and `long-answer` are hints, found by the words
+- **waive** a hint's false alarm: `answer-giveaway` and `long-answer` are hints, found by the words
   alone; when the other question is about something else (the answer is only named, not told for that subject), waive
   it and say what each asks. Never to keep a real give-away.
 - **waive**: only a true exception to a rule (a question about a word itself, a proverb to finish, a temperature
@@ -39,7 +39,7 @@ never edit it), `<work>` (this pass's folder) and your chunk's name.
 
 What the rules ask (the questions skill has the details):
 
-- **giveaway, pair-giveaway, shared-items, answer-word, options, long-answer**: remove the leak or the tell with the
+- **giveaway, shared-items, answer-word, options, long-answer**: remove the leak or the tell with the
   smallest change: drop a year from a fact, change an option or an item, reword. The question named on the other side
   may be the one to change; change whichever loses least, and only one of the two.
 - **same-identity**: keep the better of the two, replace the other (`why`: twin).
@@ -85,7 +85,7 @@ What the rules ask (the questions skill has the details):
   `<work>/fix/<chunk>/images/`. A photograph of a thing (a sculpture, an egg, a tablet) needs a free licence for the
   photograph itself: PD-old covers the work, not someone's photo of it (a museum's CC0 does). Grep the bank's `image`
   sources and alt texts first: the same picture, or the same subject, must not be in another question.
-- **decoy, order-gap, fact, spelling, typography, ending, address, language**: as the rule's message says.
+- **order-gap, fact, spelling, typography, ending, address, language**: as the rule's message says.
 
 **Other chunks run beside yours.** Change a question outside your chunk only if `<work>/owners.json` doesn't list it
 (it maps every listed id to its chunk); if it lists it, fix your side, or leave the item and say why. And before you

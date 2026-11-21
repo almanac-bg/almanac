@@ -64,7 +64,10 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 			return Added{}, err
 		}
 		prefix, last := lastID(b.InCategory(c.ID))
-		qs, err := decodeFile(data, c.ID, func(line int, id, msg string) { fault("%s.json:%d: %s: %s", c.ID, line, id, msg) })
+		qs, err := decodeFile(data, c.ID, func(line int, id, msg string) { fault("%s.json:%d: %s: %s", c.ID, line, id, msg) },
+			func(line int, id, _ string, _ json.RawMessage) {
+				fault("%s.json:%d: %s: a question of a retired kind: a batch has only the kinds the game has", c.ID, line, id)
+			})
 		if err != nil {
 			fault("%s.json: %v", c.ID, err)
 			continue
@@ -77,6 +80,19 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 				continue
 			}
 			seen[id] = true
+			if l, ok := b.left[id]; ok {
+				// A question of a retired kind, made one the game has by the same id: changed today, whole.
+				if t := item.q.Extra(); l.category != c.ID {
+					fault("%s: a question of %s: it's changed in %s.json", at, l.category, l.category)
+				} else if t.Updated != today || t.Changed != today {
+					fault("%s: a question of a retired kind made another: updated and changed are today (%s)", at, today)
+				}
+				if t := item.q.Extra(); checkedBy != "" && t.CheckedBy == "" {
+					t.Checked, t.CheckedBy = today, checkedBy
+				}
+				changes[id] = item.q
+				continue
+			}
 			if old, ok := b.Get(id); ok {
 				faults := changeFaults(old, item.q, c.ID, today)
 				for _, f := range faults {
@@ -180,13 +196,7 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 		}
 	}
 	for _, c := range b.Categories {
-		qs := b.InCategory(c.ID)
-		for i, q := range qs {
-			if changed, ok := changes[q.Base().ID]; ok {
-				qs[i] = changed
-			}
-		}
-		if err := WriteCategory(tmp, c.ID, append(qs, news[c.ID]...)); err != nil {
+		if err := b.Write(tmp, c.ID, changes, news[c.ID]); err != nil {
 			return Added{}, err
 		}
 	}
@@ -240,7 +250,7 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 		}
 	}
 	for _, c := range b.Categories {
-		if err := WriteCategory(dir, c.ID, after.InCategory(c.ID)); err != nil {
+		if err := after.Write(dir, c.ID, nil, nil); err != nil {
 			return Added{}, err
 		}
 	}
@@ -290,8 +300,8 @@ func changeFaults(old, q Question, category, today string) []string {
 
 // notAsked are a question's fields that aren't what it asks: its labels (difficulty, days, Bulgaria), the fact and
 // the day's line, its dates, sources and retirement. Players' answers from before a change to them were to the same
-// question (Tail.Changed). Every other field is what it asks: the text, the answer and options, items, pairs, decoy,
-// clues, groups, a number's unit, step, scale and tolerance, an order's direction, the type, a picture; each type's
+// question (Tail.Changed). Every other field is what it asks: the text, the answer and options, items, a number's
+// unit, step, scale and tolerance, an order's direction, the type, a picture; each type's
 // asked writes those out for its Version (version.go), and TestEveryFieldClassed holds every field to one or the other.
 var notAsked = map[string]bool{
 	"id": true, "difficulty": true, "fact": true, "day": true, "on": true, "bg": true, "sources": true,

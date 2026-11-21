@@ -10,13 +10,12 @@ import (
 )
 
 // The clock is a base for the kind and a slow reader's time to read the question, never under the kind's floor: 20 s
-// for a true-or-not, 35 s for a choice or a number, 60 s for an order, a match, a split or clues; and never over
-// LongestLimit.
+// for a true-or-not, 35 s for a choice or a number, 60 s for an order; and never over LongestLimit.
 func TestLimitByLength(t *testing.T) {
 	short := bank.Head{Text: "Кратко?"}
 	for typ, floor := range map[string]time.Duration{
 		"truefalse": 20 * time.Second, "choice": 35 * time.Second, "number": 35 * time.Second,
-		"order": 60 * time.Second, "match": 60 * time.Second, "split": 60 * time.Second, "clues": 60 * time.Second,
+		"order": 60 * time.Second,
 	} {
 		h := short
 		h.Type = typ
@@ -28,12 +27,6 @@ func TestLimitByLength(t *testing.T) {
 			q = &bank.Number{Head: h}
 		case "order":
 			q = &bank.Order{Head: h}
-		case "match":
-			q = &bank.Match{Head: h}
-		case "split":
-			q = &bank.Split{Head: h}
-		case "clues":
-			q = &bank.Clues{Head: h}
 		default:
 			q = &bank.Choice{Head: h}
 		}

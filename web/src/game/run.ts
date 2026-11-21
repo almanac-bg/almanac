@@ -158,7 +158,7 @@ export function playRun(initial: State, done: (s: State) => Child, versus = "", 
     } else whenSeen(next);
   };
 
-  // What a screen reader says as the run goes (an answer's verdict, a clue come out): one live region for the whole
+  // What a screen reader says as the run goes (an answer's verdict): one live region for the whole
   // run (answering.ts).
   const { node: region, say } = liveRegion();
 
@@ -609,7 +609,7 @@ function question(
       const line = Number.parseFloat(getComputedStyle(fact).lineHeight) || 24;
       page.style.setProperty("--least", `${Math.ceil(fact.offsetTop + 2 * line + fade + foot.offsetHeight)}px`);
     }
-    // The rows over it (an order's, pairs', groups', a choice's others): it ends them at a row's edge, never across
+    // The rows over it (an order's, a choice's others): it ends them at a row's edge, never across
     // one. It covers the row it would cut (a scroll of the page away; never the player's row or the right one, kept
     // over it), and never less once it has. Taken as laid out, not as drawn coming in.
     if (edges && place === "fixed" && !after.hidden) {
@@ -671,7 +671,6 @@ function question(
     tries: 3,
     sendNone: true,
     focus: true,
-    say,
     // Out of step with the server (the run moved on elsewhere): where it stands now.
     handles: (err) => {
       if (err.code !== "out_of_step") return false;
@@ -775,7 +774,7 @@ function question(
     at(beats.crowd, () => shows(crowd));
     at(beats.fact, () => {
       for (const part of rest) shows(part);
-      // Where answering took the focus away with it (a pad, a list, a deck gone for their answer), it goes to the way
+      // Where answering took the focus away with it (a pad, a list gone for their answer), it goes to the way
       // on; on an answer chosen, it stays there.
       const focus = document.activeElement;
       if (!focus || focus === document.body || !focus.isConnected || (focus as HTMLElement).offsetParent === null)
@@ -784,24 +783,6 @@ function question(
       due = res.state.done ? reload : next;
     });
   };
-
-  // More of the question shows as its time runs (the next clue): the server sends it when it's due, not before.
-  let more = 0;
-  const lookAgain = (ms: number) => {
-    more = window.setTimeout(async () => {
-      if (ans.locked.peek()) return;
-      try {
-        const now = await api<State>("GET", `/api/runs/${s.id}`);
-        if (ans.locked.peek() || now.question?.n !== q.n) return;
-        asked.update?.(now.question.view);
-        if (now.question.moreMs) lookAgain(now.question.moreMs);
-      } catch {
-        lookAgain(1000); // a bad moment on the line: once more, soon
-      }
-    }, ms);
-  };
-  if (q.moreMs) lookAgain(q.moreMs);
-  onCleanup(() => clearTimeout(more));
 
   // Leaving while the question's time runs would cost it, as the time runs on the server: a way out (the arrow, back,
   // a place in the header) asks first. Leaving gives the question up, so the run waits between two questions, where
@@ -893,12 +874,11 @@ function theirLine(name: string, m: TheirMark | undefined): Child {
 }
 
 /** A choice missed (or let run out): the right answer in words in the panel, „Вярно е: Съединението.“, besides its
- * row outlined above (a number says „Отговорът: …“ on its scale; an order, pairs or groups, in their rows). */
+ * row outlined above (a number says „Отговорът: …“ on its scale; an order, in its rows). */
 function rightSaid(view: View, reveal: Reveal, kind: VerdictKind): Child {
   if (kind !== "wrong" && kind !== "time") return null;
-  if (view.type !== "choice" && view.type !== "clues") return null;
   // A choice of pictures names each under it; a question that names its answer has said it.
-  if (view.type === "choice" && view.pictures?.length) return null;
+  if (view.type !== "choice" || view.pictures?.length) return null;
   const name = answerWords(view, reveal);
   return name && !names(view.text, name) ? h("p", { class: "right-said" }, "Вярно е: ", h("b", null, name), ".") : null;
 }
@@ -930,7 +910,7 @@ const settling = { duration: 240, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" };
 
 /** Brings the answer into place, its panel shown by `show`, in one movement. On a phone the panel docks at the
  * screen's foot (app.css: it's fixed there) and the answers move up above it, the page moving just enough that the
- * right answer (or, for an order or pairs, the answer's top) shows between the head and the panel, the head's foot
+ * right answer (or, for an order, the answer's top) shows between the head and the panel, the head's foot
  * between two parts, never across one; on a laptop the panel shows under the answers, beside the question, and the
  * page moves just enough to show it whole, short of the right answer going under the head; at a tablet's width the
  * panel shows under the answers, and the page moves just enough to show it, short of the question's first line going
@@ -1018,8 +998,8 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
     const room = (top: number) => top - headFoot - 12;
     const above = room(docked ? box.top : ask.getBoundingClientRect().top);
     if (beside) {
-      // The whole panel over the screen's foot, a choice's right answer's top never under the head (an order's, pairs'
-      // or groups' rows, all of them the answer, are a scroll away on a short screen: the fact shows whole).
+      // The whole panel over the screen's foot, a choice's right answer's top never under the head (an order's rows,
+      // all of them the answer, are a scroll away on a short screen: the fact shows whole).
       const over = after.getBoundingClientRect().bottom - foot;
       const top = room(box.top);
       return over > 0 ? Math.max(0, right ? Math.min(over, top) : over) : Math.min(0, Math.max(top, over));
@@ -1059,7 +1039,7 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
     let cut = 0;
     // (Under the answers, the panel first: the right answer itself goes whole under the head too.)
     for (const el of page.querySelectorAll(
-      ":scope > .q-leaf, :scope > .picture, .answering :is(.hint, .option, .options > *, .clues > *, .clues-next)",
+      ":scope > .q-leaf, :scope > .picture, .answering :is(.hint, .option, .options > *)",
     )) {
       const r = el.getBoundingClientRect();
       if (r.height && (r.bottom <= top + 1 || !(docked || beside)) && r.top < foot - 1 && r.bottom > foot + 1)

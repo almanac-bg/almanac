@@ -14,7 +14,7 @@ import (
 // no two questions are the same. Two tools keep it in hand: a day holds one question of each subject (Subjects, read
 // by the day's draw), and `bank check` lists the subjects many questions name and the "who is this" questions that
 // share an answer (Repeats, SameIdentity), for whoever keeps the bank. What a question names is read from what a
-// player sees of it before the answer — its text, options, clues, items and pairs — never from its fact.
+// player sees of it before the answer — its text, options and items — never from its fact.
 
 // quotedTitle is a title in Bulgarian quotes: „Под игото“.
 var quotedTitle = regexp.MustCompile(`„([^„“]+)“`)
@@ -28,13 +28,11 @@ func subjectKey(s string) string {
 	return strings.ToLower(strings.Join(strings.Fields(s), " "))
 }
 
-// answerOf is a question's answer as one name (a choice's, clues', a number's with its unit), "" for the kinds whose
-// answer isn't one (true or not, an order, a match, a split).
+// answerOf is a question's answer as one name (a choice's, a number's with its unit), "" for the kinds whose answer
+// isn't one (true or not, an order).
 func answerOf(q Question) string {
 	switch q := q.(type) {
 	case *Choice:
-		return q.Answer
-	case *Clues:
 		return q.Answer
 	case *Number:
 		return AnswerText(q)
@@ -67,29 +65,14 @@ func subjectsOf(q Question) []string {
 	return out
 }
 
-// asked is what a player sees of a question before the answer, as sentences (the text, the clues) and labels (the
-// options, items, pairs, groups): a label is a name as a whole, a sentence names things inside it.
+// asked is what a player sees of a question before the answer, as sentences (the text) and labels (the options,
+// items): a label is a name as a whole, a sentence names things inside it.
 func asked(q Question) (sentences, labels []string) {
 	sentences = []string{q.Base().Text}
 	switch q := q.(type) {
 	case *Choice:
 		labels = q.options()
-	case *Clues:
-		sentences = append(sentences, q.Clues...)
-		labels = q.options()
 	case *Order:
-		for _, it := range q.Items {
-			labels = append(labels, it.Text)
-		}
-	case *Match:
-		for _, p := range q.Pairs {
-			labels = append(labels, p.Left, p.Right)
-		}
-		if q.Decoy != "" {
-			labels = append(labels, q.Decoy)
-		}
-	case *Split:
-		labels = append(labels, q.Groups[0], q.Groups[1])
 		for _, it := range q.Items {
 			labels = append(labels, it.Text)
 		}
@@ -206,16 +189,11 @@ func (b *Bank) Repeats(most int) []Subject {
 	return out
 }
 
-// identity is a "who or what is this" question: a choice with a picture, or clues. Two of them with one answer ask
+// identity is a "who or what is this" question: a choice with a picture. Two of them with one answer ask
 // the same thing twice, whatever their wording.
 func identity(q Question) bool {
-	switch q.(type) {
-	case *Choice:
-		return HasPictures(q)
-	case *Clues:
-		return true
-	}
-	return false
+	_, ok := q.(*Choice)
+	return ok && HasPictures(q)
 }
 
 // SameIdentity are the live "who or what is this" questions (identity) that share an answer: each group the answer,

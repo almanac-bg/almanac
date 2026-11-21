@@ -7,7 +7,7 @@ otherwise.
                                                           # /new-questions' verify/), pictures from beside them
 
 A sheet holds live questions as a player sees them: the text, the options in a fixed shuffled order with letters, the
-clues, the items, a picture as a file in <work>/blind/images (never a path into the bank). The answerers write
+items, a picture as a file in <work>/blind/images (never a path into the bank). The answerers write
 <work>/blind/answers/<n>.json: {id: {"a": <answer>, "sure": true|false}}. `compare` lists each question whose answer
 differs where the answerer was sure (a number: off by more than three tolerances); `worklist.py --judge blind` makes
 them judge items.
@@ -28,6 +28,8 @@ p.add_argument("--from", dest="src", default="")
 a = p.parse_args()
 out = f"{a.work}/blind"
 LETTERS = "ABCDEFGH"
+# Kinds the game retired (21 Nov 2026): never dealt, so never on a sheet; the bank turns any left into a choice.
+RETIRED = ("clues", "match", "split")
 
 
 IMAGES = {}  # a question's id: the folder its pictures are in
@@ -44,12 +46,13 @@ def live():
             if os.path.basename(f) == "retire.json":
                 continue
             for q in json.load(open(f)):
-                IMAGES[q["id"]] = f"{os.path.dirname(f)}/images"
-                yield q
+                if q["type"] not in RETIRED:
+                    IMAGES[q["id"]] = f"{os.path.dirname(f)}/images"
+                    yield q
         return
     for c in json.load(open(f"{a.bank}/categories.json")):
         for q in json.load(open(f"{a.bank}/questions/{c['id']}.json")):
-            if not q.get("retired"):
+            if not q.get("retired") and q["type"] not in RETIRED:
                 yield q
 
 
@@ -69,7 +72,7 @@ def sheet_item(q):
     if q.get("image"):
         s["picture"] = picture(q["image"], q["id"])
     t = q["type"]
-    if t in ("choice", "clues"):
+    if t == "choice":
         opts = [q["answer"]] + q["wrong"]
         pics = q.get("pictures")
         idx = shuffled(q["id"], list(range(len(opts))))
@@ -77,8 +80,6 @@ def sheet_item(q):
             s["options"] = {LETTERS[k]: {"picture": picture(pics[i], q["id"])} for k, i in enumerate(idx)}
         else:
             s["options"] = {LETTERS[k]: opts[i] for k, i in enumerate(idx)}
-        if t == "clues":
-            s["clues"] = q["clues"]
         return s, LETTERS[idx.index(0)]
     if t == "truefalse":
         return s, bool(q["answer"])
@@ -92,16 +93,6 @@ def sheet_item(q):
         vals = {LETTERS[k]: q["items"][i]["value"] for k, i in enumerate(idx)}
         key = sorted(vals, key=lambda L: vals[L], reverse=q.get("direction") == "desc")
         return s, "".join(key)
-    if t == "match":
-        rights = [p_["right"] for p_ in q["pairs"]] + ([q["decoy"]] if q.get("decoy") else [])
-        ridx = shuffled(q["id"], list(range(len(rights))))
-        s["left"] = [p_["left"] for p_ in q["pairs"]]
-        s["right"] = {LETTERS[k]: rights[i] for k, i in enumerate(ridx)}
-        return s, {p_["left"]: LETTERS[ridx.index(n)] for n, p_ in enumerate(q["pairs"])}
-    if t == "split":
-        s["groups"] = q["groups"]
-        s["items"] = [it["text"] for it in shuffled(q["id"], q["items"])]
-        return s, {it["text"]: q["groups"][it["group"]] for it in q["items"]}
     raise SystemExit(f"{q['id']}: a kind the blind pass doesn't know: {t}")
 
 
@@ -127,23 +118,16 @@ if a.do == "sheets":
 def readable(s, said):
     """What an answer says, in the question's words rather than the sheet's letters."""
     try:
-        if s["kind"] in ("choice", "clues"):
+        if s["kind"] == "choice":
             o = s["options"][str(said).strip().upper()[:1]]
             return o["picture"].rsplit("/", 1)[-1] if isinstance(o, dict) else o
         if s["kind"] == "order":
             return " → ".join(s["items"][L] for L in str(said).replace(" ", "").replace(",", "").upper())
-        if s["kind"] == "match":
-            return "; ".join(f"{l} — {s['right'].get(str(r).strip(), r)}" for l, r in said.items())
         if s["kind"] == "truefalse":
             return "вярно" if said in (True, "true") else "невярно"
     except (KeyError, AttributeError, TypeError):
         pass
     return json.dumps(said, ensure_ascii=False)
-
-
-def norm(s):
-    """A text as typed: the bank's no-break spaces („1856 г.“) are plain ones to an answerer."""
-    return " ".join(str(s).replace("\u00a0", " ").split())
 
 
 key = json.load(open(f"{out}/key.json"))
@@ -164,9 +148,6 @@ for i, k in key.items():
             off = True
     elif k["kind"] == "order":
         off = str(said).replace(" ", "").replace(",", "").upper() != want
-    elif k["kind"] in ("match", "split"):
-        got = {norm(x): norm(v) for x, v in said.items()} if isinstance(said, dict) else {}
-        off = any(got.get(norm(x)) != norm(v) for x, v in want.items())
     elif k["kind"] == "truefalse":
         off = said not in (want, str(want).lower())
     else:

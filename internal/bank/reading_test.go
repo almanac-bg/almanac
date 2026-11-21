@@ -15,9 +15,6 @@ func TestReading(t *testing.T) {
 		{&TrueFalse{Head: Head{Type: "truefalse", Text: "Луната е спътник на Земята."}}, 22},
 		{&Choice{Head: Head{Type: "choice", Text: "Коя?"}, Answer: "Аа", Wrong: []string{"Бб", "Вв", "Гг"}}, 3 + 8},
 		{&Number{Head: Head{Type: "number", Text: "Колко?"}, Unit: "км", Answer: 12345}, 5 + 2},
-		{&Match{Head: Head{Type: "match", Text: "Свържи:"}, Pairs: []MatchPair{{"А", "Б"}}, Decoy: "В"}, 6 + 3},
-		{&Split{Head: Head{Type: "split", Text: "Раздели:"}, Groups: [2]string{"Да", "Не"}, Items: []SplitItem{{Text: "x1"}}}, 7 + 4 + 2},
-		{&Clues{Head: Head{Type: "clues", Text: "Кой?"}, Clues: []string{"Едно.", "Две.", "Три."}, Answer: "А", Wrong: []string{"Б", "В", "Г"}}, 3 + 10 + 4},
 		{&Choice{Head: Head{Type: "choice", Text: "Кое?"}, Answer: "скрито", Pictures: make([]Image, 4)}, 3 + 4*PictureReading},
 	} {
 		if got := Reading(c.q); got != c.want {

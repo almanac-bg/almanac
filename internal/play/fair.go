@@ -52,14 +52,14 @@ var personRun = `shadow <> ` + strconv.Itoa(ShadowScript)
 // Floor is the least time a person takes to answer a question of its kind, as the server times it (from when it
 // showed the question to when the answer came, so the trip to the server and back is in it too). Seeing four options
 // and tapping one takes about half a second before reading a word (choice reaction time), so a tap under 0.7 s
-// wasn't read: a true-or-not, a choice, a clue. A number is read, typed and sent: 1.2 s. An order, a match or a
-// split is four taps or more after reading: 2 s. Each is well under what a quick player takes (they rarely answer
+// wasn't read: a true-or-not, a choice. A number is read, typed and sent: 1.2 s. An order is four taps or more after
+// reading: 2 s. Each is well under what a quick player takes (they rarely answer
 // under a second) and well over a script (tens of milliseconds).
 func Floor(q bank.Question) time.Duration {
 	switch q.Base().Type {
 	case "number":
 		return 1200 * time.Millisecond
-	case "order", "match", "split":
+	case "order":
 		return floorMost
 	}
 	return 700 * time.Millisecond

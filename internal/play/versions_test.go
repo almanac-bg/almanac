@@ -8,6 +8,7 @@ import (
 	mrand "math/rand/v2"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -330,5 +331,61 @@ func TestCountsStandOverAReload(t *testing.T) {
 	fresh.hard.settle()
 	if h, err := fresh.hardness(gone); err != nil || len(h.byID) == 0 {
 		t.Fatalf("the count its waiter left: %v", err)
+	}
+}
+
+// A version of a question of a retired kind (bank.RetiredKinds), kept from before the kind left, can't be dealt: a run
+// that meets it, shown or still to show, passes over it as over a question gone from the bank, and the game is gone
+// over without it; nothing fails.
+func TestRetiredKindPassedOver(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	w.reload(w.b)
+	const old = "00000000deadbeef"
+	if _, err := w.db.Write.Exec(`INSERT INTO question_versions (question_id, version, category, body, since)
+		VALUES ('geo-001', ?, 'geography', ?, 0)`, old, `{"id":"geo-001","type":"match","difficulty":"easy","text":"Свържи:",`+
+		`"pairs":[{"left":"А","right":"Б"},{"left":"В","right":"Г"},{"left":"Д","right":"Е"},{"left":"Ж","right":"З"}]}`); err != nil {
+		t.Fatal(err)
+	}
+	asOld := func(run int64, n int) {
+		if _, err := w.db.Write.Exec(`UPDATE runs SET questions = json_set(questions, ?, ?) WHERE id = ?`,
+			"$["+strconv.Itoa(n)+"].v", old, run); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Still to show: passed over, the run goes on to the next, and the review has the rest.
+	ana := w.user()
+	run := w.runOf(ana, "topic", "geo-001", "geo-002")
+	asOld(run, 0)
+	if _, ok := w.g.Deal(w.picks(run)[0]); ok {
+		t.Fatal("a version of a retired kind was dealt")
+	}
+	w.show(ana, run)
+	s, err := w.g.State(ctx, ana, run)
+	if err != nil || s.At != 1 {
+		t.Fatalf("the run on it: %+v %v", s, err)
+	}
+	w.show(ana, run)
+	w.wait(3 * time.Second)
+	if _, err := w.answer(ana, run, 1, w.right(run, 1)); err != nil {
+		t.Fatal(err)
+	}
+	review, err := w.g.Review(ctx, ana, run)
+	if err != nil || len(review) != 1 || review[0].N != 1 {
+		t.Fatalf("the review: %s %v", mustJSON(t, review), err)
+	}
+
+	// Shown as the kind left (a run in play at the deploy): its answer is out of step, and the run goes on past it.
+	bo := w.user()
+	run = w.runOf(bo, "topic", "geo-001", "geo-002")
+	w.show(bo, run)
+	asOld(run, 0)
+	w.wait(3 * time.Second)
+	if _, err := w.answer(bo, run, 0, json.RawMessage(`{"pairs":[0,1,2,3]}`)); !errors.Is(err, ErrOutOfStep) {
+		t.Fatalf("an answer to it: %v", err)
+	}
+	if s, err := w.g.State(ctx, bo, run); err != nil || s.At != 1 {
+		t.Fatalf("the run on it: %+v %v", s, err)
 	}
 }

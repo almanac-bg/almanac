@@ -3,19 +3,16 @@ package play
 import (
 	"math/rand/v2"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
 
-// slot is what a place in a run asks for: a difficulty, a type, and a picture or not. A slot for a kind still new to
-// the bank (alt set) takes alt instead where the pool has none of its own.
+// slot is what a place in a run asks for: a difficulty, a type, and a picture or not.
 type slot struct {
 	difficulty bank.Difficulty
 	typ        string
 	picture    picture
-	alt        string
 }
 
 type picture int8
@@ -27,20 +24,20 @@ const (
 )
 
 // daySlots is the day's shape: one question from each topic, easy to hard; a picture and a true-or-not among the easy
-// ones, an order, a split and a match among the medium ones, and a number among the hard ones. Where each sits in its
+// ones, an order among the medium ones, and a number among the hard ones, the rest choices. Where each sits in its
 // band is drawn with the day (inBands), the same for everyone who plays it, so that the days don't all have one shape.
 // A slot whose type a topic lacks takes a choice instead (choose).
 var daySlots = []slot{
-	{bank.Easy, "choice", noPicture, ""},
-	{bank.Easy, "choice", withPicture, ""},
-	{bank.Easy, "truefalse", noPicture, ""},
-	{bank.Medium, "choice", noPicture, ""},
-	{bank.Medium, "order", noPicture, ""},
-	{bank.Medium, "split", noPicture, "choice"},
-	{bank.Medium, "match", noPicture, ""},
-	{bank.Hard, "choice", noPicture, ""},
-	{bank.Hard, "choice", noPicture, ""},
-	{bank.Hard, "number", noPicture, ""},
+	{bank.Easy, "choice", noPicture},
+	{bank.Easy, "choice", withPicture},
+	{bank.Easy, "truefalse", noPicture},
+	{bank.Medium, "choice", noPicture},
+	{bank.Medium, "order", noPicture},
+	{bank.Medium, "choice", noPicture},
+	{bank.Medium, "choice", noPicture},
+	{bank.Hard, "choice", noPicture},
+	{bank.Hard, "choice", noPicture},
+	{bank.Hard, "number", noPicture},
 }
 
 // BGFloor is how many of a day's questions are about Bulgaria, at least, where the bank has them.
@@ -60,7 +57,7 @@ const BGFloor = 3
 // had no question fitting them just so, never a day's before (the number's: an estimate, or the date's own question):
 // a day ahead is drawn only with none short (ahead.go).
 func drawDay(b *bank.Bank, day string, used, answered, recent map[string]bool, r *rand.Rand) (picks []Pick, short []string) {
-	slots := lastNumber(inBands(newKind(slices.Clone(daySlots), r), r))
+	slots := lastNumber(inBands(slices.Clone(daySlots), r))
 	var topics []string
 	next := func(wants ...func(string) bool) string {
 		if len(topics) == 0 { // more slots than topics: round again
@@ -109,7 +106,7 @@ func drawDay(b *bank.Bank, day string, used, answered, recent map[string]bool, r
 			wants[i] = append(wants[i], has(func(q bank.Question) bool { return matches(q, s, true, true) }))
 		}
 		wants[i] = append(wants[i], has(func(q bank.Question) bool {
-			return matches(q, slot{q.Base().Difficulty, s.typ, s.picture, ""}, true, true)
+			return matches(q, slot{q.Base().Difficulty, s.typ, s.picture}, true, true)
 		}))
 	}
 	// The special slots choose first, the one with the fewest topics to choose from first (the day's order on a tie),
@@ -316,14 +313,10 @@ func Overdue(b *bank.Bank, day string) []string {
 	return out
 }
 
-// place names the place of a day a slot is (Runway.Place): "medium split/clues" for the new kinds' place, whichever
-// it has; "hard number (estimate)", for the day finishes on one.
+// place names the place of a day a slot is (Runway.Place): "medium order"; "hard number (estimate)", for the day
+// finishes on one.
 func (s slot) place() string {
-	kinds := s.typ
-	if slices.Contains(newKinds, s.typ) {
-		kinds = strings.Join(newKinds, "/")
-	}
-	name := string(s.difficulty) + " " + kinds
+	name := string(s.difficulty) + " " + s.typ
 	if s.typ == "number" {
 		name += " (estimate)"
 	}
@@ -342,12 +335,8 @@ func wishes(b *bank.Bank, s slot) []func(bank.Question) bool {
 	return nil
 }
 
-// newKinds are the kinds that take turns at the run's one slot for them ("split" in a run's shape): one or the other
-// in each run.
-var newKinds = []string{"split", "clues"}
-
 // inBands shuffles a run's slots within their difficulty: the run still goes from easy to hard, but where its special
-// questions sit (the true-or-not, the order, the match, the number) changes from run to run, so that no two games
+// questions sit (the true-or-not, the order, the number) changes from run to run, so that no two games
 // share one shape. The first stays where it is, a plain choice in every shape: a game opens gently, with four options
 // to read and tap. A day is drawn once for everyone (ahead.go): its shape is the same for all who play it.
 func inBands(slots []slot, r *rand.Rand) []slot {
@@ -406,16 +395,6 @@ func recentSubjects(b *bank.Bank, days map[string][]Pick, day string) map[string
 	return out
 }
 
-// newKind gives a run's slot for the new kinds one of them, at random.
-func newKind(slots []slot, r *rand.Rand) []slot {
-	for i := range slots {
-		if slots[i].typ == newKinds[0] {
-			slots[i].typ = newKinds[r.IntN(len(newKinds))]
-		}
-	}
-	return slots
-}
-
 // choose picks an allowed question for a slot from pool: one that fits the slot exactly if it can, else as close as it
 // gets — the type kept longest, then the difficulty — and, above the fit, the least stale (stale: 0 for a question new
 // to everyone the game is for, more the more of them have met it). So a question none of them has seen, however
@@ -423,9 +402,6 @@ func newKind(slots []slot, r *rand.Rand) []slot {
 // they've played while the bank has others. Of those, the first of prefer's wishes that any of them meets.
 func choose(pool []bank.Question, s slot, allowed func(bank.Question) bool, stale func(bank.Question) int,
 	prefer []func(bank.Question) bool, r *rand.Rand) bank.Question {
-	if s.alt != "" && !slices.ContainsFunc(pool, func(q bank.Question) bool { return q.Base().Type == s.typ && allowed(q) }) {
-		s.typ = s.alt
-	}
 	fits := []func(bank.Question) bool{
 		func(q bank.Question) bool { return matches(q, s, true, true) },
 	}
@@ -433,7 +409,7 @@ func choose(pool []bank.Question, s slot, allowed func(bank.Question) bool, stal
 	// picture comes before the same difficulty without.
 	if s.picture == withPicture {
 		for _, d := range nearest(s.difficulty) {
-			fits = append(fits, func(q bank.Question) bool { return matches(q, slot{d, s.typ, s.picture, ""}, true, true) })
+			fits = append(fits, func(q bank.Question) bool { return matches(q, slot{d, s.typ, s.picture}, true, true) })
 		}
 	}
 	fits = append(fits,
@@ -509,7 +485,7 @@ func Draw(b *bank.Bank, category string, ability float64, seen map[string]int, b
 	taken := map[string]bool{}
 	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] && !barred[q.Base().ID] }
 	var picks []Pick
-	for _, s := range inBands(newKind(topicSlots(ability), r), r) {
+	for _, s := range inBands(topicSlots(ability), r) {
 		if q := choose(pool, s, allowed, seenCount(seen), wishes(b, s), r); q != nil {
 			taken[q.Base().ID] = true
 			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})

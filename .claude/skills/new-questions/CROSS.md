@@ -23,7 +23,7 @@ and `<batch>` (this batch's folder).
    two ways, a value that differs by source) → change the wording or the option until one holds, or drop it; the key
    right and one reading → keep it. Don't open the answers to look for more: only these are doubts.
 1. **Pairs across categories.** Find every pair (or more) of questions across the ten verified files that ask the same
-   thing, share an answer about the same subject, or give each other away: a text, option, item, clue or fact that
+   thing, share an answer about the same subject, or give each other away: a text, option, item or fact that
    names another's answer, or shows a value an order or number question asks. For each, keep exactly one, the best
    written, in the category it fits best; drop or fix the others. Check the drops in the checkers' `verify/<cat>.md` too: a
    question dropped as a duplicate of another category's may be the one to keep, if the other side was dropped as well.

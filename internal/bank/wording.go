@@ -12,7 +12,7 @@ import (
 
 // The rules of a question's wording (the skill's „Bulgarian, as the bank writes it“): how its lines end, its
 // typography, its words and names, and what may go stale. They read everything a player reads: the text, the options,
-// items, pairs, clues, the fact, the day's line, a picture's description.
+// items, the fact, the day's line, a picture's description.
 
 // read is every line of a question a player reads, the fact, the day's line and the pictures' descriptions too.
 func read(q Question) []string {
@@ -39,13 +39,6 @@ func ruleEnding(q Question) []string {
 		}
 	} else if !strings.ContainsRune("?:", ends(text)) {
 		out = append(out, "a question ends in „?“ or „:“")
-	}
-	if c, ok := q.(*Clues); ok {
-		for _, clue := range c.Clues {
-			if !strings.ContainsRune(".!…", ends(clue)) {
-				out = append(out, "a clue is a sentence ending in a period: "+clue)
-			}
-		}
 	}
 	return out
 }
@@ -453,7 +446,7 @@ func ruleStalePresent(q Question) []string {
 	if tf, ok := q.(*TrueFalse); ok && !tf.Answer {
 		return nil
 	}
-	lines := append([]string{q.Base().Text, q.Extra().Fact, q.Extra().Day}, cluesOf(q)...)
+	lines := []string{q.Base().Text, q.Extra().Fact, q.Extra().Day}
 	if lifeOver.MatchString(strings.ToLower(strings.Join(lines, " "))) {
 		return nil
 	}
@@ -479,12 +472,4 @@ func sentences(line string) []string {
 		}
 	}
 	return append(out, line[from:])
-}
-
-// cluesOf are a question's clues, if it has any.
-func cluesOf(q Question) []string {
-	if c, ok := q.(*Clues); ok {
-		return c.Clues
-	}
-	return nil
 }

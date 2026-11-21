@@ -100,6 +100,7 @@ func TestScriptedRunsAreMarked(t *testing.T) {
 // others as if it counted; the others see the day without it.
 func TestScriptedDayIsTheirsAlone(t *testing.T) {
 	w := setup(t)
+	w.askedSinceBefore()
 	ctx := t.Context()
 	ana, bot, cy := w.user(), w.user(), w.user()
 	day := func(user int64, pace func(int) time.Duration, answer func(int64, int) json.RawMessage) {

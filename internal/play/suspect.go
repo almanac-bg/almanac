@@ -58,11 +58,11 @@ func (g *Game) Suspects(ctx context.Context) ([]Suspect, error) {
 func suspect(q bank.Question, c *bank.Crowd) string {
 	pct := func(v float64) string { return fmt.Sprintf("%.0f%%", 100*v) }
 	switch q := q.(type) {
-	case *bank.Choice, *bank.Clues:
+	case *bank.Choice:
 		if len(c.Picks) < 2 {
 			return ""
 		}
-		wrong := wrongOptions(q)
+		wrong := q.Wrong
 		best := 1
 		for i := 2; i < len(c.Picks); i++ {
 			if c.Picks[i] > c.Picks[best] {
@@ -87,14 +87,4 @@ func suspect(q bank.Question, c *bank.Crowd) string {
 		}
 	}
 	return ""
-}
-
-func wrongOptions(q bank.Question) []string {
-	switch q := q.(type) {
-	case *bank.Choice:
-		return q.Wrong
-	case *bank.Clues:
-		return q.Wrong
-	}
-	return nil
 }

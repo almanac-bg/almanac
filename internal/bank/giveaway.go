@@ -7,11 +7,10 @@ import (
 	"unicode"
 )
 
-// Give-aways across the bank: games mix topics, so one question's words can answer another's. Four rules look for
+// Give-aways across the bank: games mix topics, so one question's words can answer another's. Three rules look for
 // it: a value asked (a number's answer, a year a choice asks, an order's values) that another question shows next to
 // the same subject (ruleGiveaway); a choice's answer that another shows as true next to its subject
-// (ruleAnswerGiveaway); both sides of a match's pair shown together by another question
-// (rulePairGiveaway); two orders with items in common (ruleSharedItems).
+// (ruleAnswerGiveaway); two orders with items in common (ruleSharedItems).
 
 // secret is a value a question asks, with the words that say what it is the value of.
 type secret struct {
@@ -58,10 +57,6 @@ func secretsOf(q Question) []secret {
 		if v, ok := numericAnswer(q.Answer); ok {
 			return []secret{{q, v, "", stemSet(text), "the answer"}}
 		}
-	case *Clues:
-		if v, ok := numericAnswer(q.Answer); ok {
-			return []secret{{q, v, "", stemSet(append(q.Clues, text)...), "the answer"}}
-		}
 	case *Order:
 		var out []secret
 		for _, it := range q.Items {
@@ -93,24 +88,9 @@ func exposuresOf(q Question) []exposure {
 		if v, ok := numericAnswer(q.Answer); ok {
 			out = append(out, exposure{q, v, "", stemSet(text), "answer"})
 		}
-	case *Clues:
-		for _, c := range q.Clues {
-			in(c, "clue")
-		}
-		if v, ok := numericAnswer(q.Answer); ok {
-			out = append(out, exposure{q, v, "", stemSet(append(q.Clues, text)...), "answer"})
-		}
 	case *Order:
 		for _, it := range q.Items {
 			out = append(out, exposure{q, it.Value, q.Unit, stemSet(it.Text, text), "item „" + strings.Trim(it.Text, "„“") + "“"})
-		}
-	case *Match:
-		for _, p := range q.Pairs {
-			in(p.Left+" "+p.Right, "pair")
-		}
-	case *Split:
-		for _, it := range q.Items {
-			in(it.Text, "item")
 		}
 	}
 	return out
@@ -220,72 +200,6 @@ var kindStems = stemSet("през коя кой която който които
 // say is a value as a report writes it.
 func say(v float64) string { return sayNumber(v, 0.01) }
 
-// PairWindow is how close the two sides of a match's pair must stand in another question's line to give it away:
-// within this many words („Кучето Лайка“, „Харон, спътникът на Плутон“), not merely somewhere in one long sentence.
-const PairWindow = 4
-
-// rulePairGiveaway: a match's pair is given away by another question that shows both sides close together, in one
-// label or one sentence („Кучето Лайка“ for Лайка — Куче). A pair whose sides share a word (Германий — Германия) is
-// left out: it shows itself wherever the word comes.
-func rulePairGiveaway(l *lintBank) []finding {
-	type line struct {
-		q     Question
-		at    map[string][]int // each stem's word places
-		where string
-	}
-	places := wordPlaces
-	var lines []line
-	for _, q := range l.live {
-		sentences, labels := asked(q)
-		for _, s := range append(sentences, labels...) {
-			lines = append(lines, line{q, places(s), "„" + s + "“"})
-		}
-		if f := q.Extra().Fact; f != "" {
-			for _, s := range strings.SplitAfter(f, ". ") {
-				lines = append(lines, line{q, places(s), "its fact: " + strings.TrimSpace(s)})
-			}
-		}
-		if d := q.Extra().Day; d != "" {
-			lines = append(lines, line{q, places(d), "its day's line: " + d})
-		}
-	}
-	byStem := map[string][]int{}
-	for i, ln := range lines {
-		for s := range ln.at {
-			byStem[s] = append(byStem[s], i)
-		}
-	}
-	var out []finding
-	for _, q := range l.live {
-		m, ok := q.(*Match)
-		if !ok || m.Difficulty == Easy {
-			continue // an easy pair is what everyone associates already: seeing it elsewhere tells nothing new
-		}
-		for _, p := range m.Pairs {
-			left, right := stems(p.Left), stems(p.Right)
-			if len(left) == 0 || len(right) == 0 || slices.ContainsFunc(left, func(s string) bool { return slices.Contains(right, s) }) {
-				continue
-			}
-			both := append(left, right...)
-			seen := map[string]bool{}
-			for _, i := range byStem[left[0]] {
-				ln := lines[i]
-				id := ln.q.Base().ID
-				if ln.q == q || seen[id] || !together(ln.at, both) {
-					continue
-				}
-				if other, ok := ln.q.(*Match); ok && hasPair(other, p) {
-					continue // the same pair in two matches: shared-items' business
-				}
-				seen[id] = true
-				out = append(out, finding{ids: l.newer(q, ln.q), msg: fmt.Sprintf("%s's pair %s — %s shows together in %s: %s",
-					m.ID, p.Left, p.Right, id, ln.where)})
-			}
-		}
-	}
-	return out
-}
-
 // wordPlaces is each stem's word places in s. It keeps a longer word under its first four letters too, so that a word
 // of four (Куче) finds its longer forms (Кучето).
 func wordPlaces(s string) map[string][]int {
@@ -302,8 +216,7 @@ func wordPlaces(s string) map[string][]int {
 }
 
 // shownLines are the lines a question shows a player as true, each with the words around it: its text (unless it
-// is a false statement), its clues, its fact's sentences, its day's line, an order's items, a match's pairs, a split's
-// items. Not a choice's options: a name among four says nothing.
+// is a false statement), its fact's sentences, its day's line, an order's items. Not a choice's options: a name among four says nothing.
 func shownLines(q Question) []shownLine {
 	text := q.Base().Text
 	var out []shownLine
@@ -321,22 +234,9 @@ func shownLines(q Question) []shownLine {
 	if d := q.Extra().Day; d != "" {
 		add(d, "day's line")
 	}
-	switch q := q.(type) {
-	case *Clues:
-		for _, c := range q.Clues {
-			add(c, "clue")
-		}
-	case *Order:
-		for _, it := range q.Items {
+	if o, ok := q.(*Order); ok {
+		for _, it := range o.Items {
 			add(it.Text, "item")
-		}
-	case *Match:
-		for _, p := range q.Pairs {
-			add(p.Left+" — "+p.Right, "pair")
-		}
-	case *Split:
-		for _, it := range q.Items {
-			add(it.Text+" — "+q.Groups[it.Group], "item")
 		}
 	}
 	return out
@@ -362,7 +262,7 @@ func (l *lintBank) rarest(stems []string) float64 {
 	return best
 }
 
-// ruleAnswerGiveaway: a choice's or clues' answer that another question shows, as true, next to the asked answer's
+// ruleAnswerGiveaway: a choice's answer that another question shows, as true, next to the asked answer's
 // subject: „Кой композира музиката към филма „Вчера“?“ → Кирил Маричков, given away by a fact that says „…песента от
 // филма „Вчера“, по музика на Кирил Маричков“. The answer's words stand together in one line of the other question,
 // and that line and its question's text share with the asking question's text what GiveawayFrom asks of a value's
@@ -380,19 +280,11 @@ func ruleAnswerGiveaway(l *lintBank) []finding {
 	done := map[pair]bool{}
 	var out []finding
 	for _, q := range l.live {
-		var answer string
-		var subject map[string]bool
-		switch c := q.(type) {
-		case *Choice:
-			if len(c.Pictures) > 0 {
-				continue // the options are pictures: a name shown elsewhere doesn't pick one
-			}
-			answer, subject = c.Answer, stemSet(c.Text)
-		case *Clues:
-			answer, subject = c.Answer, stemSet(append(c.Clues, c.Text)...)
-		default:
-			continue
+		c, ok := q.(*Choice)
+		if !ok || len(c.Pictures) > 0 {
+			continue // not a choice, or its options are pictures: a name shown elsewhere doesn't pick one
 		}
+		answer, subject := c.Answer, stemSet(c.Text)
 		if strings.ContainsAny(answer, "0123456789") {
 			continue // a number, an amount, a share: ruleGiveaway's
 		}
@@ -421,7 +313,11 @@ func ruleAnswerGiveaway(l *lintBank) []finding {
 	return out
 }
 
-// together is whether every one of the stems has a place in at, all within PairWindow words of each other.
+// NearWindow is how close the words of an answer must stand in another question's line to give it away: within this
+// many words, not merely somewhere in one long sentence.
+const NearWindow = 4
+
+// together is whether every one of the stems has a place in at, all within NearWindow words of each other.
 func together(at map[string][]int, all []string) bool {
 	for _, a := range at[all[0]] {
 		lo, hi := a, a
@@ -437,15 +333,11 @@ func together(at map[string][]int, all []string) bool {
 			}
 			lo, hi = min(lo, best), max(hi, best)
 		}
-		if hi-lo <= PairWindow {
+		if hi-lo <= NearWindow {
 			return true
 		}
 	}
 	return false
-}
-
-func hasPair(m *Match, p MatchPair) bool {
-	return slices.ContainsFunc(m.Pairs, func(o MatchPair) bool { return fold(o.Left) == fold(p.Left) && fold(o.Right) == fold(p.Right) })
 }
 
 // Two orders give each other away when one's reveal (every value shown) orders the other's items: when they share
@@ -469,7 +361,7 @@ func itemKey(text string) string {
 	return strings.Join(key, " ")
 }
 
-// ruleSharedItems: two orders that share items (shared values, or the same order), and two matches that share a pair.
+// ruleSharedItems: two orders that share items (shared values, or the same order).
 func ruleSharedItems(l *lintBank) []finding {
 	type place struct {
 		rank  int
@@ -478,10 +370,8 @@ func ruleSharedItems(l *lintBank) []finding {
 	var orders []*Order
 	ranks := map[*Order]map[string]place{}
 	byItem := map[string][]*Order{}
-	pairs := map[string][]*Match{}
 	for _, q := range l.live {
-		switch q := q.(type) {
-		case *Order:
+		if q, ok := q.(*Order); ok {
 			at := map[string]place{}
 			for rank, i := range q.right() {
 				if k := itemKey(q.Items[i].Text); k != "" {
@@ -490,11 +380,6 @@ func ruleSharedItems(l *lintBank) []finding {
 				}
 			}
 			orders, ranks[q] = append(orders, q), at
-		case *Match:
-			for _, p := range q.Pairs {
-				k := fold(p.Left) + " — " + fold(p.Right)
-				pairs[k] = append(pairs[k], q)
-			}
 		}
 	}
 	var out []finding
@@ -529,19 +414,6 @@ func ruleSharedItems(l *lintBank) []finding {
 				}
 			}
 		}
-	}
-	both := map[[2]Question][]string{}
-	for k, qs := range pairs {
-		for _, b := range qs[1:] {
-			if b != qs[0] {
-				both[[2]Question{qs[0], b}] = append(both[[2]Question{qs[0], b}], k)
-			}
-		}
-	}
-	for ab, ps := range both {
-		slices.Sort(ps)
-		out = append(out, finding{ids: l.newer(ab[0], ab[1]), msg: fmt.Sprintf("%s and %s share %d pairs: %s",
-			ab[0].Base().ID, ab[1].Base().ID, len(ps), strings.Join(ps, "; "))})
 	}
 	slices.SortFunc(out, func(a, b finding) int { return strings.Compare(a.ids[0]+a.ids[1], b.ids[0]+b.ids[1]) })
 	return out
@@ -583,7 +455,7 @@ func ruleSameIdentity(l *lintBank) []finding {
 	return out
 }
 
-// TwinShared is how many options two choices (or clues) share, of their four, to be twins (ruleTwin), each of them
+// TwinShared is how many options two choices share, of their four, to be twins (ruleTwin), each of them
 // offered by TwinRare questions at most: options many questions offer (the countries, the planets, the
 // continents) are a kind's whole list, and two questions over them ask different things.
 const (
@@ -591,7 +463,7 @@ const (
 	TwinRare   = 4
 )
 
-// ruleTwin: two choices (or clues) over one set of options ask one thing twice, whichever way round: the same answer
+// ruleTwin: two choices over one set of options ask one thing twice, whichever way round: the same answer
 // (one reworded), or each one's answer among the other's wrong options (Карлоф or Лугоши, asked twice nine days
 // apart: whoever met one has the other half answered). The same-identity rule holds "who is this" answers asked
 // twice whatever their options.
@@ -604,15 +476,11 @@ func ruleTwin(l *lintBank) []finding {
 	var qs []asking
 	by := map[string][]int{} // an option's key: the questions that offer it
 	for _, q := range l.live {
-		var opts []string
-		switch q := q.(type) {
-		case *Choice:
-			opts = q.options()
-		case *Clues:
-			opts = q.options()
-		default:
+		c, ok := q.(*Choice)
+		if !ok {
 			continue
 		}
+		opts := c.options()
 		a := asking{q: q, answer: subjectKey(opts[0]), options: map[string]bool{}}
 		for _, o := range opts {
 			k := subjectKey(o)

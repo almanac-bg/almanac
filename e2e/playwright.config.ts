@@ -1,6 +1,6 @@
 // The browser tests: the game played as players play it, in Chromium, WebKit (Safari's engine) and Firefox, at a
 // phone's size. They start the program on the public sample bank with a fresh database (where the real bank is here,
-// with its longest orders and pairs added: bank.ts).
+// with its longest orders and choices added: bank.ts).
 //
 //   npx playwright test -c e2e                     all three engines
 //   npx playwright test -c e2e --project=webkit    one (with `=`: a spec after it would read as a project)

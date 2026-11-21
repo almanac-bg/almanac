@@ -13,7 +13,7 @@ type Crowd struct {
 	Answers int
 	// Right is the share of them that were right.
 	Right float64
-	// Picks is, for a choice (or clues), the share of the answers that picked each option, as the bank keeps them (the answer
+	// Picks is, for a choice, the share of the answers that picked each option, as the bank keeps them (the answer
 	// first); for a true-or-not, the share that said true, then false. Shares of all the answers, like Right, so that
 	// the answer's share is the share right (the ones that ran out of time picked nothing).
 	Picks []float64
@@ -59,21 +59,25 @@ func CrowdOf(q Question, tallies []Tally) *Crowd {
 	}
 	c.Right = float64(right) / float64(c.Answers)
 	switch q := q.(type) {
-	case *Choice, *Clues:
+	case *Choice:
 		c.Picks = shares(ChoiceOptions, c.Answers, tallies, func(given json.RawMessage) int {
-			var a ChoiceAnswer
-			if json.Unmarshal(given, &a) != nil {
-				return -1
+			var a struct {
+				Pick *int `json:"pick"`
 			}
-			return a.Pick
+			if json.Unmarshal(given, &a) != nil || a.Pick == nil {
+				return -1 // not a pick: an answer of another kind, logged before the question became a choice
+			}
+			return *a.Pick
 		})
 	case *TrueFalse:
 		c.Picks = shares(2, c.Answers, tallies, func(given json.RawMessage) int {
-			var a TrueFalseAnswer
-			if json.Unmarshal(given, &a) != nil {
+			var a struct {
+				Truth *bool `json:"truth"`
+			}
+			if json.Unmarshal(given, &a) != nil || a.Truth == nil {
 				return -1
 			}
-			if a.Truth {
+			if *a.Truth {
 				return 0
 			}
 			return 1
@@ -111,13 +115,15 @@ func (q *Number) spread(tallies []Tally) *Spread {
 	}
 	all := 0.0
 	for _, t := range tallies {
-		var a NumberAnswer
-		if t.Given == nil || json.Unmarshal(t.Given, &a) != nil {
+		var a struct {
+			Value *float64 `json:"value"`
+		}
+		if t.Given == nil || json.Unmarshal(t.Given, &a) != nil || a.Value == nil {
 			continue
 		}
 		n := float64(t.N)
 		all += n
-		switch at := s.At(a.Value); {
+		switch at := s.At(*a.Value); {
 		case at < 0:
 			s.Below += n
 		case at > 1:
@@ -159,10 +165,7 @@ type CrowdView struct {
 // In is the crowd as deal d shows it: a choice's picks in the order its options are shown (as Dealt.Reveal has it).
 // Nil when it counts no answers.
 func (c *Crowd) In(d Dealt) *CrowdView {
-	switch d := d.(type) {
-	case *dealtChoice:
-		return c.view(d.order)
-	case *dealtClues:
+	if d, ok := d.(*dealtChoice); ok {
 		return c.view(d.order)
 	}
 	return c.view(nil)

@@ -9,8 +9,8 @@ import (
 
 // Reading is how much a player reads to answer a question: what the game's clock (play.Limit) gives them time for, and
 // what the length rule (ruleLength) holds to the bank's usual. It counts the letters and digits of everything the
-// question shows before it's answered (its text, a number's unit, a choice's or clues' options, an order's items, a
-// match's pairs and decoy, a split's groups and items, the clues), spaces and punctuation aside, and PictureReading
+// question shows before it's answered (its text, a number's unit, a choice's options, an order's items), spaces and
+// punctuation aside, and PictureReading
 // for each picture to look at (over the question, or as a choice's options).
 func Reading(q Question) int {
 	n := len(picturesOf(q)) * PictureReading
@@ -35,22 +35,9 @@ func shownTexts(q Question) []string {
 		if len(q.Pictures) == 0 {
 			out = append(out, q.options()...)
 		}
-	case *Clues:
-		out = append(out, q.Clues...)
-		out = append(out, q.options()...)
 	case *Number:
 		out = append(out, q.Unit)
 	case *Order:
-		for _, it := range q.Items {
-			out = append(out, it.Text)
-		}
-	case *Match:
-		for _, p := range q.Pairs {
-			out = append(out, p.Left, p.Right)
-		}
-		out = append(out, q.Decoy)
-	case *Split:
-		out = append(out, q.Groups[0], q.Groups[1])
 		for _, it := range q.Items {
 			out = append(out, it.Text)
 		}

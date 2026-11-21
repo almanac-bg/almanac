@@ -53,7 +53,7 @@ func (g *Game) TimedOutSince(ctx context.Context, day string) ([]TimedOut, error
 		}
 	}
 	var list []TimedOut
-	for _, k := range []string{"truefalse", "choice", "number", "order", "match", "split", "clues"} {
+	for _, k := range []string{"truefalse", "choice", "number", "order"} {
 		if t := by[k]; t != nil {
 			list = append(list, *t)
 		}

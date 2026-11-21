@@ -28,7 +28,7 @@ type Learned struct {
 	Category string `json:"category"`
 	Question string `json:"question,omitempty"`
 	Answer   string `json:"answer"`
-	// Lines is an answer of parts (an order, a match, a split: bank.AnswerLines), a line each: the entry lists them
+	// Lines is an answer of parts (an order: bank.AnswerLines), a line each: the entry lists them
 	// under a short headword rather than set the whole answer as one.
 	Lines  []string `json:"lines,omitempty"`
 	Untrue bool     `json:"untrue,omitempty"`

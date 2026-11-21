@@ -1,12 +1,11 @@
 // Package bank holds the game's questions: the types a question can be, the bank on disk, and the checks a bank must
 // pass before a server plays it.
 //
-// Every type lives in its own file (choice.go, number.go, order.go, truefalse.go, match.go, split.go, clues.go) and plugs in through the
-// same three steps: it checks itself, deals itself for one play (shuffled, without its answer), and grades what a
+// Every type lives in its own file (choice.go, number.go, order.go, truefalse.go) and plugs in through the same three
+// steps: it checks itself, deals itself for one play (shuffled, without its answer), and grades what a
 // player gave; and it writes out what it asks, field by field, which its versions are told apart by (version.go).
 // Adding a type is a new file here, a version of it pinned (TestPinnedVersions), and its renderer in the web client;
-// nothing else changes. With the
-// answer a deal also shows how players have answered the question so far (crowd.go), in its own order. What a question
+// nothing else changes. A kind the game no longer has is one of RetiredKinds (bank.go). With the answer a deal also shows how players have answered the question so far (crowd.go), in its own order. What a question
 // names (subjects.go) keeps a day to one question of a subject, and tells the bank's keepers which subjects come back.
 // A batch goes in whole or not at all (add.go): its new questions, its changes to questions the bank has, and its
 // retirements, checked against the bank as it would be first. A server plays a copy of a bank (keep.go), and knows
@@ -61,8 +60,7 @@ type Tail struct {
 	Fact string `json:"fact,omitempty"`
 	// Added is when the question joined the bank (YYYY-MM-DD).
 	Added string `json:"added,omitempty"`
-	// Changed is when what it asks last changed (YYYY-MM-DD): its wording, answer, options, items, pairs, clues or
-	// picture, so that players' answers from before then were to another question (crowds and calibration start
+	// Changed is when what it asks last changed (YYYY-MM-DD): its wording, answer, options, items or picture, so that players' answers from before then were to another question (crowds and calibration start
 	// there). Empty: not since it was added.
 	Changed string `json:"changed,omitempty"`
 	// Updated is when the question last changed at all (YYYY-MM-DD): Changed, or its fact, labels or dates.
@@ -136,7 +134,7 @@ type Question interface {
 	// key says when two questions are the same question (the bank allows no duplicates).
 	key() string
 	// asked is what the question asks besides its type, text and picture, field by field, as its Version hashes it
-	// (version.go): its answer, options, items, pairs, clues, groups; each picture as its file.
+	// (version.go): its answer, options, items; each picture as its file.
 	asked() map[string]any
 	// words is every text a player sees, the answer included (for the giveaway checks).
 	words() []string
@@ -157,8 +155,7 @@ type Dealt interface {
 // Graded is what an answer was worth.
 type Graded struct {
 	// Score runs from 0 (wrong) to 1 (perfect). Types with partial credit (a close number, an order half right) land in
-	// between, with what luck alone would get taken out (an order or a match put down at random is worth next to
-	// nothing). The game counts only Right in a score; a score short of right but above nothing is „близо“.
+	// between, with what luck alone would get taken out (an order put down at random is worth next to nothing). The game counts only Right in a score; a score short of right but above nothing is „близо“.
 	Score float64
 	// Right is whether it counts as a right answer (for streaks and stats).
 	Right bool
@@ -241,8 +238,6 @@ func AnswerText(q Question) string {
 	switch q := q.(type) {
 	case *Choice:
 		return q.Answer
-	case *Clues:
-		return q.Answer
 	case *Number:
 		return strings.TrimSpace(sayNumber(q.Answer, q.Step) + " " + q.Unit)
 	case *Order:
@@ -252,60 +247,28 @@ func AnswerText(q Question) string {
 			return "Вярно"
 		}
 		return "Невярно"
-	case *Match, *Split:
-		return strings.Join(AnswerLines(q), "; ")
 	}
 	return ""
 }
 
 // AnswerLines is an answer of parts, a line each, as an entry of the book lists it under a short headword: an
-// order's items in their right order, each with its value; a match's pairs; a split's two groups, each with its items.
-// Nil for an answer of one word or number.
+// order's items in their right order, each with its value. Nil for an answer of one word or number.
 func AnswerLines(q Question) []string {
-	switch q := q.(type) {
-	case *Order:
-		items := make([]string, 0, len(q.Items))
-		for _, i := range q.right() {
-			items = append(items, fmt.Sprintf("%s (%s)", q.Items[i].Text, strings.TrimSpace(sayNumber(q.Items[i].Value, 0.01)+" "+q.Unit)))
-		}
-		return items
-	case *Match:
-		pairs := make([]string, 0, len(q.Pairs))
-		for _, p := range q.Pairs {
-			pairs = append(pairs, p.Left+" — "+p.Right)
-		}
-		return pairs
-	case *Split:
-		groups := [2][]string{}
-		for _, it := range q.Items {
-			if it.Group == 0 || it.Group == 1 {
-				groups[it.Group] = append(groups[it.Group], it.Text)
-			}
-		}
-		return []string{q.Groups[0] + ": " + strings.Join(groups[0], ", "), q.Groups[1] + ": " + strings.Join(groups[1], ", ")}
+	o, ok := q.(*Order)
+	if !ok {
+		return nil
 	}
-	return nil
-}
-
-// KeeperText is the answer as whoever keeps the bank reads it (the admin page): a match's decoy too.
-func KeeperText(q Question) string {
-	if m, ok := q.(*Match); ok && m.Decoy != "" {
-		return AnswerText(q) + "; примамка: " + m.Decoy
+	items := make([]string, 0, len(o.Items))
+	for _, i := range o.right() {
+		items = append(items, fmt.Sprintf("%s (%s)", o.Items[i].Text, strings.TrimSpace(sayNumber(o.Items[i].Value, 0.01)+" "+o.Unit)))
 	}
-	return AnswerText(q)
+	return items
 }
 
 // Option is a choice's option by its place in the bank (0 is the answer), for reading the answer log.
 func Option(q Question, i int) string {
-	var options []string
-	switch q := q.(type) {
-	case *Choice:
-		options = q.options()
-	case *Clues:
-		options = q.options()
-	}
-	if i >= 0 && i < len(options) {
-		return options[i]
+	if c, ok := q.(*Choice); ok && i >= 0 && i < len(c.options()) {
+		return c.options()[i]
 	}
 	return ""
 }

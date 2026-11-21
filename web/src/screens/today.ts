@@ -756,24 +756,18 @@ function missed(all: () => Reviewed[] | null, rest: () => Child): Child {
   };
 }
 
-/** A question's right answer, as a miss shows it: a word or a number; an order its items in their right order, a
- * match its pairs, a split each group with its items, a line each. */
+/** A question's right answer, as a miss shows it: a word or a number; an order its items in their right order, a line
+ * each. */
 function rightAnswer(q: Reviewed): Child {
   const { view: v, reveal: r } = q;
-  const lines =
-    v.type === "order"
-      ? (r.order ?? []).map((item, i) => `${i + 1}. ${v.items[item] ?? ""}`)
-      : v.type === "match"
-        ? v.left.map((left, i) => `${left} — ${v.right[r.pairs?.[i] ?? -1] ?? ""}`)
-        : v.type === "split"
-          ? v.groups.map((g, k) => `${g}: ${v.items.filter((_, i) => (r.sides?.[i] ?? 0) === k).join(", ")}`)
-          : null;
-  if (lines)
+  if (v.type === "order") {
+    const lines = (r.order ?? []).map((item, i) => `${i + 1}. ${v.items[item] ?? ""}`);
     return h(
       "ul",
       { class: "miss-a miss-lines" },
       lines.map((l) => h("li", null, textWords(l))),
     );
+  }
   const answer = answerWords(v, r);
   return answer ? h("p", { class: "miss-a" }, textWords(answer)) : null;
 }

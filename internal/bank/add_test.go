@@ -328,7 +328,7 @@ func TestAskedChanges(t *testing.T) {
 	} {
 		old, _ := b.Get(c.id)
 		data, _ := Format([]Question{old})
-		qs, err := decodeFile(data, old.Base().Category, func(int, string, string) {})
+		qs, err := decodeFile(data, old.Base().Category, func(int, string, string) {}, func(int, string, string, json.RawMessage) {})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -342,7 +342,7 @@ func TestAskedChanges(t *testing.T) {
 	for _, typ := range []string{"number", "order"} {
 		old := b.Live("", typ)[0]
 		data, _ := Format([]Question{old})
-		qs, _ := decodeFile(data, old.Base().Category, func(int, string, string) {})
+		qs, _ := decodeFile(data, old.Base().Category, func(int, string, string) {}, func(int, string, string, json.RawMessage) {})
 		switch q := qs[0].q.(type) {
 		case *Number:
 			q.Tolerance++

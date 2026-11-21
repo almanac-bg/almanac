@@ -1,6 +1,6 @@
 // The questions the browser tests play: the public sample bank, and, where the real bank is here (private/, or the
 // main checkout's from a worktree; never on CI, which has only the sample), the real bank's extremes with it, the
-// questions a phone's short screen has the least room for (its longest orders, pairs and choices, and its longest choice
+// questions a phone's short screen has the least room for (its longest orders and choices, and its longest choice
 // under a portrait): the program serves them in a copy of the sample bank made for the tests (playwright.config,
 // BANK_DIR), and kinds.ts finds them there as the longest of their kind, beside the sample's own.
 import { copyFileSync, cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -15,12 +15,8 @@ export interface Q {
   wrong?: string[];
   image?: { file: string; w: number; h: number };
   pictures?: { alt: string }[];
-  clues?: string[];
-  items?: { text: string; value?: number; group?: number }[];
+  items?: { text: string; value?: number }[];
   direction?: string;
-  pairs?: { left: string; right: string }[];
-  decoy?: string;
-  groups?: string[];
   tolerance?: number;
   retired?: unknown;
 }
@@ -54,16 +50,7 @@ const files = (dir: string): Map<string, Q[]> =>
 
 /** All the words a question shows: the longest of each kind is the one a screen has the least room for. */
 export const words = (q: Q) =>
-  [
-    q.text,
-    q.answer,
-    q.wrong,
-    q.clues,
-    q.items?.map((i) => i.text),
-    q.pairs?.flatMap((p) => [p.left, p.right]),
-    q.decoy,
-    q.groups,
-  ]
+  [q.text, q.answer, q.wrong, q.items?.map((i) => i.text)]
     .flat()
     .filter((w) => typeof w === "string")
     .join(" ").length;
@@ -71,10 +58,9 @@ export const words = (q: Q) =>
 /** A choice under a picture taller than it's wide: the picture as tall as a question's picture is let be. */
 export const portrait = (q: Q) => q.type === "choice" && !!q.image && q.image.h > 1.2 * q.image.w;
 
-/** The real bank's questions the tests add to the sample: of an order and of pairs, the one with the most words and
- * the one with the longest question (often one question); the choice with the most words, and the one under a
- * portrait with the most; the clues, the number and the groups with the most; each with its chapter's file. None
- * without the real bank. */
+/** The real bank's questions the tests add to the sample: of an order, the one with the most words and the one with
+ * the longest question (often one question); the choice with the most words, and the one under a portrait with the
+ * most; the number with the most; each with its chapter's file. None without the real bank. */
 function picks(): [file: string, q: Q][] {
   if (!real) return [];
   // Not a question of a date (its own `on`): here it waits for a day far ahead instead, which its date's line would
@@ -87,16 +73,15 @@ function picks(): [file: string, q: Q][] {
     const best = all.filter(([, q]) => kind(q)).sort(([, a], [, b]) => size(b) - size(a))[0];
     if (best) out.set(best[1].id, best);
   };
-  for (const type of ["order", "match"])
-    for (const size of [words, (q: Q) => q.text.length]) most((q) => q.type === type, size);
+  for (const size of [words, (q: Q) => q.text.length]) most((q) => q.type === "order", size);
   most((q) => q.type === "choice" && !q.image && !q.pictures, words);
   most(portrait, words);
-  for (const type of ["clues", "number", "split"]) most((q) => q.type === type && !q.image, words);
+  most((q) => q.type === "number" && !q.image, words);
   return [...out.values()];
 }
 
 /** The bank the program serves to the tests: the sample, or, with the real bank here, a copy of it with the real
- * bank's longest orders and pairs (made once, by the main process: `make`). */
+ * bank's longest orders and choices (made once, by the main process: `make`). */
 export function testBank(make: boolean): string {
   const add = picks();
   if (!add.length) return "bank/sample";

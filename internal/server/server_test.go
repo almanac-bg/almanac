@@ -475,10 +475,6 @@ func TestPlayingOverHTTP(t *testing.T) {
 			answer = map[string][]int{"order": {0, 1, 2, 3}}
 		case "truefalse":
 			answer = map[string]bool{"truth": true}
-		case "match":
-			answer = map[string][]int{"pairs": {0, 1, 2, 3}}
-		case "split":
-			answer = map[string][]int{"sides": {0, 1, 0, 1, 0, 1}}
 		}
 		status, res := p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": answer})
 		if status != 200 || res["reveal"] == nil {
@@ -791,10 +787,6 @@ func playRun(p *player, run map[string]any) {
 			a = map[string]any{"order": []int{0, 1, 2, 3}}
 		case "truefalse":
 			a = map[string]any{"truth": true}
-		case "match":
-			a = map[string]any{"pairs": []int{0, 1, 2, 3}}
-		case "split":
-			a = map[string]any{"sides": []int{0, 1, 0, 1, 0, 1}}
 		}
 		p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": a})
 	}

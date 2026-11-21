@@ -35,10 +35,11 @@ import (
 // regrading those who answered against the new key: the old answer was given to another question (its options, its
 // order, its wording), and regraded it would say what the player never chose. A change to a day's question that isn't
 // a fix (a typo) voids it all the same: the program can't tell a fix from a polish, and a day one question short
-// is a far smaller harm than a day graded on two keys. A question is voided on its day only, as the day is kept up
-// with each bank (EnsureDays); the days ahead are drawn again instead (ahead.go). More than maxVoid of a day at once
-// is not a fix but a mistake (a version that moved for every question, say): then none is voided, and the log says
-// so.
+// is a far smaller harm than a day graded on two keys. A question of a retired kind the bank's files still have
+// (bank.RetiredKinds) is left out of the bank: void on a day that pinned it, the accepted cost. A question is voided
+// on its day only, as the day is kept up with each bank (EnsureDays); the days ahead are drawn again instead
+// (ahead.go). More than maxVoid of a day at once is not a fix but a mistake (a version that moved for every question,
+// say): then none is voided, and the log says so.
 
 // maxVoid is the most of a day's questions that a bank may void at once; more, and it's taken as a mistake.
 const maxVoid = Length / 2

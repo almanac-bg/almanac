@@ -133,7 +133,7 @@ func (s *Server) isAdmin(r *http.Request) bool {
 
 // questionKinds are the kinds of questions, as /admin names them.
 var questionKinds = map[string]string{"truefalse": "Вярно или не", "choice": "Избор", "number": "Число",
-	"order": "Подреди", "match": "Свържи", "split": "Раздели", "clues": "Подсказки"}
+	"order": "Подреди"}
 
 // timedOutRow is a kind of question's answers run out of time (play.TimedOutSince), as „1,4% (12 от 860)“.
 type timedOutRow struct{ Name, Share string }
@@ -204,7 +204,7 @@ func (s *Server) adminQuestions(w http.ResponseWriter, r *http.Request) {
 			if rp == nil {
 				rp = &reported{ID: id, More: n}
 				if q, ok := b.Get(id); ok {
-					rp.Category, rp.Text, rp.Answer = q.Base().Category, q.Base().Text, bank.KeeperText(q)
+					rp.Category, rp.Text, rp.Answer = q.Base().Category, q.Base().Text, bank.AnswerText(q)
 				}
 				byID[id] = rp
 				order = append(order, id)
@@ -264,7 +264,7 @@ func (s *Server) adminQuestions(w http.ResponseWriter, r *http.Request) {
 		}
 		st := stat{ID: id, Answers: t.n, Right: t.right, Seconds: float64(t.ms) / float64(t.n) / 1000, Share: 100 * t.right / t.n}
 		if q, ok := b.Get(id); ok {
-			st.Text, st.Answer = q.Base().Text, bank.KeeperText(q)
+			st.Text, st.Answer = q.Base().Text, bank.AnswerText(q)
 		}
 		told = append(told, st)
 	}

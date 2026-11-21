@@ -12,13 +12,10 @@ Each question has an `id`, a `kind` and its `text`; a `picture` is an image file
 
 What to answer, by kind:
 
-- `choice`, `clues`: the letter of the right option (`"B"`). An option may be a picture: open each and look. In `clues`,
-  the clues describe the answer.
+- `choice`: the letter of the right option (`"B"`). An option may be a picture: open each and look.
 - `truefalse`: `true` or `false`, for the statement in `text`.
 - `number`: your best number, in the `unit`.
 - `order`: the letters in the order the text asks (`"CADB"`).
-- `match`: `{"<left>": "<letter of its right>"}` for every left (one right is a decoy, left over).
-- `split`: `{"<item>": "<its group, as written>"}` for every item.
 
 For each, also `sure`: `true` only when you would bet on it (you know it, not a good guess); otherwise `false`.
 Always give your best answer, sure or not.

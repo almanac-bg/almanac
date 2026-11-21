@@ -1,8 +1,8 @@
 // Answering a question, the same in every game (run.ts). The question's widget is questions.ts's; this is what's
 // around it:
 //
-// - The question takes the focus as it opens, so that a screen reader reads it first, and what's said as it goes (a
-//   clue come out, an answer's verdict) is said in one live region (liveRegion), there from the run's start.
+// - The question takes the focus as it opens, so that a screen reader reads it first, and what's said as it goes (an
+//   answer's verdict) is said in one live region (liveRegion), there from the run's start.
 // - The options lock at the tap, and an answer goes once: never a second while one is on its way or in.
 // - An answer that doesn't get through (no line, the server for a moment) is sent again, the same, a few times and then
 //   said, with „Опитай пак“. The server takes an answer sent again, its reply lost, as the first.
@@ -125,8 +125,6 @@ export interface AnswerSpec<R> {
   handles?: (err: ApiError) => boolean;
   /** The question takes the focus as it opens (a run's). */
   focus?: boolean;
-  /** The game's live region (a clue come out is said there). */
-  say?: Say;
 }
 
 export interface Answering<R> {
@@ -185,7 +183,7 @@ export function answering<R>(spec: AnswerSpec<R>): Answering<R> {
   };
 
   const locked = signal(true);
-  const asked = ask(spec.view, (a) => void send(a), locked, spec.say);
+  const asked = ask(spec.view, (a) => void send(a), locked);
   // When the time is up, whatever has been put in (a typed number, things moved into order) is the answer.
   const left = countdown(
     spec.leftMs,
@@ -228,7 +226,7 @@ export function answering<R>(spec: AnswerSpec<R>): Answering<R> {
   };
 }
 
-/** The question on a short screen while an order or pairs are asked (app.css, `--clamp`): whole where every row and
+/** The question on a short screen while an order is asked (app.css, `--clamp`): whole where every row and
  * „Готово“ fit the screen under it, else cut to as many lines as leave them room (two at the least), at a whole word,
  * with „…“, as the screen opens and as its size changes. Cut, it's marked `data-cut`, and a tap on it reads it all
  * (`whole`), another cuts it again. A screen reader has it all either way (its label). */

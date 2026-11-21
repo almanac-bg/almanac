@@ -76,7 +76,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      10“, the tiles, „На десетия въпрос вярно отговарят 14 %“ (or „Десетият въпрос е най-трудният днес“ before a
      crowd), and with a crowd „България днес: средно 6,2“ (the average always to one decimal: „6,0“). Ten of ten:
      „Всички верни“ and the mark drawn over it. None right: right under the score, „Въпросите и фактите“ open
-     (`.missed-day`): the first four, each its dashed tile, the question, the right answer (an order, a match, a split
+     (`.missed-day`): the first four, each its dashed tile, the question, the right answer (an order
      in lines) and its fact, and „Още 6 въпроса“, which shows the rest in place and after them the rest of „Въпросите
      и фактите“; no word of praise. A best rank risen, the big moment, right
      under the score, on its chapter's sheet: „Нов печат“, the seal set large, the rank's name, what made it („40
@@ -88,7 +88,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      на приложението: ··· → Отвори в Safari“); sharing then stays a quiet link beside the tiles („Сподели резултата“).
      On a big screen that action heads the right page (moved there, never drawn twice), the two pages of a height.
   3. The day's entry („Днес в Алманаха“, or „Най-рядкото ти попадение“ with a crowd): a sheet of its chapter with the
-     chip, the answer as a headword (an order, a match, a split: its parts a line each, at the entry's size), the
+     chip, the answer as a headword (an order: its parts a line each, at the entry's size), the
      question, the fact. Under it what the day wrote (`game/news.ts`): „+6 с
      мастило“; „Един от въпросите вече беше в твоя Алманах и остава в сиво.“; the chapter nearest its next rank with
      its seal and pips („История: още 2 до Книга“); or ranks risen, their seals and one line, each rank once with its
@@ -317,11 +317,10 @@ to show it whole; nothing over the question.
 - **The sheet** (`.q-leaf`, no corner): the chip (and on the day's last question „Най-трудният: число“ beside it), then the
   question. Under 620px of height the sheet is the question with the chapter's glyph beside it (on the day's last, the
   chip's glyph alone beside its tag) and an answer is 52px; under 700px a number's sheet is too, so its pad and
-  „Отговори“ fit. Under 680px, while an order or pairs are asked, the sheet
+  „Отговори“ fit. Under 680px, while an order is asked, the sheet
   is the question beside its glyph a size smaller, the rows right under it (not at the foot), cut to as many lines as
   leave every row and „Готово“ on the screen (two at the least), at a whole word with „…“, the same in every engine (a
-  tap on it reads it all: answering.ts, `clamp`), and the rows and cells are 44px; the pairs' right
-  column, a cell more, has five ninths of the width. A picture over the question
+  tap on it reads it all: answering.ts, `clamp`), and the rows are 44px. A picture over the question
   takes at most 30% of the height, and shrinks where the screen is short, never under 120px. A choice of pictures is
   two by two, its cards taking the room the question leaves (each picture whole in its card), the letter and
   (answered) the ✓ or ✕ in the picture's corners, its name under it across the card once answered (no room kept for
@@ -342,7 +341,7 @@ to show it whole; nothing over the question.
   2.25rem, wrapping, never cut with „…“), so
   that the player's row and the right row are right under the question; the page doesn't move, so the question stays
   whole under the head (only if their rows wouldn't fit over the panel even at its verdict and „Напред“; moved, the
-  head's foot falls between two parts, never across one: no scrap of the sheet, a clue or a row left under it). On a
+  head's foot falls between two parts, never across one: no scrap of the sheet or a row left under it). On a
   laptop the sheet stays whole under the head however far the page moves. The crowd's shares fill in
   behind each answer. After a choice's words, in this order: „ти“, the share, the ✓ or ✕, in one box (`.row-end`) on a
   line with them, or together on the line under them, at the row's end, where they'd squeeze the words (with large
@@ -350,17 +349,13 @@ to show it whole; nothing over the question.
 - **Each kind:** true-or-not, two side by side, answered with the ✓ or ✕ beside the word and „ти“ under the player's
   wrong one; order, rows of 48px picked up and put down or dragged by their grip, answered as the right order — a row
   in place with a solid ✓, one out of place hollow and dashed with „при теб: 3-то“ under its words, its value and ✕
-  at its end; match, two columns from their tops, the left lettered А–Г and a right one joined taking its left one's
-  letter (never colour), each letter on its cell's edge where the line joins it (with few words to a line, one column
-  over the other, the letters beside the words, no lines); split, a card sent left or right, each group's arrow beside
-  its name; clues, coming out as their time does, those still to come in one line („Още 2 подсказки: след 10 с и
-  20 с“); number, typed on the game's own pad (keys
+  at its end; number, typed on the game's own pad (keys
   44px at the least; with large text what's typed stays in sight under the head), answered as what was said, the
   answer, and both on a scale (the answer a filled square; „ти, вярно“ a filled disc, „ти, близо“ half filled, „ти“
-  hollow), nothing else (how everyone guessed is said under the verdict; its chart is the review's). Pairs or groups
-  whose time ran out with nothing given show the right ones with a ✓ in a ring: none of it the player's.
+  hollow), nothing else (how everyone guessed is said under the verdict; its chart is the review's). An order
+  whose time ran out with nothing given shows the right one with a ✓ in a ring: none of it the player's.
 - **The answer** (`.after`): docked at a phone's foot, a surface over the answers, at most what leaves the player's
-  row and the right one in sight, and at least the fact's first two lines (an order, pairs or groups: at that least,
+  row and the right one in sight, and at least the fact's first two lines (an order: at that least,
   so their rows stay in sight; where a choice's two rows need more, the panel gives way to them, down to its verdict
   and „Напред“); it ends what's over it at a row's edge, covering the row it would cut; a longer fact scrolls in it,
   fading out
@@ -378,8 +373,8 @@ to show it whole; nothing over the question.
 ## Fit and large text
 
 - **Fit** (`e2e/layout.spec.ts`, at 320 × 568, 375 × 600, 390 × 664 and 1366 × 900, by day and by night; every kind of
-  question at its longest in the sample bank, and beside them the real bank's longest orders, pairs, choices, clues,
-  numbers and groups and its longest choice under a portrait where it's here (`private/`; CI has only the sample),
+  question at its longest in the sample bank, and beside them the real bank's longest orders, choices and
+  numbers and its longest choice under a portrait where it's here (`private/`; CI has only the sample),
   answered right, wrong and close: `e2e/kinds.ts`, `e2e/bank.ts`): nothing scrolls sideways; Днес shows „Започни“
   whole and high, an invite over it too; from 375 × 600 a question shows every answer or its pad and its action
   whole; at 320 × 568 every control is a scroll away, under nothing, the first answer in sight; a picture never under
@@ -389,7 +384,7 @@ to show it whole; nothing over the question.
   in rem from `<html>`; display type grows at half the rate (half px, half rem) and a big numeral is capped by the
   screen's width or height. One-column grids are `minmax(0, 1fr)`; a row of things wraps. `lib/prefs.ts` puts `tight`
   and `tighter` on `<html>` when the column holds few words, and rows give way to columns there. With `tighter`, an
-  order's or pairs' line on how to answer is read, not shown (the first rows show over „Готово“), and the answer's
+  order's line on how to answer is read, not shown (the first rows show over „Готово“), and the answer's
   panel, under the answers, opens with its verdict and the fact's first line in sight, the head's foot between two
   parts, the fact's next lines fading out over „Напред“ (where the verdict and what it says leave no room for that
   line, the fact is whole under „Напред“, a scroll away). A media query's rem

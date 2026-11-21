@@ -139,7 +139,10 @@ func bankCheck(args []string) error {
 		tally += ": almanac bank lint lists them"
 	}
 	for _, p := range problems {
-		if !p.Warning {
+		switch {
+		case !p.Warning:
+			fmt.Println(p)
+		case p.Rule == bank.RuleKind: // a question still to be made a kind the game has: told every time, not forgotten
 			fmt.Println(p)
 		}
 	}
@@ -459,7 +462,7 @@ func subjects(b *bank.Bank, shown int) string {
 		return false
 	}
 	repeats := b.Repeats(SubjectMost)
-	fmt.Fprintf(&s, "subjects that come back: %d named in more than %d live questions (text, options, clues, items; * over %.0f%% of a category)\n",
+	fmt.Fprintf(&s, "subjects that come back: %d named in more than %d live questions (text, options, items; * over %.0f%% of a category)\n",
 		len(repeats), SubjectMost, 100*SubjectShare)
 	for i, r := range repeats {
 		if cut(i, len(repeats)) {
@@ -476,7 +479,7 @@ func subjects(b *bank.Bank, shown int) string {
 		fmt.Fprintf(&s, "  %5d  %-28s %s\n", len(r.IDs), r.Name, strings.Join(where, ", "))
 	}
 	same := b.SameIdentity()
-	fmt.Fprintf(&s, "the same answer twice: %d \"who or what is this\" answers asked by more than one picture choice or clues (one is enough)\n", len(same))
+	fmt.Fprintf(&s, "the same answer twice: %d \"who or what is this\" answers asked by more than one picture choice (one is enough)\n", len(same))
 	for i, g := range same {
 		if cut(i, len(same)) {
 			break
@@ -600,7 +603,7 @@ func bankFmt(dir string) error {
 		return errors.New("fix the errors first")
 	}
 	for _, c := range b.Categories {
-		if err := bank.WriteCategory(dir, c.ID, b.InCategory(c.ID)); err != nil {
+		if err := b.Write(dir, c.ID, nil, nil); err != nil {
 			return err
 		}
 	}

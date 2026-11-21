@@ -3,7 +3,6 @@ package play
 import (
 	"math/rand/v2"
 	"os"
-	"slices"
 	"testing"
 	"time"
 
@@ -12,7 +11,7 @@ import (
 
 // With the real bank (when it's there), the days keep their shape (each band's places, in an order drawn with the
 // day) for 50 days while the bank has questions
-// for each place (it has only so many medium orders and matches: past those, a day's order is of another
+// for each place (it has only so many medium orders: past those, a day's order is of another
 // difficulty, then a choice), no question comes twice in a year, no subject twice in a day, and every day ends on its
 // hard number. And while every place of a day has questions (its shortest runway), no subject comes back within a week
 // (recentSubjects), but a date's own question on its date: past it, a place takes what it has left.
@@ -69,9 +68,6 @@ func TestAYearOfDays(t *testing.T) {
 			for j, s := range daySlots {
 				if taken[j] || s.difficulty != daySlots[i].difficulty || (i == 0) != (j == 0) {
 					continue // the first place stays first; the others move within their band
-				}
-				if s.typ == newKinds[0] && slices.Contains(newKinds, q.Base().Type) {
-					s.typ = q.Base().Type // the new kinds' place: either of them
 				}
 				if matches(q, s, true, true) {
 					fits = j

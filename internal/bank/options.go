@@ -11,21 +11,16 @@ import (
 	"unicode/utf8"
 )
 
-// The rules of a choice's options (a choice's, clues'): the answer must not stand out by its form, only by being
+// The rules of a choice's options: the answer must not stand out by its form, only by being
 // right. A player who doesn't know picks the odd one out: the one with a regnal numeral (Карл V among plain names),
 // the one in Latin letters among Cyrillic ones, the one in quotes, the long one with a qualifier the others lack. And
-// no word of the answer may be in the text or a clue unless the wrong options have it too.
+// no word of the answer may be in the text unless the wrong options have it too.
 
 // namedOptions are a question's options as a player reads them before answering (nil for a choice of pictures,
 // whose names show only with the answer), the answer first.
 func namedOptions(q Question) []string {
-	switch q := q.(type) {
-	case *Choice:
-		if len(q.Pictures) == 0 {
-			return q.options()
-		}
-	case *Clues:
-		return q.options()
+	if c, ok := q.(*Choice); ok && len(c.Pictures) == 0 {
+		return c.options()
 	}
 	return nil
 }
@@ -113,8 +108,8 @@ func ruleLongAnswer(q Question) []string {
 	return nil
 }
 
-// ruleAnswerWord: a word of the answer that the text or a clue has, and no wrong option, gives the answer away
-// („френски лекари“ in a clue to „Лекари без граници“).
+// ruleAnswerWord: a word of the answer that the text has, and no wrong option, gives the answer away („основана от
+// френски лекари“ to „Лекари без граници“).
 func ruleAnswerWord(q Question) []string {
 	opts := namedOptions(q)
 	if len(opts) < 2 {
@@ -124,29 +119,11 @@ func ruleAnswerWord(q Question) []string {
 	for s := range stemSet(opts[1:]...) {
 		delete(tell, s)
 	}
-	lines := []string{q.Base().Text}
-	if c, ok := q.(*Clues); ok {
-		lines = append(lines, c.Clues...)
-	}
-	var out []string
-	for i, line := range lines {
-		for _, s := range stems(line) {
-			if tell[s] {
-				where := "the text"
-				if i > 0 {
-					where = fmt.Sprintf("clue %d", i)
-				}
-				out = append(out, fmt.Sprintf("%s shares „%s…“ with the answer %s: %s", where, s, opts[0], line))
-				break
-			}
+	text := q.Base().Text
+	for _, s := range stems(text) {
+		if tell[s] {
+			return []string{fmt.Sprintf("the text shares „%s…“ with the answer %s: %s", s, opts[0], text)}
 		}
-	}
-	return out
-}
-
-func ruleDecoy(q Question) []string {
-	if m, ok := q.(*Match); ok && m.Decoy == "" && m.Added < DecoysFrom {
-		return []string{"a match without a decoy: whoever knows three pairs gets the fourth"}
 	}
 	return nil
 }

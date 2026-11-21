@@ -42,18 +42,18 @@ func (w *world) took(p *player, d bank.Dealt) time.Duration {
 	limit := play.Limit(d.Question())
 	t := time.Duration(float64(p.pace) * (0.6 + 0.8*w.r.Float64()))
 	if limit > 20*time.Second {
-		t += 6 * time.Second // an order, a match: more to do
+		t += 6 * time.Second // an order: more to do
 	}
 	return min(max(t, 2500*time.Millisecond), limit-time.Second)
 }
 
 // answerTo is an answer to a deal as a player's screen sends it: the right one, or a wrong one (another option, a
-// number far off, the other of true or not, every pair one along, every item the other way, an order backwards).
+// number far off, the other of true or not, an order backwards).
 func answerTo(d bank.Dealt, right bool) json.RawMessage {
 	reveal, _ := json.Marshal(d.Reveal(nil))
 	var r map[string]any
 	_ = json.Unmarshal(reveal, &r)
-	for _, k := range []string{"pick", "value", "truth", "sides", "pairs", "order"} {
+	for _, k := range []string{"pick", "value", "truth", "order"} {
 		v, ok := r[k]
 		if !ok {
 			continue
@@ -71,14 +71,6 @@ func answerTo(d bank.Dealt, right bool) json.RawMessage {
 				}
 			case "truth":
 				v = !v.(bool)
-			case "sides":
-				s := v.([]any)
-				for i, x := range s {
-					s[i] = 1 - int(x.(float64))
-				}
-			case "pairs":
-				s := v.([]any)
-				v = append(s[1:], s[0])
 			case "order":
 				s := v.([]any)
 				for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {

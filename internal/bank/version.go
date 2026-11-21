@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 )
 
-// A question changes now and then while it's in play: its answer fixed, an option reworded, a decoy added, its picture
-// swapped. Its Version says which of its versions it is, by what it asks (not its labels, fact and dates: notAsked),
+// A question changes now and then while it's in play: its answer fixed, an option reworded, its picture swapped. Its Version says which of its versions it is, by what it asks (not its labels, fact and dates: notAsked),
 // so that a play can be graded against the version it showed, and its answers counted only with those to the same
 // version (the game keeps every version it has played: play.Game.Keep). Two versions with the same Version deal and
 // grade alike, seed for seed.
@@ -55,8 +55,12 @@ func askedForm(q Question) map[string]any {
 // Encode is a question as one JSON value, everything it holds: what Decode reads back (its category aside).
 func Encode(q Question) ([]byte, error) { return json.Marshal(q) }
 
+// ErrRetiredKind is Decode's error for a version of a question of a retired kind (RetiredKinds): one the game can no
+// longer deal, which is expected of a version kept from before then, and never a fault.
+var ErrRetiredKind = errors.New("a question of a retired kind")
+
 // Decode reads a question Encode wrote, of a category: a version kept from an earlier bank, to deal and grade as it
-// was. Its type must be one the game knows. Its version is worked out again from what it reads, never taken on trust:
+// was. Its type must be one the game knows (ErrRetiredKind for one it had). Its version is worked out again from what it reads, never taken on trust:
 // a field renamed since it was kept reads back as another version, which the game refuses (play: pastVersion), rather
 // than as the same one without what it asked.
 func Decode(data []byte, category string) (Question, error) {
@@ -67,6 +71,9 @@ func Decode(data []byte, category string) (Question, error) {
 		return nil, err
 	}
 	newQuestion, ok := types[probe.Type]
+	if !ok && slices.Contains(RetiredKinds, probe.Type) {
+		return nil, fmt.Errorf("%w: %s", ErrRetiredKind, probe.Type)
+	}
 	if !ok {
 		return nil, fmt.Errorf("unknown type %q", probe.Type)
 	}

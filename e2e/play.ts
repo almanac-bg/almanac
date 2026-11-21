@@ -14,11 +14,10 @@ export const readText = (l: Locator): Promise<string> =>
  * every day's ten has one, so a day played is never none right, whatever ten a fresh database drew and in whatever
  * order their options were dealt, and its result is the same kind of result on every run); a number on the game's
  * pad; an order, dragging the first
- * item to the end (by a finger in Chromium) and tapping it back (which checks that both ways work); a match, joining each left to the right beside it (a line
- * for each); or a split, swiping the first thing left and sending the rest left too. */
+ * item to the end (by a finger in Chromium) and tapping it back (which checks that both ways work). */
 export async function answer(page: Page): Promise<void> {
   const q = page.locator("article.question");
-  await expect(q.locator(".split, .options, .keypad, .tf-options, .match").first()).toBeVisible();
+  await expect(q.locator(".options, .keypad, .tf-options").first()).toBeVisible();
   if (await q.locator(".keypad").count()) {
     for (const k of "1900") await q.locator(".keypad").getByRole("button", { name: k, exact: true }).click();
     await expect(q.locator(".typed")).toHaveText("1900");
@@ -51,27 +50,6 @@ export async function answer(page: Page): Promise<void> {
     await rows.first().click();
     await expect(text(rows.first())).toHaveText(first);
     await q.getByRole("button", { name: "Готово" }).click();
-  } else if (await q.locator(".match").count()) {
-    await uncover(page);
-    const [left, right] = [q.locator(".match-col").first(), q.locator(".match-col").last()];
-    for (let i = 0; i < 4; i++) {
-      await left.locator(".match-item").nth(i).click();
-      await right.locator(".match-item").nth(i).click();
-    }
-    await expect(q.locator(".match-lines line")).toHaveCount(4);
-    await q.getByRole("button", { name: "Готово" }).click();
-  } else if (await q.locator(".split").count()) {
-    // Sends the first by a swipe (which checks that dragging works), the rest by their group's button.
-    const card = q.locator(".split-card.top");
-    const box = await card.boundingBox();
-    if (box) {
-      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-      await page.mouse.down();
-      await page.mouse.move(box.x + box.width / 2 - 120, box.y + box.height / 2, { steps: 6 });
-      await page.mouse.up();
-    }
-    await expect(q.locator(".split-pips b.done")).toHaveCount(1);
-    for (let i = 1; i < 6; i++) await q.locator(".split-side").first().click();
   } else if (await q.locator(".tf-options").count()) {
     const asked = plain(await q.locator(".ask").textContent());
     const tf = trueOrNot().find((b) => plain(b.text) === asked);

@@ -19,7 +19,6 @@ never edit it), `<batch>` (this batch's folder) and your category.
 - **`cells`**: what to write: `count` questions of `kinds` and `difficulty` (with a picture over the question if
   `picture`), `bg` of them about Bulgaria, and `spares` more of the same. Write `count + spares` of each: the
   checker's drops come out of the spares.
-  - `split/clues`: about half of each.
   - A `number` is an **estimate**: a year, or a quantity of more than 20 of its steps, with one accepted value and
     the tolerance of the skill's formula (`bank check` says the figure). A small count is a choice in disguise. The
     day ends on a hard number, and only a quantity takes that place (a unit, an answer above 20: the day's draw
@@ -59,7 +58,7 @@ never edit it), `<batch>` (this batch's folder) and your category.
 
 - **Grep the bank** (`<bank>/questions/*.json`, case-insensitively, Cyrillic and Latin spellings) for the subject, the
   answer, the key names and numbers. No near-duplicate, no "who or what is this" answer the bank asks already, and
-  nothing in the bank that gives yours away or that yours gives away (text, options, items, clues, facts, and the
+  nothing in the bank that gives yours away or that yours gives away (text, options, items, facts, and the
   values an order or number question asks). This is where most drops come from.
 - **Confirm from a source you have read in this session**: the answer, each wrong option being wrong, every number,
   date and name, and the fact. Reliable: bg.wikipedia.org, en.wikipedia.org, Britannica, official and institutional
@@ -98,7 +97,7 @@ cd <repo> && go run ./cmd/almanac bank add -check <batch>/write/<category> <bank
 It writes nothing; it fails on any error, prints the warnings about your questions (fix those too, unless the
 warning is plainly wrong for the question), and says how big each category would be. Every rule of the skill's
 "The rules code checks" is an **error** for a new question: a give-away with a question in the bank, a word of the
-answer in a clue, a small count as a number, a tolerance off the formula, an option that stands out by its form. Fix
+answer in the text, a small count as a number, a tolerance off the formula, an option that stands out by its form. Fix
 the question; if the rule is truly wrong for it, say so in your final answer (only the owner's session waives a
 rule).
 

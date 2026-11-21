@@ -83,7 +83,7 @@ func TestShapesDiffer(t *testing.T) {
 					t.Fatalf("seed %d: place %d is %s, not %s", seed, i, slots[i].difficulty, shape[i].difficulty)
 				}
 			}
-			for _, typ := range []string{"truefalse", "order", "match", "number"} {
+			for _, typ := range []string{"truefalse", "order", "number"} {
 				if seen[typ] == nil {
 					seen[typ] = map[int]bool{}
 				}
@@ -296,14 +296,8 @@ func recurringBank(t *testing.T, n int) *bank.Bank {
 			add(category, map[string]any{"type": "order", "difficulty": "medium", "text": text("Подреди"), "direction": "asc",
 				"items": []any{map[string]any{"text": "А", "value": 1}, map[string]any{"text": "Б", "value": 2},
 					map[string]any{"text": "В", "value": 3}, map[string]any{"text": "Г", "value": 4}}})
-			add(category, map[string]any{"type": "match", "difficulty": "medium", "text": text("Свържи"),
-				"pairs": []any{map[string]any{"left": "1", "right": "А"}, map[string]any{"left": "2", "right": "Б"},
-					map[string]any{"left": "3", "right": "В"}, map[string]any{"left": "4", "right": "Г"}}})
-			add(category, map[string]any{"type": "split", "difficulty": "medium", "text": text("Раздели"), "groups": []string{"Ляво", "Дясно"},
-				"items": []any{map[string]any{"text": "А", "group": 0}, map[string]any{"text": "Б", "group": 1},
-					map[string]any{"text": "В", "group": 0}, map[string]any{"text": "Г", "group": 1}}})
-			add(category, map[string]any{"type": "clues", "difficulty": "medium", "text": text("Кой е"),
-				"clues": []string{"Първо.", "Второ.", "Трето."}, "answer": subject(), "wrong": wrong})
+			add(category, map[string]any{"type": "choice", "difficulty": "medium", "text": text("Кое още"), "answer": subject(), "wrong": wrong})
+			add(category, map[string]any{"type": "choice", "difficulty": "medium", "text": text("Кое трето"), "answer": subject(), "wrong": wrong})
 			add(category, map[string]any{"type": "choice", "difficulty": "hard", "text": text("Кое"), "answer": subject(), "wrong": wrong})
 			add(category, map[string]any{"type": "choice", "difficulty": "hard", "text": text("Кое още"), "answer": subject(), "wrong": wrong})
 			add(category, map[string]any{"type": "number", "difficulty": "hard", "text": text("Колко метра е"),

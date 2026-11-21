@@ -153,52 +153,47 @@
   },
   {
     "id": "mus-962",
-    "type": "match",
+    "type": "choice",
     "difficulty": "medium",
-    "text": "Свържи групата с родината ѝ:",
-    "pairs": [
-      {"left": "ABBA", "right": "Швеция"},
-      {"left": "U2", "right": "Ирландия"},
-      {"left": "AC/DC", "right": "Австралия"},
-      {"left": "Rammstein", "right": "Германия"}
-    ],
-    "decoy": "Норвегия",
-    "fact": "ABBA печели „Евровизия“ през 1974 г. с „Waterloo“.",
+    "text": "От коя държава е групата AC/DC?",
+    "answer": "Австралия",
+    "wrong": ["Ирландия", "Германия", "Норвегия"],
+    "fact": "AC/DC е основана в Сидни през 1973 г. от братята Малкълм и Ангъс Йънг.",
     "added": "2026-11-13",
-    "updated": "2026-11-14"
+    "changed": "2026-11-21",
+    "updated": "2026-11-21",
+    "checked": "2026-11-21",
+    "checkedBy": "retire-kinds opus-5.5",
+    "sources": ["https://en.wikipedia.org/wiki/AC/DC"]
   },
   {
     "id": "mus-963",
-    "type": "split",
+    "type": "choice",
     "difficulty": "easy",
-    "text": "Чия е песента: на „Бийтълс“ или на „Ролинг Стоунс“?",
-    "groups": ["„Бийтълс“", "„Ролинг Стоунс“"],
-    "items": [
-      {"text": "„Yesterday“", "group": 0},
-      {"text": "„Satisfaction“", "group": 1},
-      {"text": "„Hey Jude“", "group": 0},
-      {"text": "„Paint It Black“", "group": 1},
-      {"text": "„Let It Be“", "group": 0},
-      {"text": "„Angie“", "group": 1}
-    ],
+    "text": "Коя от тези песни е на „Бийтълс“?",
+    "answer": "„Yesterday“",
+    "wrong": ["„Satisfaction“", "„Paint It Black“", "„Angie“"],
     "fact": "„Yesterday“ е сред най-често записваните песни: има хиляди версии от други изпълнители.",
     "added": "2026-11-14",
-    "updated": "2026-11-14"
+    "changed": "2026-11-21",
+    "updated": "2026-11-21",
+    "checked": "2026-11-21",
+    "checkedBy": "retire-kinds opus-5.5",
+    "sources": ["https://en.wikipedia.org/wiki/Yesterday_(Beatles_song)"]
   },
   {
     "id": "mus-964",
-    "type": "clues",
+    "type": "choice",
     "difficulty": "medium",
-    "text": "Кой е този композитор?",
-    "clues": [
-      "Последните си години прекарва почти напълно глух.",
-      "Роден е в Бон през 1770 г.",
-      "Автор е на „Ода на радостта“ от Деветата симфония."
-    ],
+    "text": "Кой композитор е роден в Бон през 1770 г.?",
     "answer": "Лудвиг ван Бетовен",
     "wrong": ["Волфганг Амадеус Моцарт", "Йохан Себастиан Бах", "Франц Шуберт"],
     "fact": "Според разказите на премиерата на Деветата симфония Бетовен не чува аплодисментите и една от певиците го обръща към залата.",
     "added": "2026-11-14",
-    "updated": "2026-11-14"
+    "changed": "2026-11-21",
+    "updated": "2026-11-21",
+    "checked": "2026-11-21",
+    "checkedBy": "retire-kinds opus-5.5",
+    "sources": ["https://en.wikipedia.org/wiki/Ludwig_van_Beethoven"]
   }
 ]

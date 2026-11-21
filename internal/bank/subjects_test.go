@@ -48,7 +48,7 @@ func TestNamed(t *testing.T) {
 			[]string{"леонардо да винчи", "лиза", "мона лиза", "ню йорк"}},
 		{&Choice{Head: Head{Text: "Кой цар е наследник на Симеон I?"}, Answer: "Петър I", Wrong: []string{"Борис II", "10", "Иван Асен II"}},
 			[]string{"борис ii", "иван асен ii", "петър i", "симеон i"}},
-		{&Clues{Head: Head{Text: "Кой е този човек?"}, Clues: []string{"Роден е в Калофер.", "Пише „Хаджи Димитър“."},
+		{&Choice{Head: Head{Text: "Кой, роден в Калофер, пише „Хаджи Димитър“?"},
 			Answer: "Христо Ботев", Wrong: []string{"Иван Вазов", "Васил Левски", "Пейо Яворов"}},
 			[]string{"васил левски", "иван вазов", "калофер", "пейо яворов", "хаджи димитър", "христо ботев"}},
 	} {
@@ -59,14 +59,14 @@ func TestNamed(t *testing.T) {
 }
 
 // Repeats lists the subjects more than so many live questions name (a question once however often it names one),
-// the most first; SameIdentity the "who is this" questions (a picture choice, clues) that share an answer.
+// the most first; SameIdentity the "who is this" questions (picture choices) that share an answer.
 func TestRepeatsAndIdentities(t *testing.T) {
 	pic := &Image{File: "a.webp"}
 	qs := []Question{
 		&Choice{Head: Head{ID: "his-1", Type: "choice", Text: "Кой е този човек?", Category: "history"}, Answer: "Наполеон",
 			Wrong: []string{"Нелсън", "Уелингтън", "Кутузов"}, Tail: Tail{Image: pic}},
-		&Clues{Head: Head{ID: "his-2", Type: "clues", Text: "Кой е този човек?", Category: "history"}, Answer: "наполеон",
-			Clues: []string{"Роден е на Корсика.", "Наполеон умира на Света Елена."}, Wrong: []string{"Нелсън", "Цезар", "Петър I"}},
+		&Choice{Head: Head{ID: "his-2", Type: "choice", Text: "Кой е този човек, роден на Корсика?", Category: "history"},
+			Answer: "наполеон", Wrong: []string{"Нелсън", "Цезар", "Петър I"}, Tail: Tail{Image: pic}},
 		&Choice{Head: Head{ID: "his-3", Type: "choice", Text: "Къде умира Наполеон?", Category: "history"}, Answer: "Света Елена",
 			Wrong: []string{"Корсика", "Елба", "Нелсън"}},
 		&Choice{Head: Head{ID: "his-4", Type: "choice", Text: "Кой губи при Ватерло?", Category: "history"}, Answer: "Наполеон",

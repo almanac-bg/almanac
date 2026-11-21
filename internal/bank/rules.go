@@ -65,7 +65,7 @@ type finding struct {
 // Rules are every rule code checks, in the order `bank lint` lists them. Rules of a question's format (lengths,
 // counts, dates, fields: check.go and each type's check) are always errors and aren't listed here.
 var Rules = []Rule{
-	{Name: "ending", Says: "a question ends in „?“ or „:“, a true-or-not statement and a clue in a period", one: ruleEnding},
+	{Name: "ending", Says: "a question ends in „?“ or „:“, a true-or-not statement in a period", one: ruleEnding},
 	{Name: "address", Says: "a question says „ти“ to one player (Подреди, not Подредете)", one: ruleAddress},
 	{Name: "fact", Says: "a fact is one or two sentences, ending in a period; never „Интересно е, че…“", one: ruleFact},
 	{Name: "typography", Says: "„…“ quotes in pairs, the ellipsis „…“, a spaced dash —, „г.“ held to its year (bank fmt sets the last three)", one: ruleTypography},
@@ -84,17 +84,15 @@ var Rules = []Rule{
 	{Name: "options", Says: "no option stands out by its form: only the answer with a regnal numeral, in another script, or in quotes", one: ruleOptions},
 	{Name: "number-rank", Says: "across the bank and a topic, a choice of numbers has its answer about as often at each of the four ranks, not mostly in the middle", Hint: true, all: ruleNumberRank},
 	{Name: "long-answer", Says: "the answer isn't much longer than every wrong option", Hint: true, one: ruleLongAnswer},
-	{Name: "answer-word", Says: "no clue, and no question text, shares a word with the answer that the wrong options don't", one: ruleAnswerWord},
+	{Name: "answer-word", Says: "no question text shares a word with the answer that the wrong options don't", one: ruleAnswerWord},
 	{Name: "dated", Says: "a question for a day (on) has its day's line (day), ending in a period and naming the date, unless its text names it", one: ruleDated},
 	{Name: "own-date", Says: "a true-or-not for a day names no date and isn't about the day itself, nor has a choice for a day its date for the answer: dealt on it, it would answer itself", one: ruleOwnDate},
-	{Name: "decoy", Says: "a match has a decoy", one: ruleDecoy},
 	{Name: "giveaway", Says: "no question shows a value another asks (a year, a number, an order's value) next to the same subject", all: ruleGiveaway},
 	{Name: "answer-giveaway", Says: "no question shows a choice's answer as true next to that question's subject", Hint: true, all: ruleAnswerGiveaway},
-	{Name: "pair-giveaway", Says: "no question shows both sides of a medium or hard match's pair close together", Hint: true, all: rulePairGiveaway},
-	{Name: "shared-items", Says: "two orders share no items in one order or with one value, two matches no pair: one's reveal answers the other", all: ruleSharedItems},
+	{Name: "shared-items", Says: "two orders share no items in one order or with one value: one's reveal answers the other", all: ruleSharedItems},
 	{Name: "twin", Says: "two choices over one set of options don't ask the same answer, or each other's answers mirrored", From: AuditFrom, all: ruleTwin},
 	{Name: "length", Says: "a question reads no longer than its kind's usual allows (bank.Reading past the third quartile by twice the middle half's spread): the clock would run long for it", Hint: true, all: ruleLength},
-	{Name: "same-identity", Says: "a \"who or what is this\" answer (a picture choice, clues) is asked once", all: ruleSameIdentity},
+	{Name: "same-identity", Says: "a \"who or what is this\" answer (a picture choice) is asked once", all: ruleSameIdentity},
 }
 
 // RuleNamed finds a rule by its name.
@@ -112,7 +110,11 @@ const (
 	RuleRetired = "retired" // retired without a reason
 	RulePicture = "picture" // a picture no question uses
 	RuleWaiver  = "waiver"  // a waiver that waives nothing
+	RuleKind    = "kind"    // a question of a retired kind (RetiredKinds), still to be made one of the kinds the game has
 )
+
+// retiredRules are the rules that went with the kinds they judged (RetiredKinds): a waiver of one waives nothing.
+var retiredRules = []string{"decoy", "pair-giveaway"}
 
 // readWaivers reads a bank's waivers, if it has any.
 func readWaivers(dir string) ([]Waiver, error) {
@@ -140,6 +142,8 @@ func (b *Bank) lint(waivers []Waiver, where map[string]Problem) []Problem {
 		at := Problem{File: WaiversFile, ID: w.ID}
 		q, ok := b.Get(w.ID)
 		switch {
+		case slices.Contains(retiredRules, w.Rule) || !ok && b.isLeft(w.ID):
+			at.Msg, at.Warning, at.Rule = "the rule or the question's kind was retired: the waiver can go", true, RuleWaiver
 		case !ok:
 			at.Msg = "no such question"
 		case w.Rule == "":

@@ -99,14 +99,7 @@ func dayRulesBank(t *testing.T) *bank.Bank {
 				add(category, map[string]any{"type": "order", "difficulty": level, "text": text("Подреди"), "direction": "asc",
 					"items": []any{map[string]any{"text": "А", "value": 1}, map[string]any{"text": "Б", "value": 2},
 						map[string]any{"text": "В", "value": 3}, map[string]any{"text": "Г", "value": 4}}})
-				add(category, map[string]any{"type": "match", "difficulty": level, "text": text("Свържи"),
-					"pairs": []any{map[string]any{"left": "1", "right": "А"}, map[string]any{"left": "2", "right": "Б"},
-						map[string]any{"left": "3", "right": "В"}, map[string]any{"left": "4", "right": "Г"}}})
-				add(category, map[string]any{"type": "split", "difficulty": level, "text": text("Раздели"), "groups": []string{"Ляво", "Дясно"},
-					"items": []any{map[string]any{"text": "А", "group": 0}, map[string]any{"text": "Б", "group": 1},
-						map[string]any{"text": "В", "group": 0}, map[string]any{"text": "Г", "group": 1}}})
-				add(category, map[string]any{"type": "clues", "difficulty": level, "text": text("Кой е"),
-					"clues": []string{"Първо.", "Второ.", "Трето."}, "answer": answer + " к", "wrong": wrong})
+
 				add(category, map[string]any{"type": "number", "difficulty": level, "text": text("Колко метра"),
 					"answer": 100 + n, "unit": "м", "step": 1, "scale": "linear", "tolerance": 0.1})
 				add(category, map[string]any{"type": "number", "difficulty": level, "text": text("В коя година"),

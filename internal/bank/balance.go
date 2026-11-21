@@ -14,12 +14,12 @@ import (
 var Difficulties = []Difficulty{Easy, Medium, Hard}
 
 // TypeMix is the share of each kind of question the bank aims for, in every category (the owner's call, 2026-11-13;
-// splits and clues since 2026-11-14), close to what the game draws: a run of ten has five choices, one of each other
-// kind, and a split or clues. So that no kind runs out long before the others.
-var TypeMix = map[string]float64{"choice": 0.50, "truefalse": 0.15, "number": 0.10, "order": 0.075, "match": 0.075, "split": 0.05, "clues": 0.05}
+// the retired kinds' shares went to choice on 2026-11-21: RetiredKinds), close to what the game draws: a run of ten
+// has seven choices and one of each other kind. So that no kind runs out long before the others.
+var TypeMix = map[string]float64{"choice": 0.675, "truefalse": 0.15, "number": 0.10, "order": 0.075}
 
 // TypeOrder is the kinds in the order a report shows them.
-var TypeOrder = []string{"choice", "truefalse", "number", "order", "match", "split", "clues"}
+var TypeOrder = []string{"choice", "truefalse", "number", "order"}
 
 // SizeSlack is how far a category's live size may stand from the mean of all of them, as a share of the mean: about
 // the same size, not exactly (a batch whose checks drop a question here and there still goes in).

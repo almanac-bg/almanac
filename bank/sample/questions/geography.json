@@ -240,53 +240,51 @@
   },
   {
     "id": "geo-962",
-    "type": "match",
+    "type": "choice",
     "difficulty": "medium",
-    "text": "Свържи държавата със столицата ѝ:",
-    "pairs": [
-      {"left": "Австралия", "right": "Канбера"},
-      {"left": "Канада", "right": "Отава"},
-      {"left": "Турция", "right": "Анкара"},
-      {"left": "Швейцария", "right": "Берн"}
-    ],
-    "decoy": "Сидни",
-    "fact": "Канбера е построена нарочно за столица, като компромис между Сидни и Мелбърн.",
+    "text": "Коя е столицата на Турция?",
+    "answer": "Анкара",
+    "wrong": ["Истанбул", "Измир", "Бурса"],
+    "fact": "Анкара става столица през 1923 г., малко преди Ататюрк да обяви републиката.",
     "added": "2026-11-13",
-    "updated": "2026-11-14"
+    "changed": "2026-11-21",
+    "updated": "2026-11-21",
+    "checked": "2026-11-21",
+    "checkedBy": "retire-kinds opus-5.5",
+    "sources": ["https://en.wikipedia.org/wiki/Ankara"]
   },
   {
     "id": "geo-963",
-    "type": "split",
+    "type": "choice",
     "difficulty": "easy",
-    "text": "Членува ли държавата в Европейския съюз?",
-    "groups": ["Член на ЕС", "Не е член"],
-    "items": [
-      {"text": "Австрия", "group": 0},
-      {"text": "Норвегия", "group": 1},
-      {"text": "Хърватия", "group": 0},
-      {"text": "Швейцария", "group": 1},
-      {"text": "Малта", "group": 0},
-      {"text": "Сърбия", "group": 1}
-    ],
+    "text": "Коя от тези държави не членува в Европейския съюз?",
+    "answer": "Норвегия",
+    "wrong": ["Австрия", "Хърватия", "Малта"],
     "fact": "Норвегия два пъти отказва членство в ЕС на референдум — през 1972 и през 1994 г.",
     "added": "2026-11-14",
-    "updated": "2026-11-14"
+    "changed": "2026-11-21",
+    "updated": "2026-11-21",
+    "checked": "2026-11-21",
+    "checkedBy": "retire-kinds opus-5.5",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Member_state_of_the_European_Union",
+      "https://en.wikipedia.org/wiki/Norway–European_Union_relations"
+    ]
   },
   {
     "id": "geo-964",
-    "type": "clues",
+    "type": "choice",
     "difficulty": "easy",
-    "text": "Коя е тази държава?",
-    "clues": [
-      "Най-високата ѝ точка е връх Триглав.",
-      "Има съвсем малък излаз на Адриатическо море.",
-      "Столицата ѝ е Любляна."
-    ],
+    "text": "Коя държава граничи с Италия и има съвсем малък излаз на Адриатическо море?",
     "answer": "Словения",
     "wrong": ["Хърватия", "Словакия", "Австрия"],
     "fact": "Връх Триглав е изобразен на герба и на знамето на Словения.",
     "added": "2026-11-14",
-    "updated": "2026-11-14"
+    "changed": "2026-11-21",
+    "updated": "2026-11-21",
+    "checked": "2026-11-21",
+    "checkedBy": "retire-kinds opus-5.5",
+    "sources": ["https://en.wikipedia.org/wiki/Slovenia", "https://en.wikipedia.org/wiki/Triglav"]
   },
   {
     "id": "geo-965",

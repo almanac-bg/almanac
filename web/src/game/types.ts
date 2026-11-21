@@ -49,33 +49,7 @@ export interface TrueFalseView extends ViewBase {
   type: "truefalse";
 }
 
-/** „Свържи“: two columns, each in an order of its own. */
-export interface MatchView extends ViewBase {
-  type: "match";
-  left: string[];
-  right: string[];
-}
-
-/** „Раздели“: six things, one by one, each sent to one of two groups. */
-export interface SplitView extends ViewBase {
-  type: "split";
-  groups: [string, string];
-  items: string[];
-}
-
-/** „Подсказки“: the clues out so far (the server sends each as its time comes), and four options from the start. */
-export interface CluesView extends ViewBase {
-  type: "clues";
-  clues: string[];
-  total: number;
-  /** When each clue shows, from when the question does. */
-  stepsMs: number[];
-  /** How long the question had shown when this view was made. */
-  sinceMs: number;
-  choices: string[];
-}
-
-export type View = ChoiceView | NumberView | OrderView | TrueFalseView | MatchView | SplitView | CluesView;
+export type View = ChoiceView | NumberView | OrderView | TrueFalseView;
 
 /** The answer, as the deal showed it, with the fact behind it. */
 export interface Reveal {
@@ -87,14 +61,6 @@ export interface Reveal {
   values?: number[];
   /** Whether a true/false statement is true. */
   truth?: boolean;
-  /** A match's pairs: for each left (as shown), the right that is its pair. */
-  pairs?: number[];
-  /** Where a match's decoy is shown: the right that is no left's pair. */
-  decoy?: number;
-  /** A split's groups: for each item (as shown), the group it belongs to. */
-  sides?: number[];
-  /** All the clues of a clues question. */
-  clues?: string[];
   /** A choice of pictures: its options' names and its pictures' credits, as shown. */
   names?: string[];
   credits?: Credit[];
@@ -129,15 +95,7 @@ export interface Spread {
   above: number;
 }
 
-export type Answer =
-  | { pick: number }
-  | { value: number }
-  | { order: number[] }
-  | { truth: boolean }
-  /** For each left (as shown), the right joined to it, or -1. */
-  | { pairs: number[] }
-  /** For each item (as shown), the group it was sent to, or -1. */
-  | { sides: number[] };
+export type Answer = { pick: number } | { value: number } | { order: number[] } | { truth: boolean };
 
 export interface Mark {
   right: boolean;
@@ -153,8 +111,6 @@ export interface Shown {
   view: View;
   limitMs: number;
   leftMs: number;
-  /** How soon more of the question shows (its next clue): look again then. */
-  moreMs?: number;
   /** How soon its time starts by itself, while it waits for its pictures: the screen starts it once they're in. */
   startsMs?: number;
   /** A day's question that belongs to its date: „На този ден“ beside its topic. */

@@ -149,52 +149,47 @@
   },
   {
     "id": "tec-962",
-    "type": "match",
+    "type": "choice",
     "difficulty": "medium",
-    "text": "Свържи компанията с един от основателите ѝ:",
-    "pairs": [
-      {"left": "Microsoft", "right": "Бил Гейтс"},
-      {"left": "Amazon", "right": "Джеф Безос"},
-      {"left": "Facebook", "right": "Марк Зукърбърг"},
-      {"left": "Apple", "right": "Стив Джобс"}
-    ],
-    "decoy": "Илон Мъск",
+    "text": "Кой основава Amazon?",
+    "answer": "Джеф Безос",
+    "wrong": ["Илон Мъск", "Бил Гейтс", "Марк Зукърбърг"],
     "fact": "Amazon започва през 1994 г. като онлайн книжарница.",
     "added": "2026-11-13",
-    "updated": "2026-11-14"
+    "changed": "2026-11-21",
+    "updated": "2026-11-21",
+    "checked": "2026-11-21",
+    "checkedBy": "retire-kinds opus-5.5",
+    "sources": ["https://en.wikipedia.org/wiki/Amazon_(company)"]
   },
   {
     "id": "tec-963",
-    "type": "split",
+    "type": "choice",
     "difficulty": "easy",
-    "text": "Къде е основана компанията?",
-    "groups": ["В САЩ", "Извън САЩ"],
-    "items": [
-      {"text": "Apple", "group": 0},
-      {"text": "Nokia", "group": 1},
-      {"text": "Microsoft", "group": 0},
-      {"text": "Samsung", "group": 1},
-      {"text": "Google", "group": 0},
-      {"text": "Sony", "group": 1}
-    ],
+    "text": "Коя от тези компании е основана извън САЩ?",
+    "answer": "Nokia",
+    "wrong": ["Microsoft", "Google", "Intel"],
     "fact": "„Нокия“ започва през 1865 г. като фабрика за хартия във Финландия.",
     "added": "2026-11-14",
-    "updated": "2026-11-14"
+    "changed": "2026-11-21",
+    "updated": "2026-11-21",
+    "checked": "2026-11-21",
+    "checkedBy": "retire-kinds opus-5.5",
+    "sources": ["https://en.wikipedia.org/wiki/Nokia"]
   },
   {
     "id": "tec-964",
-    "type": "clues",
+    "type": "choice",
     "difficulty": "easy",
-    "text": "Кое е това изобретение?",
-    "clues": [
-      "Предложено е в ЦЕРН през 1989 г.",
-      "Създател му е британецът Тим Бърнърс-Лий.",
-      "Адресите в него често започват с „www“."
-    ],
+    "text": "Какво изобретение предлага британецът Тим Бърнърс-Лий в ЦЕРН през 1989 г.?",
     "answer": "Световната мрежа (уеб)",
     "wrong": ["Електронната поща", "Езикът Java", "Wi-Fi"],
     "fact": "Първият уебсайт, пуснат през 1991 г., и днес може да се види на адрес info.cern.ch.",
     "added": "2026-11-14",
-    "updated": "2026-11-14"
+    "changed": "2026-11-21",
+    "updated": "2026-11-21",
+    "checked": "2026-11-21",
+    "checkedBy": "retire-kinds opus-5.5",
+    "sources": ["https://en.wikipedia.org/wiki/World_Wide_Web", "https://en.wikipedia.org/wiki/Tim_Berners-Lee"]
   }
 ]

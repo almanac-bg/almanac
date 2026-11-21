@@ -51,7 +51,7 @@ import (
 // DayRules names the day's draw as it is, and the days after tomorrow are drawn again whenever it changes. It ends with
 // what drawDay makes of a fixed bank on fixed days and seeds (TestDayRulesNameTheDraw): a change to how a day is drawn
 // fails that test until DayRules says so, rather than reach the days drawn ahead a season late.
-const DayRules = "2026-11-20 the number last, a week apart (recent subjects), estimates count no list; draw 23ab9debaea5283c"
+const DayRules = "2026-11-21 no clues, pairs or groups: their places are choices; draw 48bb4ea344621b6a"
 
 // Ahead is how many days ahead of today the day's questions are drawn.
 const Ahead = 90

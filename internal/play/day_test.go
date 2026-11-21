@@ -254,7 +254,7 @@ func rightOf(t *testing.T, d bank.Dealt) json.RawMessage {
 	reveal, _ := json.Marshal(d.Reveal(nil))
 	var r map[string]any
 	_ = json.Unmarshal(reveal, &r)
-	for _, k := range []string{"pick", "value", "truth", "sides", "pairs", "order"} {
+	for _, k := range []string{"pick", "value", "truth", "order"} {
 		if v, ok := r[k]; ok {
 			out, _ := json.Marshal(map[string]any{k: v})
 			return out

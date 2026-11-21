@@ -21,8 +21,6 @@ const (
 	imageTextMax = 60  // a question about a picture: the picture carries the rest
 	optionMax    = 60  // a choice's option
 	itemMax      = 45  // an order's item
-	pairMax      = 30  // a side of a match's pair: two columns on a phone
-	groupMax     = 24  // a split's group: two buttons side by side on a phone
 	unitMax      = 12
 	factMax      = 200 // "Знаеше ли?": one or two sentences, read at a glance
 	dayMax       = 100 // the line of a question's day („На този ден“): one short sentence
@@ -174,9 +172,6 @@ func checkQuestion(q Question, today string) (errs []string, warnings []Problem)
 		if t.Updated == "" {
 			errs = append(errs, "a question added since "+RulesFrom+" needs updated (the day it last changed)")
 		}
-	}
-	if m, ok := q.(*Match); ok && m.Decoy == "" && !t.Retired && t.Added >= DecoysFrom {
-		errs = append(errs, "a match added since "+DecoysFrom+" needs a decoy")
 	}
 	if t.ReviewBy != "" && t.ReviewBy <= today && !t.Retired {
 		warnings = append(warnings, Problem{Rule: RuleReview, Msg: "due for review since " + t.ReviewBy})

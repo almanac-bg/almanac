@@ -120,8 +120,7 @@ func TestRulesOfAQuestion(t *testing.T) {
 		{"long-answer", choice("a", "Кой е ООН?", "Организацията на обединените нации", "НАТО", "ЕС", "ОССЕ"), true},
 		{"answer-word", choice("a", "Кой е този водопад?", "Ниагарският водопад", "Виктория", "Игуасу", "Анхел"), true},
 		{"answer-word", choice("a", "Кой е този водопад?", "Ниагарският водопад", "Водопадът Виктория", "Игуасу", "Анхел"), false},
-		{"answer-word", &Clues{Head: Head{ID: "a", Type: "clues", Text: "Коя е тази организация?"}, Answer: "Лекари без граници",
-			Wrong: []string{"Червеният кръст", "УНИЦЕФ", "Амнести"}, Clues: []string{"Основават я френски лекари.", "Втора.", "Трета."}}, true},
+		{"answer-word", choice("a", "Коя организация основават френски лекари?", "Лекари без граници", "Червеният кръст", "УНИЦЕФ", "Амнести"), true},
 		{"dated", plain("a"), false},
 		{"dated", func() Question {
 			q := plain("a")
@@ -256,8 +255,11 @@ func TestRulesOfAQuestion(t *testing.T) {
 		{"own-number", number("a", "Колко са прелюдиите в цикъла оп. 28 на Шопен?", 24, 8, "прелюдии"), false},
 		{"own-number", number("a", "Колко милиона души живеят в Германия, закръглено до сто хиляди?", 82.7, 20, "млн. души"), false},
 		{"own-number", number("a", "Колко процента от хората на 16–74 години ползват интернет?", 22, 7, "%"), false},
-		{"present", &Clues{Head: Head{ID: "a", Type: "clues", Text: "Кой е този боец?"}, Answer: "Багата", Wrong: []string{"А", "Б", "В"},
-			Clues: []string{"Роден е в София.", "Бие се в тежка категория на UFC.", "Трета."}}, true},
+		{"present", func() Question {
+			q := choice("a", "Кой е този боец?", "Багата", "А", "Б", "В")
+			q.Fact = "Роден е в София. Бие се в тежка категория на UFC."
+			return q
+		}(), true},
 		{"present", func() Question {
 			q := choice("a", "В коя сграда се записва шоуто?", "НДК", "БНТ", "Дворецът", "Арена")
 			q.Fact = "Студиото е в зала 12, а шоуто се записва всяка делнична вечер."
@@ -282,7 +284,6 @@ func TestRulesOfAQuestion(t *testing.T) {
 			q.Fact = "Бест умира през 2005 г. в Лондон."
 			return q
 		}(), false},
-		{"decoy", &Match{Head: Head{ID: "a", Type: "match", Text: "Свържи:"}, Pairs: []MatchPair{{"А", "Б"}}, Tail: Tail{Added: "2026-11-01"}}, true},
 	} {
 		rule, _ := RuleNamed(c.rule)
 		got := rule.one(c.q)
@@ -404,16 +405,7 @@ func TestAnswerGiveaway(t *testing.T) {
 	}
 }
 
-func TestPairsAndSharedItems(t *testing.T) {
-	match := &Match{Head: Head{ID: "nat-1", Type: "match", Difficulty: Hard, Text: "Свържи животното с вида му:"},
-		Pairs: []MatchPair{{"Лайка", "Куче"}, {"Хам", "Шимпанзе"}, {"Кейко", "Косатка"}, {"Джордж", "Костенурка"}}, Decoy: "Горила",
-		Tail: Tail{Added: "2026-11-01"}}
-	order := &Order{Head: Head{ID: "nat-2", Type: "order", Text: "Подреди по годината на полета:"}, Direction: "asc",
-		Items: []OrderItem{{"Кучето Лайка", 1957}, {"Белка и Стрелка", 1960}, {"Мечето Бруно", 1961}, {"Котката Фелисет", 1963}},
-		Tail:  Tail{Added: "2026-11-01"}}
-	if got := found(bankOf(match, order)); !slices.Equal(got, []string{"pair-giveaway nat-2"}) && !slices.Equal(got, []string{"pair-giveaway nat-1"}) {
-		t.Errorf("found %v", got)
-	}
+func TestSharedItems(t *testing.T) {
 	planes := func(id, text, fourth string, values ...float64) *Order {
 		return &Order{Head: Head{ID: id, Type: "order", Text: text}, Direction: "asc", Unit: "т", Tail: Tail{Added: "2026-11-01"},
 			Items: []OrderItem{{"Cessna 172", values[0]}, {"Boeing 747", values[1]}, {"Ан-225 „Мрия“", values[2]}, {fourth, values[3]}}}

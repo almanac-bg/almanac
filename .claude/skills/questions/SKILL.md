@@ -35,8 +35,8 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
     - an id the bank doesn't have is a **new** question: the next free number of its category;
     - an id the bank has (live, in that category's file) is a **change**: the batch's object replaces the question
       whole, in its place. It keeps `added` as the bank has it, sets `updated` to today, and sets `changed` to today
-      if what it asks changed (its text, answer, options, items, pairs, decoy, clues, groups, picture, tolerance,
-      unit, step, scale or direction, against the bank's version); if only the fact, the day's line or the labels
+      if what it asks changed (its text, answer, options, items, picture, tolerance, unit, step, scale or direction,
+      against the bank's version); if only the fact, the day's line or the labels
       (difficulty, `on`, `bg`, `sources`, `reviewBy`, a picture's credit) changed, `changed` stays as it was. A
       retired question isn't changed (a new one takes its place), nor one the batch also retires; one the same as
       the bank's is left out of the batch;
@@ -64,12 +64,14 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 
 - **Difficulty is the rubric's, not a quota.** Since 16 Nov 2026 there is no mix to aim for (it was 50/35/15): a
   question is labelled for what Bulgarian players know (below), and batches are written by the day's runway.
-- **Kinds: 50% choice, 15% true-or-not, 10% number, 7.5% order, 7.5% match, 5% split, 5% clues**, in every category
-  (`bank.TypeMix`), close to what the game draws (a run of ten has five choices, one of each other kind, and a split
-  or clues), so that no kind runs out long before the others. `bank check` shows each category's kinds against it.
+- **Kinds: 67.5% choice, 15% true-or-not, 10% number, 7.5% order**, in every category (`bank.TypeMix`), close to
+  what the game draws (a run of ten has seven choices and one of each other kind), so that no kind runs out long before
+  the others. `bank check` shows each category's kinds against it. Clues, pairs and groups (`clues`, `match`,
+  `split`) were retired on 21 Nov 2026: with the score only right or wrong, clues were waiting and a match or a split
+  bundled four answers into one. Each became a choice (some splits a true-or-not); never write one again.
 - **The bank grows by the day's runway** (the owner's rule since 15 Nov 2026, in place of "fully balanced, always"):
   the day spends its places at its own pace — one easy choice with a picture, one hard number, two hard choices, a
-  medium order and match… a day — about three times faster for the hard places than for the easy ones. So
+  medium order… a day — about three times faster for the hard places than for the easy ones. So
   `bank check` prints, for each place of a day, how many days from today it has questions for, counted as the day
   takes them: only the questions a day can still take (with `-used`, none the days played or
   drawn ahead have had; without it, the whole bank, which overstates it), never a dated one (it waits for its date;
@@ -110,7 +112,7 @@ enough to be worth a look, not always.
 
 | Rule | What it holds |
 | --- | --- |
-| `ending` | A question ends in „?“ or „:“; a true-or-not statement and a clue end in a period |
+| `ending` | A question ends in „?“ or „:“; a true-or-not statement ends in a period |
 | `address` | „ти“ to one player: „Подреди“, never „Подредете“ |
 | `fact` | One or two sentences, ending in a period; never „Интересно е, че…“ |
 | `typography` | „…“ quotes in pairs (never "…" or «…»); `bank fmt` sets the rest: „…“ for three dots, a spaced dash —, a no-break space before „г.“ and before „%“ („36 %“, as the game writes a share), none between an angle and its „°“ („90° с.ш.“; a temperature is „25 °C“); a quoted title keeps its own („18% сиво“) |
@@ -129,17 +131,15 @@ enough to be worth a look, not always.
 | `options` | No option stands out by its form: only the answer with a regnal numeral (Симеон I), only the answer in Latin or in Cyrillic letters (bTV among БНТ, Нова), quotes on some options only |
 | `number-rank` (hint) | Across the bank, and within a topic, a choice of numbers has its answer about as often the smallest, the second, the third and the largest of its four: never mostly in the middle, where a player who doesn't know picks. Write the wrong numbers on either side as the question allows (all above, all below), not always around the answer |
 | `long-answer` (hint) | The answer isn't half again as long as every wrong option and 10 letters longer |
-| `answer-word` | No clue, and no question text, shares a word with the answer that no wrong option has („Кой е този водопад?“ — „Ниагарският водопад“; „френски лекари“ — „Лекари без граници“) |
+| `answer-word` | No question text shares a word with the answer that no wrong option has („Кой е този водопад?“ — „Ниагарският водопад“; „френски лекари“ — „Лекари без граници“) |
 | `dated` | A question for a day (`on`) has its day's line (`day`), ending in a period, and the line names the date („На 3 март 1878 г. …“; a moving feast's names the feast). One whose text names its date may go without it |
 | `own-date` | A true-or-not for a day names no date and isn't about the day itself, nor has a choice for a day its date for the answer: dealt on it under „На този ден“, „3 юни е Световният ден на велосипеда.“ answers itself, and so do its mirror („…празнува Коледа на 7 януари.“ on 25 December) and „…са родени в един и същи ден.“ |
-| `decoy` | A match has a decoy |
-| `giveaway` | No question shows a value another asks (a number's answer, a year a choice asks, an order's values) next to the same subject: in its text, options, items, clues, fact, day's line or reveal. Judged by the value and the rare words around it; a small or round value (28) only with its unit („28 килограма“ for an answer in кг) |
-| `answer-giveaway` (hint) | No question shows a choice's or clues' answer as true (text, clue, fact, day's line, item, pair) in a line that, with its question's text, shares rare words with the asking question's subject („Ариел“ in „бащата на русалката Ариел в анимацията на „Дисни““) |
-| `pair-giveaway` (hint) | No question shows both sides of a medium or hard match's pair within four words („Кучето Лайка“ for Лайка — Куче) |
-| `shared-items` | Two orders share no two items with the same values, nor three items in the same order (one's reveal orders the other); two matches share no pair |
+| `giveaway` | No question shows a value another asks (a number's answer, a year a choice asks, an order's values) next to the same subject: in its text, options, items, fact, day's line or reveal. Judged by the value and the rare words around it; a small or round value (28) only with its unit („28 килограма“ for an answer in кг) |
+| `answer-giveaway` (hint) | No question shows a choice's answer as true (text, fact, day's line, item) in a line that, with its question's text, shares rare words with the asking question's subject („Ариел“ in „бащата на русалката Ариел в анимацията на „Дисни““) |
+| `shared-items` | Two orders share no two items with the same values, nor three items in the same order (one's reveal orders the other) |
 | `length` (hint) | A question reads no longer than its kind's usual allows: `bank.Reading` (the letters and digits it shows, a picture as 24) past the kind's third quartile by twice the spread of its middle half. The clock gives time by length (`play.Limit`), so a long one runs long for everyone: say it shorter, drop a clause the answer doesn't need |
-| `same-identity` | A "who or what is this" answer (a picture choice, clues) is asked once |
-| `twin` † | Two choices (or clues) over one set of options — three of four shared, each offered by few questions — ask one thing twice: the same answer, or mirrored (Карлоф or Лугоши, each the other's wrong option). Give one other options, or keep the better one |
+| `same-identity` | A "who or what is this" answer (a picture choice) is asked once |
+| `twin` † | Two choices over one set of options — three of four shared, each offered by few questions — ask one thing twice: the same answer, or mirrored (Карлоф or Лугоши, each the other's wrong option). Give one other options, or keep the better one |
 
 **A true exception** (a proverb to finish ends without „?“; a question about the word „таг“ itself) goes into the
 bank's `waivers.json`, with its reason: `[{"id": "gen-085", "rule": "ending", "why": "поговорка за довършване"}]`.
@@ -171,12 +171,6 @@ By kind:
   can place. The tolerance doesn't follow the label: it is one formula at every difficulty (see the format).
 - **Order:** easy has familiar things with values far apart (centuries); hard has values close together, or
   unfamiliar things.
-- **Clues:** the label is for the first clue's answer only if the last clue makes it easy: easy is a famous answer
-  whose last clue gives it to anyone; hard is one whose last clue still needs knowing the topic.
-- **Split:** easy groups are what most people tell apart already (a mammal or not); hard ones need the detail
-  (Ботев or Вазов by a lesser poem), with items that look alike across the groups.
-- **Match:** easy pairs are what most people associate already; hard ones need specific knowledge, with lefts (or
-  rights) alike. The decoy sets the difficulty too: a far one for easy, a close one for hard.
 - **A picture** makes a question easier only if it shows the answer's look to people who'd recognise it.
 
 Check the label against the answers once a question has `play.CalibrateFrom` (30) of them:
@@ -191,12 +185,12 @@ Every question is one JSON object in its category's file:
 | Field                | What                                                                                     |
 | -------------------- | ---------------------------------------------------------------------------------------- |
 | `id`                 | The category's prefix and a number (`his-412`). Next free number; never reuse or change one |
-| `type`               | `choice`, `number`, `order`, `truefalse`, `match`, `split` or `clues`                    |
+| `type`               | `choice`, `number`, `order` or `truefalse`                                               |
 | `difficulty`         | `easy`, `medium` or `hard`                                                               |
 | `text`               | The question: at most 160 characters (60 with a picture), ending in „?“ or „:“           |
 | `fact`               | One or two sentences, at most 140 characters for a question added since `ShortFactsFrom` (2026-11-19: on a phone it shows whole, under the answer), 200 for the older ones (see below) |
 | `added`, `updated`   | The day it joined the bank; the day it last changed at all                               |
-| `changed`            | The day what it asks last changed (text, answer, options, items, pairs, clues, picture): players' answers from before it don't count in its crowd and calibration. Not for a fix to the fact alone |
+| `changed`            | The day what it asks last changed (text, answer, options, items, picture): players' answers from before it don't count in its crowd and calibration. Not for a fix to the fact alone |
 | `sources`            | The pages (https://…) the answer and the fact were confirmed on: what the next check starts from. Never shown to players. Required for a question added since `SourcesFrom` (2026-11-17), or changed since `TouchedFrom` (2026-11-19) |
 | `checked`, `checkedBy` | When it was last checked against its sources, and by what: a process and its model (`"new-questions fable-5.2"`), or for older questions the bank commit that added or last changed it (`"bank 7bb2938"`: its message and report say how). Required with `sources` |
 | `reviewBy`           | For an answer that may stop being true (an office holder, a record): when to check it. From that day no game deals it (`bank check` warns, the server logs it) until it is checked and the date moved |
@@ -233,24 +227,6 @@ By type:
   many false ones as true, each false by one clear fact, not by a trick of wording. **A false statement's fact starts
   with what is true** („Монако граничи с Италия.“ — „Монако граничи по суша само с Франция…“), then the rest. 10
   seconds to answer.
-- **`clues`:** „Подсказки“. The text asks what to name („Кой е този човек?“, „Коя е тази държава?“), three `clues`
-  (each at most 110 characters, a sentence ending with a period), `answer` and three `wrong` like a choice. The clues
-  go from the hardest to the easiest: the first one only an expert knows, the second narrows it to a well-read
-  person, the third gives it to almost anyone who knows the topic at all. Every clue is true of the answer only, and
-  none names it or gives it away by a word from it. The wrong options fit the first clue's kind (all people, all
-  countries) and some of them fit a clue taken alone, so that guessing early costs. The clues come 10 seconds apart;
-  an answer is worth all of its points on the first clue, 60% on the second, 30% on the third. 30 seconds.
-- **`split`:** „Раздели“. The text asks the one question that sorts („Бозайник ли е животното?“, „Чия е
-  творбата: на Ботев или на Вазов?“), `groups` are the two answers to it (each at most 24 characters, left first),
-  and six `items` (`text` at most 45 characters, `group` 0 or 1), at least two in each group. Every item belongs to
-  its group under every source, and to only that one: a pair of groups that leaves room for „both“ or „neither“
-  („Европа или Азия?“ for Турция) is not a split. The game shows the items one by one in its own order. 30 seconds.
-- **`match`:** the text says what to join („Свържи държавата със столицата ѝ:“), four `pairs` of `left` and
-  `right`, and a `decoy`: a fifth right that fits no left, each at most 30 characters. Every left has exactly one
-  right that fits, under every source, and the decoy fits none of them (check it as hard as an answer). The decoy is
-  of the same kind as the rights and tempting: the city people take for the capital („Сидни“), a neighbour of the
-  answer, a name from the same school. Without it, whoever knows three pairs gets the fourth for nothing. The
-  checker refuses a match added since `bank.DecoysFrom` (2026-11-15) without one. 30 seconds.
 
 ## Writing a question
 
@@ -344,8 +320,8 @@ shows with the answer, over the fact: the player learns why the day. (The owner'
 
 - Change it through `bank add`: the changed questions, whole, in a batch's `<category>.json` (see the tools above),
   never by hand in the bank's files; it checks the dates below for you.
-- Set `updated` to today whenever anything changes. If what it asks changed (text, answer, options, items, pairs,
-  decoy, clues, groups, picture, tolerance, unit, step, scale, direction), set `changed` to today too: the answers
+- Set `updated` to today whenever anything changes. If what it asks changed (text, answer, options, items, picture,
+  tolerance, unit, step, scale, direction), set `changed` to today too: the answers
   given before then stop counting. A fix to the fact, the day's line or the labels leaves `changed` as it was.
 - Change it in place when it still asks the same thing, better (a clearer wording, a fairer option). If it would ask
   something else (another subject or answer), retire it (`"retired": true`, `retiredWhy`, `replacedBy`) and add a new

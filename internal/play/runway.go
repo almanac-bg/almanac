@@ -51,8 +51,7 @@ type Runway struct {
 	// Cover is how many days from today the place holds at Supply times the day's need (the days drawn already among
 	// them): what the warning and the batch plan go by.
 	Cover int
-	// Difficulty, Kinds and Picture say what fits the place ("split" and "clues" share theirs); Questions is how many
-	// fit it that a day can still take (the days drawn ahead have theirs), PerDay how many a day takes.
+	// Difficulty, Kinds and Picture say what fits the place; Questions is how many fit it that a day can still take (the days drawn ahead have theirs), PerDay how many a day takes.
 	Difficulty bank.Difficulty
 	Kinds      []string
 	Picture    bool
@@ -96,8 +95,7 @@ func (u Used) left(q bank.Question, start time.Time) bool {
 	return !u.IDs[q.Base().ID] && len(q.Extra().On) == 0 && !overdue(q, start.Format(time.DateOnly))
 }
 
-// DayRunway is the runway of each place of a day, in the day's order (the place the new kinds share counts both), on
-// today.
+// DayRunway is the runway of each place of a day, in the day's order, on today.
 func DayRunway(b *bank.Bank, used Used, today string) []Runway {
 	start := used.start(today)
 	var out []Runway
@@ -113,20 +111,14 @@ func DayRunway(b *bank.Bank, used Used, today string) []Runway {
 				times++
 			}
 		}
-		kinds := []string{s.typ}
-		if s.typ == newKinds[0] {
-			kinds = newKinds
-		}
 		n := 0
-		for _, k := range kinds {
-			for _, q := range b.Live("", k) {
-				if used.left(q, start) && fitsPlace(b, q, s, k) {
-					n++
-				}
+		for _, q := range b.Live("", s.typ) {
+			if used.left(q, start) && fitsPlace(b, q, s, s.typ) {
+				n++
 			}
 		}
-		out = append(out, Runway{Place: slot{s.difficulty, kinds[0], s.picture, ""}.place(), Difficulty: s.difficulty,
-			Kinds: kinds, Picture: s.picture == withPicture, Questions: n, PerDay: times}.from(start, today))
+		out = append(out, Runway{Place: s.place(), Difficulty: s.difficulty,
+			Kinds: []string{s.typ}, Picture: s.picture == withPicture, Questions: n, PerDay: times}.from(start, today))
 	}
 	return out
 }
@@ -140,12 +132,7 @@ func BulgariaRunway(b *bank.Bank, used Used, today string) Runway {
 		if !q.Extra().BG || !used.left(q, start) {
 			continue
 		}
-		if slices.ContainsFunc(daySlots, func(s slot) bool {
-			if s.typ == newKinds[0] {
-				return slices.ContainsFunc(newKinds, func(k string) bool { return fitsPlace(b, q, s, k) })
-			}
-			return fitsPlace(b, q, s, s.typ)
-		}) {
+		if slices.ContainsFunc(daySlots, func(s slot) bool { return fitsPlace(b, q, s, s.typ) }) {
 			n++
 		}
 	}
@@ -154,5 +141,5 @@ func BulgariaRunway(b *bank.Bank, used Used, today string) Runway {
 
 // fitsPlace is whether q fits a place of a day just so, as kind k: the number only with an estimate.
 func fitsPlace(b *bank.Bank, q bank.Question, s slot, k string) bool {
-	return matches(q, slot{s.difficulty, k, s.picture, ""}, true, true) && (k != "number" || b.Estimate(q))
+	return matches(q, slot{s.difficulty, k, s.picture}, true, true) && (k != "number" || b.Estimate(q))
 }

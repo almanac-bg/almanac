@@ -19,12 +19,21 @@ const lineWidth = 120
 // It sets the typography the bank keeps one way too (tidy: „…“, the dash, „г.“ held to its year), so that nobody has
 // to remember it.
 func Format(questions []Question) ([]byte, error) {
-	if len(questions) == 0 {
+	items := make([]any, len(questions))
+	for i, q := range questions {
+		items[i] = q
+	}
+	return format(items)
+}
+
+// format is Format of questions, or of a question as its file had it (json.RawMessage: a leftover, bank.go).
+func format(items []any) ([]byte, error) {
+	if len(items) == 0 {
 		return []byte("[]\n"), nil
 	}
 	var b bytes.Buffer
 	b.WriteString("[\n")
-	for i, q := range questions {
+	for i, q := range items {
 		raw, err := marshal(q)
 		if err != nil {
 			return nil, err
@@ -35,7 +44,7 @@ func Format(questions []Question) ([]byte, error) {
 		}
 		b.WriteString("  ")
 		n.expand(&b, 1)
-		if i < len(questions)-1 {
+		if i < len(items)-1 {
 			b.WriteByte(',')
 		}
 		b.WriteByte('\n')
@@ -44,9 +53,49 @@ func Format(questions []Question) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-// WriteCategory writes one category's questions into a bank directory.
-func WriteCategory(dir, category string, questions []Question) error {
-	data, err := Format(questions)
+// Write writes a category's file of the bank into a bank directory: its questions as Format keeps them, a question
+// changed (by its id) in its place, more at the end, and the questions of a retired kind the file had (RetiredKinds)
+// as they were, where they were, unless changed names them (a question of a retired kind made one the game has).
+func (b *Bank) Write(dir, category string, changed map[string]Question, more []Question) error {
+	var items []any
+	add := func(after string) {
+		for {
+			found := false
+			for id, l := range b.left {
+				if l.category != category || l.after != after {
+					continue
+				}
+				if q, ok := changed[id]; ok {
+					items = append(items, q)
+				} else {
+					items = append(items, l.raw)
+				}
+				after, found = id, true
+				break
+			}
+			if !found {
+				return
+			}
+		}
+	}
+	add("")
+	for _, q := range b.InCategory(category) {
+		if c, ok := changed[q.Base().ID]; ok {
+			items = append(items, c)
+		} else {
+			items = append(items, q)
+		}
+		add(q.Base().ID)
+	}
+	for _, q := range more {
+		items = append(items, q)
+	}
+	return writeCategory(dir, category, items)
+}
+
+// writeCategory writes a category's file into a bank directory.
+func writeCategory(dir, category string, items []any) error {
+	data, err := format(items)
 	if err != nil {
 		return err
 	}

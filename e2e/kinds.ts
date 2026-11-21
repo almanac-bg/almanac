@@ -1,21 +1,20 @@
 // Every kind of question, as the tests' bank has it at its longest (the sample's, and beside them the real bank's
-// longest orders, pairs and choices where the real bank is here: bank.ts), answered as a test wants it (right, wrong or
+// longest orders and choices where the real bank is here: bank.ts), answered as a test wants it (right, wrong or
 // close), and what a question's screen must never do whatever its size (layout.spec.ts, answer.spec.ts).
 import { expect, type Page } from "@playwright/test";
 import { bankQuestions, portrait, type Q, sampleIds, words } from "./bank.ts";
 
 export type { Q };
 
-/** How a question is answered: right, wrong, or close (a number near, an order, pairs or groups partly right). */
+/** How a question is answered: right, wrong, or close (a number near, an order partly right). */
 export type How = "right" | "wrong" | "close";
 
-/** Whether a kind of question can be answered close: a number, or a whole made of parts. */
-export const closeable = (q: Q) => ["number", "order", "match", "split"].includes(q.type);
+/** Whether a kind of question can be answered close: a number, or an order. */
+export const closeable = (q: Q) => ["number", "order"].includes(q.type);
 
 /** One question of each kind, the longest the sample has: a choice, a choice of pictures, a choice under a picture,
- * „Вярно или невярно“, an order, pairs, groups, clues and a number; a choice under a portrait (the picture at its
- * tallest), where the sample has one; and of an order and of pairs, the one with the longest question too, where
- * that's another (a sheet of five lines over the rows); each named. Then, where the real bank is here, the longest of
+ * „Вярно или невярно“, an order and a number; a choice under a portrait (the picture at its tallest), where the
+ * sample has one; and of an order, the one with the longest question too, where that's another (a sheet of five lines over the rows); each named. Then, where the real bank is here, the longest of
  * each kind it adds (bank.ts, named so: „order-real“): a run here covers all that a run on CI (the sample alone)
  * does, and the real bank's extremes besides. */
 export function kinds(): { name: string; q: Q }[] {
@@ -57,10 +56,6 @@ function longestOf(qs: Q[], suffix = ""): { name: string; q: Q }[] {
   add("truefalse", longest(plain("truefalse")));
   add("order", longest(plain("order")));
   add("order-asked", longest(plain("order"), asked));
-  add("match", longest(plain("match")));
-  add("match-asked", longest(plain("match"), asked));
-  add("split", longest(plain("split")));
-  add("clues", longest(plain("clues")));
   add("number", longest(plain("number")));
   return out;
 }
@@ -88,7 +83,6 @@ export async function answerAs(page: Page, q: Q, how: How): Promise<void> {
   const right = how === "right";
   switch (q.type) {
     case "choice":
-    case "clues":
       if (q.pictures) {
         const alt = q.pictures[right ? 0 : 1]?.alt ?? "";
         const i = await ask
@@ -135,35 +129,6 @@ export async function answerAs(page: Page, q: Q, how: How): Promise<void> {
       await tap(".answering .btn.primary");
       return;
     }
-    case "match": {
-      const pairs = q.pairs ?? [];
-      const n = pairs.length;
-      for (const [i, p] of pairs.entries()) {
-        // Wrong: each with the next one's pair; close: the first two right, the rest swapped.
-        const j =
-          how === "right" || (how === "close" && i < 2) ? i : how === "close" ? (i === n - 1 ? 2 : i + 1) : (i + 1) % n;
-        await tapText(page, "article.question .match-col:first-of-type .match-item", p.left);
-        await tapText(page, "article.question .match-col:last-of-type .match-item", pairs[j]?.right ?? "");
-      }
-      await expect(ask.locator(".match-lines line")).toHaveCount(n);
-      await tap(".answering .btn.primary");
-      return;
-    }
-    case "split": {
-      const items = q.items ?? [];
-      for (let i = 0; i < items.length; i++) {
-        await expect(ask.locator(".split-pips b.done")).toHaveCount(i);
-        const text = bare(await ask.locator(".split-card.top .split-text").textContent());
-        const item = items.find((x) => x.text === text);
-        const group = item?.group ?? 0;
-        const ok = how === "right" || (how === "close" && i < items.length / 2);
-        await ask
-          .locator(".split-side")
-          .nth(ok ? group : 1 - group)
-          .dispatchEvent("click");
-      }
-      return;
-    }
   }
 }
 
@@ -181,7 +146,7 @@ export async function flaws(page: Page): Promise<string[]> {
       `${e.tagName.toLowerCase()}.${[...e.classList].join(".")} „${(e.textContent ?? "").replaceAll("­", "").trim().slice(0, 30)}“`;
 
     // Nothing of the question off the screen's side (where a box that cuts what overflows it would hide it).
-    for (const e of document.querySelectorAll("article.question :is(.option, .btn, .link, .split-arrow, .split-label)"))
+    for (const e of document.querySelectorAll("article.question :is(.option, .btn, .link)"))
       if (shown(e)) {
         const r = e.getBoundingClientRect();
         if (r.left < -0.5 || r.right > innerWidth + 0.5) out.push(`off the screen's side: ${name(e)}`);
@@ -218,7 +183,7 @@ export async function flaws(page: Page): Promise<string[]> {
     }
 
     // A punctuation mark never starts a line: it goes with the word before it („революционер?“, never „?“ alone).
-    const texts = ".ask, .option, .clue, .split-card.top, .right-said, .match-pair, .split-pair";
+    const texts = ".ask, .option, .right-said";
     for (const box of document.querySelectorAll(texts)) {
       if (!shown(box)) continue;
       const walk = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
@@ -251,8 +216,8 @@ export async function flaws(page: Page): Promise<string[]> {
   });
 }
 
-/** What of a question's answering can't be seen whole at the page's top as it opens: an answer (or a key, a cell,
- * a group, a card) off the screen, under the head, or under the action at its foot („Готово“, „Отговори“). */
+/** What of a question's answering can't be seen whole at the page's top as it opens: an answer (or a key, a row)
+ * off the screen, under the head, or under the action at its foot („Готово“, „Отговори“). */
 export async function unseenAnswers(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const out: string[] = [];
@@ -260,7 +225,7 @@ export async function unseenAnswers(page: Page): Promise<string[]> {
     const action = document.querySelector(".answering .btn.primary")?.getBoundingClientRect();
     if (action && (action.top < head - 1 || action.bottom > innerHeight + 0.5)) out.push("the action off the screen");
     const parts = `article.question :is(.choices > .option, .pic-options > .option, .tf-options > .option, .keypad .key,
-      .sortable-list > .option, .match-item, .split-side, .split-card.top, .split-back:not([hidden]), .clue)`;
+      .sortable-list > .option)`;
     for (const e of document.querySelectorAll(parts)) {
       const r = e.getBoundingClientRect();
       if (!r.width || !r.height) continue;

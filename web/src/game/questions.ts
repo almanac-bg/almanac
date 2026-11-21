@@ -1,25 +1,22 @@
 // Each question type's screen: how it's asked, how it's answered, and how its answer is shown. One renderer per type,
 // as the server has one Go file per type (internal/bank).
 
-import { append, type Child, effect, h, listen, onCleanup, type Signal, signal } from "../lib/dom.ts";
+import { append, type Child, h, listen, type Signal, signal } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { play } from "../lib/sound.ts";
-import { hyphenate, listWords, withWord } from "../lib/words.ts";
+import { hyphenate } from "../lib/words.ts";
 import { formatNumber, formatValue, type VerdictKind } from "../ui.ts";
 import { percent, rare, withOwn } from "./numbers.ts";
 import { optionSizes, overSizes } from "./sizes.ts";
 import type {
   Answer,
   ChoiceView,
-  CluesView,
   Credit,
   Crowd,
-  MatchView,
   NumberView,
   OrderView,
   Picture,
   Reveal,
-  SplitView,
   Spread,
   TrueFalseView,
   View,
@@ -43,11 +40,9 @@ export interface Asked {
   reveal(reveal: Reveal, given: Answer | null, at?: Stage, how?: VerdictKind): void;
   /** What's been put in but not sent yet (a typed number, things moved into an order): it counts when time runs out. */
   pending(): Answer | null;
-  /** Takes a newer view of the same question, as more of it shows (the next clue). */
-  update?(view: View): void;
 }
 
-/** A cell's words (a pair, a thing to sort, a group): each that may break (hyphenate) held whole in a `.word`, so that
+/** A cell's words (an option, a thing to sort): each that may break (hyphenate) held whole in a `.word`, so that
  * it goes to the next line whole where it fits there („Ангел / Каралийчев“, not „Ангел Каралий-/чев“), and breaks, at
  * its syllables, only where it's wider than the cell itself. */
 export function wholeWords(text: string): Child {
@@ -75,15 +70,8 @@ export function crowdLine(type: View["type"], c: Crowd | undefined, right: boole
     return h("p", { class: right ? "crowd-says rare" : "crowd-says" }, none);
   }
   if (right && all <= rare) return h("p", { class: "crowd-says rare" }, `Познаха го само ${s}.`);
-  const says = {
-    choice: `Вярно отговарят ${s}.`,
-    truefalse: `Вярно отговарят ${s}.`,
-    clues: `Вярно отговарят ${s}.`,
-    number: `Вярно отговарят ${s}.`, // near enough to count is right; „близо“ is only the close answer that isn't
-    order: `Изцяло вярно подреждат ${s}.`,
-    match: `Всички двойки свързват вярно ${s}.`,
-    split: `Всичко разпределят вярно ${s}.`,
-  }[type];
+  // Near enough to count is right for a number too; „близо“ is only the close answer that isn't.
+  const says = type === "order" ? `Изцяло вярно подреждат ${s}.` : `Вярно отговарят ${s}.`;
   return h("p", { class: "crowd-says" }, says);
 }
 
@@ -114,17 +102,10 @@ function crowdOnAll(buttons: HTMLElement[], crowd: Crowd | undefined, mine: numb
 
 /** Draws a question's answering part; submit sends an answer once, and locked stops input. With the answer it shows
  * how everyone else has answered each option (once the question has had enough answers to say); the sentence that
- * sums it up goes under the verdict (crowdLine). `say` tells a screen reader what changes as the question runs (a
- * clue come out), in the game's live region; without it, the question keeps one of its own. `display`: drawn to be
- * looked at, never answered here (a review's): no keys, no line on how to answer, no „Готово“, no
- * grips; the clues still come out as their time comes. */
-export function ask(
-  view: View,
-  submit: (a: Answer) => void,
-  locked: Signal<boolean>,
-  say?: (s: string) => void,
-  display = false,
-): Asked {
+ * sums it up goes under the verdict (crowdLine). `display`: drawn to be looked at, never answered here (a review's):
+ * no keys, no line on how to answer, no „Готово“, no grips. A kind the client doesn't know (one retired since a game
+ * was played) is its text alone, with nothing to answer. */
+export function ask(view: View, submit: (a: Answer) => void, locked: Signal<boolean>, display = false): Asked {
   switch (view.type) {
     case "choice":
       return choice(view, submit, locked, display);
@@ -134,19 +115,14 @@ export function ask(
       return order(view, submit, locked, display);
     case "truefalse":
       return truefalse(view, submit, locked, display);
-    case "match":
-      return match(view, submit, locked, display);
-    case "split":
-      return split(view, submit, locked, display);
-    case "clues":
-      return clues(view, submit, locked, say, display);
   }
+  return { node: null, reveal: () => {}, pending: () => null };
 }
 
 /** Draws a question as it was answered, for going over it once the question is past (a review). „Вярно“ and „Невярно“ carry no ✓ while asked; here the right one says it is, for whoever can't tell
  * colours. */
 export function answered(view: View, reveal: Reveal, given: Answer | null, how?: VerdictKind): Child {
-  const a = ask(view, () => {}, signal(true), undefined, true);
+  const a = ask(view, () => {}, signal(true), true);
   a.reveal(reveal, given, undefined, how);
   if (a.node instanceof Element)
     a.node.querySelector(".option.tf.right")?.append(h("small", { class: "tf-right" }, "верният отговор"));
@@ -157,7 +133,7 @@ export function answered(view: View, reveal: Reveal, given: Answer | null, how?:
 const quoted = (name: string) => (/^[„"«]/.test(name) ? name : `„${name}“`);
 
 /** The right answer as a screen reader says it after a miss, where one short sentence holds it: „Верният отговор е „Бийтълс“.“
- * (none for an order, pairs or groups: their rows say it). */
+ * (none for an order: its rows say it). */
 export function spokenAnswer(view: View, reveal: Reveal): string {
   if (view.type === "truefalse") return reveal.truth ? "Твърдението е вярно." : "Твърдението е невярно.";
   const name = answerWords(view, reveal);
@@ -165,16 +141,14 @@ export function spokenAnswer(view: View, reveal: Reveal): string {
   return `Верният отговор е ${view.type === "number" ? name : quoted(name)}.`;
 }
 
-/** The right answer in a few words, where a few words hold it: a choice's or clues' option, a number with its unit,
- * „Вярно“ or „Невярно“ for a statement; "" for an order, pairs or groups (their rows say it). */
+/** The right answer in a few words, where a few words hold it: a choice's option, a number with its unit, „Вярно“ or
+ * „Невярно“ for a statement; "" for an order (its rows say it). */
 export function answerWords(view: View, reveal: Reveal): string {
   switch (view.type) {
     case "choice": {
       const pick = reveal.pick ?? -1;
       return reveal.names?.[pick] ?? view.choices?.[pick] ?? view.pictures?.[pick]?.alt ?? "";
     }
-    case "clues":
-      return view.choices[reveal.pick ?? -1] ?? "";
     case "truefalse":
       return reveal.truth ? "Вярно" : "Невярно";
     case "number":
@@ -846,7 +820,7 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
               { class: "row-words" },
               wholeWords(view.items[item] ?? ""),
               how === " amiss" && at >= 0
-                ? h("small", { class: "match-gave" }, `при теб: ${ordinal(at + 1, "n")}`)
+                ? h("small", { class: "row-gave" }, `при теб: ${ordinal(at + 1, "n")}`)
                 : null,
             ),
             // The value and the ✓ or ✕ in one box: under the words, where they don't fit beside them, together.
@@ -918,470 +892,6 @@ function truefalse(
         if (mine !== true) mark(yes, true);
         if (mine !== false) mark(no, false);
         crowd = crowdOnAll([yes, no], reveal.crowd, mine === null ? -1 : mine ? 0 : 1);
-      });
-      at(beats.crowd, () => crowd());
-    },
-  };
-}
-
-/** „Свържи“: tap a thing on the left, then its pair on the right (or the other way round); a line joins them. A
- * joined one tapped again comes apart. */
-function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<boolean>, display: boolean): Asked {
-  const pairs = signal<number[]>(view.left.map(() => -1)); // for each left, its right (-1: none yet)
-  const stack = h("div", { class: "stack" });
-  const chosen = signal<{ side: "left" | "right"; i: number } | null>(null);
-  const said = h("p", { class: "sr", "aria-live": "polite" });
-  const leftOf = (j: number) => pairs().indexOf(j);
-
-  const join = (i: number, j: number) => {
-    pairs.update((p) => p.map((r, k) => (k === i ? j : r === j ? -1 : r)));
-    chosen.set(null);
-    play("key");
-    said.textContent = `„${view.left[i]}“ — „${view.right[j]}“.`;
-  };
-  const tap = (side: "left" | "right", i: number) => {
-    if (locked.peek()) return;
-    const c = chosen.peek();
-    if (c && c.side === side && c.i === i) return chosen.set(null);
-    if (c && c.side !== side) return side === "left" ? join(i, c.i) : join(c.i, i);
-    // A joined one comes apart, and is chosen again.
-    const joined = side === "left" ? pairs.peek()[i] !== -1 : pairs.peek().includes(i);
-    if (joined) pairs.update((p) => p.map((r, k) => (side === "left" ? (k === i ? -1 : r) : r === i ? -1 : r)));
-    chosen.set({ side, i });
-    stack.classList.add("touched");
-    play("tap");
-  };
-
-  const cell = (side: "left" | "right", i: number, text: string) => {
-    const pairOf = () => (side === "left" ? (pairs()[i] === -1 ? -1 : i) : leftOf(i));
-    return h(
-      "button",
-      {
-        class: () => {
-          const k = pairOf();
-          const c = chosen();
-          return ["option", "match-item", k >= 0 && "joined", c && c.side === side && c.i === i && "chosen"]
-            .filter(Boolean)
-            .join(" ");
-        },
-        type: "button",
-        disabled: locked,
-        "aria-pressed": () => {
-          const c = chosen();
-          return !!c && c.side === side && c.i === i;
-        },
-        "aria-label": () => {
-          const k = pairOf();
-          const other = side === "left" ? view.right[pairs()[i] ?? -1] : view.left[k];
-          return k >= 0 && other ? `${text}, свързано ${withWord(other)}` : text;
-        },
-        onclick: () => tap(side, i),
-      },
-      // A left one is its letter; a right one, joined, takes its left one's: the pair is tied by the letter.
-      h("span", { class: "letter", "aria-hidden": "true" }, () => {
-        if (side === "left") return letters[i] ?? "";
-        const k = pairOf();
-        return k >= 0 ? (letters[k] ?? "") : "";
-      }),
-      h("span", null, wholeWords(text)),
-    );
-  };
-  const lefts = view.left.map((t, i) => cell("left", i, t));
-  const rights = view.right.map((t, j) => cell("right", j, t));
-  const lines = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  lines.setAttribute("class", "match-lines");
-  lines.setAttribute("aria-hidden", "true");
-  const grid = h(
-    "div",
-    { class: "match" },
-    lines,
-    h("div", { class: "match-col" }, lefts),
-    h("div", { class: "match-col" }, rights),
-  );
-  // A line from each joined left to its right, redrawn as pairs change or the screen does.
-  const draw = () => {
-    const box = grid.getBoundingClientRect();
-    lines.setAttribute("viewBox", `0 0 ${box.width} ${box.height}`);
-    lines.replaceChildren(
-      ...pairs().flatMap((j, i) => {
-        const a = lefts[i]?.getBoundingClientRect();
-        const b = j >= 0 ? rights[j]?.getBoundingClientRect() : undefined;
-        if (!a || !b) return [];
-        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        line.setAttribute("x1", String(a.right - box.left));
-        line.setAttribute("y1", String(a.top + a.height / 2 - box.top));
-        line.setAttribute("x2", String(b.left - box.left));
-        line.setAttribute("y2", String(b.top + b.height / 2 - box.top));
-        return [line];
-      }),
-    );
-  };
-  effect(() => {
-    pairs();
-    requestAnimationFrame(draw);
-  });
-  const resized = new ResizeObserver(() => draw());
-  resized.observe(grid);
-  onCleanup(() => resized.disconnect());
-
-  const done = h(
-    "button",
-    {
-      class: "btn primary big",
-      disabled: () => locked() || pairs().includes(-1),
-      onclick: () => {
-        if (locked.peek()) return;
-        play("tap");
-        submit({ pairs: [...pairs.peek()] });
-      },
-    },
-    "Готово",
-  );
-  const spare = view.right.length > view.left.length;
-  const hint = h(
-    "p",
-    { class: "hint", hidden: display },
-    "Докосни нещо вляво, после двойката му вдясно.",
-    spare ? " Едно вдясно остава без двойка." : null,
-  );
-  const result = h("ol", { class: "options match-result", hidden: true });
-  const decoy = h("p", { class: "hint match-decoy", hidden: true });
-  append(stack, [hint, grid, said, display ? null : done, result, decoy]);
-  return {
-    node: stack,
-    pending: () => (pairs.peek().some((j) => j !== -1) ? { pairs: [...pairs.peek()] } : null),
-    reveal(reveal, given) {
-      stack.classList.remove("touched");
-      hint.replaceChildren("Верните двойки:");
-      hint.hidden = false;
-      grid.hidden = true;
-      done.hidden = true;
-      result.hidden = false;
-      const mine = given && "pairs" in given ? given.pairs : [];
-      result.replaceChildren(
-        ...view.left.map((left, i) => {
-          const j = reveal.pairs?.[i] ?? -1;
-          // Nothing given (the time ran out): the right pairs alone, none a miss of anyone's.
-          const ok = !given || mine[i] === j;
-          const gave = mine[i] ?? -1;
-          return h(
-            "li",
-            // Nothing given: right, but none of it the player's (a ✓ in a ring, not a solid one: app.css).
-            { class: !given ? "option right untaken" : ok ? "option right" : "option amiss" },
-            h(
-              "span",
-              { class: "match-pair" },
-              h("strong", null, wholeWords(left)),
-              " — ",
-              wholeWords(view.right[j] ?? ""),
-              ok
-                ? null
-                : h("small", { class: "match-gave" }, gave >= 0 ? `при теб: ${view.right[gave]}` : "без двойка"),
-            ),
-            sign(),
-          );
-        }),
-      );
-      const spareText = reveal.decoy === undefined ? undefined : view.right[reveal.decoy];
-      if (spareText) {
-        decoy.hidden = false;
-        decoy.replaceChildren("Без двойка: ", h("strong", null, spareText));
-      }
-    },
-  };
-}
-
-/** How far a card must be dragged to go to a side, in px: past it, it goes when let go. */
-const flingAt = 72;
-
-/** „Раздели“: the things one by one on a card, each sent to its group by a swipe left or right, a tap on the group, or
- * the arrow keys. The last one sent sends the answer; until then the last one can be taken back. */
-function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<boolean>, display: boolean): Asked {
-  const n = view.items.length;
-  const sides = signal<number[]>([]); // the groups the items were sent to, in order
-  const said = h("p", { class: "sr", "aria-live": "polite" });
-  const deck = h("div", { class: "split-deck" });
-  const pips = h(
-    "div",
-    { class: "split-pips", "aria-hidden": "true" },
-    view.items.map(() => h("b")),
-  );
-  const send = (side: number) => {
-    const at = sides.peek().length;
-    if (locked.peek() || at >= n) return;
-    const card = deck.querySelector<HTMLElement>(".split-card.top");
-    if (card) {
-      card.classList.add("gone", side === 0 ? "went-left" : "went-right");
-      card.style.transform = "";
-    }
-    play("key");
-    // Said here, once: what went where, and what's next on the card (the card itself is drawn anew each time).
-    const next = view.items[at + 1];
-    said.textContent = `„${view.items[at]}“: ${view.groups[side]}.${next === undefined ? "" : ` Следва „${next}“.`}`;
-    sides.update((s) => [...s, side]);
-    if (at + 1 === n) submit({ sides: [...sides.peek()] });
-    else window.setTimeout(lay, 180);
-  };
-  const back = () => {
-    if (locked.peek() || sides.peek().length === 0) return;
-    sides.update((s) => s.slice(0, -1));
-    play("tap");
-    lay();
-    said.textContent = `Върнато: „${view.items[sides.peek().length]}“.`;
-  };
-  const sideButton = (side: number) =>
-    h(
-      "button",
-      {
-        class: `option split-side ${side === 0 ? "to-left" : "to-right"}`,
-        type: "button",
-        disabled: locked,
-        "aria-label": `Към „${view.groups[side]}“`,
-        onclick: () => send(side),
-      },
-      // The arrow beside the group's name, on its side, never wrapped away from it.
-      side === 0 ? h("span", { class: "split-arrow", "aria-hidden": "true" }, "←") : null,
-      h("span", { class: "split-label" }, wholeWords(view.groups[side] ?? "")),
-      side === 1 ? h("span", { class: "split-arrow", "aria-hidden": "true" }, "→") : null,
-    );
-  const undo = h("button", { class: "link split-back", type: "button", onclick: back }, "Върни последното");
-  // Lays the deck: the next thing on top, the one after it under it.
-  const lay = () => {
-    const at = sides.peek().length;
-    for (const [i, p] of [...pips.children].entries()) p.classList.toggle("done", i < at);
-    undo.hidden = at === 0 || at >= n;
-    const cards: HTMLElement[] = [];
-    const nextText = view.items[at + 1];
-    if (nextText !== undefined)
-      cards.push(h("div", { class: "split-card under", "aria-hidden": "true" }, wholeWords(nextText)));
-    const text = view.items[at];
-    if (text !== undefined) {
-      const card = h(
-        "div",
-        { class: "split-card top" },
-        h("span", { class: "split-lean on-left", "aria-hidden": "true" }, view.groups[0]),
-        h("span", { class: "split-lean on-right", "aria-hidden": "true" }, view.groups[1]),
-        h("span", { class: "split-text" }, wholeWords(text)),
-      );
-      drag(card);
-      cards.push(card);
-    }
-    deck.replaceChildren(...cards);
-  };
-  const drag = (card: HTMLElement) => {
-    card.addEventListener("pointerdown", (e: PointerEvent) => {
-      if (locked.peek() || e.button !== 0) return;
-      const x0 = e.clientX;
-      let dx = 0;
-      card.setPointerCapture(e.pointerId);
-      card.classList.add("dragging");
-      const follow = (ev: PointerEvent) => {
-        dx = ev.clientX - x0;
-        card.style.transform = `translateX(${dx}px) rotate(${dx / 16}deg)`;
-        card.classList.toggle("lean-left", dx < -flingAt / 2);
-        card.classList.toggle("lean-right", dx > flingAt / 2);
-      };
-      const drop = () => {
-        card.removeEventListener("pointermove", follow);
-        card.removeEventListener("pointerup", drop);
-        card.removeEventListener("pointercancel", drop);
-        card.classList.remove("dragging", "lean-left", "lean-right");
-        if (Math.abs(dx) >= flingAt) send(dx < 0 ? 0 : 1);
-        else card.style.transform = "";
-      };
-      card.addEventListener("pointermove", follow);
-      card.addEventListener("pointerup", drop);
-      card.addEventListener("pointercancel", drop);
-    });
-  };
-  if (!display)
-    listen(document, "keydown", (e: KeyboardEvent) => {
-      if (locked.peek() || e.metaKey || e.ctrlKey || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === "ArrowLeft") send(0);
-      else if (e.key === "ArrowRight") send(1);
-      else if (e.key === "Backspace") back();
-      else return;
-      e.preventDefault();
-    });
-  lay();
-  const hint = h(
-    "p",
-    { class: "hint" },
-    "Плъзни всяка карта наляво или надясно",
-    h("span", { class: "sr" }, " или натисни групата ѝ отдолу"),
-    ".",
-  );
-  // Looked at, not answered: the two groups and every thing to put in them, all at once.
-  const board = display
-    ? h(
-        "div",
-        { class: "split split-shown" },
-        h(
-          "div",
-          { class: "split-sides", "aria-hidden": "true" },
-          view.groups.map((g, side) =>
-            h(
-              "span",
-              { class: `option split-side ${side === 0 ? "to-left" : "to-right"}` },
-              h("span", { class: "split-label" }, wholeWords(g)),
-            ),
-          ),
-        ),
-        h(
-          "ul",
-          { class: "options split-items", "aria-label": `${view.groups[0]} или ${view.groups[1]}?` },
-          view.items.map((text) => h("li", { class: "option" }, wholeWords(text))),
-        ),
-      )
-    : h(
-        "div",
-        { class: "split" },
-        hint,
-        deck,
-        h("div", { class: "split-sides" }, sideButton(0), sideButton(1)),
-        h("div", { class: "split-foot" }, pips, undo),
-        said,
-      );
-  const result = h("ol", { class: "options split-result", hidden: true });
-  return {
-    node: h("div", null, board, result),
-    pending: () => {
-      const s = sides.peek();
-      return s.length ? { sides: view.items.map((_, i) => s[i] ?? -1) } : null;
-    },
-    reveal(reveal, given) {
-      board.hidden = true;
-      result.hidden = false;
-      const mine = given && "sides" in given ? given.sides : [];
-      result.replaceChildren(
-        ...view.items.map((text, i) => {
-          const group = reveal.sides?.[i] ?? 0;
-          const gave = mine[i] ?? -1;
-          const ok = !given || gave === group; // nothing given: the right groups alone, as for pairs
-          return h(
-            "li",
-            // Nothing given: right, but none of it the player's (a ✓ in a ring, not a solid one: app.css).
-            { class: !given ? "option right untaken" : ok ? "option right" : "option amiss" },
-            h(
-              "span",
-              { class: "split-pair" },
-              h("strong", null, wholeWords(text)),
-              " — ",
-              wholeWords(view.groups[group] ?? ""),
-              ok
-                ? null
-                : h("small", { class: "match-gave" }, gave >= 0 ? `при теб: ${view.groups[gave]}` : "без отговор"),
-            ),
-            sign(),
-          );
-        }),
-      );
-    },
-  };
-}
-
-/** „Подсказки“: the clues one under another, each with its number (a right answer is right whichever clue it came by: no worth is shown); the
- * ones still to come count down. The four options are there from the start: answer as soon as you know. */
-function clues(
-  view: CluesView,
-  submit: (a: Answer) => void,
-  locked: Signal<boolean>,
-  say?: (s: string) => void,
-  display = false,
-): Asked {
-  let now = view;
-  // A clue come out is said once (the list itself only counts down, and says nothing every second).
-  const said = say ? null : h("p", { class: "sr", "aria-live": "polite" });
-  const tell = (s: string) => {
-    if (say) say(s);
-    else if (said) said.textContent = s;
-  };
-  const born = performance.now() - view.sinceMs; // when the question showed, on this screen's clock
-  const rows = Array.from({ length: view.total }, (_, i) =>
-    h("li", { class: "clue" }, h("span", { class: "clue-worth" }, String(i + 1)), h("span", { class: "clue-text" })),
-  );
-  const list = h("ol", { class: "clues" }, rows);
-  // The clues still to come, in one line under those out: „Още 2 подсказки: след 10 с и 20 с“.
-  const coming = h("p", { class: "clues-next" });
-  const paint = (all?: string[]) => {
-    const out = all ?? now.clues;
-    const elapsed = performance.now() - born;
-    const when: string[] = [];
-    rows.forEach((row, i) => {
-      const text = out[i];
-      row.hidden = text === undefined;
-      row.className = `clue${!all && i === out.length - 1 ? " now" : all ? "" : " past"}`;
-      (row.lastChild as HTMLElement).textContent = text ?? "";
-      if (text !== undefined) return;
-      const left = Math.ceil(((now.stepsMs[i] ?? 0) - elapsed) / 1000);
-      when.push(left > 0 ? `${left}\u00a0с` : "миг");
-    });
-    const n = when.length;
-    coming.hidden = n === 0;
-    coming.textContent = `Още ${n === 1 ? "1 подсказка" : `${n} подсказки`}: след ${listWords(when)}`;
-  };
-  paint();
-  // Shown only (display), the clues still come: it's never locked out of them by an answer of its own.
-  const open = () => display || !locked.peek();
-  const tick = setInterval(() => {
-    if (open()) paint();
-  }, 1000);
-  onCleanup(() => clearInterval(tick));
-  const buttons = view.choices.map((text, i) =>
-    h(
-      "button",
-      {
-        class: "option",
-        type: "button",
-        "aria-disabled": locked,
-        onclick: () => {
-          if (locked.peek()) return;
-          buttons[i]?.classList.add("picked");
-          play("tap");
-          submit({ pick: i });
-        },
-      },
-      h("span", { class: "letter", "aria-hidden": "true" }, letters[i]),
-      h("span", { class: "option-words" }, wholeWords(text)),
-      display ? null : keyHint(String(i + 1)),
-    ),
-  );
-  if (!display) answerKeys(buttons, locked);
-  return {
-    node: h("div", { class: "stack" }, list, coming, said, h("div", { class: "options choices" }, buttons)),
-    pending: () => null,
-    update(next) {
-      if (next.type !== "clues" || next.clues.length <= now.clues.length || !open()) return;
-      now = next;
-      paint();
-      play("key");
-      const n = next.clues.length;
-      tell(`Подсказка ${n}: ${next.clues[n - 1] ?? ""}`);
-    },
-    reveal(reveal, given, at = atOnce) {
-      clearInterval(tick);
-      paint(reveal.clues ?? now.clues);
-      const mine = given && "pick" in given ? given.pick : -1;
-      const mark = (b: HTMLElement, i: number) => {
-        b.classList.remove("picked");
-        const how = i === reveal.pick ? "right" : i === mine ? "wrong" : "dim";
-        b.classList.add(how);
-        if (i === mine) b.classList.add("mine");
-        // „ти“, the share and the ✓ or ✕ in one box at the row's end, as a choice's (choice).
-        if (how === "dim") return;
-        const end = h("span", { class: "row-end" }) as HTMLElement;
-        if (how === "wrong") end.append(yours());
-        end.append(sign());
-        b.append(end);
-      };
-      const own = buttons[mine];
-      if (own) mark(own, mine);
-      let crowd = () => {};
-      at(beats.right, () => {
-        buttons.forEach((b, i) => {
-          if (b !== own) mark(b, i);
-        });
-        crowd = crowdOnAll(buttons, reveal.crowd, mine);
       });
       at(beats.crowd, () => crowd());
     },

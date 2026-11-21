@@ -3,8 +3,10 @@ package bank
 import (
 	"cmp"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -76,10 +78,6 @@ var pinnedVersions = []struct{ body, version string }{
 	{`{"id":"his-7","type":"number","difficulty":"medium","text":"В коя година е Съединението?","answer":1885,"step":1,"scale":"linear","tolerance":0}`, "6acdbd8361a964bc"},
 	{`{"id":"geo-8","type":"order","difficulty":"medium","text":"Подреди по височина.","items":[{"text":"Мусала","value":2925},{"text":"Вихрен","value":2914},{"text":"Ботев","value":2376},{"text":"Черни връх","value":2290}],"direction":"desc","unit":"м"}`, "f228e6bad1556dc2"},
 	{`{"id":"his-9","type":"order","difficulty":"medium","text":"Подреди по година.","items":[{"text":"А","value":681},{"text":"Б","value":864},{"text":"В","value":1185},{"text":"Г","value":1396}],"direction":"asc"}`, "7a68262020c43f75"},
-	{`{"id":"geo-10","type":"match","difficulty":"medium","text":"Свържи държавите със столиците им.","pairs":[{"left":"Франция","right":"Париж"},{"left":"Италия","right":"Рим"},{"left":"Испания","right":"Мадрид"},{"left":"Германия","right":"Берлин"}],"decoy":"Милано"}`, "6fb143f1d760a23a"},
-	{`{"id":"geo-11","type":"match","difficulty":"medium","text":"Свържи реките с моретата.","pairs":[{"left":"Дунав","right":"Черно"},{"left":"Нил","right":"Средиземно"},{"left":"Волга","right":"Каспийско"},{"left":"Рейн","right":"Северно"}]}`, "f4d80441329fcf1c"},
-	{`{"id":"nat-12","type":"split","difficulty":"medium","text":"Бозайник или птица?","groups":["Бозайник","Птица"],"items":[{"text":"Кит","group":0},{"text":"Прилеп","group":0},{"text":"Пингвин","group":1},{"text":"Щраус","group":1},{"text":"Делфин","group":0},{"text":"Киви","group":1}]}`, "0cd1a664c03f3b19"},
-	{`{"id":"lit-13","type":"clues","difficulty":"hard","text":"Кой е писателят?","clues":["Роден в Сопот.","Пише „Под игото“.","Наричат го патриарх."],"answer":"Иван Вазов","wrong":["Христо Ботев","Алеко Константинов","Пейо Яворов"],"retired":true,"retiredWhy":"weak"}`, "851717c6e2b77c70"},
 }
 
 // A version kept reads back as itself, from what was kept and from what this program encodes of it: a change to a
@@ -113,6 +111,31 @@ func TestPinnedVersions(t *testing.T) {
 		if !pinned[typ] {
 			t.Errorf("no version of a %s pinned: add one, as the game would keep it (Encode), with its version", typ)
 		}
+	}
+}
+
+// retiredVersions are versions the game kept of questions of the kinds it no longer has (RetiredKinds): each reads back
+// as ErrRetiredKind, never as another error, so that the game passes over it quietly.
+var retiredVersions = []string{
+	`{"id":"geo-10","type":"match","difficulty":"medium","text":"Свържи държавите със столиците им.","pairs":[{"left":"Франция","right":"Париж"},{"left":"Италия","right":"Рим"},{"left":"Испания","right":"Мадрид"},{"left":"Германия","right":"Берлин"}],"decoy":"Милано"}`,
+	`{"id":"geo-11","type":"match","difficulty":"medium","text":"Свържи реките с моретата.","pairs":[{"left":"Дунав","right":"Черно"},{"left":"Нил","right":"Средиземно"},{"left":"Волга","right":"Каспийско"},{"left":"Рейн","right":"Северно"}]}`,
+	`{"id":"nat-12","type":"split","difficulty":"medium","text":"Бозайник или птица?","groups":["Бозайник","Птица"],"items":[{"text":"Кит","group":0},{"text":"Прилеп","group":0},{"text":"Пингвин","group":1},{"text":"Щраус","group":1},{"text":"Делфин","group":0},{"text":"Киви","group":1}]}`,
+	`{"id":"lit-13","type":"clues","difficulty":"hard","text":"Кой е писателят?","clues":["Роден в Сопот.","Пише „Под игото“.","Наричат го патриарх."],"answer":"Иван Вазов","wrong":["Христо Ботев","Алеко Константинов","Пейо Яворов"],"retired":true,"retiredWhy":"weak"}`,
+}
+
+func TestRetiredKindsReadBack(t *testing.T) {
+	for _, body := range retiredVersions {
+		if q, err := Decode([]byte(body), "x"); !errors.Is(err, ErrRetiredKind) || q != nil {
+			t.Errorf("%.40s… read back as %v, %v", body, q, err)
+		}
+	}
+	for _, kind := range RetiredKinds {
+		if slices.Contains(Types(), kind) {
+			t.Errorf("%s is retired and a type still", kind)
+		}
+	}
+	if _, err := Decode([]byte(`{"id":"x-1","type":"nothing"}`), "x"); errors.Is(err, ErrRetiredKind) {
+		t.Error("an unknown type read back as a retired one")
 	}
 }
 

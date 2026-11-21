@@ -274,7 +274,7 @@ async function sideways(page: Page): Promise<void> {
     )
     .toBeLessThan(390);
   const rows = await page
-    .locator(".answering :is(.sortable-list, .match) .option")
+    .locator(".answering .sortable-list .option")
     .evaluateAll((all) => all.map((o) => getComputedStyle(o).minHeight));
   for (const row of rows) expect(row).toBe("48px");
 }

@@ -114,6 +114,9 @@ packages' doc comments; this file holds only what must not drift.
 - **Balance by adding, never by retiring.** A question is retired only for a real flaw (wrong, stale, weak, a twin that
   gives another away), never to make room.
 - **Rules are code** (`bank lint`), so a later change of a rule is a query, not a pass over 14 000 questions.
+- **The kinds: choice (with pictures), true-or-not, number, order.** Clues, pairs and groups were retired (21 Nov):
+  with the score only right or wrong, clues were waiting and pairs/groups bundled four answers into one; each became a
+  choice question.
 
 ## How it looks and speaks
 

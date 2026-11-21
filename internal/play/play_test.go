@@ -85,7 +85,7 @@ func (w *world) user() int64 {
 }
 
 // pastLimit is a wait past any question's time, its grace for a late answer too: the longest limit is a minute (an
-// order or a match), so a minute's wait is no time run out.
+// order), so a minute's wait is no time run out.
 const pastLimit = LongestLimit + LateGrace + time.Second
 
 func (w *world) wait(d time.Duration) {
@@ -103,6 +103,14 @@ func (w *world) picks(runID int64) []Pick {
 	return p
 }
 
+// askedSinceBefore dates every question of the world's bank as asked the way it is since before the world's day, so
+// that the answers to any of them count for it (Counted): the sample has questions added or changed after the day.
+func (w *world) askedSinceBefore() {
+	for _, q := range w.b.Live("", "") {
+		q.Extra().Added, q.Extra().Changed = "2026-11-01", ""
+	}
+}
+
 // right is the right answer to a run's question n, as the player would give it.
 func (w *world) right(runID int64, n int) json.RawMessage {
 	p := w.picks(runID)[n]
@@ -113,8 +121,6 @@ func (w *world) right(runID int64, n int) json.RawMessage {
 		Value *float64 `json:"value"`
 		Order []int    `json:"order"`
 		Truth *bool    `json:"truth"`
-		Pairs []int    `json:"pairs"`
-		Sides []int    `json:"sides"`
 	}
 	_ = json.Unmarshal(reveal, &r)
 	var a any
@@ -125,10 +131,6 @@ func (w *world) right(runID int64, n int) json.RawMessage {
 		a = map[string]float64{"value": *r.Value}
 	case r.Truth != nil:
 		a = map[string]bool{"truth": *r.Truth}
-	case r.Sides != nil:
-		a = map[string][]int{"sides": r.Sides}
-	case r.Pairs != nil:
-		a = map[string][]int{"pairs": r.Pairs}
 	default:
 		a = map[string][]int{"order": r.Order}
 	}
@@ -136,8 +138,8 @@ func (w *world) right(runID int64, n int) json.RawMessage {
 	return out
 }
 
-// wrong is a wrong answer to it (a choice's other option, a number far off, the other of true or not, every pair of
-// a match joined one along, every item of a split sent the other way, an order backwards).
+// wrong is a wrong answer to it (a choice's other option, a number far off, the other of true or not, an order
+// backwards).
 func (w *world) wrong(runID int64, n int) json.RawMessage {
 	var r map[string]any
 	_ = json.Unmarshal(w.right(runID, n), &r)
@@ -151,14 +153,6 @@ func (w *world) wrong(runID int64, n int) json.RawMessage {
 		r["value"] = num.Answer + 10*num.Tolerance*num.Answer // far off on either scale
 	case r["truth"] != nil:
 		r["truth"] = !r["truth"].(bool)
-	case r["sides"] != nil:
-		sides := r["sides"].([]any)
-		for i, v := range sides {
-			sides[i] = 1 - int(v.(float64))
-		}
-	case r["pairs"] != nil:
-		p := r["pairs"].([]any)
-		r["pairs"] = append(p[1:], p[0])
 	default:
 		o := r["order"].([]any)
 		for i, j := 0, len(o)-1; i < j; i, j = i+1, j-1 {
@@ -1205,6 +1199,7 @@ func TestCalibrate(t *testing.T) {
 		t.Fatal("the knowledge bands")
 	}
 	// Thirty players get the first question of a day right: it shows as easy, whatever it's labelled.
+	w.askedSinceBefore()
 	var first string
 	for range CalibrateFrom {
 		p := w.user()
@@ -1250,6 +1245,7 @@ func TestCrowds(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	// Fifteen players get the day's first question right and five wrong.
+	w.askedSinceBefore()
 	var first string
 	for i := range CrowdFrom {
 		p := w.user()
@@ -1316,8 +1312,8 @@ func TestDayCrowd(t *testing.T) {
 	// Every question asked as it is since before the day, whichever the day's second is (the sample's newer ones were
 	// added after it); and with a fact, as the day's entry names one: the sample has questions without, and the day's
 	// draw may deal two of them first (1 run in 30 failed so).
+	w.askedSinceBefore()
 	for _, q := range w.b.Live("", "") {
-		q.Extra().Added, q.Extra().Changed = "2026-11-01", ""
 		if q.Extra().Fact == "" {
 			q.Extra().Fact = "Факт за проверката."
 		}
