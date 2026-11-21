@@ -6981,6 +6981,10 @@
       flex-direction: row;
     }
 
+    .playing .option.tf > .tf-line {
+      flex: 0 1 auto;
+    }
+
     .playing .clues {
       gap: var(--space-1);
     }
