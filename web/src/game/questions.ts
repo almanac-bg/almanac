@@ -63,7 +63,7 @@ export function wholeWords(text: string): Child {
 export function crowdLine(type: View["type"], c: Crowd | undefined, right: boolean): Child {
   if (!c) return null;
   const all = withOwn(c, -1, right).right;
-  const s = `${percent(all)} от играчите${c.today ? " днес" : ""}`;
+  const s = `${percent(all)} от играчите${c.today ? "\u00a0днес" : ""}`;
   if (c.right === 0) {
     const none = right
       ? c.today
@@ -210,7 +210,7 @@ export function picture(view: View, fit = false): Child {
     // answering part is set at the screen's foot (a run on a phone), the room between them is the picture's too.
     const size = () => {
       const below = img.nextElementSibling;
-      // Answered, the answer sizes it (run.ts, room).
+      // Answered, it stays as it was.
       if (!img.isConnected || !below || img.closest(".answered")) return;
       const box = img.getBoundingClientRect();
       const under = below.getBoundingClientRect();
@@ -500,7 +500,10 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
             : [h("span", { class: "typed" }, said(mine)), view.unit ? h("span", { class: "unit" }, view.unit) : null],
         ),
         mine === null || mine === answer ? null : scale(answer, mine, how, view),
-        h("p", { class: "number-answer" }, "Верният отговор: ", h("strong", null, `${said(answer)}${unit}`), "."),
+        // Spot on, what was said is the answer: said once.
+        mine === answer
+          ? null
+          : h("p", { class: "number-answer" }, "Верният отговор: ", h("strong", null, `${said(answer)}${unit}`), "."),
       ]);
       // Everyone's guesses, gone over (a review's): they take their room at once, and show on their beat. In a game
       // the scale is enough, and how everyone did is said under the verdict (DESIGN.md, Play).
@@ -515,7 +518,7 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
 }
 
 /** The player's number beside the answer on a scale running a little past both (as far again as they are apart), its
- * two ends named: the answer a filled square; the player's a filled disc when it was near enough to be right, half
+ * two ends named: the answer a filled square; the player's a disc, filled when it was near enough to be right, half
  * filled when it was close („близо“), hollow when not. */
 function scale(answer: number, mine: number, how: VerdictKind | undefined, view: NumberView): HTMLElement {
   const right = how === "right" || how === "exact";
@@ -833,6 +836,8 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
       done.hidden = true;
       const mine = given && "order" in given ? given.order : null;
       const unit = reveal.unit ? ` ${reveal.unit}` : "";
+      // Values that are only the places (1, 2, 3…) aren't said again beside the places' own numbers.
+      const said = !!unit || (reveal.order ?? []).some((item, place) => reveal.values?.[item] !== place + 1);
       list.replaceChildren(
         ...(reveal.order ?? []).map((item, place) => {
           const at = mine ? mine.indexOf(item) : -1;
@@ -853,7 +858,7 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
             h(
               "span",
               { class: "row-end" },
-              h("span", { class: "value" }, `${formatValue(reveal.values?.[item] ?? 0)}${unit}`),
+              said ? h("span", { class: "value" }, `${formatValue(reveal.values?.[item] ?? 0)}${unit}`) : null,
               how ? sign() : null,
             ),
           );

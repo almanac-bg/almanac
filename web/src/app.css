@@ -598,12 +598,14 @@
     position: relative;
     display: grid;
     place-items: center;
-    min-height: 3rem;
+    /* At most a quarter taller with large text: the bar stays a bar, the page over it. */
+    min-height: min(3rem, 60px);
     padding: 0 var(--space-1);
     border-radius: 14px;
     color: var(--ink-3);
-    /* Never wider than its third of a phone: a name holds whole however large the phone sets its text. */
-    font: 700 min(0.9375rem, 5.25vw) / 1.1 var(--font-sans);
+    /* Never wider than its third of a phone, nor over a quarter larger: a name holds whole however large the phone
+       sets its text. */
+    font: 700 min(0.9375rem, 18.75px, 5.25vw) / 1.1 var(--font-sans);
     text-align: center;
     text-decoration: none;
   }
@@ -1267,7 +1269,7 @@
 
   /* The one being asked: its chapter's colour, ringed. */
   .trail li.now {
-    background: var(--tv, var(--ink));
+    background: var(--tv, var(--bg));
     box-shadow: inset 0 0 0 2px var(--ink);
     outline: 3px solid color-mix(in srgb, var(--tv, var(--ink)) 45%, transparent);
     outline-offset: 1px;
@@ -2011,6 +2013,12 @@
     color: var(--bg);
   }
 
+  /* On a picture the letter keeps its own box, fill and ink, as on the others. */
+  .option.right.mine .letter.pic-letter {
+    background: var(--surface);
+    color: var(--ink-2);
+  }
+
   .option.right.mine .sign {
     background: var(--bg);
     box-shadow: none;
@@ -2032,10 +2040,21 @@
 
   .option.wrong .sign {
     --i: var(--i-cross);
+    --ring: 2.5px;
     box-shadow: none;
-    outline: 2.5px dashed currentColor;
-    outline-offset: -2.5px;
     color: var(--ink);
+  }
+
+  /* A dashed ring: twelve dashes drawn round the disc, the same in every engine (WebKit draws a dashed border or
+     outline on a disc as a few loose dashes). */
+  :is(.option.wrong .sign, .option.amiss .sign, .verdict:is(.wrong, .time) .verdict-sign)::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: repeating-conic-gradient(currentColor 0 15deg, transparent 15deg 30deg);
+    -webkit-mask: radial-gradient(closest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring)));
+    mask: radial-gradient(closest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring)));
   }
 
   /* A part of the answer the player didn't have („Подреди“, „Свържи“, „Раздели“): the row is the right answer; it's
@@ -2049,9 +2068,8 @@
 
   .option.amiss .sign {
     --i: var(--i-cross);
+    --ring: 2px;
     box-shadow: none;
-    outline: 2px dashed currentColor;
-    outline-offset: -2px;
   }
 
   .option.amiss .sign::before {
@@ -2121,8 +2139,9 @@
     cursor: text;
   }
 
+  /* Its unit right after it. */
   .typed {
-    flex: 1;
+    flex: 0 1 auto;
     min-width: 0;
     overflow: hidden;
     color: var(--ink);
@@ -2244,7 +2263,7 @@
     font-weight: 900;
   }
 
-  /* The scale: its two ends, the answer a filled square, the player's a half one (близо) or a hollow one. */
+  /* The scale: its two ends, the answer a filled square, the player's a disc, half filled (близо) or hollow. */
   .number-near {
     display: grid;
     gap: var(--space-2);
@@ -2279,17 +2298,19 @@
     white-space: nowrap;
   }
 
+  /* The answer a square, the player's a disc. */
   .near-mark i {
     margin-left: calc(var(--at, 0.5) * 100% - 8px);
     display: block;
     width: 16px;
     height: 16px;
-    border-radius: 4px;
+    border-radius: 50%;
     box-shadow: inset 0 0 0 2.5px var(--ink);
     background: var(--bg);
   }
 
   .near-mark.answer i {
+    border-radius: 4px;
     background: var(--ink);
   }
 
@@ -2297,9 +2318,8 @@
     background: linear-gradient(90deg, var(--ink) 50%, var(--bg) 50%);
   }
 
-  /* The player's number near enough to be right: filled, as a right answer is, a disc beside the answer's square. */
+  /* The player's number near enough to be right: filled, as a right answer is. */
   .near-mark.right i {
-    border-radius: 50%;
     background: var(--ink);
   }
 
@@ -2335,11 +2355,12 @@
   .near-key i {
     width: 12px;
     height: 12px;
-    border-radius: 3px;
+    border-radius: 50%;
     box-shadow: inset 0 0 0 2px var(--ink);
   }
 
   .near-key i.answer {
+    border-radius: 3px;
     background: var(--ink);
   }
 
@@ -2348,15 +2369,7 @@
   }
 
   .near-key i.right {
-    border-radius: 50%;
     background: var(--ink);
-  }
-
-  /* A narrow, short phone: the scale says itself; its key goes. */
-  @media (max-width: 22.5rem) and (max-height: 37.5rem) {
-    .near-key {
-      display: none;
-    }
   }
 
   /* ---- Things to order: a row tapped is picked up (.chosen) and goes where the next tap says, or is dragged into
@@ -2626,7 +2639,7 @@
     display: block;
     width: 100%;
     height: auto;
-    aspect-ratio: 5 / 3;
+    aspect-ratio: 4 / 3;
     object-fit: contain;
     border-radius: var(--r-1);
     background: var(--surface-2);
@@ -3104,9 +3117,8 @@
   }
 
   .verdict:is(.wrong, .time) .verdict-sign {
+    --ring: 3px;
     background: transparent;
-    outline: 3px dashed var(--ink);
-    outline-offset: -3px;
     color: var(--ink);
   }
 
@@ -3751,6 +3763,7 @@
   .reviewed {
     --v-ink: var(--ink-3);
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-3);
     padding: var(--space-5) var(--space-4) var(--space-3);
     border-radius: var(--r-1);
@@ -6936,42 +6949,12 @@
       display: flex;
       flex-direction: column;
       min-height: calc(100dvh - var(--app-top) - var(--app-foot));
-      padding-bottom: calc(var(--after, 0px) + var(--past, 0px));
     }
 
     .run-question .answering {
       display: grid;
       gap: var(--space-4);
       margin-top: auto;
-    }
-
-    /* A choice of pictures while it's asked: its cards take the room the question leaves them (no empty band over
-       them), each picture as big as its card lets it, whole (contained, never cropped). */
-    .run-question:not(.answered) .answering:has(.pic-options) {
-      flex: 1 0 auto;
-      grid-template-rows: minmax(0, 1fr);
-    }
-
-    .run-question:not(.answered) .answering > :has(> .pic-options) {
-      display: grid;
-      grid-template-rows: minmax(0, 1fr);
-    }
-
-    .run-question:not(.answered) .pic-options {
-      grid-auto-rows: minmax(0, 1fr);
-    }
-
-    .run-question:not(.answered) .option.pic-option > .pic-frame {
-      flex: 1 1 auto;
-      min-height: 0;
-    }
-
-    .run-question:not(.answered) .option.pic-option .pic-option-img {
-      height: 100%;
-      min-height: 6rem;
-      max-height: 40dvh;
-      aspect-ratio: auto;
-      background: none;
     }
 
     /* A narrow phone: a long question in four lines at most. */
@@ -6982,44 +6965,20 @@
       }
     }
 
-    /* The answer docks at the screen's foot, in the same place every time (run.ts, settle: it rises with the answers):
-       the verdict, how everyone answered, the fact, and the way on. It leaves the head, the question and the right
-       answer (--keep: where it ends, the page unmoved) in sight over it, and at least shows the verdict and „Напред“
-       (and the fact's first two lines, --least, unless the player's row and the right one need that room: --give);
-       a fact longer than that scrolls with the panel, „Напред“ staying at its foot. */
+    /* The answer comes under the answers, at the screen's foot, edge to edge (run.ts, settle, moves the page for it
+       only as far as it must): the verdict, how everyone answered, the fact, and the way on. Nothing is over the
+       answers: where the panel goes on past the screen's foot, the page scrolls to it. */
     .run-question .after {
-      position: fixed;
-      right: 0;
-      bottom: 0;
-      left: 0;
-      z-index: 5;
-      max-width: 40rem;
-      min-height: var(--cover, 0px);
-      max-height: max(
-        min(var(--least, 10rem), var(--give, 100dvh)),
-        calc(100dvh - var(--keep, 9.5rem)),
-        var(--cover, 0px)
-      );
-      margin-inline: auto;
+      position: relative;
+      align-content: start;
       gap: var(--space-3);
-      padding: var(--space-4) max(var(--space-4), env(safe-area-inset-right)) var(--app-foot)
+      margin: auto calc(-1 * max(var(--gutter), env(safe-area-inset-right))) calc(-1 * var(--app-foot))
+        calc(-1 * max(var(--gutter), env(safe-area-inset-left)));
+      padding: var(--space-4) max(var(--space-4), env(safe-area-inset-right)) calc(var(--app-foot) + var(--past, 0px))
         max(var(--space-4), env(safe-area-inset-left));
-      overflow-y: auto;
-      overscroll-behavior: contain;
       border-radius: 22px 22px 0 0;
       background: var(--surface);
       box-shadow: 0 -12px 28px rgb(22 19 43 / 0.16);
-    }
-
-    /* An order, pairs or groups: the panel opens at its least (the verdict, how everyone did and the fact's first two
-       lines over „Напред“), so that the rows shown right stay in sight over it; the rest of the fact scrolls in it. */
-    .run-question:has(.sortable-list, .match, .split) .after {
-      min-height: var(--cover, 0px);
-      max-height: max(var(--least, 10rem), var(--cover, 0px));
-    }
-
-    .run-question .after.short {
-      align-content: end;
     }
 
     .run-question .after .fact p {
@@ -7077,42 +7036,20 @@
       background: transparent;
     }
 
-    /* At the panel's foot, over what scrolls under it: the surface goes on below it to the panel's edge. */
-    /* „Напред“ on its foot, opaque from the panel's one side to the other and down to its edge (the panel's own
-       padding under it given to the foot): nothing that scrolls in the panel shows under it or beside it. */
+    /* „Напред“ at the screen's foot while the panel goes on under it, on a foot of the panel's colour from its one
+       side to the other and down to the screen's edge; what goes on under it fades out over the foot's top (in the
+       gap over it while it's in its place). */
     .run-question .after-foot {
-      bottom: calc(-1 * var(--app-foot));
-      margin: 0 calc(-1 * var(--space-4)) calc(-1 * var(--app-foot));
-      padding: 0 var(--space-4) var(--app-foot);
-      background: var(--surface);
+      margin: calc(-1 * var(--space-3)) calc(-1 * max(var(--space-4), env(safe-area-inset-right)))
+        calc(-1 * var(--app-foot)) calc(-1 * max(var(--space-4), env(safe-area-inset-left)));
+      padding: var(--space-5) max(var(--space-4), env(safe-area-inset-right)) var(--app-foot)
+        max(var(--space-4), env(safe-area-inset-left));
+      background: linear-gradient(transparent, var(--surface) var(--space-5));
     }
 
     .run-question .after .up-next-go {
       width: 100%;
       min-height: 3.375rem;
-    }
-
-    /* While the panel scrolls (a long fact: ui.ts, reachable gives it a stop of its own), what scrolls fades out
-       above „Напред“ (run.ts, fade: 32px). */
-    .run-question .after[tabindex] .after-foot::before {
-      content: "";
-      position: absolute;
-      right: 0;
-      bottom: calc(100% + 4px);
-      left: 0;
-      height: 28px;
-      background: linear-gradient(to bottom, transparent, var(--surface));
-      pointer-events: none;
-    }
-
-    .run-question .after[tabindex] .after-foot::after {
-      content: "";
-      position: absolute;
-      right: 0;
-      bottom: 100%;
-      left: 0;
-      height: 4px;
-      background: var(--surface);
     }
   }
 
@@ -7260,14 +7197,14 @@
       line-height: 1.5rem;
     }
 
-    /* A choice of pictures four across, one row: with the answer, the right one fits between the head and the
-       panel at its least (the panel's room for them, 5.5rem and 10rem, above), with its name in two lines. */
+    /* A choice of pictures four across, one row, low enough that with the answer the fact's first line shows under
+       the right one. */
     .playing .pic-options {
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 
     .playing .pic-option-img {
-      max-height: calc(100dvh - 5.5rem - 10rem - 4rem);
+      max-height: calc(100dvh - 15rem);
     }
 
     /* A quarter of the row leaves the name beside its letter and mark a short line: smaller, a name of two words
@@ -7307,11 +7244,10 @@
       padding-block: 4px;
     }
 
-    /* The answer's panel as wide as the question, its lines longer, fewer of them; how everyone answered and
-       „Напред“ on the verdict's row, so the fact under them has what's left of the height. */
+    /* How everyone answered and „Напред“ on the verdict's row, so the fact under them has what's left of the
+       height. */
     .run-question .after {
       grid-template-columns: auto minmax(0, 1fr) auto;
-      max-width: 54rem;
     }
 
     .run-question .after > * {
@@ -7330,8 +7266,7 @@
     }
 
     .run-question .after-foot {
-      top: 0;
-      bottom: auto;
+      position: static;
       grid-row: 1;
       grid-column: 3;
       align-self: center;
@@ -7522,17 +7457,17 @@
     line-height: 1.2;
   }
 
-  /* The player's row and the right one: where the words and what the answer brings („ти“, the share, the ✓ or ✕)
-     don't fit a line together, the words keep the row's width and those go to its foot, at its end, rather than
-     squeeze the words to a word a line. */
+  /* The player's row and the right one: what the answer brings („ти“, the share, the ✓ or ✕) on the words' line
+     while they fit it together; where the words need the width, it goes to the row's foot, at its end, rather than
+     squeeze the words to a word a line. A ✓ or ✕ alone always has its room beside them. */
   .run-question.answered .choices > .option:is(.right, .wrong) {
     flex-wrap: wrap;
     row-gap: var(--space-1);
   }
 
   .run-question.answered .choices > .option:is(.right, .wrong) > .option-words {
-    flex: 1 1 9rem;
-    max-width: calc(100% - 32px - var(--space-3));
+    flex: 1 1 auto;
+    max-width: calc(100% - 32px - 30px - 2 * var(--space-3));
   }
 
   .run-question.answered .choices > .option.dim .letter {
@@ -7592,6 +7527,28 @@
       padding: 14px 16px 22px;
     }
 
+    /* The sheet is the question beside its chapter's glyph (the day's hard one keeps its tag), so that what answers it
+       fits under it: a choice under a picture, a number's pad, an order's rows. */
+    .run-question .q-leaf:not(:has(.hard-tag)) {
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      padding: 10px 14px;
+      border-radius: var(--r-2);
+    }
+
+    .run-question .q-leaf:not(:has(.hard-tag)) > .q-tags {
+      display: none;
+    }
+
+    .run-question .q-leaf:not(:has(.hard-tag)) > .q-mini {
+      display: inline-grid;
+      --g: 32px;
+    }
+
+    .run-question .q-leaf:not(:has(.hard-tag)) .ask {
+      padding: 0;
+    }
+
     .run-question .ask {
       font-size: calc(10px + 0.625rem);
       line-height: 1.22;
@@ -7638,26 +7595,6 @@
       min-height: 4.5rem;
     }
 
-    /* A number: the sheet is the question beside its chapter's glyph (the day's hard one keeps its tag), so that the
-       pad and „Отговори“ fit under it. */
-    .run-question:not(.answered):has(.keypad) .q-leaf:not(:has(.hard-tag)) {
-      grid-template-columns: auto minmax(0, 1fr);
-      align-items: center;
-      gap: 10px;
-      min-height: 0;
-      padding: 10px 14px;
-      border-radius: var(--r-2);
-    }
-
-    .run-question:not(.answered):has(.keypad) .q-leaf:not(:has(.hard-tag)) > .q-tags {
-      display: none;
-    }
-
-    .run-question:not(.answered):has(.keypad) .q-leaf:not(:has(.hard-tag)) > .q-mini {
-      display: inline-grid;
-      --g: 32px;
-    }
-
     /* „Свържи“: its cells 44px, the right column's five and „Готово“ under the question. */
     .run-question .option.match-item {
       min-height: 2.75rem;
@@ -7674,28 +7611,6 @@
     .run-question .q-leaf {
       gap: 8px;
       padding: 12px 14px 18px;
-    }
-
-    .run-question .q-leaf:not(:has(.hard-tag)) {
-      grid-template-columns: auto minmax(0, 1fr);
-      align-items: center;
-      gap: 10px;
-      min-height: 0;
-      padding: 10px 14px;
-      border-radius: var(--r-2);
-    }
-
-    .run-question .q-leaf:not(:has(.hard-tag)) > .q-tags {
-      display: none;
-    }
-
-    .run-question .q-leaf:not(:has(.hard-tag)) > .q-mini {
-      display: inline-grid;
-      --g: 32px;
-    }
-
-    .run-question .q-leaf:not(:has(.hard-tag)) .ask {
-      padding: 0;
     }
 
     .run-question .touched > .hint {
@@ -7756,8 +7671,8 @@
   }
 
   /* Under 680px of height (a 320 × 568 phone, Safari's 375 × 600 and 390 × 664), an order or pairs while asked: every
-     row and „Готово“ fit the screen. The sheet is the question beside its chapter's glyph, a size smaller and at most
-     three lines (a tap on it reads the rest: answering.ts, clamp); the rows and the cells 44px. */
+     row and „Готово“ fit the screen. The question a size smaller, right over the rows (cut to leave them room from
+     375px across: answering.ts, clamp); the rows and the cells 44px. */
   @media (max-width: 47.99rem) and (max-height: 42.5rem) {
     .run-question:not(.answered):has(.sortable-list, .match) {
       gap: 10px;
@@ -7769,30 +7684,19 @@
       margin-top: 0;
     }
 
-    .run-question:not(.answered):has(.sortable-list, .match) .q-leaf {
-      grid-template-columns: auto minmax(0, 1fr);
-      align-items: center;
-      gap: 10px;
-      min-height: 0;
-      padding: 10px 14px;
-      border-radius: var(--r-2);
-    }
-
-    .run-question:not(.answered):has(.sortable-list, .match) .q-leaf > .q-tags {
-      display: none;
-    }
-
-    .run-question:not(.answered):has(.sortable-list, .match) .q-leaf > .q-mini {
-      display: inline-grid;
-      --g: 32px;
-    }
-
-    /* Cut, where its rows need the room, at a whole word with „…“ (answering.ts, clamp), the same in every engine. */
     .run-question:not(.answered):has(.sortable-list, .match) .ask {
-      --clamp: on;
       padding: 0;
       font-size: 1rem;
       line-height: 1.25;
+    }
+
+    /* Cut, where its rows need the room, at a whole word with „…“ (answering.ts, clamp), the same in every engine:
+       from 375px across at the usual text, where the page doesn't scroll. Where it scrolls anyway (a 320px phone,
+       large text) the question is whole. */
+    @media (min-width: 23.4375rem) {
+      html:not(.tight) .run-question:not(.answered):has(.sortable-list, .match) .ask {
+        --clamp: on;
+      }
     }
 
     .run-question:not(.answered) .ask[data-cut] {
@@ -8078,13 +7982,9 @@
     font-size: calc(8px + 0.625rem);
   }
 
-  .tight .issue-time {
+  /* Nor the row of its ten chapters' glyphs (the issue's contents are under it, „В броя“). */
+  .tight :is(.issue-time, .issue-toc) {
     display: none;
-  }
-
-  /* With no line under them, the ten glyphs keep clear of the turned corner. */
-  .tight .issue-body:has(> .issue-time) {
-    padding-bottom: 36px;
   }
 
   /* The places at a phone's foot: a name no bigger than its third of the screen holds whole (a phone that enlarges
@@ -8212,6 +8112,11 @@
     margin-left: 0;
   }
 
+  /* An order's row with its ✓ or ✕ alone at its end (its values are its places): the sign beside the words. */
+  .tight .sortable-list > .option:not(:has(.value)) {
+    flex-wrap: nowrap;
+  }
+
   /* „Вярно“ over „Невярно“, each a row. */
   /* A number with large text: the pad is taller than the screen, so what's typed stays in sight under the head while
      the pad is scrolled to (run.ts: --head). */
@@ -8304,30 +8209,6 @@
   .tighter .run-question .after .crowd-says {
     font-size: 0.8125rem;
     line-height: 1.25;
-  }
-
-  /* A run's answer under the answers, as on a tablet, not docked at the screen's foot: there, at this size, it
-     would leave no room for the right answer (a whole order) and its fact both. The page scrolls to it (run.ts,
-     settle), „Напред“ at the screen's foot meanwhile. */
-  .tighter .run-question {
-    padding-bottom: 0;
-  }
-
-  .tighter .run-question .after {
-    position: relative;
-    z-index: auto;
-    max-height: none;
-    margin: var(--space-4) 0 0;
-    padding: var(--space-4);
-    overflow: visible;
-    border-radius: var(--r-1);
-  }
-
-  /* „Напред“ at the screen's foot meanwhile, on its foot of the panel's colour. */
-  .tighter .run-question .after-foot {
-    bottom: 0;
-    margin-bottom: calc(-1 * var(--space-4));
-    padding-bottom: var(--space-4);
   }
 
   /* A result's plain buttons keep their words on one line while they can, then wrap them. */

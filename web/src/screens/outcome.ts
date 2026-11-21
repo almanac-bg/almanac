@@ -41,7 +41,8 @@ let {
 const total = 10;
 
 /** Seconds, the Bulgarian way: „34,5 с“. */
-const secs = (ms: number) => `${(ms / 1000).toLocaleString("bg", { maximumFractionDigits: 1 })}\u00a0с`;
+const secs = (ms: number) =>
+  `${(ms / 1000).toLocaleString("bg", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}\u00a0с`;
 
 /** What to do next, where the screen that shows a result has its own: the gold button, and plain ones beside it. */
 export interface Steps {

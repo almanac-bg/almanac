@@ -85,26 +85,28 @@ test("a word breaks by its syllables, as Bulgarian hyphenates", () => {
       "майката", // „й“ before a consonant stays
       "майорът",
       "Блестяща бяла",
+      "Преброяването Антарктида кралство", // never fewer than three letters on the next line („Преброяване-/то“)
     ].map(breaks),
     [
-      "Не-за-ви-си-мост-та",
-      "Ос-во-бож-де-ние-то",
-      "Екс-тра-ва-гант-ни",
-      "сес-тра-та",
-      "ме-тро-то",
+      "Не-за-ви-си-мостта",
+      "Ос-во-бож-де-нието",
+      "Екс-тра-ва-гантни",
+      "сес-трата",
+      "ме-трото",
       "шам-пи-ньон",
-      "Ло-джия-та",
-      "май-ка-та",
+      "Ло-джията",
+      "май-ката",
       "ма-йо-рът",
-      "Блес-тя-ща бяла",
+      "Блес-тяща бяла",
+      "Пре-броя-ва-нето Ан-тарк-тида кралс-тво",
     ],
   );
   // Words under seven letters, numbers, Latin and what's around a word stay as they are; a hyphen of its own is kept.
   assert.equal(breaks("„Хамлет“ — Копола, U2, 1885 г."), "„Хамлет“ — Копола, U2, 1885 г.");
-  assert.equal(breaks("Сент-екзюпери"), "Сент-ек-зю-пе-ри");
+  assert.equal(breaks("Сент-екзюпери"), "Сент-ек-зю-пери");
   // A name breaks as any word (its caller holds it whole where it fits: wholeWords, nameWords), after a quote too.
-  assert.equal(breaks("Майкъл Фарадей, Сент-Екзюпери"), "Майкъл Фа-ра-дей, Сент-Ек-зю-пе-ри");
-  assert.equal(breaks("Куентин Тарантино"), "Куен-тин Та-ран-ти-но");
+  assert.equal(breaks("Майкъл Фарадей, Сент-Екзюпери"), "Майкъл Фа-ра-дей, Сент-Ек-зю-пери");
+  assert.equal(breaks("Куентин Тарантино"), "Куен-тин Та-ран-тино");
   assert.equal(breaks("„Списъкът на Шиндлер“"), "„Спи-съ-кът на Шин-длер“");
   assert.equal(breaks("Долф Лундгрен"), "Долф Лунд-грен");
   // The text reads the same without them.

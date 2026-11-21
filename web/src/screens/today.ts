@@ -664,7 +664,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       // 4. The action, once the first results are past.
       first ? null : action,
       // 5. Tomorrow.
-      t.late ? onToToday(t, t.late.today) : tomorrow(t, streak, stake, first ? null : ask),
+      t.late ? onToToday(t, t.late.today) : tomorrow(t, fresh, streak, stake, first ? null : ask),
       // None right: the questions are open under the score already, with the way to the rest there (once they came).
       () =>
         missedList()?.length
@@ -1132,11 +1132,12 @@ function onToToday(t: Today, today: () => void): Child {
 }
 
 /** Tomorrow: the next issue's date set large, „Утре, неделя · Брой 32“, the chapter of its hard question with its
- * glyph (`t.tomorrowHard`, when it's drawn), and what it makes of the streak (`streak`: with today's); a guest's ask
- * to keep the game (keep.ts: what it risks till then, `stake`); and, where it isn't on yet, the reminder's ask (`ask`;
+ * glyph (as the day says it once the game just played is in, `now`: the day fetched before it hasn't it), and what
+ * it makes of the streak (`streak`: with today's); a guest's ask to keep the game (keep.ts: what it risks till then, `stake`); and, where it isn't on yet, the reminder's ask (`ask`;
  * null where the result's action is the ask, or the way out of an app's browser). */
 function tomorrow(
   t: Today,
+  now: () => Today,
   streak: () => number,
   stake: () => string | null,
   ask: { view: Child; mailing: () => boolean } | null,
@@ -1144,7 +1145,6 @@ function tomorrow(
   const next = new Date(`${t.day}T12:00:00Z`);
   next.setUTCDate(next.getUTCDate() + 1);
   const day = next.toISOString().slice(0, 10);
-  const hard = t.tomorrowHard;
   return h(
     "section",
     { class: "sect tomorrow" },
@@ -1164,9 +1164,12 @@ function tomorrow(
           h("span", { class: "tomorrow-sep" }, " · "),
           h("span", null, `Брой\u00a0${issueOf(day)}`),
         ),
-        hard
-          ? h("span", { class: "tomorrow-hard" }, glyph(hard, 22), ` Трудният въпрос е от ${chapterName(hard)}`)
-          : null,
+        () => {
+          const hard = now().tomorrowHard;
+          return hard
+            ? h("span", { class: "tomorrow-hard" }, glyph(hard, 22), ` Трудният въпрос е от ${chapterName(hard)}`)
+            : null;
+        },
         () => {
           const n = streak();
           return n > 0 ? h("span", { class: "tomorrow-streak" }, `С него серията ти става\u00a0${n + 1}.`) : null;

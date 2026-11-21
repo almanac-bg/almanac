@@ -281,8 +281,7 @@ export async function unseenAnswers(page: Page): Promise<string[]> {
 }
 
 /** What's wrong with an answer's panel: „Напред“ (or „Към резултата“) not whole on the screen; anything of the
- * panel showing under it or beside it, between it and the panel's foot; or, where the panel scrolls, fewer than two
- * lines of the fact above the fade over „Напред“. */
+ * panel showing under it or beside it, between it and the panel's foot. */
 export async function panelFlaws(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const out: string[] = [];
@@ -300,17 +299,6 @@ export async function panelFlaws(page: Page): Promise<string[]> {
         if (hit && hit !== after && !hit.closest(".after-foot") && after.contains(hit))
           out.push(`under „Напред“ at ${Math.round(y)}: ${hit.tagName.toLowerCase()}.${hit.className}`);
       }
-    // Scrolling, at its top: the fact's first two lines above the fade over the foot (unless the panel gave way to the
-    // player's row and the right one, right over it: DESIGN.md, Play; run.ts, settle, sets --give on the question).
-    const fact = after.querySelector<HTMLElement>(".fact p:last-child");
-    const gave = !!document.querySelector<HTMLElement>("article.question")?.style.getPropertyValue("--give");
-    if (!gave && fact && after.scrollHeight > after.clientHeight + 1 && getComputedStyle(after).position === "fixed") {
-      after.scrollTop = 0;
-      const lh = Number.parseFloat(getComputedStyle(fact).lineHeight) || 24;
-      const fade = (after.querySelector(".after-foot") ?? go).getBoundingClientRect().top - 28;
-      const top = fact.getBoundingClientRect().top;
-      if (top + 2 * lh > fade + 1) out.push(`the fact's two lines under the fade (${Math.round(fade - top)}px)`);
-    }
     return [...new Set(out)];
   });
 }

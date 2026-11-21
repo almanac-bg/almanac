@@ -154,6 +154,60 @@ async function spaced(page: Page, q: Q): Promise<string[]> {
   return whole ? [] : [`the question reads „${says}“`];
 }
 
+/** A question asked from 375 × 600 up, at the usual text: the page doesn't scroll at all (a picture's question scrolled
+ * by 4–11px at 390 × 664). Where the page may scroll (320 × 568, twice the text), the question isn't cut („…“) to
+ * spare a scroll: its task is read whole. */
+async function askedFits(page: Page, scrolls: boolean): Promise<string[]> {
+  return page.evaluate((scrolls) => {
+    const out: string[] = [];
+    const over = document.documentElement.scrollHeight - innerHeight;
+    if (!scrolls && over > 0) out.push(`the page scrolls by ${over}px`);
+    if (scrolls && document.querySelector("article.question .ask[data-cut]"))
+      out.push("the question cut, the page scrolling");
+    return out;
+  }, scrolls);
+}
+
+/** An answer's panel packed (its parts at its gap, none pulled apart, „Напред“ at its own height: a panel stretched
+ * to a height of its own swelled it from 56 to 80px), and a choice's „ти“, share and sign beside its words where one
+ * line has room for them all (never dropped under one short word: #604's 9rem basis). */
+async function packed(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out: string[] = [];
+    const after = document.querySelector<HTMLElement>(".after");
+    if (!after) return ["no answer's panel"];
+    const gap = Number.parseFloat(getComputedStyle(after).rowGap) || 0;
+    const flow = [...after.children].filter(
+      (e): e is HTMLElement =>
+        e instanceof HTMLElement && e.offsetHeight > 0 && getComputedStyle(e).position === "static",
+    );
+    flow.slice(1).forEach((e, i) => {
+      const prev = flow[i] as HTMLElement;
+      const apart = e.offsetTop - (prev.offsetTop + prev.offsetHeight);
+      if (e.offsetLeft === prev.offsetLeft && apart > gap + 1) out.push(`${e.className} ${Math.round(apart)}px apart`);
+    });
+    const go = after.querySelector<HTMLElement>(".up-next-go");
+    const tall = Number.parseFloat(getComputedStyle(go ?? after).minHeight) || 0;
+    if (go && go.offsetHeight > tall + 1) out.push(`„Напред“ ${go.offsetHeight}px tall, not ${tall}px`);
+    for (const row of document.querySelectorAll<HTMLElement>(".choices > .option:is(.right, .wrong)")) {
+      const words = row.querySelector<HTMLElement>(".option-words");
+      const end = row.querySelector<HTMLElement>(".row-end");
+      const letter = row.querySelector<HTMLElement>(".letter");
+      if (!words || !end || !letter || getComputedStyle(end).position === "absolute") continue;
+      if (end.offsetTop < words.offsetTop + words.offsetHeight - 1) continue; // beside them
+      const range = document.createRange();
+      range.selectNodeContents(words);
+      const lines = new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+      const style = getComputedStyle(row);
+      const inner = row.clientWidth - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight);
+      const gaps = 2 * (Number.parseFloat(style.columnGap) || 0);
+      if (lines === 1 && range.getBoundingClientRect().width + end.offsetWidth + letter.offsetWidth + gaps <= inner)
+        out.push(`what the answer brings under one line of words with room for it: ${words.textContent}`);
+    }
+    return out;
+  });
+}
+
 /** On the smallest phone, where the page may scroll (DESIGN.md, Play): what answers a question starts in sight (its
  * first answer, row, cell or key whole on the first screen, under the head), and a picture over a question is still a
  * picture (120px tall at the least), at every size. */
@@ -472,6 +526,7 @@ for (const size of sizes)
               // text) the page may scroll, nothing under anything, what answers it starting in sight.
               ...(big || small ? await outOfReach(page, controls) : await unseenAnswers(page)),
               ...(await startsInSight(page, small && !big)),
+              ...(await askedFits(page, big || small)),
             ]);
             expect.soft(asked, `${where}, asked`).toEqual([]);
 
@@ -490,7 +545,7 @@ for (const size of sizes)
                     ...(await outOfReach(page, ".after > :not(.up-next)", ".after")),
                     ...(await outOfReach(page, "article.question .options .option")),
                   ]
-                : [...(await panelFlaws(page)), ...(await answerInPlace(page, q.type))]),
+                : [...(await panelFlaws(page)), ...(await answerInPlace(page)), ...(await packed(page))]),
               ...(!big && laptop ? await beside(page) : []),
             ]);
             expect.soft(said, `${where}, answered ${how}`).toEqual([]);
@@ -551,6 +606,13 @@ for (const size of sizes)
                   ),
                 );
               expect.soft(out, `the streak's words past its card${at}`).toBe(false);
+              // „Започни“ (or „Продължи“) on the first screen, over the places' bar, at every text size.
+              const go = await page.evaluate(() => {
+                const bar = document.querySelector(".places-foot")?.getBoundingClientRect();
+                const go = document.querySelector(".issue-go")?.getBoundingClientRect();
+                return go ? go.bottom - (bar?.height ? bar.top : innerHeight) : 0;
+              });
+              expect.soft(go, `„Започни“ under the places' bar${at}`).toBeLessThanOrEqual(1);
             }
           }
           // A duel's result: its ways on of one width.
@@ -576,21 +638,25 @@ for (const size of sizes)
       });
     });
 
-/** Where an answer ended, at the usual text: the player's row and the right one under the head and over the panel;
- * a choice's question still whole under the head, unless the panel at its least would cover the rows, and then moved
- * only as far as they need, or on to the edge of what the head would cut there; never a scrap of the sheet, the
- * picture or a row left under the head's foot (DESIGN.md, Play). */
-async function answerInPlace(page: Page, type: string): Promise<string[]> {
-  return page.evaluate((type) => {
+/** Where an answer ended, at the usual text: the player's row and the right one under the head and over „Напред“;
+ * nothing over the answers (the panel under them, never across a row: a docked panel cut them); the verdict in sight
+ * over „Напред“; the page moved no further than to show the fact's first two lines over it, or on to the edge of
+ * what the head would cut there; never a scrap of the sheet, the picture or a row left under the head's foot
+ * (DESIGN.md, Play). */
+async function answerInPlace(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
     const out: string[] = [];
-    const after = document.querySelector(".after") as Element;
-    const foot = getComputedStyle(after).position === "fixed" ? after.getBoundingClientRect().top : innerHeight;
+    const after = document.querySelector(".after") as HTMLElement;
+    const foot = after.querySelector(".after-foot") as HTMLElement;
+    const sticky = getComputedStyle(foot).position === "sticky";
+    const footH = sticky ? foot.getBoundingClientRect().height : 0;
+    const footTop = sticky ? foot.getBoundingClientRect().top : innerHeight;
     const head = document.querySelector(".question-top")?.getBoundingClientRect().bottom ?? 0;
     const rows = [...document.querySelectorAll("article.question button.option:is(.right, .wrong)")];
     for (const row of rows) {
       const r = row.getBoundingClientRect();
       if (r.top < head - 1) out.push(`a row under the head: ${row.textContent}`);
-      if (r.bottom > foot + 1) out.push(`a row under the panel: ${row.textContent}`);
+      if (r.bottom > footTop + 1) out.push(`a row under „Напред“: ${row.textContent}`);
     }
     const parts = [
       ...document.querySelectorAll(
@@ -600,21 +666,26 @@ async function answerInPlace(page: Page, type: string): Promise<string[]> {
     for (const { el, r } of parts)
       if (r.height && r.top < head - 1 && r.bottom > head + 1 && !rows.includes(el))
         out.push(`a scrap under the head: ${el.className} [${Math.round(r.top)}–${Math.round(r.bottom)}]`);
-    // The docked panel ends what's over it at an edge: never across a row (an order's, pairs', groups', a choice's).
-    if (getComputedStyle(after).position === "fixed")
-      for (const { el, r } of parts)
-        if (r.height && r.top < foot - 1 && r.bottom > foot + 1 && el.closest(".answering"))
-          out.push(`a row cut by the panel: ${el.className} [${Math.round(r.top)}–${Math.round(r.bottom)}]`);
-    const leaf = document.querySelector("article.question .q-leaf");
-    if (!leaf) out.push("no question's sheet (.q-leaf)");
-    else if (type === "choice" || type === "clues") {
-      const bottom = Math.max(...rows.map((r) => r.getBoundingClientRect().bottom));
-      const edge = parts.some(({ r }) => r.height && Math.abs(r.bottom - head) <= 2);
-      if (leaf.getBoundingClientRect().top < head - 1 && !(bottom > foot - 24) && !edge)
-        out.push("the question went under the head, further than the rows needed");
-    }
+    // Nothing over the answers: the panel comes under them.
+    const panel = after.getBoundingClientRect();
+    for (const { el, r } of parts)
+      if (r.height && el.closest(".answering") && r.bottom > panel.top + 1)
+        out.push(`a row under the panel: ${el.className} [${Math.round(r.top)}–${Math.round(r.bottom)}]`);
+    const verdict = after.firstElementChild?.getBoundingClientRect();
+    if (!verdict || verdict.top < head - 1 || verdict.bottom > footTop + 1) out.push("the verdict out of sight");
+    const fact = after.querySelector<HTMLElement>(".fact p:last-child");
+    const lines = fact
+      ? fact.getBoundingClientRect().top + 2 * (Number.parseFloat(getComputedStyle(fact).lineHeight) || 24)
+      : (verdict?.bottom ?? 0);
+    const need = scrollY + lines + footH + 8 - innerHeight;
+    const edge = parts.some(({ r }) => r.height && Math.abs(r.bottom - head) <= 2);
+    // (On a laptop the panel beside the question shows whole: beside, below.)
+    const sheet = document.querySelector("article.question .q-leaf")?.getBoundingClientRect();
+    const besides = !!sheet && panel.left >= sheet.right;
+    if (!besides && scrollY > Math.max(0, need) + 2 && !edge)
+      out.push(`moved ${Math.round(scrollY - need)}px further than it needs`);
     return out;
-  }, type);
+  });
 }
 
 /** A miss of a choice says the right answer in words, in the panel right under the verdict and how many got it (when
@@ -842,24 +913,27 @@ for (const size of sizes.filter((s) => s.width < 1000))
     expect(at.go, "„Започни“ whole on the first screen").toBeLessThanOrEqual(Math.min(at.foot, size.go));
   });
 
-// A number gone over (the review under a game's result), with twice the text on a 320px phone: its scale's numbers,
-// a mark at an end too, keep to the screen's width.
-test.describe("a number gone over, twice the text, 320 × 568", () => {
+// The questions gone over (the review under a game's result), with twice the text on a 320px phone: a number's scale
+// (its numbers, a mark at an end too) and a right answer's long words keep to the screen's width.
+test.describe("the questions gone over, twice the text, 320 × 568", () => {
   test.use({ viewport: { width: 320, height: 568 }, bypassCSP: true });
 
-  test("its scale keeps to the screen's width", async ({ page }) => {
+  test("every kind keeps to the screen's width", async ({ page }) => {
+    test.setTimeout(150_000);
     await textAt(page, 200);
-    const numbers = kinds().filter((k) => k.q.type === "number");
+    // (Not groups: a kind on its way out, slow to play through in WebKit at this size.)
+    const all = kinds().filter((k) => k.q.type !== "split");
     await page.goto("/");
     await dealt(
       page,
       "history",
-      numbers.map((k) => k.q.id),
+      all.map((k) => k.q.id),
     );
     await page.goto("/play/history");
     await page.getByRole("button", { name: "Продължи", exact: true }).click();
     await page.getByRole("button", { name: "Започни сега" }).click();
-    for (const { q } of numbers) {
+    for (const [n, { q }] of all.entries()) {
+      await expect(page.locator(".question-head")).toContainText(`${n + 1} от ${all.length}`, { timeout: 10_000 });
       await expect(page.locator("article.question .answering")).toBeVisible();
       await answerAs(page, q, "wrong");
       await moveOn(page);

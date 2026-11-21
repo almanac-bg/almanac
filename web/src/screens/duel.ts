@@ -131,7 +131,8 @@ export function tieWords(d: DuelView): string {
 }
 
 /** Seconds, the Bulgarian way: „34,5 с“. */
-const seconds = (ms: number) => `${(ms / 1000).toLocaleString("bg", { maximumFractionDigits: 1 })} с`;
+const seconds = (ms: number) =>
+  `${(ms / 1000).toLocaleString("bg", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} с`;
 
 /** What a duel's end is called. */
 const ends: Record<DuelView["state"], string> = {

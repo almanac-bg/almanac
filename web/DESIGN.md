@@ -315,22 +315,22 @@ to show it whole; nothing over the question.
 - **The clock** (`.timer`): a bar under the pips, the seconds at its end; ink and heavier for the last ten seconds;
   gone once answered. Its sound: silent until ten seconds are left.
 - **The sheet** (`.q-leaf`, no corner): the chip (and on the day's last question „Най-трудният: число“ beside it), then the
-  question. Under 620px of height the sheet is the question with the chapter's glyph beside it (on the day's last, the
-  chip's glyph alone beside its tag) and an answer is 52px; under 700px a number's sheet is too, so its pad and
-  „Отговори“ fit. Under 680px, while an order or pairs are asked, the sheet
-  is the question beside its glyph a size smaller, the rows right under it (not at the foot), cut to as many lines as
-  leave every row and „Готово“ on the screen (two at the least), at a whole word with „…“, the same in every engine (a
-  tap on it reads it all: answering.ts, `clamp`), and the rows and cells are 44px; the pairs' right
+  question. Under 700px of height the sheet is the question with the chapter's glyph beside it (on the day's last, its
+  tag; under 620px the chip's glyph alone beside it), so that a picture, a pad or rows fit under it; under 620px an
+  answer is 52px. Under 680px, while an order or pairs are asked, the question is a size smaller, the rows right under
+  it (not at the foot), and the rows and cells are 44px; from 375px across at the usual text it's cut to as many lines
+  as leave every row and „Готово“ on the screen (two at the least), at a whole word with „…“, the same in every engine
+  (a tap on it reads it all: answering.ts, `clamp`); where the page scrolls anyway (320px, large text) it's whole; the pairs' right
   column, a cell more, has five ninths of the width. A picture over the question
   takes at most 30% of the height, and shrinks where the screen is short, never under 120px. A choice of pictures is
-  two by two, its cards taking the room the question leaves (each picture whole in its card), the letter and
+  two by two, each picture whole and centred in its card, the letter and
   (answered) the ✓ or ✕ in the picture's corners, its name under it across the card once answered (no room kept for
   it before).
 - **What fits** (21 Nov: the fit machinery kept trading one defect for another): from 375 × 600 up, a question and what answers it fit without scrolling.
   On a 320 × 568 phone and with twice the text the page may scroll, but nothing is shrunk into uselessness, cut
   mid-element or covered: what answers it starts in sight, a picture is never under 120px, a cut question ends at a
-  whole word, the page moved for an answer lands on whole edges, and the answer's panel ends what's over it at a
-  row's edge. „Отговори“ and „Готово“ are in the page's flow, never over what they'd cover. Prefer removing fit logic
+  whole word, the page moved for an answer lands on whole edges, and the answer's panel comes under the answers,
+  never over them. „Отговори“ and „Готово“ are in the page's flow, never over what they'd cover. Prefer removing fit logic
   to adding more.
 - **A cell's words** (`wholeWords()`): a long word breaks only at its syllables (soft hyphens, `lib/words.ts`) and only
   where it's wider than its cell; a punctuation mark stays with its word. Never `break-all`.
@@ -340,9 +340,9 @@ to show it whole; nothing over the question.
   text by night — and a solid ✓; the right one they didn't give has a 3px ink outline and a ✓ in a ring; their wrong
   one is hollow and dashed with a ✕ in a dashed ring and „ти“. The rest shrink to their own words, a size smaller (from
   2.25rem, wrapping, never cut with „…“), so
-  that the player's row and the right row are right under the question; the page doesn't move, so the question stays
-  whole under the head (only if their rows wouldn't fit over the panel even at its verdict and „Напред“; moved, the
-  head's foot falls between two parts, never across one: no scrap of the sheet, a clue or a row left under it). On a
+  that the player's row and the right row are right under the question; the page moves once, as little as it can
+  (the answer, below), and moved, the head's foot falls between two parts, never across one: no scrap of the sheet,
+  a clue or a row left under it. On a
   laptop the sheet stays whole under the head however far the page moves. The crowd's shares fill in
   behind each answer. After a choice's words, in this order: „ти“, the share, the ✓ or ✕, in one box (`.row-end`) on a
   line with them, or together on the line under them, at the row's end, where they'd squeeze the words (with large
@@ -356,16 +356,15 @@ to show it whole; nothing over the question.
   its name; clues, coming out as their time does, those still to come in one line („Още 2 подсказки: след 10 с и
   20 с“); number, typed on the game's own pad (keys
   44px at the least; with large text what's typed stays in sight under the head), answered as what was said, the
-  answer, and both on a scale (the answer a filled square; „ти, вярно“ a filled disc, „ти, близо“ half filled, „ти“
-  hollow), nothing else (how everyone guessed is said under the verdict; its chart is the review's). Pairs or groups
+  answer (not again where it was spot on), and both on a scale with its key (the answer a filled square; „ти,
+  вярно“ a filled disc, „ти, близо“ half filled, „ти“ hollow), nothing else (how everyone guessed is said under the verdict; its chart is the review's). Pairs or groups
   whose time ran out with nothing given show the right ones with a ✓ in a ring: none of it the player's.
-- **The answer** (`.after`): docked at a phone's foot, a surface over the answers, at most what leaves the player's
-  row and the right one in sight, and at least the fact's first two lines (an order, pairs or groups: at that least,
-  so their rows stay in sight; where a choice's two rows need more, the panel gives way to them, down to its verdict
-  and „Напред“); it ends what's over it at a row's edge, covering the row it would cut; a longer fact scrolls in it,
-  fading out
-  above „Напред“, which stands on a foot of the panel's colour down to its edge (`.after-foot`): nothing shows under
-  it. In it, the verdict, a choice
+- **The answer** (`.after`): under the answers, never over them; on a phone at the screen's foot, edge to edge, a
+  surface. The page moves once (run.ts, `settle`), as little as it can: to show the verdict over „Напред“ (under an
+  order's rows, the fact's first line too), and the fact's first two lines where that leaves the player's row and the
+  right one (an order's rows) clear of the head. Where the panel goes on past the screen's foot, „Напред“ stays there on a foot of the panel's colour down
+  to its edge (`.after-foot`), what goes on under it fading out over it: nothing shows under it. In it, the verdict,
+  a choice
   missed its right answer in words („Вярно е: Съединението.“; not a choice of pictures, each named under it, nor
   where the question names it), how many got it, „Записано с мастило · глава История“
   for ink, on a question of the date „На този ден“ and what happened that day, „Знаеше ли?“ and the fact, a picture's credits (a choice of pictures' too, here where nothing covers
@@ -383,14 +382,15 @@ to show it whole; nothing over the question.
   answered right, wrong and close: `e2e/kinds.ts`, `e2e/bank.ts`): nothing scrolls sideways; Днес shows „Започни“
   whole and high, an invite over it too; from 375 × 600 a question shows every answer or its pad and its action
   whole; at 320 × 568 every control is a scroll away, under nothing, the first answer in sight; a picture never under
-  120px; once answered, the player's row, the right one and „Напред“ are in sight, nothing under „Напред“, no row cut
-  by the panel nor a scrap under the head; a row's sign never on a line of its own, nor a punctuation mark.
+  120px; once answered, the player's row, the right one, the verdict and „Напред“ are in sight, nothing under „Напред“,
+  nothing under the panel nor a scrap under the head, the panel packed; a row's sign never on a line of its own, nor a punctuation mark.
 - **Large text:** the text grows with the browser's setting and with „Размер на текста“ (up to twice). Everything is
   in rem from `<html>`; display type grows at half the rate (half px, half rem) and a big numeral is capped by the
   screen's width or height. One-column grids are `minmax(0, 1fr)`; a row of things wraps. `lib/prefs.ts` puts `tight`
   and `tighter` on `<html>` when the column holds few words, and rows give way to columns there. With `tighter`, an
-  order's or pairs' line on how to answer is read, not shown (the first rows show over „Готово“), and the answer's
-  panel, under the answers, opens with its verdict and the fact's first line in sight. A media query's rem
+  order's or pairs' line on how to answer is read, not shown (the first rows show over „Готово“). With `tight`, Днес's
+  cover leaves out its row of glyphs, and the places' bar at a phone's foot grows at most a quarter, so „Започни“
+  stays over it. A media query's rem
   is the browser's own size, so a short screen is a phone on its side only with `(orientation: landscape)` too.
   `e2e/layout.spec.ts` holds it at every size above.
 
