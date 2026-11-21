@@ -86,7 +86,7 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await expect(b.getByText("Още нямаш приятели тук. Добави ги по потребителско име или имейл.")).toBeVisible();
   // Nothing typed: said in the game's words, the cursor in the field.
   await b.getByRole("button", { name: "Добави", exact: true }).click();
-  await expect(b.getByRole("alert")).toHaveText("Напиши потребителското име или имейла на приятеля си.");
+  await expect(b.getByRole("alert")).toHaveText("Въведи потребителско име или имейл.");
   await expect(b.getByLabel("Потребителско име или имейл на приятел")).toBeFocused();
   await b.getByLabel("Потребителско име или имейл на приятел").fill(`@${tag}`);
   await b.getByRole("button", { name: "Добави", exact: true }).click();

@@ -554,7 +554,7 @@ function addFriend(reload: () => Promise<void>): Child {
         const who = to.peek().trim();
         // Said the game's way, not in the browser's bubble.
         if (!who) {
-          note.set({ text: "Напиши потребителското име или имейла на приятеля си.", bad: true });
+          note.set({ text: "Въведи потребителско име или имейл.", bad: true });
           field?.focus();
           return;
         }
@@ -585,7 +585,7 @@ function addFriend(reload: () => Promise<void>): Child {
       h("input", {
         name: "to",
         "aria-label": "Потребителско име или имейл на приятел",
-        placeholder: "име или имейл",
+        placeholder: "потребителско име или имейл",
         autocomplete: "off",
         autocapitalize: "none",
         spellcheck: false,
