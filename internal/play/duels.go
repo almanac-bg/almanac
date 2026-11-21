@@ -32,8 +32,10 @@ import (
 // one, played at a person's speed, none of its questions the player has seen first), chosen as „равен“ (Even: about
 // as many right as the player would get on its ten) or „по-силен“ (Stronger: a couple more), by the player's hidden
 // mastery (mastery.go: expectedRights), played against it as it went:
-// its marks come with the duel, for the screen to show at their times. It's shown by who played it, labelled a
-// recording (recordings.go); the recorded player hears of it quietly, with a game's news (RecordingsNews).
+// its marks come with the duel, for the screen to show at their times. It's shown by who played it, as anyone is seen
+// anywhere in the game (owner, 2026-11-19): their name (a way to their profile) and avatar, during the duel, on its
+// result and in the duel history, always labelled a recording, never taken for a person here now. The recorded player
+// is never told who played it.
 //
 // A duel the player started and left unfinished is gone on with when they start one the same way again (with the same
 // friend, or against a recording); one never finished goes at its time, as if never started (SettleDue). A friend's
@@ -91,9 +93,6 @@ type DuelView struct {
 	// recording is that level (recordingFit: meets); none where it was only the nearest there was („Запис“), nor
 	// against a friend.
 	Level string `json:"level,omitempty"`
-	// Asked is, against a recording, the level the player asked for, whether the recording met it or not: another
-	// duel against a recording, from this one's end, asks for it again.
-	Asked string `json:"asked,omitempty"`
 	// Topic is, against a recording of a topic's game, its topic (none: a game over all of them, „Микс“).
 	Topic string `json:"topic,omitempty"`
 	// First says the player played first (sent it).
@@ -307,9 +306,8 @@ func (g *Game) DuelRecording(ctx context.Context, userID int64, level string) (i
 		if rec.meets {
 			kept = &level
 		}
-		res, err := tx.Exec(`INSERT INTO duels (kind, questions, a_id, a_run, ghost_run, level, asked, created_at,
-				expires_at)
-			VALUES ('recording', ?, ?, ?, ?, ?, ?, ?, ?)`, string(data), userID, r.id, rec.id, kept, level,
+		res, err := tx.Exec(`INSERT INTO duels (kind, questions, a_id, a_run, ghost_run, level, created_at, expires_at)
+			VALUES ('recording', ?, ?, ?, ?, ?, ?, ?)`, string(data), userID, r.id, rec.id, kept,
 			store.Ms(now), store.Ms(now.Add(DuelFor)))
 		if err != nil {
 			return err
@@ -829,7 +827,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 			coalesce(CASE WHEN NOT d.mine THEN d.a_id WHEN d.kind = 'recording'
 				THEN (SELECT user_id FROM runs WHERE id = d.ghost_run) ELSE d.b_id END, 0),
 			coalesce((SELECT category FROM runs WHERE id = d.ghost_run AND kind = 'topic' AND category <> ?3), ''),
-			coalesce(d.level, ''), coalesce(d.asked, '')
+			coalesce(d.level, '')
 		FROM (SELECT *, coalesce(a_id = ?1, 0) AS mine FROM duels
 			WHERE (a_id = ?1 OR (b_id = ?1 AND sent_at IS NOT NULL)) AND (?2 = 0 OR id = ?2)) d
 		ORDER BY d.ended_at IS NOT NULL, CASE WHEN d.ended_at IS NULL THEN d.expires_at ELSE -d.ended_at END
@@ -848,8 +846,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 	for rows.Next() {
 		var r row
 		if err := rows.Scan(&r.v.ID, &r.kind, &r.v.First, &r.v.CreatedAt, &r.v.EndedAt, &r.expires, &r.sent,
-			&r.outcome, &r.myRun, &r.theirRun, &r.theirs, &r.v.Topic, &r.v.Level,
-			&r.v.Asked); err != nil {
+			&r.outcome, &r.myRun, &r.theirRun, &r.theirs, &r.v.Topic, &r.v.Level); err != nil {
 			rows.Close()
 			return nil, err
 		}

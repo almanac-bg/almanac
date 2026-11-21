@@ -156,7 +156,7 @@ export function me(kit: Kit) {
           { class: "lead" },
           "Имаш профил? Влез с имейла си. Ако нямаш, профилът се създава сам с първата ти игра.",
         ),
-        haveProfile(() => go("/me", true), undefined, true, undefined, true),
+        haveProfile(() => go("/me", true), undefined, true, true),
       ],
     ),
   );

@@ -99,15 +99,13 @@ var mergeSteps = []mergeStep{
 	{carries: []string{"invites.user_id"}, sql: `UPDATE OR IGNORE invites SET user_id = ?1 WHERE user_id = ?2`},
 	// The questions the guest reported, still theirs.
 	{carries: []string{"reports.user_id"}, sql: `UPDATE reports SET user_id = ?1 WHERE user_id = ?2`},
-	// What the guest has been told, so that nothing is told twice: of Начало's lines, of the duels against their
-	// recordings, of their streak.
+	// What the guest has been told, so that nothing is told twice: of Начало's lines, of their streak.
 	{carries: []string{"home_lines.user_id"},
 		sql: `INSERT OR IGNORE INTO home_lines (user_id, what, at) SELECT ?1, what, at FROM home_lines WHERE user_id = ?2`},
-	{carries: []string{"users.recordings_told", "users.streak_told"},
-		sql: `UPDATE users SET recordings_told = max(users.recordings_told, g.recordings_told),
-		streak_told = CASE WHEN substr(g.streak_told, instr(g.streak_told, ':') + 1)
+	{carries: []string{"users.streak_told"},
+		sql: `UPDATE users SET streak_told = CASE WHEN substr(g.streak_told, instr(g.streak_told, ':') + 1)
 			> substr(users.streak_told, instr(users.streak_told, ':') + 1) THEN g.streak_told ELSE users.streak_told END
-		FROM (SELECT recordings_told, streak_told FROM users WHERE id = ?2) g
+		FROM (SELECT streak_told FROM users WHERE id = ?2) g
 		WHERE users.id = ?1`},
 	// The player came in when, and where, the earlier of the two did, and met the version that one met; and was last
 	// seen when the later was.

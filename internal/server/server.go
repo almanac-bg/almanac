@@ -186,7 +186,6 @@ func (s *Server) routes() http.Handler {
 	}
 	api("GET /api/health", s.health)
 	api("GET /api/me", s.me)
-	api("GET /api/mail-who", s.mailWho)
 	api("PATCH /api/me", s.rename)
 	api("DELETE /api/me", s.deleteAccount)
 	api("GET /api/me/stats", s.stats)
