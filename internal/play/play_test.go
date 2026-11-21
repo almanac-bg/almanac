@@ -1028,27 +1028,28 @@ func TestDecided(t *testing.T) {
 	}
 }
 
-// A duel goes by right answers, then as the board breaks a tie (how close the number came), then by time, by TieBand
-// or more.
+// A duel goes by right answers, then as the board breaks a tie (how close the number came); even in both, a draw.
 func TestDuelScore(t *testing.T) {
-	base := duelScore{rights: 7, tie: tiebreak{closeness: 500}, ms: 60_000}
+	base := duelScore{rights: 7, tie: tiebreak{closeness: 500}}
 	for _, c := range []struct {
 		name string
 		o    duelScore
 		want int
+		by   string
 	}{
-		{"more right answers", duelScore{rights: 8}, 1},
-		{"fewer right answers, closer and quicker", duelScore{rights: 6, tie: tiebreak{closeness: 1000}, ms: 1}, -1},
-		{"a closer number", duelScore{rights: 7, tie: tiebreak{closeness: 600}, ms: 90_000}, 1},
-		{"quicker by a second", duelScore{rights: 7, tie: base.tie, ms: 59_000}, 1},
-		{"quicker by less", duelScore{rights: 7, tie: base.tie, ms: 59_500}, 0},
-		{"slower by a second", duelScore{rights: 7, tie: base.tie, ms: 61_000}, -1},
+		{"more right answers", duelScore{rights: 8}, 1, ""},
+		{"fewer right answers, closer", duelScore{rights: 6, tie: tiebreak{closeness: 1000}}, -1, ""},
+		{"a closer number", duelScore{rights: 7, tie: tiebreak{closeness: 600}}, 1, TieNumber},
+		{"even in both", duelScore{rights: 7, tie: base.tie}, 0, ""},
 	} {
 		if got := base.against(c.o); got != c.want {
 			t.Errorf("%s: %d, want %d", c.name, got, c.want)
 		}
 		if got := c.o.against(base); got != -c.want {
 			t.Errorf("%s, the other way: %d, want %d", c.name, got, -c.want)
+		}
+		if got := base.tieBy(c.o); got != c.by {
+			t.Errorf("%s: broken by %q, want %q", c.name, got, c.by)
 		}
 	}
 }

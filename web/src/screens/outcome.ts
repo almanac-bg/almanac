@@ -40,9 +40,6 @@ let {
 /** How many questions a duel has. */
 const total = 10;
 
-/** Seconds, the Bulgarian way: „34,5 с“. */
-const secs = (ms: number) => `${(ms / 1000).toLocaleString("bg", { maximumFractionDigits: 1 })}\u00a0с`;
-
 /** What to do next, where the screen that shows a result has its own: the gold button, and plain ones beside it. */
 export interface Steps {
   main: Child;
@@ -170,11 +167,10 @@ function face(s: Side, label: string, tag: string, won: boolean): Child {
 }
 
 /** The duel question by question: the player's marks over the other's, aligned (right filled, близо half filled,
- * wrong hollow), and a band behind the question that decided it. Speed only breaks a tie (line), so no mark says who
- * was quicker; gold is the mark's alone. */
+ * wrong hollow), and a band behind the question that decided it. Time never counts, so no mark says how long it
+ * took or who was quicker; gold is the mark's alone. */
 function marks(d: DuelView, mine: DuelMark[], theirs: DuelMark[]): Child {
-  const words = (m: DuelMark) =>
-    m.right ? `вярно за ${secs(m.ms)}` : m.close ? "близо" : m.missed ? "без отговор" : "грешно";
+  const words = (m: DuelMark) => (m.right ? "вярно" : m.close ? "близо" : m.missed ? "без отговор" : "грешно");
   const them = d.opponent?.name ?? "съперникът";
   const pip = (m: DuelMark | undefined, row: number, i: number) =>
     h("span", {
@@ -211,8 +207,8 @@ function marks(d: DuelView, mine: DuelMark[], theirs: DuelMark[]): Child {
 }
 
 /** What decided the duel: on even right answers, and only then, what broke the tie as on the day's board
- * (play.duelScore, tieWords): the number nearer, or the time (a second apart or more: closer is a draw,
- * play.TieBand); else the question from which the winner led to the end. */
+ * (play.duelScore, tieWords): the number nearer (even in that too, a draw, which says nothing more); else the
+ * question from which the winner led to the end. */
 function line(d: DuelView): string {
   const them = d.opponent?.name ?? "Съперникът";
   if (d.opponent?.gone) return ""; // their game went with them: nothing to set the player's against

@@ -304,20 +304,114 @@ func TestBoardAverage(t *testing.T) {
 	}
 }
 
-// A game not yet counted takes its place among those counted as the count would put it: right answers first, then
-// how close the hard number came, then time, then the earlier started.
+// A game is placed ahead of another by right answers, then by how close the hard number came, and nothing else: as
+// many right and as close, neither is ahead (they share a place), and the board shows the earlier started first.
 func TestBoardRunAhead(t *testing.T) {
-	nine := boardRun{id: 2, rights: 9, tie: tiebreak{closeness: 0}, ms: 90_000}
-	eight := boardRun{id: 1, rights: 8, tie: tiebreak{closeness: 700}, ms: 60_000}
-	closer := boardRun{id: 5, rights: 8, tie: tiebreak{closeness: 750}, ms: 90_000}
-	quicker := boardRun{id: 3, rights: 8, tie: eight.tie, ms: 50_000}
-	later := boardRun{id: 4, rights: 8, tie: eight.tie, ms: 60_000}
-	if !nine.ahead(eight) || eight.ahead(nine) || !quicker.ahead(eight) || eight.ahead(quicker) || nine.ahead(nine) ||
-		!eight.ahead(later) || later.ahead(eight) || !nine.ahead(closer) {
+	nine := boardRun{id: 2, rights: 9, tie: tiebreak{closeness: 0}}
+	eight := boardRun{id: 1, rights: 8, tie: tiebreak{closeness: 700}}
+	closer := boardRun{id: 5, rights: 8, tie: tiebreak{closeness: 750}}
+	even := boardRun{id: 4, rights: 8, tie: eight.tie}
+	if !nine.ahead(eight) || eight.ahead(nine) || nine.ahead(nine) || !nine.ahead(closer) {
 		t.Fatal("ahead")
 	}
-	if !closer.ahead(eight) || eight.ahead(closer) || !closer.ahead(quicker) {
+	if !closer.ahead(eight) || eight.ahead(closer) {
 		t.Fatal("the closer number isn't ahead")
+	}
+	if eight.ahead(even) || even.ahead(eight) {
+		t.Fatal("as many right and as close: one ahead")
+	}
+	if !eight.before(even) || even.before(eight) || !closer.before(eight) || !nine.before(closer) || eight.before(eight) {
+		t.Fatal("the board's order")
+	}
+}
+
+// Games as many right and as close on the number share a place (1, 2, 2, 4), however long each took: time never
+// counts. On the day's board and the friends' board, the viewer's row goes first among their equals; a game the count
+// doesn't have yet is placed as one it has.
+func TestBoardSharesPlaces(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	patience, stale := boardPatience, boardStale
+	t.Cleanup(func() { boardPatience, boardStale = patience, stale })
+	boardStale = 0
+
+	nine, slow, quick, four := w.user(), w.user(), w.user(), w.user()
+	w.befriend(nine, slow)
+	w.befriend(nine, quick)
+	w.befriend(nine, four)
+	finish := func(user int64, rights, closeness int, ms int64) {
+		s, err := w.g.StartDay(ctx, user)
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.play(user, s.ID, append(repeat(w.right, rights), repeat(w.wrong, Length-rights)...)...)
+		if _, err := w.db.Write.ExecContext(ctx, `UPDATE runs SET closeness = ?, ms = ? WHERE id = ?`,
+			closeness, ms, s.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Slow and Quick: eight right, as close on the number; Slow took ten times as long, and started first.
+	finish(nine, 9, 100, 50_000)
+	finish(slow, 8, 700, 500_000)
+	finish(quick, 8, 700, 50_000)
+	tags := map[string]int64{}
+	for _, id := range []int64{nine, slow, quick, four} {
+		var tag string
+		if err := w.db.Read.QueryRow(`SELECT tag FROM users WHERE id = ?`, id).Scan(&tag); err != nil {
+			t.Fatal(err)
+		}
+		tags[tag] = id
+	}
+	check := func(what string, scores []Score, place, wantPlace int, want []int64, wantPlaces []int) {
+		t.Helper()
+		var who []int64
+		var places []int
+		for _, s := range scores {
+			who, places = append(who, tags[s.Tag]), append(places, s.Place)
+		}
+		if !slices.Equal(who, want) || !slices.Equal(places, wantPlaces) || place != wantPlace {
+			t.Fatalf("%s: %v at %v, place %d; want %v at %v, place %d", what, who, places, place, want, wantPlaces,
+				wantPlace)
+		}
+	}
+	today := w.g.Today()
+	b, err := w.g.BoardOf(ctx, today, slow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("as Slow sees it", b.Top, b.Place, 2, []int64{nine, slow, quick}, []int{1, 2, 2})
+	b, _ = w.g.BoardOf(ctx, today, quick)
+	check("as Quick sees it", b.Top, b.Place, 2, []int64{nine, quick, slow}, []int{1, 2, 2})
+	b, _ = w.g.BoardOf(ctx, today, 0)
+	check("as a guest sees it", b.Top, b.Place, 0, []int64{nine, slow, quick}, []int{1, 2, 2})
+
+	// Counted with three, the board is kept; a fourth, behind the two, comes after both, counted or not yet.
+	boardPatience, boardStale = 1<<30, time.Hour
+	if _, err := w.g.BoardOf(ctx, today, 0); err != nil {
+		t.Fatal(err)
+	}
+	finish(four, 8, 400, 10_000)
+	b, _ = w.g.BoardOf(ctx, today, four)
+	check("as the fourth sees it, not counted yet", b.Top, b.Place, 4, []int64{nine, slow, quick, four},
+		[]int{1, 2, 2, 4})
+	if b.Players != 4 || b.Mine == nil || b.Mine.Place != 4 {
+		t.Fatalf("the fourth: %d players, %+v", b.Players, b.Mine)
+	}
+	boardStale = 0
+	b, _ = w.g.BoardOf(ctx, today, four)
+	check("as the fourth sees it, counted", b.Top, b.Place, 4, []int64{nine, slow, quick, four}, []int{1, 2, 2, 4})
+
+	f, err := w.g.FriendsBoard(ctx, today, nine)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("the friends' board, as Nine sees it", f, 0, 0, []int64{nine, slow, quick, four}, []int{1, 2, 2, 4})
+	w.befriend(slow, quick)
+	f, _ = w.g.FriendsBoard(ctx, today, quick)
+	check("the friends' board, as Quick sees it", f, 0, 0, []int64{nine, quick, slow}, []int{1, 2, 2})
+	list, err := w.g.FriendsOf(ctx, nine)
+	if err != nil || len(list) != 3 || list[2].ID != four {
+		t.Fatalf("Nine's friends: %+v %v", list, err)
 	}
 }
 

@@ -20,8 +20,8 @@ import { missing } from "./missing.ts";
 import { nameFirst } from "./name.ts";
 import { signIn } from "./signin.ts";
 
-/** How one question of a duel went for one side: right, or close (not right), how long it took, and whether nothing
- * was given. */
+/** How one question of a duel went for one side: right, or close (not right), when it was answered (a recording's
+ * answer shows at its time), and whether nothing was given. */
 export interface DuelMark {
   right: boolean;
   close?: boolean;
@@ -33,7 +33,6 @@ export interface Side {
   name: string;
   tag?: string;
   rights: number;
-  ms: number;
   done: boolean;
   /** Whether the side has answered a question yet: a duel sent first may be made and never begun. */
   started?: boolean;
@@ -69,8 +68,8 @@ export interface DuelView {
   /** One duel's view: the question (from 1) after which the winner led to the end (none: the right answers were
    * even). */
   decided?: number;
-  /** One duel's view, of a result on even right answers: what broke the tie (play.DuelView.TieBy). */
-  tieBy?: "number" | "time";
+  /** One duel's view, of one won on even right answers: what broke the tie (play.DuelView.TieBy), the number nearer. */
+  tieBy?: "number";
   record?: { won: number; lost: number; drawn: number };
   /** The other is a friend now (`them`, their id): a rematch is a tap away. */
   friend?: boolean;
@@ -117,21 +116,12 @@ export async function startDuel(to: To): Promise<DuelView | null> {
 }
 
 /** What broke a tie on even right answers (DuelView.tieBy), as a duel's row and its result say it: „равен брой верни ·
- * реши по-близкото число“, „равен брой верни · по-бързо отговаря Иво: 34,5 с срещу твоите 40,1 с“ (who was quicker, by name); a draw, „равен брой верни и под секунда разлика“; "" for a
- * duel won on right answers, or none ended. */
+ * реши по-близкото число“, the only thing that breaks one (time never counts: even in both, it's „Равенство“, with
+ * nothing more to say); "" for a duel won on right answers, a draw, or none ended. */
 export function tieWords(d: DuelView): string {
-  if (d.state === "draw") return "равен брой верни и под секунда разлика";
   if (d.state !== "won" && d.state !== "lost") return "";
-  if (d.tieBy === "number") return "равен брой верни ·\u00a0реши по-близкото число";
-  if (d.tieBy === "time" && d.you && d.opponent)
-    return d.state === "won"
-      ? `равен брой верни ·\u00a0по-бързо отговаряш ти: ${seconds(d.you.ms)} срещу ${seconds(d.opponent.ms)} на ${d.opponent.name}`
-      : `равен брой верни ·\u00a0по-бързо отговаря ${d.opponent.name}: ${seconds(d.opponent.ms)} срещу твоите ${seconds(d.you.ms)}`;
-  return "";
+  return d.tieBy === "number" ? "равен брой верни ·\u00a0реши по-близкото число" : "";
 }
-
-/** Seconds, the Bulgarian way: „34,5 с“. */
-const seconds = (ms: number) => `${(ms / 1000).toLocaleString("bg", { maximumFractionDigits: 1 })} с`;
 
 /** What a duel's end is called. */
 const ends: Record<DuelView["state"], string> = {
