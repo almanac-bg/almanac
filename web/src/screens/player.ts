@@ -1,8 +1,9 @@
 // Another player's profile, by their tag (/players/tag), laid out as Профил is (screens/me.ts: one column, on a big
 // screen too): the same head (their avatar with the seal they wear on its corner, their name and tag, and since when
-// they play), how you stand with them where Профил has the streak (friends and a duel a tap away, ask to be friends,
-// or answer their asking), and the same „Печати“ (ui.ts: profileHead, sealsSection). Nothing that's only theirs
-// (play/profile.go: no streak, no lifetime totals), and nothing that's only one's own (Смени, Настройки).
+// they play), with their streak as it is now by the tag (never an ended one's), how you stand with them under it
+// (friends and a duel a tap away, ask to be friends, or answer their asking), and the same „Печати“ (ui.ts:
+// profileHead, sealsSection). Nothing that's only theirs (play/profile.go: no week's forgiving, no lifetime totals), and
+// nothing that's only one's own (Смени, Настройки). One's own, opened by its tag, is simply the page as others see it.
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -36,6 +37,8 @@ interface Profile {
   since: number;
   seal?: { chapter: string; level: number };
   ranks: ChapterRank[];
+  // The streak as it is now (none: none runs).
+  streak?: number;
   friend?: "yes" | "asked" | "asks";
   request?: number;
   record?: { won: number; lost: number; drawn: number };
@@ -95,16 +98,16 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
         nameWords(p.name),
         p.tag,
         h("span", { class: "muted" }, `Играе от ${month(p.since)}`),
+        () => p.streak,
       ),
-      relation(p, load),
+      p.me ? null : relation(p, load),
       sealsSection(p.ranks, h("p", { class: "seal-worn" }, "Още няма печат.")),
     );
   });
 }
 
-/** How the viewer stands with them, where Профил has the streak: as friends, the duels between the two so far and a
- * duel a tap away; else ask to be friends, or answer their asking. One's own page, as others see it: the way back to
- * Профил. */
+/** How the viewer stands with them, under the head: as friends, the duels between the two so far and a duel a tap
+ * away; else ask to be friends, or answer their asking. */
 function relation(p: Profile, reload: () => Promise<unknown>): Child {
   const busy = signal(false);
   const note = signal<{ text: string; bad?: boolean } | null>(null);
@@ -127,14 +130,7 @@ function relation(p: Profile, reload: () => Promise<unknown>): Child {
     );
 
   let body: Child;
-  if (p.me) {
-    body = h(
-      "p",
-      { class: "player-relation muted" },
-      "Така те виждат другите. ",
-      h("a", { href: "/me" }, "Към твоя профил"),
-    );
-  } else if (p.friend === "yes") {
+  if (p.friend === "yes") {
     const r = p.record ?? { won: 0, lost: 0, drawn: 0 };
     const played = r.won + r.lost + r.drawn;
     const id = p.id;

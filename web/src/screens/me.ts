@@ -1,9 +1,10 @@
 // Профил: who you are in the game, in its budget's order (DESIGN.md, Places): your avatar with the seal you wear on its
-// corner (a tap on it, or „Смени“ under it, opens the animals on a sheet: screens/avatar.ts), your name and tag; the
-// streak as it is now; your seals, one list, a row a chapter with its rank, its progress to the next and its ink (the
+// corner (a tap on it, or „Смени“ under it, opens the animals on a sheet: screens/avatar.ts), your name and tag with the
+// streak as it is now by it; your seals, one list, a row a chapter with its rank, its progress to the next and its ink (the
 // one worn is the best: never chosen); and Настройки, last. One column, on a big screen too. A guest is asked to keep
 // their game, and the way in for a profile from elsewhere is apart from it (the sign-in page: screens/signin.ts,
-// signInPage). Nobody on this device yet: that page instead. No lifetime totals.
+// signInPage). Nobody on this device yet: that page instead. No lifetime totals. No way to the page as others see it
+// (/players/<tag>): it is this one without what's one's own (Смени, Настройки, the week's forgiving on the streak).
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -25,13 +26,10 @@ let {
   avatar,
   look,
   failure,
-  profileHref,
   keepGame,
   loadStats,
-  formatNumber,
   profileHead,
   sealsSection,
-  illustration,
 } = {} as Kit;
 
 export function me(kit: Kit) {
@@ -48,13 +46,10 @@ export function me(kit: Kit) {
     avatar,
     look,
     failure,
-    profileHref,
     keepGame,
     loadStats,
-    formatNumber,
     profileHead,
     sealsSection,
-    illustration,
   } = kit);
   title("Профил");
   // Nobody on this device yet: nothing of theirs to show, the way in instead (screens/signin.ts, signInPage).
@@ -94,13 +89,10 @@ export function me(kit: Kit) {
             said ? h("p", { class: "muted", role: "status" }, said) : null,
             head(data, pick),
             () => (failed() && !data() ? failure(failed(), () => go("/me", true)) : null),
-            // A guest keeps their game with an email, or signs in to a profile they have elsewhere, and sees how others
-            // see them: one line of ways (not four loose ones before anything else). Either way in, Профил again, as
-            // the profile has it.
-            () => (user()?.email ? null : keepGame(() => go("/me", true), theirView(user()?.tag))),
-            () => streakNow(data()),
+            // A guest keeps their game with an email, or signs in to a profile they have elsewhere: one line of ways
+            // (not loose ones before anything else). Either way in, Профил again, as the profile has it.
+            () => (user()?.email ? null : keepGame(() => go("/me", true))),
             () => seals(ranks(), data()),
-            () => (user()?.email && user()?.tag ? h("p", { class: "me-links" }, theirView(user()?.tag)) : null),
           ),
           h(
             "div",
@@ -126,14 +118,10 @@ export function me(kit: Kit) {
   );
 }
 
-/** The way to the player's page as others see it (`/players/<tag>`); nothing without a tag. */
-function theirView(tag: string | undefined): Child {
-  return tag ? h("a", { class: "link muted", href: profileHref(tag) }, "Как те виждат другите") : null;
-}
-
 /** Who you are: your avatar as you wear it, the seal you wear on its corner, and „Смени“ under it (it, or a tap on the
- * avatar, opens the animals: `pick`); your name and tag; a name still the one drawn says so, with the way to change
- * it. The same head as another's page (ui.ts, profileHead). */
+ * avatar, opens the animals: `pick`); your name and tag, the streak as it is now by it; a name still the one drawn
+ * says so, with the way to change it. The same head as another's page (ui.ts, profileHead), but for what the week
+ * forgives: yours, on the streak for a pointer resting on it. */
 function head(data: () => Stats | null, pick: () => void): Child {
   return profileHead(
     // One button, the avatar and its word: the whole of it a tap.
@@ -149,37 +137,17 @@ function head(data: () => Stats | null, pick: () => void): Child {
       user()?.drawn ? "Това име е избрано наслуки. " : null,
       h("a", { class: "link", href: "/settings#name" }, "Смени името"),
     ],
+    () => data()?.streak,
+    () => forgives(data()),
   );
 }
 
-/** The streak as it is now: its number and words, the flame by it (never the longest: an ended streak's number is
- * never named, DECISIONS.md); under it, what the week forgives (that it has forgiven all it can, only while a streak
- * runs). Nothing while there's none. */
-function streakNow(s: Stats | null): Child {
-  if (!s?.streak) return null;
-  return [
-    h(
-      "div",
-      { class: "streak-chip me-streak" },
-      illustration("flame", "streak-flame"),
-      h("b", { class: "status-n" }, formatNumber(s.streak)),
-      h(
-        "span",
-        { class: "status-text" },
-        h("span", { class: "status-label" }, s.streak === 1 ? "ден в серията" : "дни в серията"),
-      ),
-    ),
-    // The week's forgiving used up says something only of a streak that's running.
-    s.spare || s.streak > 0
-      ? h(
-          "p",
-          { class: "small muted me-forgives" },
-          s.spare
-            ? "До два пропуснати дни в седмицата не прекъсват серията."
-            : "Тази седмица простените дни са използвани: следващият пропуснат ден прекъсва серията.",
-        )
-      : null,
-  ];
+/** What the week forgives, while a streak runs: two days missed, or that it has forgiven all it can. */
+function forgives(s: Stats | null): string | undefined {
+  if (!s?.streak) return undefined;
+  return s.spare
+    ? "До два пропуснати дни в седмицата не прекъсват серията."
+    : "Тази седмица простените дни са използвани: следващият пропуснат ден прекъсва серията.";
 }
 
 /** The seals, as another's page has them (ui.ts, sealsSection): a row a chapter with a rank, its ink as the book has it

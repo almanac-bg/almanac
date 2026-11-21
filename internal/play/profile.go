@@ -10,11 +10,12 @@ import (
 )
 
 // A profile is a player as anyone may see them, found by their tag: how they look, the seal they wear, their ranks by
-// chapter (rank.go: kept as each day's issue finishes, never as they play) (DECISIONS.md, „The direction“). No
-// streak (the longest would name an ended one's number), no lifetime totals, and nothing of how well they know a topic
-// (mastery is the game's own). What only they see stays theirs: their games one by one, their Алманах, their email, their friends.
-// Its time is a date, the month they started, never the moment (review 2026-11-18, S12). The privacy page says what
-// it shows; the server limits how many anyone looks at (server.profileOf).
+// chapter (rank.go: kept as each day's issue finishes, never as they play) (DECISIONS.md, „The direction“), and their
+// streak as it is now (runs.go: its days, nothing more): never an ended one's, nor the longest (an ended streak's
+// number is never named), nor what their week has forgiven (theirs). No lifetime totals, and nothing of how well they
+// know a topic (mastery is the game's own). What only they see stays theirs: their games one by one, their Алманах,
+// their email, their friends. Its time is a date, the month they started, never the moment (review 2026-11-18, S12).
+// The privacy page says what it shows; the server limits how many anyone looks at (server.profileOf).
 
 // Profile is a player as another sees them, and how the viewer stands with them.
 type Profile struct {
@@ -29,6 +30,8 @@ type Profile struct {
 	// only its chapter and level. Ranks their ranks in the bank's chapters.
 	Seal  *Seal         `json:"seal,omitempty"`
 	Ranks []ChapterRank `json:"ranks"`
+	// Streak is their streak's days as it is now (StreakNow.Days): none while there's none.
+	Streak int `json:"streak,omitempty"`
 	// Friend is how the viewer stands with them: "yes" (friends), "asked" (the viewer asked them), "asks" (they
 	// asked the viewer), or "" (none of these, or no viewer). Request is the request's id, while one waits.
 	Friend  string `json:"friend,omitempty"`
@@ -81,6 +84,9 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 	}
 	p.Seal = sealOf(p.Ranks)
 	p.Since = monthOnly(p.Since)
+	if p.Streak, err = g.Streak(ctx, id); err != nil {
+		return p, err
+	}
 	if viewer == 0 || p.Me {
 		return p, nil
 	}

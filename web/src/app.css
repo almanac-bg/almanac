@@ -4312,9 +4312,9 @@
     --size: 72px;
   }
 
-  /* ---- Профил: the avatar with the seal worn, the name; the streak now; the seals; Настройки (the avatars on a
-     sheet: screens/avatar.ts). A player's page is laid out the same (.screen.me): the head, how you stand with them
-     where the streak is, the seals ---- */
+  /* ---- Профил: the avatar with the seal worn, the name, the tag and the streak now; the seals; Настройки (the avatars on a
+     sheet: screens/avatar.ts). A player's page is laid out the same (.screen.me): the head, how you stand with them,
+     the seals ---- */
 
   .me-intro,
   .me-side {
@@ -4399,6 +4399,37 @@
     font: 700 1rem / 1.2 var(--font-sans);
   }
 
+  /* The @username and, by it, the streak as it is now: the flame, the number heavy, the words in the tag's size; the
+     streak goes under the tag where they don't fit, never broken. */
+  .me-ids {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 14px;
+    margin: 0;
+  }
+
+  .me-streak {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--ink-2);
+    font: 700 1rem / 1.2 var(--font-sans);
+    white-space: nowrap;
+  }
+
+  .me-streak .num {
+    color: var(--ink);
+    font: 900 1.125rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .me-streak-flame {
+    --tone: var(--t-sports);
+    width: 22px;
+    height: 22px;
+  }
+
   /* The head's quiet line under the tag: on Профил the way to change the name, on a player's page since when they
      play. */
   .me-line {
@@ -4406,8 +4437,8 @@
     font: 600 0.9375rem / 1.4 var(--font-sans);
   }
 
-  /* How you stand with a player, on their page where Профил has the streak, in the streak's card (.streak-chip): the
-     words on a line, the buttons under them. */
+  /* How you stand with a player, on their page under the head, on a card: the words on a line, the buttons under
+     them. */
   .player-actions {
     display: flex;
     flex-wrap: wrap;
@@ -4421,12 +4452,6 @@
   .player-actions > p {
     flex: 1 1 100%;
     margin: 0;
-  }
-
-  .me-links {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2) var(--space-5);
   }
 
   /* The seals (ui.ts, sealList): one list on a card, a row a chapter between hairlines: the seal; the chapter's name,
