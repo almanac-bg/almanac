@@ -1,7 +1,7 @@
 ---
 name: fix-questions
 description: Fix questions already in АЛМАНАХ's bank by what `almanac bank lint` flags or a rule asks to judge again — a fixer and an independent checker per chunk on pinned models, then `bank add` (all of it or nothing), the report, the commit and the questions live. Run as /fix-questions [rules] [judge] [categories]; for a rule change, add the rule's check first, then run this.
-argument-hint: "[rules: all|giveaway,stale,…] [judge: false-fact,easy-picture,blind,signals,days] [categories]"
+argument-hint: "[rules: all|giveaway,stale,…] [judge: false-fact,easy-picture,blind,signals] [categories]"
 disable-model-invocation: true
 model: opus
 effort: high
@@ -32,25 +32,6 @@ any rule:
 2. `Workflow({scriptPath: "<skill>/blind.js", args: {sheets: [1, …, n], work, skill}})`; resume if `done: false`.
 3. `python3 -I <skill>/blind.py compare <bank> <work>` writes `<work>/blind/disagree.json`; then the steps below
    from 3, with `--judge blind` (what lint flags joins in).
-
-## The pre-check
-
-Every week (a session's job; the questions skill's „The weekly pre-check“), the issues of the next 14–30 days are
-read before players meet them, and fixed the same way:
-
-1. From the server, as `bank used` below: `bank days -n 30 -json > <work>/days.json` (the days and their question ids
-   only) and `bank days -n 30 > <work>/days.txt` (each issue whole, with what lint finds and the subjects that come
-   back within a week: read it first, for what a question alone can't show).
-2. The steps below from 3 with `--judge days` (what lint flags about the days' questions joins in): each question of those days is judged whole
-   by the questions skill, as FIX.md's **judge: days** says. A fix changes the question in place, so its day keeps it;
-   one retired leaves its day, which the server draws again.
-3. **Keep the month that was read.** The server draws every day after tomorrow again when the live questions that
-   are dated or about Bulgaria change (`play.Ahead`'s rules hash `bank.Tail.On` and `BG`): a pre-check that retires,
-   adds or re-labels one of them throws away the month it read and deals one nobody read (21 Nov 2026: 243 of the 300
-   questions came new). So a pre-check changes such a question only in place, its `on` and `bg` as they were, and
-   replaces only a question with neither, by one with neither; `merge.py` stops on a batch that breaks it (exit 1, before
-   it writes anything; `--redraw-days` only when the days are meant to be drawn again). After
-   `almanac-bank`, fetch `bank days -n 30` again and check that the days are the ones judged.
 
 ## The upkeep
 

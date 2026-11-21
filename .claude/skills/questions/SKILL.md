@@ -25,13 +25,6 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
   - `almanac bank used`, on the server, prints the question ids the days have had (played and drawn ahead) and the
     last day drawn, nothing of a player's; fetch it into a file for `-used` (the `new-questions` skill shows the ssh
     line);
-  - `almanac bank days [-n 30] [-from YYYY-MM-DD] [-json]`, on the server, prints the issues to come: the next N days'
-    tens as the game has drawn them (`play.Ahead`, 90 days ahead), each question with its answer, options, fact, what
-    lint finds and a subject that came back within a week. It only reads the database (`-json`: the days and their ids
-    alone, for a work list). Run it as the game's user with its settings, as `bank used`:
-    `ssh -i ~/.ssh/hetzner -o BatchMode=yes root@2.31.121.12 systemd-run --pipe --wait -p User=almanac -p
-    EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac bank days -n 30 > <work>/days.txt` (it reads the bank the
-    game plays, `BANK_DIR`); it is what the weekly pre-check reads (below);
   - `go run ./cmd/almanac bank plan [-n N] [-json] [-used file] private` plans a batch of N a topic: the cells to
     write (the day's shortest runway first, at most a third of the batch in one place), how many about Bulgaria (30%,
     per cell: `bg`), the dates with the fewest questions left, the ids and the subjects to avoid;
@@ -337,16 +330,6 @@ shows with the answer, over the fact: the player learns why the day. (The owner'
   questions about Bulgaria on its own theme, two or three of them (`bank check` fails while one has none). A date's
   questions prefer a story with a Bulgarian or a human angle to a template („Коя държава празнува на … ?“, „Какво
   отбелязва ООН на …?“): templates stay under a tenth of the dated questions, and never a national day's.
-
-## The weekly pre-check
-
-The days are drawn 90 days ahead, so every issue can be read before anyone plays it. Once a week (a session's job,
-never the owner's), the next 14–30 days are read and fixed through `/fix-questions` with `--judge days` (its „The
-pre-check“): `bank days -n 30 -json` from the server gives the work list, `bank days -n 30` the issues to read whole.
-Each question is judged by everything above, not only what lint finds: a wrong or stale answer or fact, a truism among
-the easy true-or-not, a closing number without its anchor, a twin or a subject again within the week, a question
-filed under the wrong topic. A fix changes the question in place, so its day keeps it; a retired one leaves its day,
-which the server draws again.
 
 ## Pictures
 

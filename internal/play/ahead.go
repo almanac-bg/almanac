@@ -323,39 +323,6 @@ func (g *Game) DaysUsed(ctx context.Context) (Used, error) {
 	return used, err
 }
 
-// Drawn is a day's ten as drawn: its date, and its questions in the day's order.
-type Drawn struct {
-	Day   string `json:"day"`
-	Picks []Pick `json:"picks"`
-}
-
-// DaysDrawn are the days stored from `from` on, n of them at most, in order: the issues to come, as `almanac bank
-// days` prints them for a review before they go live. Question ids and days, nothing of a player's. With them, the
-// Recent days before `from`, so that a review can tell a subject that comes back within a week (recentSubjects).
-func (g *Game) DaysDrawn(ctx context.Context, from string, n int) (before, days []Drawn, err error) {
-	tx, err := g.DB.Read.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
-	if err != nil {
-		return nil, nil, err
-	}
-	defer tx.Rollback() //nolint:errcheck // a read: nothing to keep
-	d, err := time.Parse(time.DateOnly, from)
-	if err != nil {
-		return nil, nil, err
-	}
-	stored, err := storedDays(tx, d.AddDate(0, 0, -Recent).Format(time.DateOnly))
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, day := range slices.Sorted(maps.Keys(stored)) {
-		if day < from {
-			before = append(before, Drawn{day, stored[day]})
-		} else if len(days) < n {
-			days = append(days, Drawn{day, stored[day]})
-		}
-	}
-	return before, days, nil
-}
-
 // drawnBy names what the days ahead were drawn by: the rules, and the bank's dated and Bulgarian questions.
 func drawnBy(b *bank.Bank) string {
 	var tagged []string

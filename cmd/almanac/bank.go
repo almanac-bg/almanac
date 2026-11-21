@@ -33,8 +33,6 @@ func bankCommand(args []string) error {
 		return bankCheck(rest)
 	case "used":
 		return bankUsed()
-	case "days":
-		return bankDays(rest)
 	case "fmt":
 		return bankFmt(dir())
 	case "lint":
