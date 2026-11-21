@@ -81,9 +81,9 @@ func (s *Server) logged(next http.Handler) http.Handler {
 
 // polled are the routes a page asks every so often while it's open (or a monitor does): logged only when they fail.
 var polled = map[string]bool{
-	"GET /api/health":           true,
-	"GET /api/friends":          true,
-	"GET /api/friends/news":     true,
+	"GET /api/health":       true,
+	"GET /api/friends":      true,
+	"GET /api/friends/news": true,
 }
 
 // route is a request as the log names it: the pattern it matched, without its method; or, for a page (and whatever
