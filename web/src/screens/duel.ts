@@ -15,7 +15,7 @@ import { type Child, effect, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { backOut, byTap, go, hold, title } from "../lib/router.ts";
 import { leftWords, withWord } from "../lib/words.ts";
 import { player, topics, user } from "../state.ts";
-import { back, failure, formatNumber, type Look, pageArt, who } from "../ui.ts";
+import { back, failure, formatNumber, type Look, who } from "../ui.ts";
 import { missing } from "./missing.ts";
 import { nameFirst } from "./name.ts";
 import { signIn } from "./signin.ts";
@@ -304,7 +304,6 @@ export function duelNew() {
       "div",
       { class: "intro" },
       back("/friends", "Приятели"),
-      pageArt("duel", "tone-rose"),
       h("h1", null, "Нов дуел"),
       h("p", { class: "lead" }, "Десет въпроса. Ти ги играеш сега, а приятелят ти — когато може."),
     ),
