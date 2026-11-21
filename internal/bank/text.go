@@ -138,12 +138,13 @@ func outsideQuotes(s string) string {
 // lintBank is the live bank as the rules over it read it: the questions, and how common each stem is (a stem most
 // questions have, like „година“, says little when two questions share it).
 type lintBank struct {
+	bank *Bank
 	live []Question
 	df   map[string]int
 }
 
 func newLintBank(b *Bank) *lintBank {
-	l := &lintBank{live: b.Live("", ""), df: map[string]int{}}
+	l := &lintBank{bank: b, live: b.Live("", ""), df: map[string]int{}}
 	for _, q := range l.live {
 		for s := range stemSet(append(q.words(), q.Extra().Fact, q.Extra().Day)...) {
 			l.df[s]++

@@ -390,7 +390,9 @@ to show it whole; nothing over the question.
   screen's width or height. One-column grids are `minmax(0, 1fr)`; a row of things wraps. `lib/prefs.ts` puts `tight`
   and `tighter` on `<html>` when the column holds few words, and rows give way to columns there. With `tighter`, an
   order's or pairs' line on how to answer is read, not shown (the first rows show over „Готово“), and the answer's
-  panel, under the answers, opens with its verdict and the fact's first line in sight. A media query's rem
+  panel, under the answers, opens with its verdict and the fact's first line in sight, the head's foot between two
+  parts, the fact's next lines fading out over „Напред“ (where the verdict and what it says leave no room for that
+  line, the fact is whole under „Напред“, a scroll away). A media query's rem
   is the browser's own size, so a short screen is a phone on its side only with `(orientation: landscape)` too.
   `e2e/layout.spec.ts` holds it at every size above.
 

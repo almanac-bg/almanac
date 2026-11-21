@@ -976,7 +976,6 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
   const sheet = page.querySelector(":scope > .q-leaf")?.getBoundingClientRect();
   const beside = !docked && !!sheet && after.getBoundingClientRect().left >= sheet.right;
   const ask = page.querySelector(".ask") ?? key;
-  const go = after.querySelector<HTMLElement>(".up-next-go");
   // What has to show of the panel, its foot as it's laid out, not as it's drawn coming in (app.css: .after > *,
   // enter): the fact's first line, or without a fact the verdict.
   const verdict = after.firstElementChild instanceof HTMLElement ? after.firstElementChild : after;
@@ -1008,6 +1007,8 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
     const under = footing && footing.offsetTop >= verdictFoot ? footing.offsetHeight : 0;
     return Math.ceil(told + under + 8);
   };
+  // Whether the verdict, what it says and the fact's first line fit between the head and „Напред“ (by says).
+  let fits = true;
   const by = (headFoot: number) => {
     const box = docked || beside ? keyBox() : after.getBoundingClientRect();
     // Docked under a choice: the page moves only if its rows wouldn't fit over the panel even at its floor.
@@ -1023,14 +1024,18 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
       const top = room(box.top);
       return over > 0 ? Math.max(0, right ? Math.min(over, top) : over) : Math.min(0, Math.max(top, over));
     }
-    // (Never so far that the verdict's own top goes under the head: with large text, all of it doesn't fit.)
-    const least = docked
-      ? 0
-      : Math.min(
-          told() - (foot - (go ? go.offsetHeight + 12 : 0)),
-          room(after.getBoundingClientRect().top + laid(verdict) - laid(after)),
-        );
-    if (below > 0) return Math.max(0, least, Math.min(below, above));
+    // Under the answers, „Напред“ stays at the screen's foot over what scrolls under it (app.css, .after-foot, its
+    // fade with it): the fact's first line whole over it. Never so far that the verdict's own top goes under the
+    // head: where the verdict and what it says leave no room for that line (large text), the fact goes whole under
+    // „Напред“, a scroll away, never cut.
+    const verdictRoom = room(after.getBoundingClientRect().top + laid(verdict) - laid(after));
+    const footTop = innerHeight - (footing?.offsetHeight ?? 0);
+    const factTop = fact?.parentElement
+      ? after.getBoundingClientRect().top + laid(fact.parentElement) - laid(after) - footTop
+      : verdictRoom;
+    fits = docked || told() - footTop <= verdictRoom;
+    const least = docked ? 0 : fits ? told() - footTop : Math.min(verdictRoom, factTop);
+    if (below > 0) return fits ? Math.max(0, least, Math.min(below, above)) : Math.max(0, least);
     return above < 0 ? Math.max(above, below) : 0;
   };
   const most = Math.max(0, document.documentElement.scrollHeight - innerHeight);
@@ -1046,17 +1051,23 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
   head.stick(head.stuckAt(y - was));
   if (y !== was) scrollTo({ top: y, behavior: "instant" });
   // Moved, the head's foot falls between two parts, never across one: what it would cut there (the sheet's foot, the
-  // picture's, a row above the right answer) goes whole under it, not a scrap of it left in sight.
+  // picture's, a row above the right answer) goes whole under it, not a scrap of it left in sight; or, where the page
+  // can't move further without cutting the fact under „Напред“ (it didn't fit), comes back whole from under it.
   if (y > was) {
     const foot = head.node.getBoundingClientRect().bottom;
     const top = keyBox().top;
     let cut = 0;
+    // (Under the answers, the panel first: the right answer itself goes whole under the head too.)
     for (const el of page.querySelectorAll(
-      ":scope > .q-leaf, :scope > .picture, .answering :is(.hint, .options > *, .clues > *, .clues-next)",
+      ":scope > .q-leaf, :scope > .picture, .answering :is(.hint, .option, .options > *, .clues > *, .clues-next)",
     )) {
       const r = el.getBoundingClientRect();
-      if (r.height && r.bottom <= top + 1 && r.top < foot - 1 && r.bottom > foot + 1)
-        cut = Math.max(cut, r.bottom - foot);
+      if (r.height && (r.bottom <= top + 1 || !(docked || beside)) && r.top < foot - 1 && r.bottom > foot + 1)
+        cut = fits ? Math.max(cut, r.bottom - foot) : Math.min(cut, r.top - foot);
+    }
+    if (cut < 0) {
+      y = Math.max(0, y + Math.floor(cut));
+      scrollTo({ top: y, behavior: "instant" });
     }
     if (cut > 0) {
       // The page a little longer where it ends short of that (app.css, --past): the room under the answers.

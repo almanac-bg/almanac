@@ -97,15 +97,22 @@ func (b *Bank) Estimate(q Question) bool {
 	return Countable(q) == "" || b.waived[[2]string{n.ID, "countable"}]
 }
 
-// ruleClosing (a hint): a hard number is written for the day's last place, which takes only an Estimate, so one whose
-// answer is EstimateFrom or less (6,5 on a step of 0,1 is an estimate, but never closes a day) fills no day's place.
-func ruleClosing(q Question) []string {
-	n, ok := q.(*Number)
-	if !ok || n.Difficulty != Hard || n.IsYear() || math.Abs(n.Answer) > EstimateFrom {
-		return nil
+// ruleClosing (a hint): a hard number is written for the day's last place, which takes only an Estimate (Bank.Estimate
+// itself: a quantity with a unit, over EstimateFrom, not counting a list unless waived), so a hard one that isn't
+// (6,5 on a step of 0,1 is an estimate, but never closes a day) fills no day's place. A year is the day's choice of
+// a date, not its close.
+func ruleClosing(l *lintBank) []finding {
+	var out []finding
+	for _, q := range l.live {
+		n, ok := q.(*Number)
+		if !ok || n.Difficulty != Hard || n.IsYear() || l.bank.Estimate(q) {
+			continue
+		}
+		out = append(out, finding{ids: []string{n.ID}, msg: fmt.Sprintf("a hard number closes the day only as an "+
+			"estimate (Bank.Estimate): a quantity with a unit, over %d, not a count of a list; say it in a smaller "+
+			"unit (650 мм, not 0,65 м), or ask it at another difficulty", EstimateFrom)})
 	}
-	return []string{fmt.Sprintf("a hard number closes the day only above %d (Bank.Estimate): say it in a smaller unit "+
-		"(650 мм, not 0,65 м), or ask it at another difficulty", EstimateFrom)}
+	return out
 }
 
 // OffsetScale is whether a number's scale has no zero of its own (a temperature in °C, an angle or a latitude in

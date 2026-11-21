@@ -94,7 +94,8 @@ test("an invite link: sent, opened by a stranger, the day played, and friends bo
 });
 
 // A tap kept for the first game outlasts the server down for a moment as that game ends: kept on the device, and
-// taken as the page is opened again. A profile deleted takes its kept tap with it.
+// taken as the page is opened again (at the link, in its card, the way to Приятели with it). A profile deleted takes
+// its kept tap with it.
 test("a kept tap: kept through a server error at the game's end and taken on a reload, gone with the profile", async ({
   browser,
 }) => {
@@ -133,6 +134,27 @@ test("a kept tap: kept through a server error at the game's end and taken on a r
   await expect(bo.locator(".invite-card")).toHaveCount(0);
   await expect(bo).toHaveURL(/\/$/);
   expect(await kept(bo)).toBeNull();
+
+  // Di's first game is a chapter's, as the server is down for a moment; the link opened again, Днес not played yet:
+  // the card takes the kept tap and says they're friends, the way to Приятели with it.
+  const di = await (await browser.newContext()).newPage();
+  await di.route(`**/api/invites/${code}`, (r) =>
+    r.request().method() === "POST"
+      ? r.fulfill({ status: 503, json: { error: "busy", message: "Сървърът е зает. Опитай пак." } })
+      : r.continue(),
+  );
+  await di.goto(link);
+  await di.locator(".invite-card").getByRole("button", { name: "Добави като приятел" }).click();
+  await expect(di.locator(".invite-card")).toContainText("Първо изиграй днешния брой.");
+  await openGame(di, "/play/music");
+  await playRun(di);
+  expect(await kept(di)).toContain(code);
+  await di.unroute(`**/api/invites/${code}`);
+  await di.goto(link);
+  const dis = di.locator(".invite-card");
+  await expect(dis).toContainText("Вече сте приятели");
+  await expect(dis.getByRole("link", { name: "Към Приятели" })).toBeVisible();
+  expect(await kept(di)).toBeNull();
 
   // Cy has a profile, but no game finished: the tap waits for it; her profile deleted, it goes with it.
   const cy = await (await browser.newContext()).newPage();

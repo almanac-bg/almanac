@@ -1414,6 +1414,12 @@
     --seal-outline: transparent;
   }
 
+  /* The glyph, an <svg> inside the seal's, kept to its own box: every picture is drawn inside its 64 × 64, and
+     Firefox measures a nested <svg> that may overflow as far wider than it paints (past a card's edge). */
+  .seal .pic {
+    overflow: hidden;
+  }
+
   .seal .f-vivid {
     fill: var(--tv);
   }
@@ -8310,7 +8316,7 @@
      would leave no room for the right answer (a whole order) and its fact both. The page scrolls to it (run.ts,
      settle), „Напред“ at the screen's foot meanwhile. */
   .tighter .run-question {
-    padding-bottom: 0;
+    padding-bottom: var(--past, 0px);
   }
 
   .tighter .run-question .after {
@@ -8323,11 +8329,16 @@
     border-radius: var(--r-1);
   }
 
-  /* „Напред“ at the screen's foot meanwhile, on its foot of the panel's colour. */
+  /* „Напред“ at the screen's foot meanwhile, on its foot of the panel's colour, what scrolls under it fading out
+     over it (run.ts, settle: the fact's first line lands whole over the fade). At the panel's end the fade is the
+     room between the fact and „Напред“. */
   .tighter .run-question .after-foot {
     bottom: 0;
+    margin-top: calc(-1 * var(--space-3));
     margin-bottom: calc(-1 * var(--space-4));
+    padding-top: 28px;
     padding-bottom: var(--space-4);
+    background: linear-gradient(to bottom, transparent, var(--surface) 28px);
   }
 
   /* A result's plain buttons keep their words on one line while they can, then wrap them. */
