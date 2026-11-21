@@ -76,6 +76,9 @@ class FakeAudio {
   }
 }
 (globalThis as { AudioContext?: unknown }).AudioContext = FakeAudio;
+// Whether the page is being touched right now (the browser's navigator.userActivation): not yet, as a page opens.
+const touch = { isActive: false };
+Object.defineProperty(globalThis.navigator, "userActivation", { value: touch, configurable: true });
 
 const { loadFeel, play, playAnswer, playCount, setSound } = await import("./sound.ts");
 await loadFeel(); // in the game, the first touch sends for the voices
@@ -85,6 +88,17 @@ beforeEach(() => {
   tones.length = 0;
   // Each test starts a while after the last, so nothing of it is still sounding.
   if (FakeAudio.last) FakeAudio.last.currentTime += 60;
+});
+
+// Making the audio takes a phone a long moment: nothing is made for a sound asked for before any touch (a friend's duel
+// waiting, as the page opens), when it couldn't sound anyway.
+test("no audio is made before the page is touched", () => {
+  play("ping");
+  playCount(3);
+  assert.equal(FakeAudio.last, undefined);
+  touch.isActive = true; // and from here on, the player plays
+  play("tap");
+  assert.ok(FakeAudio.last);
 });
 
 const near = (a: number, b: number) => Math.abs(a - b) < 0.5;
@@ -167,7 +181,9 @@ test("nothing plays with sounds off, or before the page is touched", () => {
   setSound(true);
   tones.length = 0;
   FakeAudio.last.state = "suspended";
+  touch.isActive = false;
   play("tap");
   assert.equal(tones.length, 0, "the audio waits for a touch");
+  touch.isActive = true;
   FakeAudio.last.state = "running";
 });

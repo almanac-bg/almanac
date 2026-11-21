@@ -136,6 +136,14 @@ export function prepareSound(): void {
   };
   for (const event of ["touchend", "click", "keydown"])
     addEventListener(event, start, { capture: true, passive: true });
+  // Making the audio takes a phone a long moment (a tenth of a second on a slow one): made as the finger goes down,
+  // while it's still on the glass, so that the tap's own screen doesn't wait for it as the finger lifts. Started only
+  // then (start), as an iPhone allows.
+  const ready = () => {
+    if (soundOn.peek()) context();
+  };
+  for (const event of ["touchstart", "pointerdown"])
+    addEventListener(event, ready, { capture: true, passive: true, once: true });
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState !== "visible" || !audio || audio.state === "closed") return;
     const c = audio;
@@ -154,6 +162,8 @@ export function play(name: SoundName, lift = 0): void {
 /** A sound (play's). */
 export function voice(name: SoundName, lift = 0): void {
   if (!soundOn.peek()) return;
+  // Before any touch nothing could sound: no audio is made for it (a page's news as it opens, a friend's duel waiting).
+  if (!audio && !touchedNow()) return;
   const c = context();
   if (!c) return;
   if (c.state !== "running") {
