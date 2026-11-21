@@ -133,7 +133,7 @@ interface Run {
   /** The chapter it's of (Микс, България too): its start on the chapter's sheet. */
   chapter: string;
   lead: string;
-  /** Where „Откажи“ on the count goes back to, if not where the game was opened from: its chapter. */
+  /** Where „Отказ“ on the count goes back to, if not where the game was opened from: its chapter. */
   home: string;
   begin: () => Promise<State>;
   left: (l: LeftRun) => boolean;
@@ -147,7 +147,7 @@ interface Run {
  * running (as one opened by a tap does). */
 function run(r: Run): Child {
   const screen = slot(() => h("p", { class: "muted" }, "…"));
-  // What „Откажи“ on the count comes back to in a game opened from outside (its own entry held over Начало): the
+  // What „Отказ“ on the count comes back to in a game opened from outside (its own entry held over Начало): the
   // screen's start, in place (router.ts, backOut).
   let startHere = async () => {};
   const ready = () => {

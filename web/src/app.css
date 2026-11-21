@@ -2252,13 +2252,13 @@
 
   .near-scale {
     position: relative;
-    height: 56px;
+    height: calc(0.9375rem + 25px + 0.75rem + 4px);
     margin: 0 18px;
   }
 
   .near-track {
     position: absolute;
-    top: 30px;
+    top: calc(0.9375rem + 15px);
     right: -18px;
     left: -18px;
     height: 4px;
@@ -2266,18 +2266,21 @@
     background: var(--surface-2);
   }
 
+  /* A mark at its place on the scale (--at, 0 to 1), its number over it shifted as far along itself, so that a mark
+     at an end keeps its number within the scale (a long one, large text: never past the screen's side). */
   .near-mark {
     position: absolute;
     top: 0;
     display: grid;
-    justify-items: center;
+    justify-items: start;
     gap: 6px;
-    translate: -50% 0;
+    translate: calc(var(--at, 0.5) * -100%) 0;
     font: 900 0.9375rem / 1 var(--font-numeral);
     white-space: nowrap;
   }
 
   .near-mark i {
+    margin-left: calc(var(--at, 0.5) * 100% - 8px);
     display: block;
     width: 16px;
     height: 16px;
@@ -2302,7 +2305,7 @@
 
   .near-end {
     position: absolute;
-    top: 40px;
+    top: calc(0.9375rem + 25px);
     color: var(--ink-3);
     font: 800 0.75rem / 1 var(--font-sans);
   }

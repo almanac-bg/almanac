@@ -526,7 +526,11 @@ function scale(answer: number, mine: number, how: VerdictKind | undefined, view:
   const hi = Math.max(answer, mine) + gap;
   // A scale of a count or a size starts no lower than nothing, as the answer can't be under it.
   if (lo < 0 && Math.min(answer, mine) >= 0) lo = 0;
-  const at = (v: number) => `${((v - lo) / (hi - lo || 1)) * 100}%`;
+  // Where a value is on the scale (0 to 1): its mark there, its number over it held within the scale (app.css).
+  const at = (v: number) => {
+    const x = (v - lo) / (hi - lo || 1);
+    return { left: `${x * 100}%`, "--at": String(x) };
+  };
   const word = (v: number) => `${v < 0 ? "−" : ""}${formatNumber(Math.abs(v), view.step)}`;
   const unit = view.unit ? ` ${view.unit}` : "";
   return h(
@@ -536,8 +540,8 @@ function scale(answer: number, mine: number, how: VerdictKind | undefined, view:
       "div",
       { class: "near-scale", "aria-hidden": "true" },
       h("span", { class: "near-track" }),
-      h("span", { class: "near-mark answer", style: { left: at(answer) } }, word(answer), h("i")),
-      h("span", { class: `near-mark ${mark}`, style: { left: at(mine) } }, word(mine), h("i")),
+      h("span", { class: "near-mark answer", style: at(answer) }, word(answer), h("i")),
+      h("span", { class: `near-mark ${mark}`, style: at(mine) }, word(mine), h("i")),
       h("span", { class: "near-end lo" }, word(lo)),
       h("span", { class: "near-end hi" }, `${word(hi)}${unit}`),
     ),
@@ -1203,8 +1207,8 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
   const hint = h(
     "p",
     { class: "hint" },
-    "Плъзни всяко наляво или надясно",
-    h("span", { class: "sr" }, " или натисни групата му отдолу"),
+    "Плъзни всяка карта наляво или надясно",
+    h("span", { class: "sr" }, " или натисни групата ѝ отдолу"),
     ".",
   );
   // Looked at, not answered: the two groups and every thing to put in them, all at once.

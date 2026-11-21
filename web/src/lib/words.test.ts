@@ -7,6 +7,7 @@ import {
   hyphenate,
   issueOf,
   issueWords,
+  keepNumbers,
   leftWords,
   stakeWords,
   weekday,
@@ -150,4 +151,13 @@ test("how long a duel has left, rounded up, as it reads after „Иво има�
   assert.equal(leftWords(now + hour - 1, now), "по-малко от час");
   assert.equal(leftWords(now + 60_000, now), "по-малко от час");
   assert.equal(`Иво има ${leftWords(now + 60_000, now)}`, "Иво има по-малко от час");
+});
+
+test("a number stays with its unit, a short word after it, and its own thousands at a line's end", () => {
+  const nb = " ";
+  assert.equal(keepNumbers("Кипи при 135 °C."), `Кипи при 135${nb}°C.`);
+  assert.equal(keepNumbers("на 20 км от 1878 г. насам"), `на 20${nb}км от 1878${nb}г. насам`);
+  assert.equal(keepNumbers("около 3 млн. души, 45 % от тях"), `около 3${nb}млн. души, 45${nb}% от тях`);
+  assert.equal(keepNumbers("13 000 реда"), `13${nb}000${nb}реда`);
+  assert.equal(keepNumbers("през 2010 година"), "през 2010 година");
 });

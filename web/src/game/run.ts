@@ -270,7 +270,7 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
       h(
         "button",
         { class: "btn", onclick: () => leave(cancel) },
-        "Откажи",
+        "Отказ",
         h("kbd", { class: "key-hint", "aria-hidden": "true" }, "Esc"),
       ),
     ),
@@ -996,10 +996,18 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
   // the right answer's top never under the head. Under the answers: the panel, to the screen's foot, but never the question's first line under the head
   // (what doesn't fit is a scroll away, „Напред“ at the screen's foot meanwhile, app.css), and always the verdict
   // and the fact's first line, over „Напред“.
-  // The least the docked panel gives way to, for a choice's rows over it: its verdict and „Напред“ (the fact a scroll
-  // of the panel away).
+  // The least the docked panel gives way to, for a choice's rows over it: its verdict, the fact's first line over the
+  // fade and „Напред“ under them (on a phone on its side „Напред“ is on the verdict's row); the rest of the fact a
+  // scroll of the panel away.
   const footing = after.querySelector<HTMLElement>(".after-foot");
-  const floor = () => Math.ceil(verdict.offsetTop + verdict.offsetHeight + (footing?.offsetHeight ?? 0) + 8);
+  const floor = () => {
+    const verdictFoot = verdict.offsetTop + verdict.offsetHeight;
+    const told = fact
+      ? fact.offsetTop + (Number.parseFloat(getComputedStyle(fact).lineHeight) || 24) + fade
+      : verdictFoot;
+    const under = footing && footing.offsetTop >= verdictFoot ? footing.offsetHeight : 0;
+    return Math.ceil(told + under + 8);
+  };
   const by = (headFoot: number) => {
     const box = docked || beside ? keyBox() : after.getBoundingClientRect();
     // Docked under a choice: the page moves only if its rows wouldn't fit over the panel even at its floor.

@@ -20,7 +20,7 @@
 // that's over isn't kept in memory. FIT_SHOTS=<folder> keeps a picture of each question before and after its answer.
 import { expect, type Page, test } from "@playwright/test";
 import { answerAs, beside, closeable, flaws, kinds, panelFlaws, type Q, unseenAnswers } from "./kinds.ts";
-import { cutOrOverlapping, daysPlayed, dealt, keptPlayer, knows, startDay } from "./play.ts";
+import { cutOrOverlapping, daysPlayed, dealt, keptPlayer, knows, moveOn, startDay } from "./play.ts";
 
 const sizes = [
   { width: 320, height: 568, go: 500 },
@@ -840,3 +840,32 @@ for (const size of sizes.filter((s) => s.width < 1000))
     expect(at.card, "the invite, one row").toBeLessThanOrEqual(96);
     expect(at.go, "„Започни“ whole on the first screen").toBeLessThanOrEqual(Math.min(at.foot, size.go));
   });
+
+// A number gone over (the review under a game's result), with twice the text on a 320px phone: its scale's numbers,
+// a mark at an end too, keep to the screen's width.
+test.describe("a number gone over, twice the text, 320 × 568", () => {
+  test.use({ viewport: { width: 320, height: 568 }, bypassCSP: true });
+
+  test("its scale keeps to the screen's width", async ({ page }) => {
+    await textAt(page, 200);
+    const numbers = kinds().filter((k) => k.q.type === "number");
+    await page.goto("/");
+    await dealt(
+      page,
+      "history",
+      numbers.map((k) => k.q.id),
+    );
+    await page.goto("/play/history");
+    await page.getByRole("button", { name: "Продължи", exact: true }).click();
+    await page.getByRole("button", { name: "Започни сега" }).click();
+    for (const { q } of numbers) {
+      await expect(page.locator("article.question .answering")).toBeVisible();
+      await answerAs(page, q, "wrong");
+      await moveOn(page);
+    }
+    await page.getByRole("button", { name: "Прегледай въпросите" }).click();
+    await expect(page.locator(".number-near").first()).toBeVisible();
+    await settled(page);
+    expect(await sideways(page)).toEqual([]);
+  });
+});

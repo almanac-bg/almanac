@@ -127,6 +127,15 @@ export function hyphenate(text: string): string {
   });
 }
 
+/** A number never parted from what it counts at a line's end: a no-break space between it and its unit or a short
+ * word after it („135 °C“, „20 км“, „1878 г.“, „3 млн.“, „45 %“), and inside it („13 000“). The bank's text stays as
+ * it is; only the line keeps them together (ui.ts, textWords). */
+export function keepNumbers(text: string): string {
+  return text
+    .replace(/(\d)[ \t]+(?=\d{3}(?!\d))/g, "$1 ")
+    .replace(/(\d)[ \t]+(?=(?:[°%‰]\S*|\p{L}{1,4}\.?)(?=[\s,;:.!?)“”»]|$))/gu, "$1 ");
+}
+
 /** The hour (in Bulgaria) from which a streak at stake says it ends at midnight. */
 export const stakeHour = 18;
 
