@@ -481,6 +481,45 @@ func TestTwin(t *testing.T) {
 	}
 }
 
+// The answers of choices of numbers sit evenly across the four ranks, or the rule says which to move.
+func TestNumberRank(t *testing.T) {
+	for opts, want := range map[[4]string]int{
+		{"15%", "10%", "18%", "25%"}:                   2,
+		{"1 600 км", "900 км", "1 200 км", "2 000 км"}: 3,
+		{"1 млн.", "500 000", "2 млн.", "3 млн."}:      0, // not one shape
+		{"Около 7", "7", "9", "12"}:                    0,
+		{"Париж", "Рим", "Мадрид", "Берлин"}:           0,
+	} {
+		if got := numberRank(choice("gen-1", "Колко?", opts[0], opts[1:]...)); got != want {
+			t.Errorf("numberRank(%v) = %d, want %d", opts, got, want)
+		}
+	}
+	ranked := func(ranks ...int) []string {
+		var qs []Question
+		for i, r := range ranks {
+			opts := []string{"10", "20", "30", "40"}
+			q := choice(fmt.Sprintf("gen-%d", i), fmt.Sprintf("Колко %d?", i), opts[r-1], slices.Delete(slices.Clone(opts), r-1, r)...)
+			q.Added = fmt.Sprintf("2026-10-%02d", 1+i*30/len(ranks))
+			qs = append(qs, q)
+		}
+		return slices.DeleteFunc(found(bankOf(qs...)), func(s string) bool { return !strings.HasPrefix(s, "number-rank") })
+	}
+	var even, middle []int
+	for i := range 80 {
+		even, middle = append(even, i%4+1), append(middle, i%2+2)
+	}
+	if got := ranked(even...); len(got) != 0 {
+		t.Errorf("even: %v", got)
+	}
+	// The bank and its one topic, both skewed: a warning each, at the newest question of the most common rank.
+	if got := ranked(middle...); len(got) != 2 || got[0] != "number-rank gen-78" {
+		t.Errorf("all in the middle: %v", got)
+	}
+	if got := ranked(middle[:NumberRankAt-1]...); len(got) != 0 {
+		t.Errorf("too few to judge: %v", got)
+	}
+}
+
 // A bank's waivers file is read with it.
 func TestWaiversFile(t *testing.T) {
 	dir := t.TempDir()

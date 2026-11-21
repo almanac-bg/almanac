@@ -126,6 +126,7 @@ enough to be worth a look, not always.
 | `own-number` † | A number question's text, and a name it quotes, shows no number (in figures or words) within the tolerance of its answer: „Стоте дни“ asked as 110 with 33 answers itself |
 | `order-gap` | An order's measured values (м, км², кг, жители, %, …: `measured` in order.go) stand 10% apart; exact ones (years, counts, coordinates) only differ |
 | `options` | No option stands out by its form: only the answer with a regnal numeral (Симеон I), only the answer in Latin or in Cyrillic letters (bTV among БНТ, Нова), quotes on some options only |
+| `number-rank` (hint) | Across the bank, and within a topic, a choice of numbers has its answer about as often the smallest, the second, the third and the largest of its four: never mostly in the middle, where a player who doesn't know picks. Write the wrong numbers on either side as the question allows (all above, all below), not always around the answer |
 | `long-answer` (hint) | The answer isn't half again as long as every wrong option and 10 letters longer |
 | `answer-word` | No clue, and no question text, shares a word with the answer that no wrong option has („Кой е този водопад?“ — „Ниагарският водопад“; „френски лекари“ — „Лекари без граници“) |
 | `dated` | A question for a day (`on`) has its day's line (`day`), ending in a period, and the line names the date („На 3 март 1878 г. …“; a moving feast's names the feast). One whose text names its date may go without it |
