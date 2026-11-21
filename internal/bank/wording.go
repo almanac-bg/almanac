@@ -95,11 +95,11 @@ var (
 	looseYear   = regexp.MustCompile(`\d г\.`)
 	foreignMark = regexp.MustCompile(`["”«»]`)
 	// looseShare is a percent sign glued to its number or apart by a plain space: the game writes „36 %“, a no-break
-	// space between (web/src/game/numbers.ts).
-	looseShare = regexp.MustCompile(`(\d) ?%`)
+	// space between (web/src/game/numbers.ts). Not a word made of it („100%-ов“).
+	looseShare = regexp.MustCompile(`(\d) ?%([^-]|$)`)
 	// looseDegree is an angle's degree sign apart from its number („90 ° с.ш.“): an angle is „90°“, a temperature
-	// „25 °C“.
-	looseDegree = regexp.MustCompile(`(\d)[ \x{a0}]°([^CF]|$)`)
+	// „25 °C“, its C or F Latin or Cyrillic (a Bulgarian keyboard's „°С“).
+	looseDegree = regexp.MustCompile(`(\d)[ \x{a0}]°([^CFСФ]|$)`)
 )
 
 // unquoted applies f to the parts of s outside „…“ quotes: a quoted title keeps its own spelling („18% сиво“).
@@ -166,7 +166,7 @@ func tidy(s string) string {
 
 // shareAndDegree sets a percent sign and a degree sign as the game writes them.
 func shareAndDegree(s string) string {
-	s = looseShare.ReplaceAllString(s, "$1 %")
+	s = looseShare.ReplaceAllString(s, "$1 %$2")
 	return looseDegree.ReplaceAllString(s, "$1°$2")
 }
 

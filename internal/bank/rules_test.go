@@ -106,22 +106,6 @@ func TestRulesOfAQuestion(t *testing.T) {
 		{"estimate", number("a", "Кой е номерът за спешни случаи в ЕС?", 112, 20, ""), true},
 		{"estimate", number("a", "Колко метра е висок Мусала?", 2925, 880, "м"), false},
 		{"estimate", number("a", "През коя година е Освобождението?", 1878, 15, ""), false},
-		{"closing", func() Question {
-			q := number("a", "Колко милиона души живеят в България?", 6.4, 1.9, "млн. души")
-			q.Difficulty, q.Step = Hard, 0.1
-			return q
-		}(), true},
-		{"closing", func() Question {
-			q := number("a", "Колко метра е висок Мусала?", 2925, 880, "м")
-			q.Difficulty = Hard
-			return q
-		}(), false},
-		{"closing", func() Question {
-			q := number("a", "До колко градуса по Целзий пада температурата в Антарктида?", -89, 15, "°C")
-			q.Difficulty = Hard
-			return q
-		}(), false},
-		{"closing", number("a", "Колко милиона души живеят в България?", 6.4, 1.9, "млн. души"), false},
 		{"tolerance", number("a", "Колко метра е висок Мусала?", 2925, 880, "м"), false},
 		{"tolerance", number("a", "Колко метра е висок Мусала?", 2925, 100, "м"), true},
 		{"tolerance", number("a", "През коя година е Освобождението?", 1878, 2, ""), true},
@@ -305,6 +289,33 @@ func TestRulesOfAQuestion(t *testing.T) {
 		if (len(got) > 0) != c.bad {
 			t.Errorf("%s on %q: %v", c.rule, c.q.Base().Text, got)
 		}
+	}
+}
+
+// A hard number closes the day only as an estimate, asked of Bank.Estimate itself: a small answer, a count of a list or
+// a quantity without a unit is flagged; a height, a temperature below zero, a year or a medium number isn't.
+func TestClosing(t *testing.T) {
+	hard := func(id string, q *Number) *Number {
+		q.ID, q.Difficulty = id, Hard
+		return q
+	}
+	small := hard("gen-1", number("", "Колко милиона души живеят в България?", 6.4, 1.9, "млн. души"))
+	small.Step = 0.1
+	qs := []Question{
+		small,
+		hard("gen-2", number("", "Колко опери пише Джоакино Росини?", 39, 12, "опери")),
+		hard("gen-3", number("", "Колко са държавите в ООН?", 193, 58, "")),
+		hard("gen-4", number("", "Колко метра е висок Мусала?", 2925, 880, "м")),
+		hard("gen-5", number("", "До колко градуса по Целзий пада температурата в Антарктида?", -89, 15, "°C")),
+		hard("gen-6", number("", "През коя година е Освобождението?", 1878, 15, "")),
+		number("gen-7", "Колко милиона души живеят в Германия?", 83, 25, "млн. души"),
+	}
+	var got []string
+	for _, f := range ruleClosing(&lintBank{bank: bankOf(qs...), live: qs}) {
+		got = append(got, f.ids[0])
+	}
+	if want := []string{"gen-1", "gen-2", "gen-3"}; !slices.Equal(got, want) {
+		t.Errorf("flagged %v, want %v", got, want)
 	}
 }
 
@@ -576,6 +587,8 @@ func TestTidy(t *testing.T) {
 		"Около 2% от тях, после 15 %":       "Около 2 % от тях, после 15 %",
 		"Романът „18% сиво“ — 18% от":       "Романът „18% сиво“ — 18 % от",
 		"На 90 ° с.ш., при 25 °C":           "На 90° с.ш., при 25 °C",
+		"При 25 °С и 77 °Ф, на 45 ° ъгъл":   "При 25 °С и 77 °Ф, на 45° ъгъл",
+		"Със 100%-ов успех, 5%":             "Със 100%-ов успех, 5 %",
 		"https://x.org/wiki/Ch%C3%A2teau":   "https://x.org/wiki/Ch%C3%A2teau",
 		"1877–1878 г.":                      "1877–1878 г.",
 	} {

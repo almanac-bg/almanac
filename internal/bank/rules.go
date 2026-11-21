@@ -76,7 +76,7 @@ var Rules = []Rule{
 	{Name: "estimate", Says: "a number question is an estimate: a year, or a quantity over 20 of its steps (a small count is a choice)", one: ruleEstimate},
 	{Name: "anchor", Says: "an estimate counts what a well-read player can place, not an archive's count (episodes, seats, words, prize money)", Hint: true, one: ruleAnchor},
 	{Name: "countable", Says: "a number doesn't count a list's items (works, awards, articles, seats, goals, times) unless a waiver names its anchor", From: AuditFrom, one: ruleCountable},
-	{Name: "closing", Says: "a hard number can close the day: its answer is over 20 (Bank.Estimate), whatever its step", Hint: true, one: ruleClosing},
+	{Name: "closing", Says: "a hard number can close the day: it is an estimate (Bank.Estimate: a quantity with a unit, over 20, not a count of a list)", Hint: true, all: ruleClosing},
 	{Name: "tolerance", Says: "a number's tolerance follows the formula (Tolerance): a well-read guess scores about half", one: ruleTolerance},
 	{Name: "offset-scale", Says: "on an offset scale (°C, degrees, points, a rating) the tolerance is judged, never the formula's 3/10", From: AuditFrom, one: ruleOffsetScale},
 	{Name: "own-number", Says: "a number question's text or a name in it shows no number within the tolerance of its answer („Стоте дни“)", From: AuditFrom, one: ruleOwnNumber},

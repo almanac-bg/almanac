@@ -158,8 +158,8 @@ func writtenIn(ctx context.Context, db querier, b *bank.Bank, userID int64, asOf
 // writtenShows is whether the book shows a question's fact: it has one, and it's so (one retired as untrue isn't).
 func writtenShows(q bank.Question) bool { return q.Extra().Fact != "" && !q.Extra().Untrue() }
 
-// InkOf is how many facts a player's book has in ink in each chapter: the bank's topics, „Микс“ (all of them) and
-// „България“ (the questions about Bulgaria).
+// InkOf is how many facts a player's book has in ink in each chapter: the bank's topics (a chapter is a topic; „Микс“
+// and „България“, games across topics, have no chapter of their own).
 func (g *Game) InkOf(ctx context.Context, userID int64) (map[string]int, error) {
 	return inkIn(ctx, g.DB.Read, g.Bank(), userID, time.Time{})
 }
@@ -176,13 +176,9 @@ func inkIn(ctx context.Context, db querier, b *bank.Bank, userID int64, asOf tim
 	return ink, err
 }
 
-// countIn counts a question in the chapters it's in.
+// countIn counts a question in its chapter, its topic.
 func countIn(by map[string]int, q bank.Question) {
 	by[q.Base().Category]++
-	by[MixTopic]++
-	if q.Extra().BG {
-		by[BulgariaTopic]++
-	}
 }
 
 // InkIn is how many facts a game (runID) wrote in a player's book in ink, and how many of its right answers were to
