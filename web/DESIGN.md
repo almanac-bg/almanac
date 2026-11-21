@@ -167,10 +167,10 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   ти е само на това устройство. Запази я с имейл · Имаш профил? Влез · Как те виждат другите“, each opening its form
   in the line's place); the longest streak and what the week forgives (that it's used up, only while a streak runs);
   the seal worn on its ladder („Печатът на География“, its ink, Бележка to Летопис, the one reached ringed); the seals
-  by chapter (only those earned), each a button: the one worn ringed in ink, a tap on another wears it at once, „Носиш
-  печата на глава „Обща култура“.“ over them saying which; the avatars (every animal,
-  and a chapter's art from its Страница, hollow with a grey ring and its name until then, the rule said once under
-  them); the seals two to a row, one under 340px and with large text, a long name wrapping; the avatars chosen here,
+  by chapter (only those earned), a view of the ranks: nothing to tap, none ringed (the one worn is the best, never
+  chosen: on the avatar's corner and its ladder); the avatars (every animal, and a chapter's art from its Страница,
+  hollow with a grey ring until then, „при „Страница““ under its name, and a tap on it says how far it is: „Картината
+  на История става твоя при печата „Страница“: още 3 с мастило.“); the seals two to a row, one under 340px and with large text, a long name wrapping; the avatars chosen here,
   their one place (no page of their own); Настройки last; no list of past games (a game isn't gone over after its day). No
   duplicate avatar in the bar's corner on this page. Another player's page (`/players/<tag>`) is the same head,
   streak and seals, with the way to be friends. Where no email may be asked for (an app's browser that reads what's
@@ -293,7 +293,8 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   result's line only. By day a fine
   outline in the deep colour; on a sheet (its own colour, often) a 2px ink rim (`.rimmed`), and a filled seal there a
   lighter disc of its colour, so Бележка, a thin open ring, shows the sheet through it and Страница doesn't. Beside a
-  player's name only the seal shows, never its rank's word (`worn()`); the word is the Алманах's and a rank-up's.
+  player's name only the seal shows, never its rank's word (`worn()`); the word is the Алманах's and a rank-up's. The
+  seal worn is the player's best, never chosen (play.sealOf).
 - **The ladder** (`ladder()`, `.ladder`): a chapter's six ranks in a row, each its seal and name; the one reached ringed
   in ink, its name heavy; those to come faded (with large text, two rows of three). On a rank-up and Профил. Six equal
   columns, the reached seal's ring inside its own; sized by the ladder's own width (a container query), so that under

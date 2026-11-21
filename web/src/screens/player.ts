@@ -234,7 +234,7 @@ function ranks(p: Profile): Child {
               null,
               h(
                 "span",
-                { class: p.seal?.chapter === r.chapter ? "rk worn" : "rk" },
+                { class: "rk" },
                 seal(r.chapter, r.level, 40),
                 h("span", { class: "rk-words" }, h("b", null, chapterName(r.chapter)), h("span", null, r.name)),
               ),

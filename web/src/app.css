@@ -4368,16 +4368,6 @@
     text-align: left;
   }
 
-  button.rk {
-    cursor: pointer;
-    box-shadow: inset 0 0 0 2px var(--line-2);
-  }
-
-  .rk.worn,
-  .rk[aria-pressed="true"] {
-    box-shadow: inset 0 0 0 3px var(--ink);
-  }
-
   .seal-worn {
     margin-bottom: 10px;
     color: var(--ink-2);
@@ -4646,8 +4636,12 @@
     height: 88%;
   }
 
-  .pick.locked {
-    cursor: default;
+  /* Art not the player's yet: when it opens under its name; a tap says how far it is. */
+  .pick-when {
+    margin-top: -4px;
+    color: var(--ink-3);
+    font: 700 0.75rem / 1rem var(--font-sans);
+    text-align: center;
   }
 
   .pick.locked .avatar.chart {

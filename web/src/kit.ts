@@ -55,7 +55,7 @@ import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
 import { noEmail, noEmailLine, signIn } from "./screens/signin.ts";
 import { loadStats } from "./screens/stats.ts";
-import { rankName, rankNames } from "./seal.ts";
+import { artFrom, rankName, rankNames } from "./seal.ts";
 import {
   bulgaria,
   categories,
@@ -109,6 +109,7 @@ import {
 } from "./ui.ts";
 
 export const kit = {
+  artFrom,
   acceptedLine,
   inSight,
   answered,

@@ -51,6 +51,8 @@ packages' doc comments; this file holds only what must not drift.
     a badge of its own (not the logo), filling in quarters between ranks; beside a name only the seal shows, the name
     only in the Алманах and on a rank-up. No check against guessing: the names claim nothing a count doesn't hold. The
     chapter's art becomes a choosable avatar at Страница. The animals stay free. Mastery is hidden: it steers chapter games and recordings.
+    The badge is the player's best seal, never chosen (the highest rank, then the most ink, then the rank that came
+    first: a choice nobody playing saw the point of, and the best says the most).
     These are the only levels, titles and unlocks; nothing else adds up across games (no XP, currencies, goals,
     achievements, notes as rewards, lifetime totals, rating, divisions, leagues, rooms). Anything live stays out until
     the owner reopens it.
@@ -79,7 +81,7 @@ packages' doc comments; this file holds only what must not drift.
     fix restores stated behaviour; polish adds no data, count, block or notification.
   - **The bets,** each read from what the game keeps anyway (runs, facts, duels, shares), by a query when it's asked,
     never by new tracking: that ink from the issue alone is enough progress (D30 of the players whose games are only
-    the day's); that the seals are wanted (players who chose the seal they wear, or a chapter's art as their avatar);
+    the day's); that the seals are wanted (players who chose a chapter's art as their avatar);
     that the share brings players (new players beside the days shared, day by day).
   The decisions below that this replaces are gone from this file.
 - **The day's ten questions are the heart;** everything else serves them or stays out of the way. A new system replaces
