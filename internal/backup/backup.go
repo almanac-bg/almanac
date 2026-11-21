@@ -19,12 +19,8 @@
 // The copy of the day is brought back as a restore would bring it — downloaded, decrypted, unzipped, checked again
 // with rows in every core table (Drill) — so its bytes are known to come back whole before they're needed. The server
 // can open it for that though it holds no key to the copies: each copy is also encrypted to a key made for it alone,
-// whose secret half lives in memory until that check (drillKey). That proves the copy decodes, not that the owner's
-// key opens it: a valid but wrong BACKUP_RECIPIENT would pass. So whoever holds the key proves it now and then
-// (proof.go): `backup verify -identity` off the server opens a day's copy and prints a code only its plain bytes give,
-// and `backup proven <code>` on the server records it. The server knows each day's code by its hash alone, and says
-// daily when the key the copies go to has had no proof, or none for a month (a problem told), and at once when that
-// key changes.
+// whose secret half lives in memory until that check (drillKey). That proves the copy decodes; that the owner's key
+// opens it is shown whenever it does (`backup restore` or `backup verify -identity`, off the server), not asked for.
 //
 // What a copy holds is weighed as it's made, against the copy before and the day's first (Changes): every table's
 // rows, so that a table that loses half its rows (a bug that deletes, a bad release) or more than doubles is a problem
@@ -35,8 +31,8 @@
 // at midnight), by running itself as a program of its own (`almanac backup now`) at a lower priority,
 // so a copy never takes the game's processor or memory (cmd/almanac). A file beside the database remembers the copies
 // (State): when the last was made, for the first after a start (soon, if one is due), the rows it had and the day's
-// first had, the day whose copy was brought back, the key the copies go to, and what this server stored (each copy's
-// hash, so that a copy in the bucket is known for the server's own or not: Made; and the hash of each day's proof code).
+// first had, the day whose copy was brought back, and what this server stored (each copy's hash, so that a copy in the
+// bucket is known for the server's own or not: Made).
 package backup
 
 import (
@@ -132,24 +128,13 @@ type State struct {
 	Rows    map[string]int64 `json:"rows"`              // every table's, in the last copy
 	Day     string           `json:"day"`               // the last UTC day (2006-01-02) whose copy was brought back whole
 	DayRows map[string]int64 `json:"dayRows,omitempty"` // every table's, in that day's copy
-	// Recipient is the key the copies go to, and since when (nil: they go unencrypted).
-	Recipient *Recipient `json:"recipient,omitempty"`
 	// Sent is what this server stored, by key, for as long as the bucket keeps it.
 	Sent map[string]Sent `json:"sent,omitempty"`
 }
 
-// Recipient is the key (BACKUP_RECIPIENT) the copies go to, by its Fingerprint, and since when.
-type Recipient struct {
-	Key   string    `json:"key"`
-	Since time.Time `json:"since"`
-}
-
-// Sent is a copy this server stored: its bytes' hash (SHA-256, hex), and for a day's encrypted copy, the hash of its
-// proof code (ProofCode) and the key it went to.
+// Sent is a copy this server stored: its bytes' hash (SHA-256, hex).
 type Sent struct {
-	SHA256    string `json:"sha256"`
-	Proof     string `json:"proof,omitempty"`
-	Recipient string `json:"recipient,omitempty"`
+	SHA256 string `json:"sha256"`
 }
 
 // LoadState reads the state kept in dir (the zero State if there's none).
@@ -262,25 +247,14 @@ func (b *Backer) Once(ctx context.Context) (*Report, error) {
 
 	recipients := b.Recipients
 	var drill []age.Identity
-	fingerprint := ""
 	if r.Encrypted {
-		fingerprint = Fingerprint(recipients)
-		if state.Recipient == nil || state.Recipient.Key != fingerprint {
-			if state.Recipient != nil {
-				r.Warnings = append(r.Warnings, "the copies now go to another key (BACKUP_RECIPIENT changed): none of "+
-					"them is known to open until its secret key opens one (backup verify -identity, off the server; then backup proven)")
-			}
-			state.Recipient = &Recipient{Key: fingerprint, Since: now}
-		}
 		id, rec, err := drillKey(recipients)
 		if err != nil {
 			return nil, err
 		}
 		recipients, drill = append(recipients[:len(recipients):len(recipients)], rec), []age.Identity{id}
-	} else {
-		state.Recipient = nil
 	}
-	packed, sums, err := pack(snap, recipients)
+	packed, sum, err := pack(snap, recipients)
 	if err != nil {
 		return nil, fmt.Errorf("packing the copy: %w", err)
 	}
@@ -304,7 +278,7 @@ func (b *Backer) Once(ctx context.Context) (*Report, error) {
 	}
 	r.Keys = append(r.Keys, key)
 	state.At, state.Key, state.Rows = now, key, r.Rows
-	state.record(key, Sent{SHA256: sums.file}, now)
+	state.record(key, Sent{SHA256: sum}, now)
 	if err := state.save(b.Dir); err != nil {
 		slog.Warn("backup: keeping its state", "err", err)
 	}
@@ -318,11 +292,7 @@ func (b *Backer) Once(ctx context.Context) (*Report, error) {
 		return r, err
 	}
 	r.Keys = append(r.Keys, key)
-	sent := Sent{SHA256: sums.file}
-	if r.Encrypted {
-		sent.Proof, sent.Recipient = proofHash(ProofCode(sums.plain)), fingerprint
-	}
-	state.record(key, sent, now)
+	state.record(key, Sent{SHA256: sum}, now)
 	if err := state.save(b.Dir); err != nil {
 		slog.Warn("backup: keeping its state", "err", err)
 	}
@@ -340,9 +310,6 @@ func (b *Backer) Once(ctx context.Context) (*Report, error) {
 		r.Warnings = append(r.Warnings, "listing the copies: "+err.Error())
 	} else {
 		r.Warnings = append(r.Warnings, said...)
-	}
-	if r.Encrypted {
-		r.Warnings = append(r.Warnings, unproven(state, LoadProven(b.Dir), now)...)
 	}
 	return r, nil
 }
@@ -371,24 +338,17 @@ func snapshot(ctx context.Context, db *sql.DB, dir string) (string, error) {
 	return path, nil
 }
 
-// packSums are a packed copy's hashes (SHA-256): of the file as it's stored (hex), and of the gzipped database before
-// it was encrypted, which only a key that opens the copy gives back (ProofCode).
-type packSums struct {
-	file  string
-	plain []byte
-}
-
 // pack gzips the database file at path and encrypts it to recipients (if any) into a new file beside it, as it
-// streams: no more of it is in memory at once than the buffers.
-func pack(path string, recipients []age.Recipient) (_ string, sums packSums, err error) {
+// streams: no more of it is in memory at once than the buffers. sum is the SHA-256 (hex) of the file as it's stored.
+func pack(path string, recipients []age.Recipient) (_, sum string, err error) {
 	in, err := os.Open(path)
 	if err != nil {
-		return "", sums, err
+		return "", "", err
 	}
 	defer in.Close()
 	out, err := os.CreateTemp(filepath.Dir(path), "copy-*.part")
 	if err != nil {
-		return "", sums, err
+		return "", "", err
 	}
 	defer func() {
 		if cerr := out.Close(); err == nil {
@@ -398,33 +358,32 @@ func pack(path string, recipients []age.Recipient) (_ string, sums packSums, err
 			os.Remove(out.Name())
 		}
 	}()
-	fileSum, plainSum := sha256.New(), sha256.New()
+	fileSum := sha256.New()
 	buf := bufio.NewWriterSize(io.MultiWriter(out, fileSum), 256<<10)
 	var w io.Writer = buf
 	var enc io.WriteCloser
 	if len(recipients) > 0 {
 		if enc, err = age.Encrypt(buf, recipients...); err != nil {
-			return "", sums, err
+			return "", "", err
 		}
 		w = enc
 	}
-	zw, _ := gzip.NewWriterLevel(io.MultiWriter(w, plainSum), level)
+	zw, _ := gzip.NewWriterLevel(w, level)
 	if _, err := io.Copy(zw, bufio.NewReaderSize(in, 256<<10)); err != nil {
-		return "", sums, err
+		return "", "", err
 	}
 	if err := zw.Close(); err != nil {
-		return "", sums, err
+		return "", "", err
 	}
 	if enc != nil {
 		if err := enc.Close(); err != nil {
-			return "", sums, err
+			return "", "", err
 		}
 	}
 	if err := buf.Flush(); err != nil {
-		return "", sums, err
+		return "", "", err
 	}
-	sums.file, sums.plain = hex.EncodeToString(fileSum.Sum(nil)), plainSum.Sum(nil)
-	return out.Name(), sums, out.Sync()
+	return out.Name(), hex.EncodeToString(fileSum.Sum(nil)), out.Sync()
 }
 
 // removeLeftovers removes what a copy cut short (the server stopped under it) left in dir: an hour old, so never
