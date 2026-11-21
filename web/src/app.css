@@ -1337,9 +1337,18 @@
     outline-offset: -2.5px;
   }
 
-  /* Близо: the upper left half in the chapter's colour, the lower right empty (◩), outlined the same. */
+  /* Близо, one rule wherever it's drawn as a square (the result's tiles and the issue's, the small squares of the
+     boards, a duel's marks; the share's ◩ and its card say it the same): the upper left half filled, cut on the
+     diagonal, the lower right empty, so that it parts from a full one at a glance. Filled in --half: a tile's chapter
+     colour, else ink. */
+  :is(.tile.near, .mini li.partial, .duel-pip.partial) {
+    background-image: linear-gradient(to bottom right, var(--half, var(--ink)) 50%, transparent 50%);
+  }
+
+  /* A tile's, in its chapter's colour, outlined in the deep one. */
   .tile.near {
-    background: linear-gradient(to bottom right, var(--tv) 50%, transparent 50%);
+    --half: var(--tv);
+    background-color: transparent;
     box-shadow: inset 0 0 0 2.5px var(--td);
   }
 
@@ -1403,10 +1412,6 @@
 
   .mini li.right {
     background: var(--ink);
-  }
-
-  .mini li.partial {
-    background: linear-gradient(to bottom right, var(--ink) 50%, transparent 50%);
   }
 
   .mini li.void {
@@ -5424,11 +5429,6 @@
   .issue-leaf .tile:is(.wrong, .near, .later, .void) {
     background-color: #fff;
   }
-
-  .issue-leaf .tile.near {
-    background-image: linear-gradient(to bottom right, var(--tv) 50%, transparent 50%);
-  }
-
   .issue-meta {
     padding-right: 50px;
     font: 700 0.875rem / 1.3 var(--font-sans);
@@ -5593,11 +5593,6 @@
   .score-leaf .tile:is(.wrong, .near, .void) {
     background-color: #fff;
   }
-
-  .score-leaf .tile.near {
-    background-image: linear-gradient(to bottom right, var(--tv) 50%, transparent 50%);
-  }
-
   /* A right tile of the sheet's own chapter would melt into it: every right one on the sheet has a rim of ink. */
   :is(.score-leaf, .issue-leaf) .tile.right {
     box-shadow: inset 0 0 0 2px #16132b;
