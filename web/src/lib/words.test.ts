@@ -132,7 +132,7 @@ test("a number the Bulgarian way: a space between thousands from 10 000, a decim
 test("an order's value with every digit it has: a nanometre isn't 0, π's approximations stay apart", () => {
   assert.equal(formatValue(1e-9), "0,000000001");
   assert.equal(formatValue(0.0004), "0,0004");
-  assert.equal(formatValue(3.14159), "3,14159");
+  assert.equal(formatValue(1.23456), "1,23456");
   assert.equal(formatValue(3.142857), "3,142857");
   assert.equal(formatValue(95.16), "95,16");
   assert.equal(formatValue(1411778724), "1\u00a0411\u00a0778\u00a0724");

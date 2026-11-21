@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Tools for developing the web client only: nothing from npm ships to players.",
   "scripts": {
-    "check": "tsc -p web && tsc -p e2e && biome ci .",
+    "check": "tsc -p web && tsc -p e2e && biome ci --error-on-warnings .",
     "format": "biome check --write .",
     "test": "node --test 'web/src/**/*.test.ts'",
     "e2e": "playwright test -c e2e"

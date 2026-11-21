@@ -69,7 +69,8 @@ its database from `storetest.Open(t)` (migrated once per test program, copied) a
 `banktest.Sample(t)` (shared: a test that changes questions loads its own with `bank.Load`).
 
 Formatting is done for you: a hook (`.claude/hooks/format.sh`) runs gofmt or Biome on every file a session edits,
-and stops a `git commit` with an unformatted file in it (`git add` them and commit again).
+and stops a `git commit` with an unformatted file in it (`git add` them and commit again), or while Biome warns of
+anything in the client: a warning fails CI as an error does, so fix it, never leave it.
 
 Node (from `~/.nvm`) is on the shell's PATH already: don't `export PATH` in a command (a worktree-isolated agent is
 refused git commands that do). Without Playwright's Chromium, the Chromium tests run in Brave by themselves

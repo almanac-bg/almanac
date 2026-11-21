@@ -143,6 +143,7 @@ async function spaced(page: Page, q: Q): Promise<string[]> {
   const shown = await page
     .locator("article.question .ask")
     .first()
+    // biome-ignore lint/performance/useDomNodeTextContent: the check is of the text as drawn, which only innerText reads
     .evaluate((e) => (e as HTMLElement).innerText);
   const plain = (s: string) => s.replaceAll("\u00ad", "").replace(/\s+/g, " ").trim();
   const [says, all] = [plain(shown), plain(q.text)];
