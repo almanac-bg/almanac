@@ -67,6 +67,7 @@ func TestHandoffLink(t *testing.T) {
 		t.Fatalf("taken twice: %d %v", status, out)
 	}
 }
+
 // A browser that started the day's questions keeps it, whoever it's signed in as after: a game brought into it that
 // day plays the issue a second time there (playedHere), which writes pencil, not ink.
 func TestPlayedHere(t *testing.T) {
