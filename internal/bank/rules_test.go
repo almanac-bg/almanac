@@ -106,6 +106,22 @@ func TestRulesOfAQuestion(t *testing.T) {
 		{"estimate", number("a", "Кой е номерът за спешни случаи в ЕС?", 112, 20, ""), true},
 		{"estimate", number("a", "Колко метра е висок Мусала?", 2925, 880, "м"), false},
 		{"estimate", number("a", "През коя година е Освобождението?", 1878, 15, ""), false},
+		{"closing", func() Question {
+			q := number("a", "Колко милиона души живеят в България?", 6.4, 1.9, "млн. души")
+			q.Difficulty, q.Step = Hard, 0.1
+			return q
+		}(), true},
+		{"closing", func() Question {
+			q := number("a", "Колко метра е висок Мусала?", 2925, 880, "м")
+			q.Difficulty = Hard
+			return q
+		}(), false},
+		{"closing", func() Question {
+			q := number("a", "До колко градуса по Целзий пада температурата в Антарктида?", -89, 15, "°C")
+			q.Difficulty = Hard
+			return q
+		}(), false},
+		{"closing", number("a", "Колко милиона души живеят в България?", 6.4, 1.9, "млн. души"), false},
 		{"tolerance", number("a", "Колко метра е висок Мусала?", 2925, 880, "м"), false},
 		{"tolerance", number("a", "Колко метра е висок Мусала?", 2925, 100, "м"), true},
 		{"tolerance", number("a", "През коя година е Освобождението?", 1878, 2, ""), true},
@@ -445,6 +461,19 @@ func TestEstimateOfACount(t *testing.T) {
 		t.Errorf("found %v", got)
 	}
 	for q, want := range map[Question]bool{operas: false, books: true, height: true, year: false} {
+		if b.Estimate(q) != want {
+			t.Errorf("%s: estimate %v", q.Base().ID, !want)
+		}
+	}
+}
+
+// A temperature below zero is an estimate as far from zero as one above it: the coldest ever measured closes a day,
+// a winter's night of −5 °C doesn't.
+func TestEstimateBelowZero(t *testing.T) {
+	coldest := number("gen-1", "До колко градуса по Целзий пада температурата в Антарктида?", -89, 15, "°C")
+	night := number("gen-2", "Колко градуса по Целзий е зимна нощ в София?", -5, 3, "°C")
+	b := bankOf(coldest, night)
+	for q, want := range map[Question]bool{coldest: true, night: false} {
 		if b.Estimate(q) != want {
 			t.Errorf("%s: estimate %v", q.Base().ID, !want)
 		}

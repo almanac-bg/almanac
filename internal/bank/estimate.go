@@ -88,13 +88,24 @@ func ruleCountable(q Question) []string {
 
 // Estimate is whether a number question is worth closing a day on: a quantity with a unit, more than EstimateFrom —
 // not a year (no unit) nor a small count, which are choices in disguise — that doesn't count a list (Countable), or
-// whose count the bank waives for its anchor.
+// whose count the bank waives for its anchor. A temperature below zero is as far from zero as one above it.
 func (b *Bank) Estimate(q Question) bool {
 	n, ok := q.(*Number)
-	if !ok || n.Unit == "" || n.Answer <= EstimateFrom {
+	if !ok || n.Unit == "" || math.Abs(n.Answer) <= EstimateFrom {
 		return false
 	}
 	return Countable(q) == "" || b.waived[[2]string{n.ID, "countable"}]
+}
+
+// ruleClosing (a hint): a hard number is written for the day's last place, which takes only an Estimate, so one whose
+// answer is EstimateFrom or less (6,5 on a step of 0,1 is an estimate, but never closes a day) fills no day's place.
+func ruleClosing(q Question) []string {
+	n, ok := q.(*Number)
+	if !ok || n.Difficulty != Hard || n.IsYear() || math.Abs(n.Answer) > EstimateFrom {
+		return nil
+	}
+	return []string{fmt.Sprintf("a hard number closes the day only above %d (Bank.Estimate): say it in a smaller unit "+
+		"(650 мм, not 0,65 м), or ask it at another difficulty", EstimateFrom)}
 }
 
 // OffsetScale is whether a number's scale has no zero of its own (a temperature in °C, an angle or a latitude in
