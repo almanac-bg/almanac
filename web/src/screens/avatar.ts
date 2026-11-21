@@ -1,15 +1,13 @@
 // The avatar's choice: how a player shows to others. Every animal is anyone's from the first day (play.Shapes); a
 // chapter's art is the player's from the chapter's Страница (play/rank.go), and until then shows hollow. On Профил
-// (picker) and on a page of its own (/avatar, avatarChoice): each with its name, the one worn ringed; a tap wears it
-// at once.
+// (picker), its one place: each with its name, the one worn ringed; a tap wears it at once.
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
-let { api, back, errorText, h, signal, when, title, user, avatar, shapeNames, look, setLook, categories, chapterName } =
-  {} as Kit;
+let { api, errorText, h, signal, avatar, shapeNames, look, setLook, categories, chapterName } = {} as Kit;
 
 /** A chapter's rank, as the book has it: its art is the player's from level 2 (Страница). */
 interface Rank {
@@ -18,31 +16,7 @@ interface Rank {
 }
 
 function setKit(kit: Kit) {
-  ({ api, back, errorText, h, signal, when, title, user, avatar, shapeNames, look, setLook, categories, chapterName } =
-    kit);
-}
-
-export function avatarChoice(kit: Kit) {
-  setKit(kit);
-  title("Аватар");
-  const ranks = signal<Rank[]>([]);
-  const tag = user.peek()?.tag;
-  if (tag)
-    api<{ ranks?: Rank[] }>("GET", `/api/players/${encodeURIComponent(tag)}`).then(
-      (p) => ranks.set(p.ranks ?? []),
-      () => {},
-    );
-  return h(
-    "section",
-    { class: "screen" },
-    back("/me", "Профил"),
-    h("h1", null, "Аватар"),
-    when(
-      () => user(),
-      () => choice(ranks),
-      () => h("p", { class: "lead" }, "Аватар избираш след първата си игра. Изиграй първите си въпроси."),
-    ),
-  );
+  ({ api, errorText, h, signal, avatar, shapeNames, look, setLook, categories, chapterName } = kit);
 }
 
 /** The avatars for Профил (`kit`: the app's pieces, as the page opens; `ranks`: the player's, as Профил has them). */

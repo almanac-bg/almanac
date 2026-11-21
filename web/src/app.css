@@ -1876,6 +1876,18 @@
     min-width: 0;
   }
 
+  /* An order answered: where its words and its value don't fit a line together, the value and the ✓ or ✕ go on a
+     line under the words, at the row's end, rather than squeeze the words to a word or two a line. */
+  .sortable-list > .option:has(> .value) {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 2px;
+  }
+
+  .sortable-list > .option:has(> .value) > .row-words {
+    flex: 1 1 auto;
+  }
+
   /* An order's value at its row's end: a long one („179,4 млн. долара“) on two lines rather than squeeze the words
      beside it to a letter or two. */
   .option .value {
@@ -2458,28 +2470,15 @@
     }
   }
 
-  /* A choice's answers keep the room at their end from the start for what the answer brings there (questions.ts): how
-     many gave each, and its ✓ or ✕ at the far end, where the key waits on a computer. Nothing re-wraps as they come. */
-  .choices > .option {
-    padding-right: calc(14px + 30px + var(--space-2) + 2.75rem + var(--space-2));
+  /* A choice's words have the row's width while it's asked; once answered, what the answer brings („ти“, how many
+     gave it, its ✓ or ✕) comes after them, in that order, at the row's end and on a line with them. The shares come
+     in place, hidden, with the ✓ (questions.ts, crowdOnAll), so nothing re-wraps as they show. */
+  .choices > .option > :is(.yours, .crowd-share) {
+    flex: none;
   }
 
-  .choices > .option > :is(.sign, .crowd-share, .key-hint) {
-    position: absolute;
-    top: 50%;
-    right: 14px;
-    translate: 0 -50%;
-  }
-
-  .choices > .option > .crowd-share {
-    right: calc(14px + 30px + var(--space-2));
-  }
-
-  /* „ти“ on the player's own wrong choice: in the room kept at its end, over how many gave it. */
-  .choices > .option > .yours {
-    position: absolute;
-    top: 6px;
-    right: calc(14px + 30px + var(--space-2));
+  .choices > .option > .yours + .crowd-share {
+    margin-left: 0;
   }
 
   .crowd-says {
@@ -4734,6 +4733,10 @@
     font: 700 0.8125rem / 1.25 var(--font-sans);
   }
 
+  .card-rank > span {
+    display: block;
+  }
+
   @media (hover: hover) and (pointer: fine) {
     .chapter-card:hover .card-name {
       text-decoration: underline;
@@ -5930,8 +5933,11 @@
 
   /* How all of България did, under „Въпросите и фактите“: eleven bars, 0 to 10, the player's in ink, the average a
      thin line. */
+  /* Over the bars, a row of its own for the average's label: „ти“ over the player's bar (as high as the tallest) never
+     meets it, whatever the two counts. */
   .spread-chart {
     margin-top: 14px;
+    padding-top: 1.75rem;
   }
 
   .spread-bars {
@@ -5967,14 +5973,14 @@
 
   .spread-avg {
     position: absolute;
-    top: 0;
+    top: -2rem;
     bottom: 0;
     border-left: 2px solid var(--ink-3);
   }
 
   .spread-avg span {
     position: absolute;
-    top: -2px;
+    top: 0;
     right: 6px;
     color: var(--ink-2);
     font: 700 0.75rem / 1 var(--font-sans);
@@ -6805,7 +6811,7 @@
       display: flex;
       flex-direction: column;
       min-height: calc(100dvh - var(--app-top) - var(--app-foot));
-      padding-bottom: var(--after, 0px);
+      padding-bottom: calc(var(--after, 0px) + var(--past, 0px));
     }
 
     .run-question .answering {
@@ -6824,7 +6830,8 @@
 
     /* The answer docks at the screen's foot, in the same place every time (run.ts, settle: it rises with the answers):
        the verdict, how everyone answered, the fact, and the way on. It leaves the head, the question and the right
-       answer (--keep: where it ends, the page unmoved) in sight over it, and at least shows the verdict and „Напред“;
+       answer (--keep: where it ends, the page unmoved) in sight over it, and at least shows the verdict and „Напред“
+       (and the fact's first two lines, --least, unless the player's row and the right one need that room: --give);
        a fact longer than that scrolls with the panel, „Напред“ staying at its foot. */
     .run-question .after {
       position: fixed;
@@ -6833,7 +6840,7 @@
       left: 0;
       z-index: 5;
       max-width: 40rem;
-      max-height: max(var(--least, 10rem), calc(100dvh - var(--keep, 9.5rem)));
+      max-height: max(min(var(--least, 10rem), var(--give, 100dvh)), calc(100dvh - var(--keep, 9.5rem)));
       margin-inline: auto;
       gap: var(--space-3);
       padding: var(--space-4) max(var(--space-4), env(safe-area-inset-right)) var(--app-foot)
@@ -6843,6 +6850,12 @@
       border-radius: 22px 22px 0 0;
       background: var(--surface);
       box-shadow: 0 -12px 28px rgb(22 19 43 / 0.16);
+    }
+
+    /* An order, pairs or groups: the panel opens at its least (the verdict, how everyone did and the fact's first two
+       lines over „Напред“), so that the rows shown right stay in sight over it; the rest of the fact scrolls in it. */
+    .run-question:has(.sortable-list, .match, .split) .after {
+      max-height: var(--least, 10rem);
     }
 
     .run-question .after .fact p {
@@ -7017,6 +7030,11 @@
 
     .actions > .result-actions {
       display: contents;
+    }
+
+    /* A chapter game's result on its right page (results.ts, summary): its action the page's width, as the day's. */
+    .summary.spread .actions {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     /* Three ways on under a result (a duel sent: „Към Приятели“, „Прегледай въпросите“, „Нов дуел“): one row of
@@ -7278,6 +7296,12 @@
     .run-question .pic-options {
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
+
+    /* Answered, the player's row and the right one a little lower, so the answer under them (a long fact, a day's
+       line) shows whole with them. */
+    .run-question.answered .choices > .option:not(.dim) {
+      min-height: 3.25rem;
+    }
   }
 
   /* A computer: the keys that play show on what they play (1–4 on the answers, Enter to go on). */
@@ -7336,7 +7360,7 @@
   }
 
   .run-question.answered .choices > .option.dim {
-    min-height: 36px;
+    min-height: 2.25rem;
     padding-block: 4px;
     border-width: 1.5px;
     font-size: 0.9375rem;
@@ -7557,6 +7581,12 @@
       gap: 10px;
     }
 
+    /* The rows right under the question, „Готово“ under them: no room left empty between the question and what it
+       asks to put in place. */
+    .run-question:not(.answered):has(.sortable-list, .match) .answering {
+      margin-top: 0;
+    }
+
     .run-question:not(.answered):has(.sortable-list, .match) .q-leaf {
       grid-template-columns: auto minmax(0, 1fr);
       align-items: center;
@@ -7575,19 +7605,28 @@
       --g: 32px;
     }
 
+    /* Cut by its height, never by -webkit-box's line-clamp: that box drops the spaces between a cell's whole words
+       (wholeWords) in Chromium. Its last line fades out at its end where it's cut. */
     .run-question:not(.answered):has(.sortable-list, .match) .ask {
       --clamp: on;
-      display: -webkit-box;
+      max-height: calc(var(--lines, 3) * 1.25em);
       padding: 0;
       overflow: hidden;
       font-size: 1rem;
       line-height: 1.25;
-      -webkit-box-orient: vertical;
-      -webkit-line-clamp: var(--lines, 3);
+    }
+
+    .run-question:not(.answered):has(.sortable-list, .match) .ask[data-cut]:not(.whole) {
+      -webkit-mask:
+        linear-gradient(#000, #000) top / 100% calc(100% - 1.25em) no-repeat,
+        linear-gradient(to left, transparent, #000 3em) bottom / 100% 1.25em no-repeat;
+      mask:
+        linear-gradient(#000, #000) top / 100% calc(100% - 1.25em) no-repeat,
+        linear-gradient(to left, transparent, #000 3em) bottom / 100% 1.25em no-repeat;
     }
 
     .run-question:not(.answered):has(.sortable-list, .match) .ask.whole {
-      display: block;
+      max-height: none;
     }
 
     .run-question:not(.answered) .ask[data-cut] {
@@ -7679,13 +7718,16 @@
     }
   }
 
-  /* A laptop: the question is a spread. On the left the head, the pips and the clock over the question's sheet (and
-     its picture), and the answer under them as it comes, kept in sight at the screen's foot; on the right what answers
-     it, marked. */
+  /* A laptop: the question is a spread, the page's width (as the mockups have it, 1180px). On the left the head, the
+     pips and the clock over the question's sheet (and its picture); on the right what answers it, level with the
+     sheet, and the answer under it as it comes (run.ts, settle, brings it into sight). The sheet spans the answers'
+     row and the answer's, whose row (1fr) takes what the sheet has past the answers: the answer comes right under
+     them, never over the question. */
   @media (min-width: 64rem) {
     .run-question {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-rows: auto auto minmax(0, 1fr);
       grid-auto-rows: min-content;
       column-gap: 20px;
       row-gap: var(--space-4);
@@ -7701,37 +7743,29 @@
     }
 
     .run-question > .q-leaf {
-      grid-row: 2;
+      grid-row: 2 / span 2;
+      align-self: start;
     }
 
     .run-question > .picture {
-      grid-row: 3;
+      grid-row: 4;
     }
 
-    /* What answers it, level with the sheet. */
     .run-question > .answering {
-      grid-row: 2 / span 4;
+      grid-row: 2;
       grid-column: 2;
       align-self: start;
     }
 
     .run-question > .after {
-      position: sticky;
-      bottom: 0;
-      z-index: 1;
-      grid-row: 4;
-      grid-column: 1;
-      box-shadow: 0 0 0 var(--space-4) var(--bg);
+      grid-row: 3 / span 2;
+      grid-column: 2;
+      align-self: start;
     }
 
     .run-question .q-leaf {
       min-height: 22.5rem;
       padding: 32px 36px 40px;
-    }
-
-    /* Answered, the sheet is as tall as its question: the answer comes right under it. */
-    .run-question.answered .q-leaf {
-      min-height: 0;
     }
 
     .run-question .ask {
@@ -7743,8 +7777,12 @@
       justify-self: start;
     }
 
+    .playing main > :is(.run-question, :has(.run-question)) {
+      max-width: none;
+    }
+
     #main:has(.run-question) {
-      max-width: 76rem;
+      max-width: calc(1180px + 2 * var(--space-6));
     }
   }
 
@@ -7826,6 +7864,22 @@
   .tight .duel-row-end {
     justify-items: start;
     text-align: left;
+  }
+
+  /* Tomorrow: its date over its words, which have the column's width; the issue's name and its number a line each,
+     no dot between them. */
+  .tight .tomorrow-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+
+  .tight .tomorrow-head > span {
+    display: block;
+  }
+
+  .tight .tomorrow-head > .tomorrow-sep {
+    display: none;
   }
 
   /* Профил's seals, one to a row. */
@@ -7965,6 +8019,10 @@
     margin-left: auto;
   }
 
+  .tight .option > .value {
+    max-width: none;
+  }
+
   .tight .option > .sign + .value {
     margin-left: 0;
   }
@@ -7985,6 +8043,17 @@
   /* „Раздели“: the two groups one over the other, each the column's width; „Върни последното“ under the pips. */
   .tight .split-sides {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* An order or pairs with few words to a line: the line on how to answer is read, not shown (the rows' grips and
+     letters say it), so that the first rows show over „Готово“ as the question opens. */
+  .tighter .run-question:not(.answered):has(.sortable-list, .match) .answering .hint {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   /* „Свържи“ with fewer words still to a line: the things on the left over those on the right, a cell the column's
@@ -8008,24 +8077,44 @@
     translate: none;
   }
 
-  /* A choice keeps the room for what the answer brings (its share, its ✓ or ✕) at its foot, not at its end: its
-     words have the row's width, and nothing re-wraps as they come. */
-  .tighter .choices > .option {
-    padding-right: var(--space-4);
-    padding-bottom: calc(10px + 28px + var(--space-1));
+  /* A choice answered, with few words to a line: its words keep the row's width, and what the answer brings goes in
+     the room the row makes at its foot (set in its corners, never a line of its own): „ти“ at the left, how many gave
+     it and the ✓ or ✕ at the right. One the player neither gave nor got right stays a line, its share after its
+     words. */
+  .tight .choices > .option:is(.right, .wrong, .dim, .crowd) {
+    flex-wrap: nowrap;
   }
 
-  .tighter .choices > .option > :is(.sign, .crowd-share, .key-hint) {
-    top: auto;
+  .tight .choices > .option:is(.right, .wrong) {
+    padding-bottom: calc(10px + max(30px, 1.5rem) + var(--space-1));
+  }
+
+  .tight .choices > .option:is(.right, .wrong) > :is(.sign, .crowd-share, .yours) {
+    position: absolute;
+    right: 14px;
     bottom: 10px;
-    translate: none;
   }
 
-  .tighter .choices > .option > .yours {
-    top: auto;
+  .tight .choices > .option:is(.right, .wrong) > .crowd-share {
+    right: calc(14px + 30px + var(--space-2));
+    bottom: 14px;
+  }
+
+  .tight .choices > .option:is(.right, .wrong) > .yours {
     right: auto;
     bottom: 18px;
     left: 14px;
+  }
+
+  /* The verdict on a line with its sign, and how everyone answered a size smaller: the fact's first line comes into
+     sight over „Напред“ with them. */
+  .tighter .run-question .after .verdict-word {
+    font-size: 1.25rem;
+  }
+
+  .tighter .run-question .after .crowd-says {
+    font-size: 0.8125rem;
+    line-height: 1.25;
   }
 
   /* A run's answer under the answers, as on a tablet, not docked at the screen's foot: there, at this size, it

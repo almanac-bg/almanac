@@ -106,22 +106,13 @@ export function me(kit: Kit) {
             said ? h("p", { class: "muted", role: "status" }, said) : null,
             head(data),
             () => (failed() && !data() ? failure(failed(), () => go("/me", true)) : null),
-            // A guest keeps their game with an email; one who has a profile elsewhere signs in to it, apart, in a
-            // smaller line. Either way, Профил again, as the profile has it.
-            () =>
-              user()?.email
-                ? null
-                : [keepGame(() => go("/me", true)), haveProfile(() => go("/me", true), "Имаш профил? Влез", signingIn)],
+            // A guest keeps their game with an email, or signs in to a profile they have elsewhere, and sees how others
+            // see them: one line of ways (not four loose ones before anything else). Either way in, Профил again, as
+            // the profile has it.
+            () => (user()?.email ? null : keepGame(() => go("/me", true), signingIn, theirView(user()?.tag))),
             () => longest(data()),
             () => wornLadder(data()),
-            () =>
-              user()?.tag
-                ? h(
-                    "p",
-                    { class: "me-links" },
-                    h("a", { class: "link muted", href: profileHref(user()?.tag ?? "") }, "Как те виждат другите"),
-                  )
-                : null,
+            () => (user()?.email && user()?.tag ? h("p", { class: "me-links" }, theirView(user()?.tag)) : null),
           ),
           h(
             "div",
@@ -162,6 +153,11 @@ export function me(kit: Kit) {
   );
 }
 
+/** The way to the player's page as others see it (`/players/<tag>`); nothing without a tag. */
+function theirView(tag: string | undefined): Child {
+  return tag ? h("a", { class: "link muted", href: profileHref(tag) }, "Как те виждат другите") : null;
+}
+
 /** Who you are: your avatar as you wear it, the seal you wear on its corner, your name and tag; a name still the one
  * drawn says so, with the way to change it. */
 function head(data: () => Stats | null): Child {
@@ -192,8 +188,8 @@ function head(data: () => Stats | null): Child {
   );
 }
 
-/** The longest streak: its number and words, the flame by it; under it, what the week forgives. Nothing before a
- * first day. */
+/** The longest streak: its number and words, the flame by it; under it, what the week forgives (that it has
+ * forgiven all it can, only while a streak runs). Nothing before a first day. */
 function longest(s: Stats | null): Child {
   if (!s?.best) return null;
   return [
@@ -209,13 +205,16 @@ function longest(s: Stats | null): Child {
         h("span", { class: "streak-note" }, "най-дълга серия"),
       ),
     ),
-    h(
-      "p",
-      { class: "small muted me-forgives" },
-      s.spare
-        ? "До два пропуснати дни в седмицата не прекъсват серията."
-        : "Тази седмица простените дни са използвани: следващият пропуснат ден прекъсва серията.",
-    ),
+    // The week's forgiving used up says something only of a streak that's running.
+    s.spare || s.streak > 0
+      ? h(
+          "p",
+          { class: "small muted me-forgives" },
+          s.spare
+            ? "До два пропуснати дни в седмицата не прекъсват серията."
+            : "Тази седмица простените дни са използвани: следващият пропуснат ден прекъсва серията.",
+        )
+      : null,
   ];
 }
 

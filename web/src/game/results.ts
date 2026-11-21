@@ -16,7 +16,8 @@ import type { Reviewed, Score, State } from "./types.ts";
 /** A finished run: the score as the screen's big number (its right answers), a line about it (the place), and the
  * marks; right under it what to do next (`next`: the gold action, then „Прегледай въпросите“ and the others, as
  * buttons, or with `quiet` as plain links in a line); then whatever the screen adds (`more`: what the game earned);
- * and at the end, once opened, the questions. */
+ * and at the end, once opened, the questions. A chapter's game (`chapter`) is a spread on a big screen, as the day's
+ * result is: its sheet on the left page, the ways on and what it wrote on the right, the questions under both. */
 export function summary(
   s: State,
   line: Child,
@@ -31,16 +32,20 @@ export function summary(
   const perfect = outOf(s) > 0 && s.rights === outOf(s);
   const hero = chapter ? chapterCard(s, chapter) : scoreCard(s, line);
   if (moment) land(hero, s.id, perfect, s.kind === "day");
-  return h(
-    "section",
-    { class: "summary" },
-    hero,
-    next.quiet
-      ? [h("div", { class: "actions" }, next.main), quietSteps([questions.button, ...(next.also ?? [])])]
-      : nextSteps(next.main, [questions.button, ...(next.also ?? [])]),
-    more,
-    questions.list,
-  );
+  const steps = next.quiet
+    ? [h("div", { class: "actions" }, next.main), quietSteps([questions.button, ...(next.also ?? [])])]
+    : nextSteps(next.main, [questions.button, ...(next.also ?? [])]);
+  if (chapter) {
+    hero.classList.add("page-1");
+    return h(
+      "section",
+      { class: "summary screen spread" },
+      hero,
+      h("div", { class: "page-2 stack" }, steps, more),
+      questions.list,
+    );
+  }
+  return h("section", { class: "summary" }, hero, steps, more, questions.list);
 }
 
 /** A finished game's score, as its result has it: the right answers big (the close ones beside them), a line about

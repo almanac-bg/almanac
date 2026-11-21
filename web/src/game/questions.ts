@@ -97,7 +97,10 @@ function crowdOnAll(buttons: HTMLElement[], crowd: Crowd | undefined, mine: numb
     const x = c?.picks?.[i];
     if (!c || x === undefined) return [];
     const share = h("span", { class: "value crowd-share unseen" }, percent(x));
-    (b.querySelector(".pic-frame") ?? b).append(share);
+    // After the words (and „ти“), before the ✓ or ✕ at the row's end.
+    const sign = b.querySelector(":scope > .sign");
+    if (sign) sign.before(share);
+    else (b.querySelector(".pic-frame") ?? b).append(share);
     return [{ b, share, x }];
   });
   return () => {
@@ -181,8 +184,9 @@ export function answerWords(view: View, reveal: Reveal): string {
   }
 }
 
-/** The least a question's picture is drawn at, however little room the screen has. */
-const pictureFloor = 80;
+/** The least a question's picture is drawn at, however little room the screen has; on a short screen (under 620px)
+ * less, so the picture gives way before an answer goes under the screen's foot. */
+const pictureFloor = () => (innerHeight < 620 ? 48 : 80);
 
 /** The picture over a question. While it's asked (fit), it's kept low enough that the question, the picture and the
  * whole answering part under it fit on the screen, down to a floor on a screen too small for that, and kept so as
@@ -213,7 +217,7 @@ export function picture(view: View, fit = false): Child {
       const gap = Number.parseFloat(getComputedStyle(img.parentElement ?? img).rowGap) || 0;
       const spare = Math.max(0, under.top - box.bottom - gap);
       const end = under.bottom + scrollY - box.height - spare;
-      img.style.setProperty("--fit", `${Math.max(pictureFloor, Math.floor(innerHeight - end - 16))}px`);
+      img.style.setProperty("--fit", `${Math.max(pictureFloor(), Math.floor(innerHeight - end - 16))}px`);
     };
     requestAnimationFrame(size);
     listen(window, "resize", size);
@@ -266,8 +270,8 @@ function answerKeys(buttons: HTMLElement[], locked: Signal<boolean>): void {
 /** The ✓ or ✕ on a revealed answer (its colour and words say the same). */
 const sign = () => h("span", { class: "sign", "aria-hidden": "true" });
 
-/** „ти“ on the player's own wrong answer: a choice's in its corner, over how many gave it (its words never wrap
- * anew as the answer shows); a picture's after its name (held to the last word of it). */
+/** „ти“ on the player's own wrong answer: a choice's after its words, before how many gave it; a picture's after its
+ * name (held to the last word of it). */
 const yours = () => h("span", { class: "yours" }, "ти");
 
 function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<boolean>, display: boolean): Asked {

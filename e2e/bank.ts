@@ -1,8 +1,9 @@
 // The questions the browser tests play: the public sample bank, and, where the real bank is here (private/, or the
-// main checkout's from a worktree; never on CI, which has only the sample), the real bank's longest orders and pairs
-// with it, the kinds a phone's short screen has the least room for: the program serves them in a copy of the sample
-// bank made for the tests (playwright.config, BANK_DIR), and kinds.ts finds them there as the longest of their kind.
-import { cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+// main checkout's from a worktree; never on CI, which has only the sample), the real bank's extremes with it, the
+// questions a phone's short screen has the least room for (its longest orders, pairs and choices, and its longest choice
+// under a portrait): the program serves them in a copy of the sample bank made for the tests (playwright.config,
+// BANK_DIR), and kinds.ts finds them there as the longest of their kind.
+import { copyFileSync, cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /** A question of the bank, as much of it as the tests read. */
@@ -12,7 +13,7 @@ export interface Q {
   text: string;
   answer?: unknown;
   wrong?: string[];
-  image?: unknown;
+  image?: { file: string; w: number; h: number };
   pictures?: { alt: string }[];
   clues?: string[];
   items?: { text: string; value?: number; group?: number }[];
@@ -67,17 +68,24 @@ export const words = (q: Q) =>
     .filter((w) => typeof w === "string")
     .join(" ").length;
 
+/** A choice under a picture taller than it's wide: the picture as tall as a question's picture is let be. */
+export const portrait = (q: Q) => q.type === "choice" && !!q.image && q.image.h > 1.2 * q.image.w;
+
 /** The real bank's questions the tests add to the sample: of an order and of pairs, the one with the most words and
- * the one with the longest question (often one question), each with its chapter's file. None without the real bank. */
+ * the one with the longest question (often one question); the choice with the most words, and the one under a
+ * portrait with the most; each with its chapter's file. None without the real bank. */
 function picks(): [file: string, q: Q][] {
   if (!real) return [];
   const all = [...files(real)].flatMap(([f, qs]) => qs.filter((q) => !q.retired).map((q) => [f, q] as [string, Q]));
   const out = new Map<string, [string, Q]>();
+  const most = (kind: (q: Q) => boolean, size: (q: Q) => number) => {
+    const best = all.filter(([, q]) => kind(q)).sort(([, a], [, b]) => size(b) - size(a))[0];
+    if (best) out.set(best[1].id, best);
+  };
   for (const type of ["order", "match"])
-    for (const size of [words, (q: Q) => q.text.length]) {
-      const best = all.filter(([, q]) => q.type === type).sort(([, a], [, b]) => size(b) - size(a))[0];
-      if (best) out.set(best[1].id, best);
-    }
+    for (const size of [words, (q: Q) => q.text.length]) most((q) => q.type === type, size);
+  most((q) => q.type === "choice" && !q.image && !q.pictures, words);
+  most(portrait, words);
   return [...out.values()];
 }
 
@@ -96,6 +104,11 @@ export function testBank(make: boolean): string {
     // here as on CI.
     for (const [f, q] of add) if (!ids.has(q.id)) qs.set(f, [...(qs.get(f) ?? []), { ...q, on: ["2999-01-01"] } as Q]);
     for (const [f, list] of qs) writeFileSync(resolve(served, "questions", f), JSON.stringify(list, null, 2));
+    // A picture's files with it, each width the program offers (its name, and -600, -900).
+    const stems = new Set(add.flatMap(([, q]) => (q.image ? [q.image.file.replace(/\.[a-z]+$/, "")] : [])));
+    for (const name of readdirSync(resolve(real ?? "", "images")))
+      if (stems.has(name.replace(/(-\d+)?\.[a-z]+$/, "")))
+        copyFileSync(resolve(real ?? "", "images", name), resolve(served, "images", name));
   }
   return "test-results/bank";
 }
