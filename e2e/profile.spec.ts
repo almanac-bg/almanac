@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { playedBefore, playRun, ranked } from "./play.ts";
+import { daysPlayed, playedBefore, playRun, ranked } from "./play.ts";
 
 test("Профил: one list of seals, the best worn on the avatar, never chosen; only animals as avatars", async ({
   page,
@@ -86,14 +86,18 @@ test("a player's profile: asked to be friends from it, and friends there", async
   await b.goto(`/players/${ana.tag}`);
   await expect(b.getByRole("heading", { level: 1, name: ana.name })).toBeVisible();
   await expect(b.locator(".me-tag")).toHaveText(`@${ana.tag}`);
+  // Since the day she started, as the game writes a date, with its year.
+  await expect(b.locator(".me-line")).toHaveText(/^Играе от \d{1,2} [а-я]+ \d{4}\u00a0г\.$/);
   // Her avatar is hers to change, not his: no way to it here.
   await expect(b.getByRole("button", { name: "Смени аватара" })).toHaveCount(0);
   // A topic's game writes no rank and no streak: nothing yet, and no lifetime totals nor how well she knows a topic.
   await expect(b.getByText("Още няма печат.")).toBeVisible();
+  await expect(b.locator(".me-streak")).toHaveCount(0);
   await expect(b.locator(".me-head")).not.toContainText("Ниво");
   await expect(b.locator(".screen")).not.toContainText(/изиграна игра|верни отговори|Колко знае/);
 
   // Nobody on his device yet: told to play a game first or sign in, and no guest is made for the asking.
+  await expect(b.locator(".player-actions .kicker")).toHaveText("Приятели");
   await expect(b.getByText("За да добавяш приятели, първо изиграй една игра или влез с имейл.")).toBeVisible();
   await expect(b.getByRole("button", { name: "Добави приятел" })).toHaveCount(0);
   expect(await b.evaluate(async () => (await (await fetch("/api/me")).json()).user)).toBeNull();
@@ -102,7 +106,8 @@ test("a player's profile: asked to be friends from it, and friends there", async
   await playedBefore(b, 1);
   await b.reload();
   await b.getByRole("button", { name: "Добави приятел" }).click();
-  await expect(b.getByText("Поканата за приятелство чака отговор.")).toBeVisible();
+  await expect(b.locator(".player-actions .kicker")).toHaveText("Покана за приятелство");
+  await expect(b.getByText(`Чака отговор от ${ana.name}.`)).toBeVisible();
   const bo = await b.evaluate(
     async () => (await (await fetch("/api/me")).json()).user as { name: string; tag: string },
   );
@@ -110,22 +115,46 @@ test("a player's profile: asked to be friends from it, and friends there", async
   await a.locator(".invitation").getByRole("link", { name: bo.name }).click();
   await expect(a.getByText(`${bo.name} иска да сте приятели.`)).toBeVisible();
   await a.getByRole("button", { name: "Приеми" }).click();
-  await expect(a.getByText("Приятели сте.")).toBeVisible();
+  await expect(a.locator(".player-actions .kicker")).toHaveText("Приятели");
+  await expect(a.locator(".player-actions")).toContainText("Още нямате дуели.");
 
   // Friends now, on his side too, with a duel a tap away (its name first, a drawn one: duels.spec); the page laid out
-  // as Профил is: the head, how they stand where the streak would be, the seals.
+  // as Профил is: the head, her streak as it is now by her tag (as Профил has it, without the week's forgiving:
+  // hers), how they stand, the seals.
+  await daysPlayed(a, 3, 2, 1);
   await b.reload();
-  await expect(b.locator(".player-actions")).toContainText("Приятели сте.");
+  await expect(b.locator(".player-actions .kicker")).toHaveText("Приятели");
   expect(await b.locator(".screen.me > .me-intro > *").evaluateAll((els) => els.map((e) => e.classList[0]))).toEqual([
     "me-head",
     "player-actions",
     "sect",
   ]);
+  await expect(b.locator(".me-head .me-ids .me-streak")).toHaveText("3 дни в серията");
+  await expect(b.locator(".me-streak")).not.toHaveAttribute("title");
+  await expect(b.locator(".screen")).not.toContainText(/простен|пропуснат/);
   await expect(b.getByRole("button", { name: /^Дуел (с|със) / })).toBeVisible();
+  // The duels between them so far, as numerals with their words under them: wins and losses, draws only where any.
+  for (const [rec, want] of [
+    [{ won: 3, lost: 0, drawn: 0 }, ["3победи", "0загуби"]],
+    [{ won: 1, lost: 2, drawn: 1 }, ["1победа", "2загуби", "1равенство"]],
+  ] as const) {
+    await b.route(`**/api/players/${ana.tag}`, async (route) => {
+      const res = await route.fetch();
+      await route.fulfill({ response: res, json: { ...(await res.json()), record: rec } });
+    });
+    await b.reload();
+    await expect(b.locator(".player-record .player-stat")).toHaveText([...want]);
+    await b.unroute(`**/api/players/${ana.tag}`);
+  }
 
-  // Her own profile, as others see it, says so.
+  // Профил has no way to the page as others see it: her own, opened by its tag, is simply that page.
+  await a.goto("/me");
+  await expect(a.locator(".me-head .me-streak")).toHaveText("3 дни в серията");
+  await expect(a.getByText(/Как (те|ме) виждат другите/)).toHaveCount(0);
   await a.goto(`/players/${ana.tag}`);
-  await expect(a.getByText("Така те виждат другите.")).toBeVisible();
+  await expect(a.locator(".me-head .me-streak")).toHaveText("3 дни в серията");
+  await expect(a.locator(".player-actions")).toHaveCount(0);
+  await expect(a.locator(".screen")).not.toContainText(/виждат другите|Към твоя профил/);
   await a.goto("/players/nosuchplayer");
   await expect(a.getByRole("heading", { name: "Няма такъв профил" })).toBeVisible();
 });

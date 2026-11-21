@@ -186,18 +186,11 @@ const told =
   };
 
 /** Профил's line to a guest, from the first game, one quiet line: the game is only here, „Запази я с имейл“ (a tap
- * opens its form in the line's place), „Имаш профил? Влез“ (a profile from elsewhere: the sign-in page, signInPage),
- * and `more` after them. Once the code is in, `signedIn` draws Профил again as the profile has it, and it says what
- * came of it (notice). */
-export function keepGame(signedIn: () => void, more: Child = null): Child {
+ * opens its form in the line's place), „Имаш профил? Влез“ (a profile from elsewhere: the sign-in page, signInPage).
+ * Once the code is in, `signedIn` draws Профил again as the profile has it, and it says what came of it (notice). */
+export function keepGame(signedIn: () => void): Child {
   // Where no email is asked for: no offer of one, only why not, and the way (the phone's browser).
-  if (noEmail)
-    return h(
-      "p",
-      { class: "muted keep-line" },
-      `Играта ти е само на това устройство. ${noEmailLine}`,
-      more ? [" ", more] : null,
-    );
+  if (noEmail) return h("p", { class: "muted keep-line" }, `Играта ти е само на това устройство. ${noEmailLine}`);
   const keeping = signal(false);
   return () =>
     keeping()
@@ -214,7 +207,6 @@ export function keepGame(signedIn: () => void, more: Child = null): Child {
           h("button", { class: "link", type: "button", onclick: () => keeping.set(true) }, "Запази я с имейл"),
           " · ",
           h("a", { class: "link", href: "/signin" }, "Имаш профил? Влез"),
-          more ? [" · ", more] : null,
         );
 }
 

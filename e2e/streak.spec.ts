@@ -14,14 +14,22 @@ test("a streak that ended is said to have ended, once", async ({ page }) => {
   await expect(page.locator(".streak-notice")).toHaveCount(0);
 });
 
-test("Профил shows the streak as it is now, never an ended one's, and says what the week forgives", async ({
+test("Профил shows the streak as it is now in its head, never an ended one's, and what the week forgives on it", async ({
   page,
 }) => {
   await page.goto("/");
-  await daysPlayed(page, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 2, 1);
+  // Twelve days that ended long before this week (four missed at most forgiven: by 14 days ago at the latest), so
+  // this week has forgiven nothing, whatever today's weekday; then the last two.
+  await daysPlayed(page, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 2, 1);
   await page.goto("/me");
-  await expect(page.locator(".me-streak .status-n")).toHaveText("2");
-  await expect(page.locator(".me-intro")).toContainText("До два пропуснати дни в седмицата не прекъсват серията.");
+  await expect(page.locator(".me-head .me-streak")).toHaveText("2 дни в серията");
+  // What the week forgives is the pointer's, resting on it (a phone has it where a day missed is forgiven): not a line
+  // of the page.
+  await expect(page.locator(".me-head .me-streak")).toHaveAttribute(
+    "title",
+    "До два пропуснати дни в седмицата не прекъсват серията.",
+  );
+  await expect(page.locator(".me-intro")).not.toContainText("пропуснат");
 });
 
 test("a streak at stake: unlit till the day lights it, pointed to from a topic, tomorrow under the result", async ({

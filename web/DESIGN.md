@@ -175,21 +175,30 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   nothing ringed, no time on any of them: time never counts.
 - **Профил:** one column, on a big screen too: the avatar with the seal worn on its corner and a pencil on its top corner (a phone: always; a big screen: as the pointer
   comes over it, with the tooltip „Смени аватара“), the
-  name; a guest's ways in one quiet line under it („Играта ти е само на това устройство. Запази я с имейл · Имаш
-  профил? Влез · Как те виждат другите“: the first opens its form in the line's place, the second is the sign-in page); the streak
-  as it is now (never an ended one's) and what the week forgives (that it's used up, only while a streak runs); „Печати“, one list on a card
+  name, the @username and by it, on the same line where it fits, the streak as it is now, sized to the head (the
+  flame, „58 дни в серията“; never an ended one's, nothing while none runs; no card of its own). What the week
+  forgives is no line of the page: the streak's `title`, for a pointer resting on it (that it's used up, only while a
+  streak runs); a phone is told it where it matters, when a day missed is forgiven. A guest's ways in one quiet line
+  under it („Играта ти е само на това устройство. Запази я с имейл · Имаш профил? Влез“: the first opens its form in
+  the line's place, the second is the sign-in page); „Печати“, one list on a card
   (`sealList()`), a row a chapter with a rank (only those earned), in the bank's order: its seal; its name with its
   ink at the line's end („27 с мастило“, the book's count; under the name where they don't fit); under them where it
   stands (`standing()`); a view of the ranks: nothing to tap, none ringed, no single chapter's ladder (the one worn is
-  the best, never chosen: on the avatar's corner); „Как те виждат другите“; Настройки last. No list of past games (a
+  the best, never chosen: on the avatar's corner); Настройки last. No way to the page as others see it: it is this one
+  without what's one's own. No list of past games (a
   game isn't gone over after its day). No duplicate avatar in the bar's corner on this page. The avatars, the fifteen
   animals and nothing else (an avatar is a face: a seal is worn on it, never chosen as it), are a choice made rarely,
   so never on the page: a sheet (`screens/avatar.ts`) opened by the avatar (one button, its pencil on it), the one
   worn ringed; a tap wears one and, once it's kept, puts the sheet away. Another player's page (`/players/<tag>`) is
   laid out the same, one column (`profileHead`, `sealsSection`): the same head without a way to change it („Играе от
-  …“ in the line under the @username), in the streak's place a card of how you stand (ask to be friends, answer their
-  asking, or friends and „Дуел“), the same seals (no streak: none of it is another's to see); nothing of one's own
-  (Смени, Настройки). Where no email may be asked for (an app's browser that reads what's typed: `noEmail`), Профил and
+  6 ноември 2026 г.“, the day they started, in the line under the @username), their streak by the @username as Профил has it (only as it is now: never the
+  longest nor an ended one's, nothing while none runs, and not what the week forgives: that's theirs), right under
+  the head a card of how you stand: its kicker („Приятели“, „Покана за приятелство“, „Не сте приятели“); as
+  friends the duels between you as heavy numerals with their words under them („3 / победи“, „0 / загуби“, and
+  „равенства“ only where there are any; „Още нямате дуели.“ before any) and „Дуел“ its one primary button, the row's
+  width on a phone; else a line and its buttons (ask to be friends, answer their asking, call it off); the same seals; nothing of one's own
+  (Смени, Настройки). One's own, opened by its @username, is simply the page as others see it, with no card of how
+  you stand. Where no email may be asked for (an app's browser that reads what's typed: `noEmail`), Профил and
   Настройки offer none, only the line that says so.
 
 ## Colour

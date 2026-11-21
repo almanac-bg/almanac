@@ -1,8 +1,9 @@
 // Another player's profile, by their tag (/players/tag), laid out as Профил is (screens/me.ts: one column, on a big
-// screen too): the same head (their avatar with the seal they wear on its corner, their name and tag, and since when
-// they play), how you stand with them where Профил has the streak (friends and a duel a tap away, ask to be friends,
-// or answer their asking), and the same „Печати“ (ui.ts: profileHead, sealsSection). Nothing that's only theirs
-// (play/profile.go: no streak, no lifetime totals), and nothing that's only one's own (Смени, Настройки).
+// screen too): the same head (their avatar with the seal they wear on its corner, their name and tag, and the day they
+// started playing), with their streak as it is now by the tag (never an ended one's), a card of how you stand with
+// them under it (friends: the duels between you and „Дуел“; or the request either way), and the same „Печати“ (ui.ts:
+// profileHead, sealsSection). Nothing that's only theirs (play/profile.go: no week's forgiving, no lifetime totals), and
+// nothing that's only one's own (Смени, Настройки). One's own, opened by its tag, is simply the page as others see it.
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -20,7 +21,7 @@ let {
   checkNews,
   user,
   avatar,
-  record,
+  dateWords,
   go,
   startDuel,
   withWord,
@@ -33,9 +34,12 @@ interface Profile {
   tag: string;
   me?: boolean;
   avatar: string;
-  since: number;
+  // The day they started playing (YYYY-MM-DD, Bulgaria's).
+  since: string;
   seal?: { chapter: string; level: number };
   ranks: ChapterRank[];
+  // The streak as it is now (none: none runs).
+  streak?: number;
   friend?: "yes" | "asked" | "asks";
   request?: number;
   record?: { won: number; lost: number; drawn: number };
@@ -43,9 +47,8 @@ interface Profile {
   id?: number;
 }
 
-// „г.“ kept with its year, never alone on a line.
-const month = (ms: number) =>
-  new Intl.DateTimeFormat("bg", { month: "long", year: "numeric" }).format(new Date(ms)).replace(/\s(?=г\.)/, " ");
+// A day as the game writes it, with its year: „6 ноември 2026 г.“ („г.“ kept with its year, never alone on a line).
+const fullDate = (day: string) => `${dateWords(day)} ${day.slice(0, 4)} г.`;
 
 export function playerProfile(kit: Kit, [tag]: string[]): Child {
   ({
@@ -58,7 +61,7 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
     checkNews,
     user,
     avatar,
-    record,
+    dateWords,
     go,
     startDuel,
     withWord,
@@ -94,17 +97,28 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
         h("span", { class: "me-avatar" }, avatar(p.avatar, { size: "l", name: p.name, seal: p.seal })),
         nameWords(p.name),
         p.tag,
-        h("span", { class: "muted" }, `Играе от ${month(p.since)}`),
+        h("span", { class: "muted" }, `Играе от ${fullDate(p.since)}`),
+        () => p.streak,
       ),
-      relation(p, load),
+      p.me ? null : relation(p, load),
       sealsSection(p.ranks, h("p", { class: "seal-worn" }, "Още няма печат.")),
     );
   });
 }
 
-/** How the viewer stands with them, where Профил has the streak: as friends, the duels between the two so far and a
- * duel a tap away; else ask to be friends, or answer their asking. One's own page, as others see it: the way back to
- * Профил. */
+/** One count of the duels between two, as the card says it: a heavy numeral, its word under it. */
+function tally(n: number, one: string, many: string): Child {
+  return h(
+    "span",
+    { class: "player-stat" },
+    h("b", { class: "player-n" }, String(n)),
+    h("span", { class: "player-stat-word" }, n === 1 ? one : many),
+  );
+}
+
+/** How the viewer stands with them, a card under the head: a kicker that names it („Приятели“, or the request); as
+ * friends, the duels between the two (wins and losses as numerals, draws where there are any, or that there are none
+ * yet) and „Дуел“, the card's one action; else ask to be friends, or answer their asking. */
 function relation(p: Profile, reload: () => Promise<unknown>): Child {
   const busy = signal(false);
   const note = signal<{ text: string; bad?: boolean } | null>(null);
@@ -122,45 +136,44 @@ function relation(p: Profile, reload: () => Promise<unknown>): Child {
   const button = (label: string, cls: string, fn: () => Promise<unknown>, aria?: string) =>
     h(
       "button",
-      { class: `btn inline ${cls}`, type: "button", disabled: busy, "aria-label": aria, onclick: () => act(fn) },
+      { class: `btn ${cls}`, type: "button", disabled: busy, "aria-label": aria, onclick: () => act(fn) },
       label,
     );
+  const line = (text: string) => h("p", { class: "player-relation" }, text);
 
+  let kicker: string;
   let body: Child;
-  if (p.me) {
-    body = h(
-      "p",
-      { class: "player-relation muted" },
-      "Така те виждат другите. ",
-      h("a", { href: "/me" }, "Към твоя профил"),
-    );
-  } else if (p.friend === "yes") {
+  let actions: Child;
+  if (p.friend === "yes") {
     const r = p.record ?? { won: 0, lost: 0, drawn: 0 };
-    const played = r.won + r.lost + r.drawn;
     const id = p.id;
-    body = [
-      h(
-        "p",
-        { class: "player-relation" },
-        "Приятели сте.",
-        played ? h("span", { class: "muted" }, ` Дуели помежду ви: ${record(r.won, r.lost, r.drawn)}.`) : null,
-      ),
-      id
-        ? button(
-            "Дуел",
-            "primary",
-            async () => {
-              const d = await startDuel({ friend: id });
-              if (d) go(`/duel/${d.id}`);
-            },
-            `Дуел ${withWord(p.name)}`,
+    kicker = "Приятели";
+    body =
+      r.won + r.lost + r.drawn
+        ? h(
+            "p",
+            { class: "player-record" },
+            tally(r.won, "победа", "победи"),
+            tally(r.lost, "загуба", "загуби"),
+            r.drawn ? tally(r.drawn, "равенство", "равенства") : null,
           )
-        : null,
-    ];
+        : line("Още нямате дуели.");
+    actions = id
+      ? button(
+          "Дуел",
+          "primary",
+          async () => {
+            const d = await startDuel({ friend: id });
+            if (d) go(`/duel/${d.id}`);
+          },
+          `Дуел ${withWord(p.name)}`,
+        )
+      : null;
   } else if (p.friend === "asks") {
-    body = [
-      h("p", { class: "player-relation" }, `${p.name} иска да сте приятели.`),
-      button("Приеми", "", async () => {
+    kicker = "Покана за приятелство";
+    body = line(`${p.name} иска да сте приятели.`);
+    actions = [
+      button("Приеми", "primary", async () => {
         await api("POST", `/api/friends/requests/${p.request}/accept`, {});
         checkNews();
         await reload();
@@ -172,33 +185,39 @@ function relation(p: Profile, reload: () => Promise<unknown>): Child {
       }),
     ];
   } else if (p.friend === "asked") {
-    body = [
-      h("p", { class: "player-relation muted" }, "Поканата за приятелство чака отговор."),
-      button("Отмени поканата", "", async () => {
-        await api("DELETE", `/api/friends/requests/${p.request}`);
-        await reload();
-      }),
-    ];
+    kicker = "Покана за приятелство";
+    body = line(`Чака отговор от ${p.name}.`);
+    actions = button("Отмени поканата", "", async () => {
+      await api("DELETE", `/api/friends/requests/${p.request}`);
+      await reload();
+    });
   } else if (!user.peek()) {
     // Nobody yet on this device: a request is a player's, never a guest made for the asking (a guest with no game
     // finished is told so by the server).
-    body = [
-      h("p", { class: "player-relation muted" }, "За да добавяш приятели, първо изиграй една игра или влез с имейл."),
-      h("a", { class: "btn inline primary", href: "/" }, "Към днешния брой"),
-      h("a", { class: "btn inline", href: "/signin" }, "Влез"),
+    kicker = "Приятели";
+    body = line("За да добавяш приятели, първо изиграй една игра или влез с имейл.");
+    actions = [
+      h("a", { class: "btn primary", href: "/" }, "Към днешния брой"),
+      h("a", { class: "btn", href: "/signin" }, "Влез"),
     ];
   } else {
-    body = [
-      h("p", { class: "player-relation muted" }, "Приятелите виждат резултатите си всеки ден."),
-      button("Добави приятел", "primary", async () => {
-        const r = await api<{ friends?: boolean; name?: string }>("POST", "/api/friends/requests", { to: p.tag });
-        await reload();
-        if (!r.friends) note.set({ text: `Поканата до ${p.name} е изпратена.` });
-      }),
-    ];
+    kicker = "Не сте приятели";
+    body = line("Приятелите виждат резултатите си всеки ден.");
+    actions = button("Добави приятел", "primary", async () => {
+      const r = await api<{ friends?: boolean; name?: string }>("POST", "/api/friends/requests", { to: p.tag });
+      await reload();
+      if (!r.friends) note.set({ text: `Поканата до ${p.name} е изпратена.` });
+    });
   }
-  return h("section", { class: "player-actions" }, body, () => {
-    const n = note();
-    return n && h("p", { class: n.bad ? "bad" : "muted", role: n.bad ? "alert" : "status" }, n.text);
-  });
+  return h(
+    "section",
+    { class: "player-actions" },
+    h("h2", { class: "kicker" }, kicker),
+    body,
+    actions ? h("div", { class: "player-buttons" }, actions) : null,
+    () => {
+      const n = note();
+      return n && h("p", { class: n.bad ? "bad" : "muted", role: n.bad ? "alert" : "status" }, n.text);
+    },
+  );
 }
