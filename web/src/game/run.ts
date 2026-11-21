@@ -458,8 +458,11 @@ export function timer(leftMs: number, limitMs: number, left: () => number, locke
     if (n <= 5) play("hurry", 5 - n);
     else if (limitMs > 10_000) play("tick");
   });
-  // Once answered, the bar stops where it is.
+  // Once answered, the bar stops where it is. Paused (and filling forwards), the animation stays on the document's
+  // timeline, and with it the bar and the whole question around it: cancelled as the question goes, or every question
+  // of the run would stay in memory to its end.
   const freeze = () => run?.pause();
+  onCleanup(() => run?.cancel());
   return h(
     "div",
     // Quiet while there's time, as the clock's sound is; gold from the last ten seconds, red for the last five.

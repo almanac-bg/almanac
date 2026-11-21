@@ -525,17 +525,21 @@ function roll(el: HTMLElement, from: string, to: string): Promise<void> {
   box.append(was, now);
   el.replaceChildren(box);
   const options = { duration: 300, easing: settleIn, fill: "both" as const };
-  was.animate([{ transform: "none" }, { transform: "translateY(-100%)", opacity: 0 }], options);
-  const put = () => el.replaceChildren(to);
-  return now
-    .animate(
-      [
-        { transform: "translateY(100%)", opacity: 0 },
-        { transform: "none", opacity: 1 },
-      ],
-      options,
-    )
-    .finished.then(put, put);
+  const out = was.animate([{ transform: "none" }, { transform: "translateY(-100%)", opacity: 0 }], options);
+  const into = now.animate(
+    [
+      { transform: "translateY(100%)", opacity: 0 },
+      { transform: "none", opacity: 1 },
+    ],
+    options,
+  );
+  // Filling, an animation stays on the document's timeline with what it moves: cancelled once the number is put.
+  const put = () => {
+    el.replaceChildren(to);
+    out.cancel();
+    into.cancel();
+  };
+  return into.finished.then(put, put);
 }
 
 /** The streak one day longer, in its chip (drawn with the new number): once `after` has come (the result has landed),
