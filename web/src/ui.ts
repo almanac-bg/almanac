@@ -6,11 +6,11 @@ import { errorText, passing } from "./lib/api.ts";
 import { hourInBulgaria } from "./lib/day.ts";
 import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
 import { type Scheme, scheme, setScheme } from "./lib/prefs.ts";
-import { formatNumber, stakeWords } from "./lib/words.ts";
+import { formatNumber, formatValue, stakeWords } from "./lib/words.ts";
 import { glyphBox, rankName, sealParts } from "./seal.ts";
 import { topics } from "./state.ts";
 
-export { formatNumber };
+export { formatNumber, formatValue };
 
 export type VerdictKind = "exact" | "right" | "partial" | "wrong" | "time";
 
