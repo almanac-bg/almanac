@@ -20,7 +20,7 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
   (the client's language test reads it too). A bank's `waivers.json` (in `private/`) lists its true exceptions.
 - The tools (from the repo root):
   - `go run ./cmd/almanac bank fmt private` writes the files in their one format, and sets the typography kept one
-    way („…“ for three dots, „ — “ for a spaced hyphen, a no-break space between a number and its „г.“); run it after
+    way („…“ for three dots, „ — “ for a spaced hyphen, a no-break space between a number and its „г.“ or its „%“); run it after
     every edit;
   - `almanac bank used`, on the server, prints the question ids the days have had (played and drawn ahead) and the
     last day drawn, nothing of a player's; fetch it into a file for `-used` (the `new-questions` skill shows the ssh
@@ -113,7 +113,7 @@ enough to be worth a look, not always.
 | `ending` | A question ends in „?“ or „:“; a true-or-not statement and a clue end in a period |
 | `address` | „ти“ to one player: „Подреди“, never „Подредете“ |
 | `fact` | One or two sentences, ending in a period; never „Интересно е, че…“ |
-| `typography` | „…“ quotes in pairs (never "…" or «…»); `bank fmt` sets the rest: „…“ for three dots, a spaced dash —, a no-break space before „г.“ |
+| `typography` | „…“ quotes in pairs (never "…" or «…»); `bank fmt` sets the rest: „…“ for three dots, a spaced dash —, a no-break space before „г.“ and before „%“ („36 %“, as the game writes a share), none between an angle and its „°“ („90° с.ш.“; a temperature is „25 °C“); a quoted title keeps its own („18% сиво“) |
 | `language` | None of the Russian words or loanwords in `language.json` |
 | `spelling` | A name spelled as `names.json` says (Чингис хан, НАСА, Sony, „Дисни“, Ferrari, Нидерландия, олимпийските игри mid-sentence); a quoted title keeps its own spelling |
 | `stale` | Wording that can stop being true has `reviewBy`: „към 2026 г.“, „все още“, „в момента“, „понастоящем“, the oldest still „действащ“, „държи рекорда“, „рекордьор“, „досега“ |

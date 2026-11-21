@@ -88,13 +88,47 @@ func ruleFact(q Question) []string {
 	return out
 }
 
-// Typography the bank keeps one way (bank fmt sets the first three: tidy).
+// Typography the bank keeps one way (bank fmt sets all but the quotes: tidy).
 var (
 	threeDots   = regexp.MustCompile(`\.\.\.`)
 	spacedDash  = regexp.MustCompile(` [-–] `)
 	looseYear   = regexp.MustCompile(`\d г\.`)
 	foreignMark = regexp.MustCompile(`["”«»]`)
+	// looseShare is a percent sign glued to its number or apart by a plain space: the game writes „36 %“, a no-break
+	// space between (web/src/game/numbers.ts).
+	looseShare = regexp.MustCompile(`(\d) ?%`)
+	// looseDegree is an angle's degree sign apart from its number („90 ° с.ш.“): an angle is „90°“, a temperature
+	// „25 °C“.
+	looseDegree = regexp.MustCompile(`(\d)[ \x{a0}]°([^CF]|$)`)
 )
+
+// unquoted applies f to the parts of s outside „…“ quotes: a quoted title keeps its own spelling („18% сиво“).
+func unquoted(s string, f func(string) string) string {
+	var b strings.Builder
+	depth, start := 0, 0
+	for i, r := range s {
+		switch r {
+		case '„':
+			if depth == 0 {
+				b.WriteString(f(s[start:i]))
+				start = i
+			}
+			depth++
+		case '“':
+			if depth > 0 {
+				depth--
+				if depth == 0 {
+					b.WriteString(s[start : i+len("“")])
+					start = i + len("“")
+				}
+			}
+		}
+	}
+	if depth > 0 {
+		return b.String() + s[start:]
+	}
+	return b.String() + f(s[start:])
+}
 
 func ruleTypography(q Question) []string {
 	var out []string
@@ -106,6 +140,8 @@ func ruleTypography(q Question) []string {
 			out = append(out, "a hyphen for a dash: „ — “ (bank fmt sets it): "+s)
 		case looseYear.MatchString(s):
 			out = append(out, "„г.“ apart from its number: a no-break space (bank fmt sets it): "+s)
+		case unquoted(s, shareAndDegree) != s:
+			out = append(out, "„36 %“ with a no-break space, an angle „90°“ with none (bank fmt sets them): "+s)
 		case foreignMark.MatchString(s):
 			out = append(out, "quotes are „…“: "+s)
 		case strings.Count(s, "„") != strings.Count(s, "“"):
@@ -116,14 +152,22 @@ func ruleTypography(q Question) []string {
 }
 
 // tidy sets in a line what the bank writes one way: „…“ for three dots, a dash for a spaced hyphen, a no-break space
-// between a number and its „г.“ (so that a year never ends a line without it). A web address is left as it is.
+// between a number and its „г.“ (so that a year never ends a line without it), and outside quotes one between a
+// number and its „%“, none between an angle and its „°“. A web address is left as it is.
 func tidy(s string) string {
 	if strings.HasPrefix(s, "https://") || strings.HasPrefix(s, "http://") {
 		return s
 	}
 	s = threeDots.ReplaceAllString(s, "…")
 	s = spacedDash.ReplaceAllString(s, " — ")
-	return looseYear.ReplaceAllStringFunc(s, func(m string) string { return strings.Replace(m, " ", " ", 1) })
+	s = looseYear.ReplaceAllStringFunc(s, func(m string) string { return strings.Replace(m, " ", " ", 1) })
+	return unquoted(s, shareAndDegree)
+}
+
+// shareAndDegree sets a percent sign and a degree sign as the game writes them.
+func shareAndDegree(s string) string {
+	s = looseShare.ReplaceAllString(s, "$1 %")
+	return looseDegree.ReplaceAllString(s, "$1°$2")
 }
 
 // language.json is the one list of the Russian words and the loanwords the game doesn't use, with the Bulgarian

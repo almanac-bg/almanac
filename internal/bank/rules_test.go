@@ -544,6 +544,10 @@ func TestTidy(t *testing.T) {
 		"ЕС - Китай и ЕС – Индия":           "ЕС — Китай и ЕС — Индия",
 		"През 1878 г. и 1885 г.":            "През 1878 г. и 1885 г.",
 		"https://en.wikipedia.org/wiki/...": "https://en.wikipedia.org/wiki/...",
+		"Около 2% от тях, после 15 %":       "Около 2 % от тях, после 15 %",
+		"Романът „18% сиво“ — 18% от":       "Романът „18% сиво“ — 18 % от",
+		"На 90 ° с.ш., при 25 °C":           "На 90° с.ш., при 25 °C",
+		"https://x.org/wiki/Ch%C3%A2teau":   "https://x.org/wiki/Ch%C3%A2teau",
 		"1877–1878 г.":                      "1877–1878 г.",
 	} {
 		if got := tidy(in); got != want {
@@ -581,5 +585,21 @@ func TestLanguageList(t *testing.T) {
 	}
 	if !kinds["Russian"] || !kinds["a loanword"] {
 		t.Errorf("language.json gives %v", kinds)
+	}
+}
+
+// A share glued to its number, or an angle apart from its degree, is a typography finding (bank fmt sets both).
+func TestTypographyOfShares(t *testing.T) {
+	q := choice("gen-1", "Колко?", "15 %", "10 %", "20 %", "25 %")
+	if got := ruleTypography(q); len(got) != 0 {
+		t.Errorf("as the game writes it: %v", got)
+	}
+	q.Fact = "Около 2% от тях."
+	if got := ruleTypography(q); len(got) != 1 {
+		t.Errorf("a glued share: %v", got)
+	}
+	q.Fact = "Романът „18% сиво“ е за един фотограф."
+	if got := ruleTypography(q); len(got) != 0 {
+		t.Errorf("a quoted title keeps its spelling: %v", got)
 	}
 }
