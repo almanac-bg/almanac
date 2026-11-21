@@ -625,10 +625,10 @@
     font-size: min(1.375rem, 27px);
   }
 
+  /* The place here: on a well, in full ink, never a heavier weight (a wider name would shift its neighbours). */
   .places-foot a[aria-current="page"] {
     background: var(--surface-2);
     color: var(--ink);
-    font-weight: 900;
   }
 
   /* Someone asks to be friends, or a friend's duel waits: a dot on Приятели. */
@@ -728,7 +728,6 @@
     .places a[aria-current="page"] {
       background: var(--surface);
       color: var(--ink);
-      font-weight: 900;
     }
 
     .places a.news::after {
