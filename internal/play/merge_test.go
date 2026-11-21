@@ -71,9 +71,9 @@ func TestMergeCarriesTheRest(t *testing.T) {
 	guest, owner := w.user(), w.user()
 	for _, q := range []string{
 		`UPDATE users SET avatar = 'lynx-mint', streak_told = 'forgiven:2026-11-12',
-			created_at = 5, seen_at = 900 WHERE id = ?2`,
+			created_at = 5, seen_at = 900, friends_seen_at = 700 WHERE id = ?2`,
 		`UPDATE users SET streak_told = 'ended:2026-11-01', created_at = 10,
-			seen_at = 100 WHERE id = ?1`,
+			seen_at = 100, friends_seen_at = 50 WHERE id = ?1`,
 		`INSERT INTO reports (question_id, user_id, text, at) VALUES ('his-001', ?2, 'Грешен отговор', 1)`,
 		`INSERT INTO push_reminded (user_id, day, at) VALUES (?2, '2026-11-11', 1), (?1, '2026-11-11', 2), (?2, '2026-11-10', 3)`,
 		`INSERT INTO push_queue (user_id, kind, message, day, next_at, until) VALUES
@@ -92,12 +92,12 @@ func TestMergeCarriesTheRest(t *testing.T) {
 
 	var reports, reminded, queued int
 	var avatar, streak string
-	var created, seen int
+	var created, seen, looked int
 	if err := w.db.Read.QueryRow(`SELECT
 		(SELECT count(*) FROM reports WHERE user_id = ?1), (SELECT count(*) FROM push_reminded WHERE user_id = ?1),
 		(SELECT count(*) FROM push_queue WHERE user_id = ?1),
-		avatar, streak_told, created_at, seen_at FROM users WHERE id = ?1`, owner).
-		Scan(&reports, &reminded, &queued, &avatar, &streak, &created, &seen); err != nil {
+		avatar, streak_told, created_at, seen_at, friends_seen_at FROM users WHERE id = ?1`, owner).
+		Scan(&reports, &reminded, &queued, &avatar, &streak, &created, &seen, &looked); err != nil {
 		t.Fatal(err)
 	}
 	if reports != 1 || reminded != 2 || queued != 2 {
@@ -106,8 +106,8 @@ func TestMergeCarriesTheRest(t *testing.T) {
 	if avatar != "lynx-mint" || streak != "forgiven:2026-11-12" {
 		t.Fatalf("look and told: %s, %q", avatar, streak)
 	}
-	if created != 5 || seen != 900 {
-		t.Fatalf("came at %d, seen %d", created, seen)
+	if created != 5 || seen != 900 || looked != 700 {
+		t.Fatalf("came at %d, seen %d, looked at Приятели %d", created, seen, looked)
 	}
 }
 

@@ -121,8 +121,8 @@ func TestFriendDuel(t *testing.T) {
 		db.Yours[0].First {
 		t.Fatalf("Bo's duels once sent: %+v", db)
 	}
-	if wt, _ := w.g.DuelsWaiting(ctx, bo); wt == nil || wt.ID != id || wt.N != 1 {
-		t.Fatalf("waiting for Bo: %+v", wt)
+	if news, _ := w.g.FriendsNews(ctx, bo); !news {
+		t.Fatal("no news for Bo of the duel sent him")
 	}
 	// Bo's turn: nothing of how Ana's answers went before he plays them (they come with his run, as far as he goes).
 	d, err := w.g.DuelOf(ctx, bo, id)
@@ -138,8 +138,11 @@ func TestFriendDuel(t *testing.T) {
 	if n := h.take(); len(n) != 1 || n[0] != (DuelNews{DuelID: id, From: bo, To: ana, Played: true}) {
 		t.Fatalf("Ana isn't told the result: %+v", n)
 	}
-	if wt, _ := w.g.DuelsWaiting(ctx, bo); wt != nil {
-		t.Fatalf("still waiting: %+v", wt)
+	if news, _ := w.g.FriendsNews(ctx, bo); news {
+		t.Fatal("news for Bo of the duel he began and played himself")
+	}
+	if news, _ := w.g.FriendsNews(ctx, ana); !news {
+		t.Fatal("no news for Ana of her duel's result")
 	}
 	d, err = w.g.DuelOf(ctx, ana, id)
 	if err != nil || d.State != DuelWon || d.Decided != 1 || !d.Friend || d.Record == nil ||

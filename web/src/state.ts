@@ -4,6 +4,7 @@
 import { api } from "./lib/api.ts";
 import { boot } from "./lib/boot.ts";
 import { effect, onCleanup, signal, untracked } from "./lib/dom.ts";
+import { path } from "./lib/router.ts";
 import { play } from "./lib/sound.ts";
 
 export interface User {
@@ -91,11 +92,22 @@ export function refreshSeal(): void {
   );
 }
 
-/** How many friend requests wait for the player's answer. */
-export const friendRequests = signal(0);
+/** Whether something has come to Приятели since the player last looked there, on any device (play.FriendsNews): a
+ * friend request, a duel sent to them, a result of one of their duels. The dot on Приятели: news, not what waits there. */
+export const friendsNews = signal(false);
 
-/** How many friends' duels wait for the player to play them. */
-export const duelsWaiting = signal(0);
+/** How many looks at Приятели have gone to the server (sawFriends), and the last on its way: a look for news begun
+ * before one doesn't count. */
+let looks = 0;
+let looked: Promise<unknown> = Promise.resolve();
+
+/** The player looks at Приятели (opens it, or is on it as news comes): what has come there is seen, on every device
+ * (POST /api/friends/seen), and the dot goes at once. */
+export function sawFriends(): void {
+  friendsNews.set(false);
+  looks++;
+  looked = api("POST", "/api/friends/seen", {}).catch(() => {});
+}
 
 /** How many parts of the screen hold that a game is under way (playingWhile), and whether any does. */
 let holds = 0;
@@ -124,43 +136,46 @@ export function playingWhile(now: () => boolean = () => true): void {
   });
 }
 
-/** Looks again, now, whether something waits for the player (after they've answered a request, say). */
-export let checkWaiting: () => Promise<void> = async () => {};
+/** Looks again, now, whether something has come to Приятели (after a request answered on a profile, say). */
+export function checkNews(): Promise<void> {
+  return lookNow();
+}
+let lookNow: () => Promise<void> = async () => {};
 
-/** How long between two looks for what waits for the player: half a minute, twice as long after each that found
- * nothing new, up to five minutes. */
+/** How long between two looks for news in Приятели: half a minute, twice as long after each that found nothing new,
+ * up to five minutes. */
 const lookEvery = 30_000;
 const lookAtMost = 300_000;
 
-/** Looks, while the page is in view and no game is under way, whether someone asks to be friends or a friend's duel
- * waits: every half minute,
- * less often while nothing changes (lookEvery); and again at once each time the page comes back into view, and each
- * time a game ends. */
-export function watchWaiting(): void {
+/** Looks, while the page is in view and no game is under way, whether something has come to Приятели since the player
+ * last looked there (friendsNews): every half minute, less often while nothing changes (lookEvery); and again at once
+ * each time the page comes back into view, and each time a game ends. News lights the dot with a ping (never over a
+ * question), once: more news while it's lit stays quiet. On Приятели itself, news is seen as it comes. */
+export function watchNews(): void {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let quiet = 0; // looks in a row that found nothing new
   const later = () => {
     clearTimeout(timer);
-    timer = setTimeout(() => checkWaiting(), Math.min(lookEvery * 2 ** quiet, lookAtMost));
+    timer = setTimeout(() => lookNow(), Math.min(lookEvery * 2 ** quiet, lookAtMost));
   };
-  checkWaiting = async () => {
+  lookNow = async () => {
     if (!user.peek()) {
-      // Signed out, or the account deleted: its requests and duels go with it.
-      friendRequests.set(0);
-      duelsWaiting.set(0);
+      // Signed out, or the account deleted: its news goes with it.
+      friendsNews.set(false);
       return;
     }
     // Hidden, or in a game (whose end looks again): no asking, nor any sound over a question.
     if (document.hidden || playing.peek()) return;
     try {
-      const r = await api<{ requests: number; duels?: number }>("GET", "/api/friends/requests");
-      const duels = r.duels ?? 0;
-      const news = r.requests > friendRequests.peek() || duels > duelsWaiting.peek();
-      const same = r.requests === friendRequests.peek() && duels === duelsWaiting.peek();
-      quiet = same ? Math.min(quiet + 1, 4) : 0;
-      if (news && !playing.peek()) play("ping"); // never over a question
-      friendRequests.set(r.requests);
-      duelsWaiting.set(duels);
+      await looked; // a look at Приятели on its way counts first
+      const before = looks;
+      const r = await api<{ news: boolean }>("GET", "/api/friends/news");
+      if (before === looks) {
+        quiet = r.news === friendsNews.peek() ? Math.min(quiet + 1, 4) : 0;
+        if (r.news && !friendsNews.peek() && !playing.peek()) play("ping"); // never over a question
+        if (r.news && path.peek() === "/friends") sawFriends();
+        else friendsNews.set(r.news);
+      }
     } catch {
       // Offline for a moment: the next look will tell.
     }
@@ -168,10 +183,10 @@ export function watchWaiting(): void {
   };
   effect(() => {
     user();
-    if (!playing()) untracked(checkWaiting);
+    if (!playing()) untracked(lookNow);
   });
   document.addEventListener("visibilitychange", () => {
     quiet = 0;
-    checkWaiting();
+    lookNow();
   });
 }

@@ -38,7 +38,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
 - **The frame** (`app.ts`): the bar holds the rosette and „АЛМАНАХ“ in spaced capitals (a way to Днес); on a big
   screen the three places as words on pills (`.places`); the avatar with the seal the player wears on its corner
   (`.bar-me`), or „Вход“ (straight to the sign-in form). On a phone the places are at the foot (`.places-foot`), the
-  current one on a well, a dot on Приятели while a request or a friend's duel waits. The frame steps aside in a game
+  current one on a well, a dot on Приятели while something has come there since the player last looked (a request, a
+  duel sent, a duel's result), gone as it opens. The frame steps aside in a game
   (`html.playing`) and on a new visitor's cover (`html.cover`, no places).
 - **Днес** (`screens/today.ts`): the issue; its action; the streak.
   - The issue (`.issue`): a stack of ten sheets (`.stack-leaf`) in the colours of its ten chapters, the top one the
@@ -70,7 +71,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
     button; a link gone: „Тази връзка вече не важи. Поискай нова.“
   - Nothing over the issue but what came of the player's own step (a profile signed in to, a game brought here, an
     invite opened).
-    Others' news is Приятели's: its dot for a friend's duel or request, its line for a friend's yes.
+    Others' news is Приятели's: its dot for a request, a duel or a duel's result since the last look, its line for a
+    friend's yes.
 - **The day's result** (Днес once the day is played):
   1. The score on a sheet of the issue's first chapter: „Брой 9 · 20 ноември“, the score as the hero numeral „7 от
      10“, the tiles, „На десетия въпрос вярно отговарят 14 %“ (or „Десетият въпрос е най-трудният днес“ before a

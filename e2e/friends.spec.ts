@@ -108,6 +108,8 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await expect(bar.getByRole("link", { name: /Приятели/ })).toHaveClass(/news/);
   await bar.getByRole("link", { name: /Приятели/ }).click();
   await expect(a).toHaveURL(/\/friends$/);
+  // Opened: the dot goes at once, though the request still waits for her answer.
+  await expect(bar.getByRole("link", { name: /Приятели/ })).not.toHaveClass(/news/);
   // Who asks, as every row of players has them: the avatar, the name (a way to their profile), and the ask under it.
   await expect(a.locator(".invitation a.who .avatar")).toHaveCount(1);
   await expect(a.locator(".invitation .invitation-line")).toHaveText("Иска да сте приятели.");

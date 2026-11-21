@@ -1051,27 +1051,6 @@ func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, erro
 	return v, nil
 }
 
-// DuelWaiting is the duels sent to the player waiting for them to play (Приятели's dot): how many, and
-// the one that lapses first, by whom.
-type DuelWaiting struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
-	N    int    `json:"n"`
-}
-
-// DuelsWaiting are the duels sent to the player that wait for them; nil if none does.
-func (g *Game) DuelsWaiting(ctx context.Context, userID int64) (*DuelWaiting, error) {
-	var w DuelWaiting
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT d.id, coalesce(u.name, ''), count(*) OVER ()
-		FROM duels d LEFT JOIN users u ON u.id = d.a_id LEFT JOIN runs r ON r.id = d.b_run
-		WHERE d.b_id = ? AND d.sent_at IS NOT NULL AND d.ended_at IS NULL AND r.finished_at IS NULL
-		ORDER BY d.expires_at LIMIT 1`, userID).Scan(&w.ID, &w.Name, &w.N)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	return &w, err
-}
-
 // duelMarks is how each question of a run went, in order.
 func (g *Game) duelMarks(ctx context.Context, runID int64) ([]DuelMark, error) {
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT score, is_right, ms, given IS NULL FROM answers WHERE run_id = ?

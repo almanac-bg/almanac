@@ -115,7 +115,7 @@ func TestSeededGame(t *testing.T) {
 		"POST /api/me/news", "/api/day", "/api/runs/left",
 		"/api/duels",
 		"/api/almanac", "/api/friends",
-		"/api/friends/requests", "/api/push/prefs", "/api/mail/prefs"}
+		"/api/friends/news", "/api/push/prefs", "/api/mail/prefs"}
 	for _, p := range personas {
 		for _, path := range append(screens, "/api/players/"+p.Tag) {
 			if code, v := get(p, path); code != http.StatusOK {

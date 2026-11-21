@@ -116,7 +116,7 @@ func TestDeclinedEmailRequestStaysWaiting(t *testing.T) {
 	if in, _, _ := w.g.Requests(ctx, ana); len(in) != 0 {
 		t.Fatalf("Ana still sees the request she said no to: %+v", in)
 	}
-	if n, _ := w.g.RequestsWaiting(ctx, ana); n != 0 {
+	if n := w.requestsIn(ana); n != 0 {
 		t.Fatalf("waiting for Ana: %d", n)
 	}
 	if _, err := w.g.Accept(ctx, ana, in[0].ID); !errors.Is(err, ErrNoRequest) {
@@ -132,7 +132,7 @@ func TestDeclinedEmailRequestStaysWaiting(t *testing.T) {
 	if _, err := w.g.Request(ctx, bo, "ana@example.com", true); err != nil {
 		t.Fatal(err)
 	}
-	if n, _ := w.g.RequestsWaiting(ctx, ana); n != 0 {
+	if n := w.requestsIn(ana); n != 0 {
 		t.Fatalf("waiting for Ana after Bo asked again: %d", n)
 	}
 	_, out, err := w.g.Requests(ctx, bo)
