@@ -284,11 +284,6 @@ export function worn(w: Worn | null | undefined, size = 24): Child {
   return s;
 }
 
-/** A page's picture, over its heading (decoration): one of the ways to play, or "almanac", "friends". */
-export function pageArt(id: string, tone: string): Child {
-  return picture(`mode-${id}`, `page-art ${tone}`);
-}
-
 /** A topic's small picture, as on a chip (decoration), in the topic's own tone wherever it's put; a plain dot for all
  * of them. */
 export function topicMark(category: string): Child {
