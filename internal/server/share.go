@@ -24,7 +24,7 @@ import (
 // sharesPlayer a player and sharesNet a network an hour (with their site's); a card is the same for every result of
 // one shape on one day, so one is drawn once and kept (cardsKept, the newest), drawn at most cardsDrawing at once,
 // and a network may have the server draw cardsNet an hour (its site cardsSite): past those it gets the game's picture
-// instead. Previews (Viber's, Messenger's) ask from their own networks, for every chat a link is sent to: the card is
+// instead, marked a stand-in (standIn). Previews (Viber's, Messenger's) ask from their own networks, for every chat a link is sent to: the card is
 // cached by them and by Cloudflare too, for a week (its address says all it shows).
 
 const (
@@ -37,11 +37,16 @@ const (
 	cardsDrawing = 2
 )
 
-// sharePath is a shared day's link (play.Share.Path), and cardName a card's file.
+// sharePath is a shared day's link (play.Share.Path), and cardName a card's file: only as cardOf spells it (the issue
+// without a leading zero, then its ten marks), so that no card is drawn, kept or cached under a second name.
 var (
 	sharePath = regexp.MustCompile(`^/d/([0-9]{1,5})-([a-z2-9]{8})$`)
-	cardName  = regexp.MustCompile(`^([0-9]{1,5})-([0-3]{1,10})\.png$`)
+	cardName  = regexp.MustCompile(`^([1-9][0-9]{0,4})-([0-3]{10})\.png$`)
 )
+
+// standIn is the header that marks the site's picture sent in a card's place, past its budget: the page sharing the
+// day (game/share.ts, cardFile) shares no card then; a link's preview shows the picture as it is.
+const standIn = "X-Stand-In"
 
 // siteImage is the site's own picture (card.Site), drawn once.
 var siteImage = sync.OnceValues(card.Site)
@@ -153,6 +158,7 @@ func (s *Server) card(w http.ResponseWriter, r *http.Request) {
 		if !s.allowFrom(r, "card", cardsNet, cardsSite, time.Hour) {
 			// Past its budget: the game's own picture, for now.
 			w.Header().Set("Cache-Control", "no-store")
+			w.Header().Set(standIn, "1")
 			s.sitePicture(w, r)
 			return
 		}

@@ -1,6 +1,9 @@
 package play
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestIssue(t *testing.T) {
 	for day, want := range map[string]int{
@@ -38,5 +41,37 @@ func TestIssueTopics(t *testing.T) {
 	}
 	if len(seen) != len(w.b.Categories) {
 		t.Fatalf("not one of each topic: %v", got)
+	}
+}
+
+// Each of an issue's topics stays in its own place, as the tiles and the shared day's card put each mark under its
+// chapter: a retired question keeps its chapter (the bank keeps it), and one gone from the bank altogether is a
+// „Микс“ in its place, none after it moved up.
+func TestIssueTopicsKeepTheirPlaces(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	st, err := w.g.StartDay(ctx, w.user())
+	if err != nil {
+		t.Fatal(err)
+	}
+	day := w.g.Today()
+	was, err := w.g.IssueTopics(ctx, day)
+	if err != nil || len(was) != Length {
+		t.Fatalf("today's: %v %v", was, err)
+	}
+	picks := w.picks(st.ID)
+	w.swap(editedSample(t, func(id string, q map[string]any) {
+		if id == picks[6].ID {
+			q["retired"], q["retiredWhy"] = true, "weak"
+		}
+	}))
+	if got, err := w.g.IssueTopics(ctx, day); err != nil || !slices.Equal(got, was) {
+		t.Fatalf("a question retired: %v %v, want %v", got, err, was)
+	}
+	w.swap(withoutQuestion(t, picks[3].ID))
+	want := slices.Clone(was)
+	want[3] = "mix"
+	if got, err := w.g.IssueTopics(ctx, day); err != nil || !slices.Equal(got, want) {
+		t.Fatalf("a question gone: %v %v, want %v", got, err, want)
 	}
 }

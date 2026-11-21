@@ -90,6 +90,10 @@ test("the card is the server's, by the issue and the shape as play.Share spells 
   assert.deepEqual([file?.name, file?.type, asked], ["almanah-9.png", "image/png", ["/card/9-1230.png"]]);
   globalThis.fetch = (async () => new Response("no", { status: 404 })) as typeof fetch;
   assert.equal(await cardFile(9, marks), null);
+  // Past the server's budget, the site's picture in the card's place: a preview shows it, but it isn't the day's.
+  globalThis.fetch = (async () =>
+    new Response("png", { headers: { "Content-Type": "image/png", "X-Stand-In": "1" } })) as typeof fetch;
+  assert.equal(await cardFile(9, marks), null);
 });
 
 test("the sheet closed without a choice is nothing; refused, the text is copied", async () => {
