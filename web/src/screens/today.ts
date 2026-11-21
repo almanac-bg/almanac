@@ -31,19 +31,7 @@ import { pushable, pushOn, turnOn } from "../lib/push.ts";
 import { go, goBack, hold, release, title } from "../lib/router.ts";
 import { dateWords, issueOf, onDay, stakeHour, weekday } from "../lib/words.ts";
 import { cover, notice, player, playing, user } from "../state.ts";
-import {
-  chapterName,
-  chip,
-  failure,
-  formatNumber,
-  glyph,
-  leaf,
-  mini,
-  stakeLine,
-  textWords,
-  tiles,
-  who,
-} from "../ui.ts";
+import { chapterName, chip, failure, formatNumber, glyph, leaf, scoreRow, stakeLine, textWords, tiles } from "../ui.ts";
 import { app, coverExit, exitWay, handedIn, haveProfile, keepLine, keepStake, mailAsk, takeHand } from "./keep.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
@@ -812,8 +800,10 @@ function tenthLine(review: Promise<Reviewed[]>): Child {
   return () => (said() ? h("p", { class: "tenth" }, said()) : null);
 }
 
-/** The friends who have played the day, best first, up to five, each with their tiles as small squares and their
- * score; nothing while none has (no line asking for friends: the day's result isn't the place). */
+/** The friends who have played the day, best first, up to five, each a board's row as Приятели draws it (scoreRow):
+ * their place among the player and their friends, the avatar with its seal, the name, and under it the score and
+ * their small squares; nothing while none has (no line asking for friends: the day's result isn't the place). Only
+ * on the result: the squares come once the player has finished the day (play.FriendsBoard). */
 function friendsDay(t: Today): Child {
   const all = (t.friends ?? []).filter((s) => !s.me).slice(0, 5);
   if (!all.length) return null;
@@ -828,16 +818,8 @@ function friendsDay(t: Today): Child {
     ),
     h(
       "ol",
-      { class: "rows" },
-      all.map((s) =>
-        h(
-          "li",
-          { class: "fd-row" },
-          who(s.name, s, null, s.name, s.tag),
-          s.trail?.length ? mini(s.trail) : null,
-          h("b", { class: "fd-score", "aria-label": `${s.rights} от ${s.of}` }, String(s.rights)),
-        ),
-      ),
+      { class: "rows ranks" },
+      all.map((s, i) => scoreRow(s, s.place ?? i + 1)),
     ),
   );
 }

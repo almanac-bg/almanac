@@ -2,7 +2,7 @@
 // topic's colour. The stylesheet draws them; these only say what to draw.
 
 import { picture } from "./art/picture.ts";
-import type { Credit } from "./game/types.ts";
+import type { Credit, Score } from "./game/types.ts";
 import { errorText, passing } from "./lib/api.ts";
 import { hourInBulgaria } from "./lib/day.ts";
 import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
@@ -723,6 +723,46 @@ export function who(name: Child, look: Look = {}, extra: Child = null, plainName
     ),
   );
 }
+
+/** A player's row, a friend's or a board's (Приятели's lists, Днес's friends): what comes before the avatar (a board's
+ * place), the avatar with its seal, the name across the row (a way to their profile; on a second line rather than
+ * cut), their day on a line under it, and what comes after (a friend's duel). */
+export function playerRow(
+  cls: string,
+  look: { name: string; avatar?: string; seal?: Score["seal"] },
+  tag: string | undefined,
+  name: Child,
+  day: Child,
+  before: Child = null,
+  after: Child = null,
+): HTMLElement {
+  return h(
+    "li",
+    { class: cls },
+    before,
+    avatar(look.avatar, { name: look.name, seal: look.seal }),
+    h(
+      "div",
+      { class: "friend-text" },
+      tag ? h("a", { class: "friend-name", href: profileHref(tag) }, name) : h("span", { class: "friend-name" }, name),
+    ),
+    h("span", { class: "friend-day" }, day),
+    after,
+  );
+}
+
+/** A day's row on a board (Приятели's, Днес's friends), built as a friend's (`playerRow`): its place before the
+ * avatar, „ти“ after the player's own name (their row washed), and under the name the score, the day's small squares
+ * after it (only where the server sends them: once the viewer has finished the day). */
+export const scoreRow = (s: Score, place: number, gap = false) =>
+  playerRow(
+    ["rank-row", s.me && "me", gap && "gap"].filter(Boolean).join(" "),
+    s,
+    s.tag,
+    nameWords(s.name, s.me ? h("span", { class: "rank-you" }, " ти") : null),
+    [h("span", { class: "rank-score" }, rightsOf(s.rights, s.of)), s.trail?.length ? mini(s.trail) : null],
+    h("span", { class: "rank-place" }, String(place)),
+  );
 
 /** A screen that couldn't load, never a dead end: what went wrong (lib/api.ts, errorText); „Опитай пак“ where trying
  * again can help, and the same by itself as the line comes back; and a way on (`way`: Начало, unless the screen is

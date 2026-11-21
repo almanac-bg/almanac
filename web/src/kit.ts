@@ -86,11 +86,13 @@ import {
   mini,
   nameWords,
   pictureCredit,
+  playerRow,
   profileHref,
   questions,
   record,
   rightsOf,
   schemeSwitch,
+  scoreRow,
   seal,
   sealList,
   segmented,
@@ -236,6 +238,8 @@ export const kit = {
   when,
   withWord,
   who,
+  playerRow,
+  scoreRow,
 };
 
 export type Kit = typeof kit;
