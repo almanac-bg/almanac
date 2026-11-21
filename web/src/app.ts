@@ -104,7 +104,9 @@ if (root) {
   // In a game the frame steps aside (app.css): the question gets the screen.
   effect(() => document.documentElement.classList.toggle("playing", playing()));
   // The frame bare, no places: a new visitor's cover (Днес at its own address), and the sign-in page.
-  effect(() => document.documentElement.classList.toggle("bare", (cover() && path() === "/") || path() === "/signin"));
+  // Днес without a player is the cover from the first frame: not once the day has loaded (cover), or the places would
+  // flash in and out on the way back from the sign-in page.
+  effect(() => document.documentElement.classList.toggle("bare", (!user() && path() === "/") || path() === "/signin"));
   watchNews();
   prepareSound();
   preparePush();

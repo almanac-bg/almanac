@@ -25,6 +25,8 @@ export interface SignInOptions {
   /** The code taken: what came of it in words (keptWords), and the player now, told before the player is set, so that
    * what draws the screen anew as they are can say it. */
   done?: (said: string, now: User) => void;
+  /** The email field takes the focus as the form shows: on the sign-in page, which is there for nothing else. */
+  focus?: boolean;
 }
 
 /** Whether this browser is one where no email or code is asked for (Meta's, TikTok's: lib/embedded.ts, forms): there
@@ -51,6 +53,7 @@ export function signInPage(): Child {
     h("div", { class: "intro" }, back(from, "Назад"), h("h1", null, "Влез в профила си")),
     signIn({
       form: "signin",
+      focus: true,
       done: (said) => {
         if (/^\/(me)?([?#]|$)/.test(from)) notice.set(said);
         // Once the player is set (signIn sets them after this), so that the page come back to draws them as they are.
@@ -68,6 +71,7 @@ export function signIn({
   send: sendWords = "Прати ми код",
   note = "Без пароли: всеки път ти пращаме код за вход.",
   done,
+  focus = false,
 }: SignInOptions): Child {
   if (noEmail) return h("p", { class: "muted" }, noEmailLine);
   // A code sent from this form a little while ago, in this tab: a reload comes back to the step that takes it.
@@ -246,6 +250,7 @@ export function signIn({
             },
             ref: (el) => {
               emailField = el as HTMLInputElement;
+              if (focus) requestAnimationFrame(() => emailField?.focus());
             },
           }),
         ),
