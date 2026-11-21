@@ -28,8 +28,7 @@ import (
 // streak's number is never named): „Днешният брой те чака“, and its link lands on Днес as from a mail. It
 // goes the day after the day missed that ended it, at the player's own hour (RemindMinute), never in the night
 // (quietFrom: pushes.go), unless they've played by then. At most one in StreakMailEvery days, claimed in streak_mails before it's queued in the outbox, so a restart
-// never sends two. A player held out of the reminders (play.HeldReminders) is claimed the same, marked held, and never
-// mailed: what they would have had, for /admin to compare.
+// never sends two.
 //
 // The player stops it with a switch in Настройки → Известия, or with the link in the mail, signed so that it needs
 // no sign-in (mailOff); mail programs offer the same as a button of their own (mail.Message.Unsubscribe).
@@ -140,16 +139,15 @@ func (s *Server) streakMail(ctx context.Context, today string, at time.Time, use
 		return false, err
 	}
 	sent := false
-	held := s.heldOut(userID)
 	err = s.db.Tx(ctx, func(tx *sql.Tx) error {
-		res, err := tx.Exec(`INSERT INTO streak_mails (user_id, day, at, held) SELECT ?1, ?2, ?3, ?5
+		res, err := tx.Exec(`INSERT INTO streak_mails (user_id, day, at) SELECT ?1, ?2, ?3
 			WHERE NOT EXISTS (SELECT 1 FROM streak_mails WHERE user_id = ?1 AND day > ?4)
 			AND NOT EXISTS (SELECT 1 FROM day_mails WHERE user_id = ?1 AND day = ?2) ON CONFLICT DO NOTHING`,
-			userID, today, at.UnixMilli(), play.DayShift(today, -StreakMailEvery), held)
+			userID, today, at.UnixMilli(), play.DayShift(today, -StreakMailEvery))
 		if err != nil {
 			return err
 		}
-		if n, _ := res.RowsAffected(); n == 0 || held {
+		if n, _ := res.RowsAffected(); n == 0 {
 			return nil
 		}
 		sent = true

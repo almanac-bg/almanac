@@ -76,22 +76,20 @@ type Deps struct {
 
 // Server is the game's HTTP side.
 type Server struct {
-	cfg       Config
-	db        *store.DB
-	accounts  *account.Accounts
-	outbox    *mail.Outbox
-	game      *play.Game
-	push      *push.Sender
-	bank      atomic.Pointer[bank.Bank]
-	banks     banks // a bank refused (bank.go)
-	client    fs.FS
-	limits    *limiter // the limits on floods (limits.go)
-	cards     *cards   // the shared days' cards drawn (share.go)
-	guard     *limiter // apart, the limits that keep players safe: codes, guests, reports
-	problems  *problems
-	reminders reminders // who is due the day's reminder when, today (remind.go)
-	// heldOut says whether a player is held out of the reminders (play.HeldReminders: remind.go, streakmail.go).
-	heldOut       func(userID int64) bool
+	cfg           Config
+	db            *store.DB
+	accounts      *account.Accounts
+	outbox        *mail.Outbox
+	game          *play.Game
+	push          *push.Sender
+	bank          atomic.Pointer[bank.Bank]
+	banks         banks // a bank refused (bank.go)
+	client        fs.FS
+	limits        *limiter // the limits on floods (limits.go)
+	cards         *cards   // the shared days' cards drawn (share.go)
+	guard         *limiter // apart, the limits that keep players safe: codes, guests, reports
+	problems      *problems
+	reminders     reminders     // who is due the day's reminder when, today (remind.go)
 	pushq         pushQueue     // the notifications' queue, as Push sends it (pushes.go)
 	streakMailing streakMailing // who is due the mail of a streak ended when, today (streakmail.go)
 	dayMailing    reminders     // who is due the day's reminder by mail when, today (daymail.go)
@@ -139,7 +137,6 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.guard.onFull = func() { s.problems.add("limits: a flood of keys filled the guard's limiter; counts were pushed out") }
 	s.bank.Store(d.Bank)
 	s.game = play.New(d.DB, s.bank.Load)
-	s.heldOut = func(id int64) bool { return play.HeldOut(play.HeldReminders, id) }
 	s.nearestStep = s.stepOf
 	if strings.HasPrefix(cfg.Version, "v") { // a release, not a developer's build
 		s.game.Version = cfg.Version

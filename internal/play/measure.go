@@ -26,8 +26,7 @@ import (
 //   - users.came_from: where a player first came in (Landings), set as their guest is made; users.first_version, the
 //     version they met (markActive); runs.device, what each game was played on (FromDevice).
 //   - what the game keeps anyway: the days played (active_days), the games (runs), notifications on (push_subs),
-//     friends, the streaks (walkStreak), the reminders and mails sent or held (push_reminded, streak_mails:
-//     experiment.go).
+//     friends, the streaks (walkStreak), the reminders and mails sent (push_reminded, streak_mails).
 
 // Landings are where a player can first come in (users.came_from): the front page, a shared day's link (share.go), an
 // invite link (invite.go), a player's page, and anywhere else.

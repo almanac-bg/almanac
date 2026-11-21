@@ -171,64 +171,6 @@ func (r rate) HTML() template.HTML {
 		class, title, r.share(), r.N, r.Of, lo, hi))
 }
 
-// claims are one player's claims of a kind (reminders, mails), and how many of them they answered by playing.
-type claims struct{ hits, of int }
-
-// players is a rate of claims answered by playing, of several players' claims: one who plays after a reminder plays
-// after the next one too, so a player's claims aren't independent, and the interval is as wide as the players make it
-// (eff: the claims over the design effect, the variance of the ratio by player over the binomial's).
-type players struct {
-	rate
-	Players int
-	eff     float64 // the effective number of claims, for the interval
-}
-
-// byPlayer is the players' claims together.
-func byPlayer(of []claims) players {
-	p := players{Players: len(of)}
-	for _, c := range of {
-		p.N, p.Of = p.N+c.hits, p.Of+c.of
-	}
-	if p.Of == 0 {
-		return p
-	}
-	n, total := float64(len(of)), float64(p.Of)
-	r := float64(p.N) / total
-	switch {
-	case len(of) < 2:
-		p.eff = 1 // one player tells one thing
-	case p.N == 0 || p.N == p.Of:
-		p.eff = n // no spread to measure: as if each player were one claim
-	default:
-		sq := 0.0
-		for _, c := range of {
-			d := float64(c.hits) - r*float64(c.of)
-			sq += d * d
-		}
-		v := n / (n - 1) * sq / (total * total)
-		p.eff = min(total, max(n, r*(1-r)/v)) // never fewer than one claim a player, nor more than all
-	}
-	return p
-}
-
-// HTML is the share as a cell of /admin shows it, with how many players it's of; greyed under fewer players.
-func (p players) HTML() template.HTML {
-	if p.Of == 0 {
-		return `<span class="rate none">—</span>`
-	}
-	lo, hi := wilson(float64(p.N)/float64(p.Of), p.eff)
-	word := "играча"
-	if p.Players == 1 {
-		word = "играч"
-	}
-	class, title := "rate", fmt.Sprintf("%d от %d, на %d %s; 90%%: от %d до %d%%", p.N, p.Of, p.Players, word, lo, hi)
-	if p.Players < fewer {
-		class, title = "rate few", title+"; малко данни"
-	}
-	return template.HTML(fmt.Sprintf(`<span class="%s" title="%s">%d%%<small>%d/%d · %d–%d</small><small>%d %s</small></span>`,
-		class, title, p.share(), p.N, p.Of, lo, hi, p.Players, word))
-}
-
 // capped is the rate no more than all: a step of the funnel whose players came in earlier than its week's.
 func (r rate) capped() rate {
 	r.N = min(r.N, r.Of)
@@ -527,13 +469,6 @@ type timedOutRow struct {
 	Share rate
 }
 
-// holdoutRow is a measure of the reminders' experiment (play.HeldReminders): for those reminded (Sent) and those held
-// out (Held).
-type holdoutRow struct {
-	Name       string
-	Sent, Held players
-}
-
 // measures is what the admin page tells of the players: the numbers at the top, the charts, the first weeks, the
 // daily loop, the streaks, the games.
 type measures struct {
@@ -550,17 +485,10 @@ type measures struct {
 	Growth              []growthRow
 	Stick               string
 	Loop, Notices       []loopRow
-	Holdout             []holdoutRow
-	HoldoutShare        int
-	HoldoutFrom         string // its first day, as „19.11.2026“; "" from the start
-	// The streak's hold-out (play.StreakHoldout): the newcomers of its window, two forgiven days a week against one,
-	// and the window, as „21.11.2026“.
-	StreakHoldout           []streakHoldoutRow
-	StreakFrom, StreakUntil string
-	Repeats                 rate
-	TimedOut                []timedOutRow
-	Nouns                   []nounRow
-	NounWeeks               [2]string // this week and the last, as „17.11–20.11“
+	Repeats             rate
+	TimedOut            []timedOutRow
+	Nouns               []nounRow
+	NounWeeks           [2]string // this week and the last, as „17.11–20.11“
 	// The bets: back on days 28–34, of the newcomers who in their first week played only the day, and the others; the
 	// shared days' links made in 28 days, the newcomers who came by one and finished their first game, and that per
 	// link.
@@ -627,7 +555,7 @@ func funnelWeek(visits, guests int, news []play.Newcomer) []template.HTML {
 func short(day string) string { return day[8:10] + "." + day[5:7] }
 
 func (s *Server) measures(ctx context.Context) (measures, error) {
-	f := measures{CohortHeads: cohortHeads, HoldoutShare: play.Holdout}
+	f := measures{CohortHeads: cohortHeads}
 	g := s.game
 	today := g.Today()
 	yesterday := play.DayShift(today, -1)
@@ -967,23 +895,6 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 		f.TimedOut = append(f.TimedOut, timedOutRow{Name: cmp.Or(questionKinds[t.Kind], t.Kind), Share: rate{t.N, t.Of}})
 	}
 
-	// The reminders against the hold-out (play/experiment.go), since it began.
-	if f.Holdout, err = s.holdout(ctx, today); err != nil {
-		return f, err
-	}
-	began, err := g.ExperimentFrom(ctx, play.HeldReminders)
-	if err != nil {
-		return f, err
-	}
-	if began != "" {
-		f.HoldoutFrom = short(began) + "." + began[:4]
-	}
-
-	// The streak's hold-out: its measure and window said in advance (admin_page.go).
-	if f.StreakHoldout, f.StreakFrom, f.StreakUntil, err = s.streakHoldout(ctx); err != nil {
-		return f, err
-	}
-
 	// The streaks.
 	h, err := g.StreakHealth(ctx, 7)
 	if err != nil {
@@ -1102,134 +1013,6 @@ func (s *Server) measures(ctx context.Context) (measures, error) {
 			DayFinished: rate{day.Finished, day.Games}})
 	}
 	return f, nil
-}
-
-// streakHoldoutRow is a measure of the streak's hold-out (play.StreakHoldout): of the newcomers of its window, those
-// forgiven two days a week (Two) and those forgiven one (One).
-type streakHoldoutRow struct {
-	Name     string
-	Two, One rate
-}
-
-// streakHoldout compares the newcomers of the streak hold-out's window (first played on or after its first day, come
-// in before its end), forgiven two missed days a week and one, by the measure set in advance: back on any of days 7 to
-// 13 (the first row, what decides it), and played again on days 1 to 6, back on days 28 to 34, each of those whose
-// days are over. None with no window kept.
-func (s *Server) streakHoldout(ctx context.Context) ([]streakHoldoutRow, string, string, error) {
-	g := s.game
-	from, until, err := g.StreakHoldoutWindow(ctx)
-	if err != nil || from == "" {
-		return nil, "", "", err
-	}
-	act, err := g.Activity(ctx, from)
-	if err != nil {
-		return nil, "", "", err
-	}
-	news, err := g.Newcomers(ctx, act, from)
-	if err != nil {
-		return nil, "", "", err
-	}
-	measures := []struct {
-		name string
-		a, b int
-	}{{"Върнали се в дни 7–13 (мярката)", 7, 13}, {"Играли пак в дни 1–6", 1, 6}, {"Върнали се в дни 28–34", 28, 34}}
-	rows := make([]streakHoldoutRow, len(measures))
-	for i, m := range measures {
-		rows[i].Name = m.name
-	}
-	for _, n := range news {
-		var created int64
-		if err := s.db.Read.QueryRowContext(ctx, `SELECT created_at FROM users WHERE id = ?`, n.ID).Scan(&created); err != nil {
-			continue // gone since
-		}
-		if came := time.UnixMilli(created).In(play.Bulgaria).Format(time.DateOnly); came < from || came >= until {
-			continue // came in before the window, or after it: in neither group
-		}
-		held := play.HeldOut(play.StreakHoldout, n.ID)
-		for i, m := range measures {
-			if !n.Due(m.b) {
-				continue
-			}
-			r := &rows[i].Two
-			if held {
-				r = &rows[i].One
-			}
-			r.Of++
-			if n.BackWithin(m.a, m.b) {
-				r.N++
-			}
-		}
-	}
-	day := func(d string) string { return short(d) + "." + d[:4] }
-	return rows, day(from), day(play.DayShift(until, -1)), nil
-}
-
-// holdout compares the players reminded with those held out of the reminders (play.HeldReminders), from its first
-// whole day (ExperimentFrom) to yesterday: of the day's notifications (not the last word that they stop), the days
-// finished after one that day, and within two hours of it; of the streaks' mails whose three days are over, those
-// back by then. All the claims, sent or not (reached a device or not): it's the sending that's tried. Counted by
-// player (byPlayer): one who plays after a reminder plays after the next one too.
-func (s *Server) holdout(ctx context.Context, today string) ([]holdoutRow, error) {
-	from, err := s.game.ExperimentFrom(ctx, play.HeldReminders)
-	if err != nil {
-		return nil, err
-	}
-	const people = ` AND d.user_id NOT IN (SELECT id FROM users WHERE admin)`
-	finished := func(within string) string {
-		return `coalesce(sum(EXISTS (SELECT 1 FROM runs r WHERE r.user_id = d.user_id AND r.kind = 'day' AND r.day = d.day
-			AND r.finished_at ` + within + `)), 0)`
-	}
-	rows := []holdoutRow{
-		{Name: "Известие за деня: денят изигран след него"}, {Name: "…до 2 часа след него"},
-		{Name: "Писмо за серия: пак до 3 дни"},
-	}
-	for _, q := range []struct {
-		sql  string
-		args []any
-		into []int // the rows each measure after the count goes to
-	}{
-		{`SELECT d.held, count(*), ` + finished(">= d.at") + `, ` + finished("BETWEEN d.at AND d.at + 7200000") + `
-			FROM push_reminded d WHERE NOT d.last AND d.day >= ? AND d.day < ?` + people + ` GROUP BY d.held, d.user_id`,
-			[]any{from, today}, []int{0, 1}},
-		{`SELECT d.held, count(*), count(*) FILTER (WHERE EXISTS (SELECT 1 FROM runs r WHERE r.user_id = d.user_id
-				AND r.kind = 'day' AND r.finished_at IS NOT NULL AND r.day BETWEEN d.day AND date(d.day, '+2 days')))
-			FROM streak_mails d WHERE d.day >= ? AND d.day <= ?` + people + ` GROUP BY d.held, d.user_id`,
-			[]any{from, play.DayShift(today, -3)}, []int{2}},
-	} {
-		res, err := s.db.Read.QueryContext(ctx, q.sql, q.args...)
-		if err != nil {
-			return nil, err
-		}
-		sent, held := make([][]claims, len(q.into)), make([][]claims, len(q.into)) // by measure, a player each
-		for res.Next() {
-			var h bool
-			n := 0
-			hits := make([]int, len(q.into))
-			dest := []any{&h, &n}
-			for i := range hits {
-				dest = append(dest, &hits[i])
-			}
-			if err := res.Scan(dest...); err != nil {
-				res.Close()
-				return nil, err
-			}
-			for i := range q.into {
-				if h {
-					held[i] = append(held[i], claims{hits[i], n})
-				} else {
-					sent[i] = append(sent[i], claims{hits[i], n})
-				}
-			}
-		}
-		res.Close()
-		if err := res.Err(); err != nil {
-			return nil, err
-		}
-		for i, row := range q.into {
-			rows[row].Sent, rows[row].Held = byPlayer(sent[i]), byPlayer(held[i])
-		}
-	}
-	return rows, nil
 }
 
 // release is a version of the game and the day it first served.

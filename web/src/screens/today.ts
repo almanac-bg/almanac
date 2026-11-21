@@ -55,12 +55,10 @@ export interface Today {
   /** The issue's topics, in the order its ten are asked (play.IssueTopics): „В броя“. */
   topics?: string[] | null;
   streak: number;
-  /** Whether this week would still forgive a day missed (play/runs.go: one a week). */
+  /** Whether this week would still forgive a day missed (play/runs.go: two a week). */
   spare?: boolean;
   /** A day just missed that the week forgave (the last 3 days). */
   forgiven?: string;
-  /** How many missed days a week the streak forgives the player (play.StreakNow.PerWeek). */
-  perWeek?: number;
   /** A streak that just ended (the last 3 days): the day missed that ended it. How many days it had is never said. */
   ended?: { on: string };
   /** Whether today is the player's first day (no game finished before it): the same all day, whatever they play. */
@@ -1165,7 +1163,10 @@ function streakNotice(t: Today): StreakSaid | null {
   // An ended streak's number is never said (DECISIONS.md, „The direction“): only that a new one begins.
   if (t.forgiven) {
     const missed = `${onDay(t.forgiven).replace(/^./, (c) => c.toUpperCase())} пропусна броя, но серията остава.`;
-    return { short: missed, long: `${missed} ${forgivesWords(t.perWeek)} Серия: ${count(t.streak, "ден", "дни")}.` };
+    return {
+      short: missed,
+      long: `${missed} До два пропуснати дни на седмица ти се прощават. Серия: ${count(t.streak, "ден", "дни")}.`,
+    };
   }
   const text = t.ended ? `Серията ти прекъсна. ${begins}.` : `Радваме се, че се върна. ${begins}.`;
   return { short: text, long: text };
@@ -1176,10 +1177,6 @@ interface StreakSaid {
   short: string;
   long: string;
 }
-
-/** What the streak forgives a week, in words: „До два пропуснати дни на седмица ти се прощават.“ */
-const forgivesWords = (perWeek = 2) =>
-  perWeek === 1 ? "Един пропуснат ден на седмица ти се прощава." : "До два пропуснати дни на седмица ти се прощават.";
 
 /** The logo's rosette over ten of ten: four petals, the gold one last (feel.ts draws them in). */
 function perfectMark(): SVGElement {

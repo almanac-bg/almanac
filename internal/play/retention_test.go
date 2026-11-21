@@ -160,8 +160,7 @@ func TestFirstVersion(t *testing.T) {
 	}
 }
 
-// Migration 0069 takes back the versions stamped on players from before 0068 first served, and keeps the
-// hold-out's first whole day.
+// Migration 0069 takes back the versions stamped on players from before 0068 first served.
 func TestFirstVersionsTakenBack(t *testing.T) {
 	w := setup(t)
 	old, fresh := w.user(), w.user()
@@ -170,7 +169,6 @@ func TestFirstVersionsTakenBack(t *testing.T) {
 		`INSERT INTO active_days (user_id, day) VALUES (` + strconv.FormatInt(old, 10) + `, '2026-11-10'), (` +
 			strconv.FormatInt(old, 10) + `, '2026-11-19'), (` + strconv.FormatInt(fresh, 10) + `, '2026-11-18')`,
 		`UPDATE users SET first_version = 'v3.9.0'`,
-		`DELETE FROM kv WHERE key = 'reminders_from'`,
 	} {
 		if _, err := w.db.Write.Exec(q); err != nil {
 			t.Fatal(err)
@@ -197,9 +195,6 @@ func TestFirstVersionsTakenBack(t *testing.T) {
 	if version(old) != "" || version(fresh) != "v3.9.0" {
 		t.Fatalf("old %q, fresh %q", version(old), version(fresh))
 	}
-	if from, err := w.g.ExperimentFrom(t.Context(), HeldReminders); err != nil || from != "2026-11-19" {
-		t.Fatalf("the hold-out from %q, %v", from, err)
-	}
 }
 
 // A game keeps the device it was started on, where ctx says it (D5).
@@ -216,37 +211,5 @@ func TestGameKeepsItsDevice(t *testing.T) {
 	_ = w.db.Read.QueryRow(`SELECT device FROM runs WHERE id = ?`, b.ID).Scan(&db)
 	if da.String != "phone" || db.Valid {
 		t.Fatalf("devices: %v %v", da, db)
-	}
-}
-
-// A player's bucket is theirs for good, a tenth of players held out (D4).
-func TestHoldout(t *testing.T) {
-	held := 0
-	for id := range int64(20000) {
-		if HeldOut(HeldReminders, id) {
-			held++
-		}
-		if Bucket(HeldReminders, id) != Bucket(HeldReminders, id) {
-			t.Fatal("a bucket changed")
-		}
-	}
-	if held < 1800 || held > 2200 {
-		t.Fatalf("held out: %d of 20000", held)
-	}
-	same := 0
-	for id := range int64(1000) {
-		if Bucket(HeldReminders, id) == Bucket("other", id) {
-			same++
-		}
-	}
-	if same > 40 {
-		t.Fatalf("two experiments' buckets agree for %d of 1000", same)
-	}
-}
-
-// personRun names the shadow by its number.
-func TestPeopleShadows(t *testing.T) {
-	if personRun != "shadow <> "+strconv.Itoa(ShadowScript) || ShadowGuest == ShadowScript || ShadowThrowaway == ShadowScript {
-		t.Fatalf("personRun: %s", personRun)
 	}
 }

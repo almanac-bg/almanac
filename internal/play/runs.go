@@ -313,10 +313,6 @@ func (g *Game) Left(ctx context.Context, userID int64) ([]LeftRun, error) {
 // the other are forgiven across a week's turn too (a Saturday and Sunday, then the Monday and Tuesday after), so a
 // streak ends at most MostForgiven+1 days after the last day played.
 //
-// The rule is measured against a hold-out (StreakHoldout, experiment.go): a tenth of the players who come in during
-// its window (its first day to the day it ends, kv "streak_forgives_from" and "_until", kept by migration 0095) get
-// HeldForgives a week instead, while the window lasts; from its end everyone gets Forgives. /admin compares them.
-//
 // The days missed before the rule came in were judged by the reserve days of then (earned, held, spent): each such day
 // is kept as it was judged (streak_missed, migration 0084), kept or ended, so that the rule changed no streak that was
 // going, and won back none that had ended. A day kept so is one of its week's.
@@ -324,26 +320,19 @@ func (g *Game) Left(ctx context.Context, userID int64) ([]LeftRun, error) {
 const (
 	// Forgives is how many missed days a week the streak forgives.
 	Forgives = 2
-	// HeldForgives is how many the hold-out's players get (StreakHoldout).
-	HeldForgives = 1
 	// MostForgiven is how many days missed in a row a streak can be forgiven: a week's last two and the next's first
 	// two.
 	MostForgiven = 2 * Forgives
 )
 
-// StreakHoldout is the experiment of the streak's two forgiven days a week, its own salt (experiment.go).
-const StreakHoldout = "streak_forgives"
-
 // StreakNow is a player's streak: the days they've played the day's issue one after another (up to today, or
 // yesterday while today isn't played yet; and a day still being played just after its midnight, within DayGrace, is
-// played yet neither), the days missed that it forgave, how many a week it forgives the player (PerWeek) and how many
-// of this week's are left (Left; Spare: any), the last streak that ended, if one did, and the longest the player has
+// played yet neither), the days missed that it forgave, how many of this week's Forgives are left (Left; Spare: any), the last streak that ended, if one did, and the longest the player has
 // had (this one, maybe).
 type StreakNow struct {
 	Days     int      `json:"days"`
 	Best     int      `json:"best"`
 	Forgiven []string `json:"forgiven"`
-	PerWeek  int      `json:"perWeek"`
 	Left     int      `json:"left"`
 	Spare    bool     `json:"spare"`
 	Ended    *Ended   `json:"ended,omitempty"`
@@ -361,71 +350,24 @@ type Ended struct {
 func (g *Game) StreakOf(ctx context.Context, userID int64) (StreakNow, error) {
 	h, err := g.streakDays(ctx, userID)
 	if err != nil || h.first == "" {
-		return StreakNow{Forgiven: []string{}, PerWeek: h.perWeek(g.Today()), Left: h.perWeek(g.Today()), Spare: true}, err
+		return StreakNow{Forgiven: []string{}, Left: Forgives, Spare: true}, err
 	}
 	return walkStreak(h, g.Today(), nil), nil
 }
 
 // streakHistory is what a streak is made of: the days a player finished the day's questions on (first: the first of
 // them, "" for none), the days missed before today's rule, as they were judged then (kept: true, ended: false),
-// yesterday, if its run is still being played (open: within DayGrace of its midnight, it may count yet), and, for a
-// player in the hold-out (StreakHoldout), the day its window ends (heldUntil; "" for any other).
+// and yesterday, if its run is still being played (open: within DayGrace of its midnight, it may count yet).
 type streakHistory struct {
-	played    map[string]bool
-	missed    map[string]bool
-	first     string
-	open      string
-	heldUntil string
-}
-
-// perWeek is how many missed days the week of a day forgives the player: HeldForgives in the hold-out's window,
-// Forgives otherwise.
-func (h streakHistory) perWeek(day string) int {
-	if h.heldUntil != "" && day < h.heldUntil {
-		return HeldForgives
-	}
-	return Forgives
-}
-
-// StreakHoldoutWindow is the streak's hold-out window (StreakHoldout): its first day and the day it ends ("" for both
-// with none kept, as in a database made after it).
-func (g *Game) StreakHoldoutWindow(ctx context.Context) (from, until string, err error) {
-	err = g.DB.Read.QueryRowContext(ctx, `SELECT coalesce((SELECT value FROM kv WHERE key = ?), ''),
-		coalesce((SELECT value FROM kv WHERE key = ?), '')`, StreakHoldout+"_from", StreakHoldout+"_until").
-		Scan(&from, &until)
-	return from, until, err
-}
-
-// heldUntil is, for a player in the streak's hold-out (StreakHoldout: in its bucket, and come in during its window),
-// the day the window ends; "" for any other, or with no window kept (a database made after it).
-func (g *Game) heldUntil(ctx context.Context, userID int64) (string, error) {
-	if !HeldOut(StreakHoldout, userID) {
-		return "", nil
-	}
-	var from, until sql.NullString
-	var created int64
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT (SELECT value FROM kv WHERE key = ?2),
-			(SELECT value FROM kv WHERE key = ?3), created_at FROM users WHERE id = ?1`,
-		userID, StreakHoldout+"_from", StreakHoldout+"_until").Scan(&from, &until, &created)
-	if errors.Is(err, sql.ErrNoRows) || err == nil && (!from.Valid || !until.Valid) {
-		return "", nil
-	}
-	if err != nil {
-		return "", err
-	}
-	if came := dayOf(time.UnixMilli(created)); came >= from.String && came < until.String {
-		return until.String, nil
-	}
-	return "", nil
+	played map[string]bool
+	missed map[string]bool
+	first  string
+	open   string
 }
 
 // streakDays are a player's days as the streak counts them (streakHistory), over the last ten years.
 func (g *Game) streakDays(ctx context.Context, userID int64) (streakHistory, error) {
 	h := streakHistory{played: map[string]bool{}, missed: map[string]bool{}}
-	var err error
-	if h.heldUntil, err = g.heldUntil(ctx, userID); err != nil {
-		return h, err
-	}
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT day, NULL FROM runs WHERE user_id = ?1 AND kind = 'day'
 			AND finished_at IS NOT NULL AND day >= ?2
 		UNION ALL SELECT day, kept FROM streak_missed WHERE user_id = ?1 AND day >= ?2`,
@@ -489,7 +431,7 @@ func walkStreak(h streakHistory, today string, saw func(day string, forgiven boo
 		default:
 			kept, judged := h.missed[day]
 			if !judged {
-				kept = used < h.perWeek(day)
+				kept = used < Forgives
 			}
 			if kept {
 				used++
@@ -511,8 +453,7 @@ func walkStreak(h streakHistory, today string, saw func(day string, forgiven boo
 	if !monday(end).Equal(week) {
 		used = 0
 	}
-	s.PerWeek = h.perWeek(today)
-	s.Left = max(0, s.PerWeek-used)
+	s.Left = max(0, Forgives-used)
 	s.Spare = s.Left > 0
 	return s
 }

@@ -14,7 +14,7 @@ import (
 
 // adminSections are /admin's parts, as its menu names them: on /admin, but the questions, on a page of their own.
 var adminSections = []struct{ ID, Name string }{
-	{"reminders", "Напомняния"}, {"back", "Връщане"}, {"path", "Път"}, {"habit", "Навик"}, {"streaks", "Серии"},
+	{"back", "Връщане"}, {"path", "Път"}, {"habit", "Навик"}, {"streaks", "Серии"},
 	{"fair", "Честна игра"}, {"notices", "Известия"}, {"games", "Игри"}, {"players", "Играчи"},
 }
 
@@ -71,30 +71,6 @@ var adminBody = template.Must(template.New("admin").Parse(`
 данни.</p>
 
 {{with .M}}
-<section class="admin-section" id="reminders">
-<h2>Помагат ли напомнянията</h2>
-<p class="muted">{{.HoldoutShare}} % от играчите, избрани по жребий, не получават известието за деня и писмото за
-прекъсната серия: пазим само кога щяха да ги получат. Напомнянето по имейл не е в опита: идва при всеки, който го
-поиска. Ако интервалите на двете групи не се застъпват, разликата е от напомнянията. Броим по играч, затова интервалът
-е толкова тесен, колкото позволяват играчите, а не напомнянията: при малко играчи ще е широк месеци наред.
-{{if .HoldoutFrom}}От {{.HoldoutFrom}}{{else}}От началото на опита{{end}}, без днешния ден.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">Получили</th><th class="num">Без напомняне</th></tr></thead><tbody>
-{{range .Holdout}}<tr><td>{{.Name}}</td><td class="num">{{.Sent.HTML}}</td><td class="num">{{.Held.HTML}}</td></tr>{{end}}
-</tbody></table></div>
-</section>
-
-{{if .StreakHoldout}}
-<section class="admin-section" id="streak-holdout">
-<h2>Помага ли вторият простен ден</h2>
-<p class="muted">Новите играчи от {{.StreakFrom}} до {{.StreakUntil}}: един от всеки десет, по жребий, има един простен
-пропуснат ден на седмица, останалите два. Мярката, казана предварително: колко се връщат в дни 7–13. Ако до края на
-прозореца интервалите на двете групи се застъпват, двата простени дни остават.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th></th><th class="num">Два дни</th><th class="num">Един ден</th></tr></thead><tbody>
-{{range .StreakHoldout}}<tr><td>{{.Name}}</td><td class="num">{{.Two.HTML}}</td><td class="num">{{.One.HTML}}</td></tr>{{end}}
-</tbody></table></div>
-</section>
-{{end}}
-
 <section class="admin-section" id="back">
 <h2>Връщане</h2>
 <div class="charts">{{.PlayersChart}}{{.CohortChart}}{{.Curve}}</div>

@@ -64,7 +64,6 @@ func start(t *testing.T) *game {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s.heldOut = func(int64) bool { return false } // the reminders' tests remind everyone; TestRemindersHeldOut, some
 	ts.Config.Handler = s.Handler()
 	ts.Start()
 	// Run in reverse: the server stops taking requests, then what it started in the background ends, then the
@@ -629,7 +628,7 @@ func TestReportsAndTheAdminPage(t *testing.T) {
 		t.Fatalf("the admin page: %d %s", status, body)
 	}
 	_, main := at("/admin")
-	for _, part := range []string{"Връщане", "Посещения без профил", "Кои се връщат", "Навик", "Помагат ли напомнянията",
+	for _, part := range []string{"Връщане", "Посещения без профил", "Кои се връщат", "Навик",
 		"Серии", "Части на играта", "Устройства", "Честна игра", "Играчи", `href="/admin/questions"`} {
 		if !strings.Contains(main, part) {
 			t.Fatalf("the admin page has no %q", part)
@@ -742,7 +741,6 @@ func pushWorld(t *testing.T) (*Server, *game, *fakePushService, func(p *player, 
 		t.Fatal(err)
 	}
 	s.game.Now = daytime()
-	s.heldOut = func(int64) bool { return false } // the reminders' tests remind everyone; TestRemindersHeldOut, some
 	ts.Config.Handler = s.Handler()
 	ts.Start()
 	t.Cleanup(ts.Close)
