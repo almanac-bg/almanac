@@ -38,7 +38,9 @@ import (
 // is never told who played it.
 //
 // A duel the player started and left unfinished is gone on with when they start one the same way again (with the same
-// friend, or against a recording); one never finished goes at its time, as if never started (SettleDue). A friend's
+// friend, or against a recording); one never finished goes at its time, as if never started (SettleDue). One left
+// before its first question showed (a tap, then „Отказ“ or away) isn't a duel yet: it isn't listed, and goes with its
+// run DuelUnbegun after it was made (SettleDue), so that nothing lingers as „Твой ред“ that nobody played. A friend's
 // side left half-way counts as it stood when the time runs out.
 
 const (
@@ -54,6 +56,9 @@ const (
 	// DuelsADay is how many duels a player may start with friends in a day (in Bulgaria): more than anyone plays, and
 	// a bound on what one player can send others.
 	DuelsADay = 20
+	// DuelUnbegun is how long a duel the player made and left before its first question showed is kept (unlisted, to be
+	// gone on with by a tap on the same duel again) before it goes: long past its count, should its screen still be open.
+	DuelUnbegun = 10 * time.Minute
 )
 
 var (
@@ -131,8 +136,8 @@ type DuelSide struct {
 	Ms     int64  `json:"ms"`
 	Done   bool   `json:"done"`
 	// Started is whether the side's game has begun: a question shown (its time running, or run out), or answered (a
-	// duel sent first may be made and never begun).
-	Started bool  `json:"started,omitempty"`
+	// duel made first may be left before it begins: not listed, and gone DuelUnbegun after).
+	Started bool  `json:"-"`
 	Look    *Look `json:"look,omitempty"`
 	// Gone is a player who has gone since (play.Forget): their game went with them, so their score isn't known.
 	Gone bool `json:"gone,omitempty"`
@@ -705,8 +710,12 @@ func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 
 // SettleDue ends the duels whose time is up. A friend's side left half-way counts as it stood: it's finished there,
 // and the duel has its result. One the friend never started lapses, without a result. One whose first side was never
-// finished goes, as if never started (its run stays the player's, a game left half-way). Run every few minutes.
+// finished goes, as if never started (its run stays the player's, a game left half-way). One whose first question never
+// showed goes with its run DuelUnbegun after it was made (dropUnbegun). Run every few minutes.
 func (g *Game) SettleDue(ctx context.Context) error {
+	if err := g.dropUnbegun(ctx); err != nil {
+		return err
+	}
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, d.kind, d.sent_at IS NOT NULL, coalesce(d.b_run, 0),
 			coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = d.a_run), 0)
 		FROM duels d WHERE d.ended_at IS NULL AND d.expires_at <= ?`, store.Ms(g.Now()))
@@ -748,6 +757,53 @@ func (g *Game) SettleDue(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// dropUnbegun deletes the duels made more than DuelUnbegun ago whose first side never showed a question (a tap that
+// made one, then „Отказ“ or away), and their runs: nothing of them was played, nor sent (the friend never knew of it).
+// Each is looked at again as it goes, in one write: a question shown meanwhile keeps it.
+func (g *Game) dropUnbegun(ctx context.Context) error {
+	const unbegun = `r.finished_at IS NULL AND r.at = 0 AND r.shown_at IS NULL
+		AND NOT EXISTS (SELECT 1 FROM answers WHERE run_id = r.id)`
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id FROM duels d JOIN runs r ON r.id = d.a_run
+		WHERE d.ended_at IS NULL AND d.sent_at IS NULL AND d.created_at <= ? AND `+unbegun,
+		store.Ms(g.Now().Add(-DuelUnbegun)))
+	if err != nil {
+		return err
+	}
+	var due []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		due = append(due, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil || len(due) == 0 {
+		return err
+	}
+	return g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		for _, id := range due {
+			var run int64
+			err := tx.QueryRow(`SELECT r.id FROM duels d JOIN runs r ON r.id = d.a_run
+				WHERE d.id = ? AND d.ended_at IS NULL AND d.sent_at IS NULL AND `+unbegun, id).Scan(&run)
+			if errors.Is(err, sql.ErrNoRows) {
+				continue // begun meanwhile
+			}
+			if err != nil {
+				return err
+			}
+			if _, err := tx.Exec(`DELETE FROM duels WHERE id = ?`, id); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(`DELETE FROM runs WHERE id = ?`, run); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // endDue settles a duel whose time is up, its last side finished where it stood (run; 0: played already).
@@ -876,6 +932,10 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 			v.Opponent = &DuelSide{Name: GoneName, Done: true, Gone: true}
 		}
 		mine := v.First
+		// The player's own, left before its first question showed: not a duel yet, in the lists (SettleDue drops it).
+		if only == 0 && v.EndedAt == 0 && mine && v.You != nil && !v.You.Started {
+			continue
+		}
 		switch {
 		case v.EndedAt == 0:
 			v.Until = r.expires

@@ -35,8 +35,6 @@ export interface Side {
   rights: number;
   ms: number;
   done: boolean;
-  /** Whether the side has answered a question yet: a duel sent first may be made and never begun. */
-  started?: boolean;
   look?: Look;
   /** A player who has gone since (play.DuelSide.Gone): their game went with them, so their score isn't known. */
   gone?: boolean;
@@ -143,13 +141,13 @@ const ends: Record<DuelView["state"], string> = {
   expired: "Изтече",
 };
 
-/** What a row says of an open duel, under the name: where it stands (begun: a question shown, its time run out or
- * not), and how long is left. The pair's record is said once, on the friend (Приятели), not on each duel. */
+/** What a row says of an open duel, under the name: where it stands, and how long is left (the player's own, left
+ * before its first question showed, isn't listed: play.DuelUnbegun). The pair's record is said once, on the friend
+ * (Приятели), not on each duel. */
 function rowLine(d: DuelView): string {
   if (d.state === "theirs")
     // The player's ten are in: their score, and how long the other (named over it) has for the same ten.
     return `Ти: ${formatNumber(d.you?.rights ?? 0)} ·\u00a0${leftWords(d.until ?? 0)}`;
-  if (d.first && !d.you?.started) return `Още не е започнат ·\u00a0${leftWords(d.until ?? 0)}`;
   return d.first
     ? `Довърши своята игра ·\u00a0${leftWords(d.until ?? 0)}`
     : `Изиграй същите десет въпроса ·\u00a0${leftWords(d.until ?? 0)}`;
@@ -555,6 +553,8 @@ export function duelOne(params: string[]) {
       if (!life.aborted) play(now, s);
     } catch (err) {
       if (life.aborted) return;
+      // Gone while its start waited (left before its first question showed, for long: play.DuelUnbegun).
+      if ((err as ApiError).code === "duel_gone") return screen.show(missing);
       screen.show(() =>
         h(
           "div",
