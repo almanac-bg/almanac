@@ -1,6 +1,6 @@
 // What a game brought, said once, at its end, quietly: the ink it wrote in the Алманах (play/ink.go), a right answer
 // in the issue that stayed grey because the book had its fact already, and the chapter nearest its next rank (its
-// seal, how much ink is still to come, and the quarters as pips); or the ranks it raised (play/rank.go): several as
+// seal, how much ink is still to come, over its bar); or the ranks it raised (play/rank.go): several as
 // one line (one chapter's with its ladder of ranks), and a rise of the player's best rank as the result's one big
 // moment, the seal set large on its ladder. A game that ended without its result on screen has
 // its news told on Днес later (play/told.go): under its result, if it's the day's; else under a line that says whose it
@@ -11,7 +11,7 @@ import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { formatNumber } from "../lib/words.ts";
 import { rankName, rankNames } from "../seal.ts";
 import { refreshSeal } from "../state.ts";
-import { chapterName, ladder, pips, seal } from "../ui.ts";
+import { chapterName, ladder, seal, standing } from "../ui.ts";
 
 interface News {
   /** The facts the game wrote in the Алманах in ink (play.News.Ink). */
@@ -20,9 +20,9 @@ interface News {
   metBefore?: number;
   /** The ranks risen since last told, as one (play.Rose): Бележка never; `best`, the player's best rank rose. */
   rose?: { ranks: { chapter: string; name: string; to?: number; ink?: number }[]; best?: boolean };
-  /** After a day's issue, the chapter nearest its next rank (play.Step), when none rose: its rank now (0: none yet) and
-   * the quarters of the way to the next. */
-  step?: { chapter: string; left: number; next: string; level: number; quarter: number };
+  /** After a day's issue, the chapter nearest its next rank (play.Step), when none rose: its rank now (0: none yet), and
+   * the ink it starts at and the next one's. */
+  step?: { chapter: string; left: number; next: string; level: number; from: number; nextAt: number };
 }
 
 /** What a game brought, asked for once the game (run) is kept (after `delay`: a duel is kept a moment after it ends).
@@ -87,7 +87,7 @@ function metLine(n: number): Child {
   );
 }
 
-/** The chapter nearest its next rank: its seal and pips, „История: още 2 до Тетрадка“. */
+/** The chapter nearest its next rank: its seal, its name, and where it stands (ui.ts, standing),„История: още 2 до Тетрадка“. */
 function stepLine(s: NonNullable<News["step"]>): Child {
   return h(
     "p",
@@ -96,8 +96,9 @@ function stepLine(s: NonNullable<News["step"]>): Child {
     h(
       "span",
       { class: "step-words" },
-      h("span", null, h("b", null, `${chapterName(s.chapter)}:`), ` още\u00a0${s.left} с\u00a0мастило до „${s.next}“`),
-      s.level > 0 ? pips(s.quarter) : null,
+      h("b", null, chapterName(s.chapter)),
+      // Its ink, as the step counted it (play.StepOf): what's left of the way to the next.
+      standing({ chapter: s.chapter, level: s.level, ink: s.nextAt - s.left, from: s.from, nextAt: s.nextAt }),
     ),
   );
 }

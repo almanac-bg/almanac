@@ -7,25 +7,63 @@ test("Профил: one list of seals, the best worn on the avatar, never chosen
   await page.goto("/");
   await ranked(page, 3);
   await page.goto("/me");
-  // One list, a row a chapter: its seal, its name, its rank with the pips to the next, its ink. Nothing to tap,
-  // nothing ringed as worn, no way to choose; no single chapter's ladder over it.
+  // One list, a row a chapter: its seal, its name and its ink, and under them its rank and what's left to the next in
+  // words over a bar of the way (at the rank's first ink: empty). Nothing to tap, nothing ringed as worn, no way to
+  // choose; no single chapter's ladder over it.
   const rows = page.locator(".me-seals .seal-list .seal-row");
   await expect(rows).toHaveCount(10);
   const history = rows.filter({ hasText: "История" });
   await expect(history.locator(".seal")).toHaveClass(/\bt-history\b/);
-  await expect(history.locator(".seal-row-rank")).toHaveText("Тетрадка");
-  await expect(history.locator(".seal-pips i.on")).toHaveCount(1);
+  await expect(history.locator(".seal-row-name")).toHaveText("История");
   await expect(history.locator(".seal-row-ink")).toHaveText("15 с мастило");
+  await expect(history.locator(".standing-words")).toHaveText(/^·Тетрадка·още\s25\sдо „Книга“$/);
+  await expect(history.locator(".standing-bar")).toBeVisible();
+  expect(await history.locator(".standing-bar > i").evaluate((i) => (i as HTMLElement).style.width)).toBe("0%");
   await expect(page.locator(".me-seals button, .ladder")).toHaveCount(0);
   await expect(page.locator(".screen")).not.toContainText(/избери|Носиш|Печатът на/);
   // The badge is the best (every chapter alike in rank, ink and day: the bank's first), on the avatar's corner.
   await expect(page.locator(".me-avatar .avatar > .seal")).toHaveClass(/\bt-general\b/);
   expect((await page.request.patch("/api/me/seal", { data: { chapter: "music" } })).ok()).toBe(false);
-  // An avatar is a face: the fifteen animals, and no chapter's art, whatever its rank, here or by the API.
-  await expect(page.locator(".me-avatars .pick")).toHaveCount(15);
-  await expect(page.locator(".me-avatars")).not.toContainText(/История|Страница/);
+  // An avatar is a face: the fifteen animals, and no chapter's art, whatever its rank, here or by the API. A choice
+  // made rarely: on a sheet, not on the page.
+  await expect(page.locator(".screen .pick")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Аватар" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Смени аватара" }).click();
+  const sheet = page.getByRole("dialog", { name: "Аватар" });
+  await expect(sheet.locator(".pick")).toHaveCount(15);
+  await expect(sheet).not.toContainText(/История|Страница/);
   for (const art of ["history", "geography"])
     expect((await page.request.patch("/api/me/look", { data: { avatar: art } })).ok()).toBe(false);
+});
+
+test("Профил: the avatar is changed on a sheet, the one worn marked; a tap wears one, kept, and puts the sheet away", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await playedBefore(page, 1);
+  await page.goto("/me");
+  // Found by „Смени“ under the avatar as well as the avatar itself: one button, its name says what it does.
+  await page.locator(".me-avatar-change").click();
+  const sheet = page.getByRole("dialog", { name: "Аватар" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator('.pick[aria-pressed="true"]')).toHaveCount(1);
+  // „Затвори“ puts it away, nothing changed.
+  const was = await page.locator(".me-head .avatar").getAttribute("class");
+  await sheet.getByRole("button", { name: "Затвори" }).click();
+  await expect(sheet).toHaveCount(0);
+  expect(await page.locator(".me-head .avatar").getAttribute("class")).toBe(was);
+  // A tap on an animal wears it at once and puts the sheet away; kept, as Профил shows it again.
+  await page.getByRole("button", { name: "Смени аватара" }).click();
+  await sheet.getByRole("button", { name: "Рис", exact: true }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(page.locator(".me-head .avatar.sh-lynx")).toBeVisible();
+  await page.reload();
+  await expect(page.locator(".me-head .avatar.sh-lynx")).toBeVisible();
+  await page.getByRole("button", { name: "Смени аватара" }).click();
+  await expect(sheet.getByRole("button", { name: "Рис", exact: true })).toHaveAttribute("aria-pressed", "true");
+  // Esc puts it away too.
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
 });
 
 test("a player's profile: asked to be friends from it, and friends there", async ({ browser }) => {
@@ -45,6 +83,8 @@ test("a player's profile: asked to be friends from it, and friends there", async
   await b.goto(`/players/${ana.tag}`);
   await expect(b.getByRole("heading", { level: 1, name: ana.name })).toBeVisible();
   await expect(b.locator(".me-tag")).toHaveText(`@${ana.tag}`);
+  // Her avatar is hers to change, not his: no way to it here.
+  await expect(b.getByRole("button", { name: "Смени аватара" })).toHaveCount(0);
   // A topic's game writes no rank and no streak: nothing yet, and no lifetime totals nor how well she knows a topic.
   await expect(b.getByText("Още няма печат.")).toBeVisible();
   await expect(b.locator(".me-head")).not.toContainText("Ниво");

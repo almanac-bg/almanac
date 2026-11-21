@@ -37,7 +37,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // The seals one list, a row a chapter with a rank, and the best of them worn on the avatar's corner.
   if (await page.locator(".me-seals .seal-row").count()) {
     await expect(page.locator(".me-avatar .avatar > .seal")).toHaveCount(1);
-    await expect(page.locator(".me-seals .seal-row").first().locator(".seal-pips")).toBeVisible();
+    await expect(page.locator(".me-seals .seal-row").first().locator(".standing-bar")).toBeVisible();
   }
 
   await openGame(page, "/play/history");

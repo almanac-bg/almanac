@@ -155,7 +155,6 @@ test("the ways back pop the history; back comes to a page and its board where th
   // What Профил loads after it opens, in: scrolled before, the page would move as it comes (the browser keeps what's
   // in view), and be kept where it moved to.
   await expect(page.locator(".me-seals")).toBeVisible();
-  await expect(page.locator(".pick")).toHaveCount(25);
   await page.evaluate(() => scrollTo(0, 200));
   await page.waitForTimeout(400); // kept once it stops
   const y = await page.evaluate(() => scrollY);

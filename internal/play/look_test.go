@@ -129,7 +129,7 @@ func TestSealBesideTheName(t *testing.T) {
 		t.Fatalf("Ana in Bo's duel: %+v %v", d.Opponent, err)
 	}
 
-	// The profile: the seal worn, whole (its name, its quarters), as the profile's own.
+	// The profile: the seal worn, whole (its name, the way to the next), as the profile's own.
 	var anaTag string
 	if err := w.db.Read.QueryRow(`SELECT tag FROM users WHERE id = ?`, ana).Scan(&anaTag); err != nil {
 		t.Fatal(err)

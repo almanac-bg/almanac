@@ -10,8 +10,8 @@
 //   6 Летопис   the ten scallops and two tails
 //   7 and up    Летопис with its number on a tab („Летопис · 2“), from 32px
 //
-// How far the chapter has come towards its next rank (quarters, 0–3) isn't on the seal: from 32px it's four pips under
-// it (ui.ts, seal), on a chapter's page and the result's line; at 24px, nothing.
+// How far the chapter has come towards its next rank isn't on the seal: it's said beside it, over a slim bar of the way
+// (ui.ts, standing), on Профил's seals, a chapter's page and card, and the result's line; on an avatar, nothing.
 //
 // This file only draws (the paths, as strings, on a 48 × 48 grid); ui.ts (seal) puts the chapter's glyph in its
 // middle, and app.css colours it (.seal: --tv, the chapter's vivid; the inks from the tokens).

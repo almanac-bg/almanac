@@ -238,29 +238,68 @@ export function seal(topic: string, rank: number, size = 32, cls = ""): SVGSVGEl
   return svg;
 }
 
-/** How far a chapter has come towards its next rank: four pips under its seal, `quarters` (0–3) of them filled. For
- * the eye: the words beside it say how much ink is still to come. */
-export function pips(quarters: number): HTMLElement {
+/** Where a chapter stands between two ranks (play.ChapterRank; play.Step): its rank (0 before any), its ink, the ink
+ * its rank starts at and the ink the next one does. */
+export interface Standing {
+  chapter: string;
+  level: number;
+  ink: number;
+  from: number;
+  nextAt: number;
+}
+
+/** The ink still to come to the next rank: never 0 (the next rank, held for a day's count: play.StepOf). */
+const leftOf = (s: Standing) => Math.max(1, s.nextAt - s.ink);
+
+/** How much of the way from its rank to the next a chapter has come, 0 to 1, as its words say it (never the whole:
+ * the next rank isn't held yet). */
+export function wayOf(s: Standing): number {
+  const span = s.nextAt - s.from;
+  return span > 0 ? Math.min(1, Math.max(0, (s.nextAt - leftOf(s) - s.from) / span)) : 0;
+}
+
+/** What's left to the next rank, in words: „още 8 до „Тетрадка““; `named`, after the rank's own name: „Страница · още
+ * 8 до „Тетрадка““, „Летопис · 2 · още 37 до „Летопис · 3““ (before a first rank, no name: „още 1 до „Бележка““). */
+export function standingWords(s: Standing, named = true): string[] {
+  const next = rankName(s.level + 1).replaceAll(" ", " ");
+  const left = `още ${leftOf(s)} до „${next}“`;
+  return named && s.level > 0 ? [rankName(s.level), left] : [left];
+}
+
+/** Where a chapter stands, said and drawn, one way everywhere (Профил's seals, a chapter's head and card, the result's
+ * line): the words (`named`: the rank's name first, where nothing over them says it), and under them a slim bar in the
+ * chapter's colour (in ink on its sheet) filled for the part of the way from its rank to the next. The bar is for the
+ * eye: the words say it. Where they don't fit on a line, they go on two, the dot between them gone (app.css). */
+export function standing(s: Standing, named = true): HTMLElement {
   return h(
     "span",
-    { class: "seal-pips", "aria-hidden": "true" },
-    [0, 1, 2, 3].map((i) => h("i", { class: i < quarters ? "on" : undefined })),
+    { class: `standing t-${s.chapter}` },
+    h(
+      "span",
+      { class: "standing-words" },
+      h(
+        "span",
+        null,
+        standingWords(s, named).map((w) =>
+          h("span", null, h("i", { class: "standing-dot", "aria-hidden": "true" }, "·"), h("span", null, w)),
+        ),
+      ),
+    ),
+    h(
+      "span",
+      { class: "standing-bar", "aria-hidden": "true" },
+      h("i", { style: { width: `${Math.round(wayOf(s) * 1000) / 10}%` } }),
+    ),
   );
 }
 
 /** A chapter's rank as Профил and a player's page have it (play.ChapterRank). */
-export interface ChapterRank {
-  chapter: string;
-  level: number;
-  /** The quarters of the way to the next rank (0–3). */
-  quarter: number;
-  /** The chapter's ink, as the rank was counted from. */
-  ink: number;
-}
+export type ChapterRank = Standing;
 
-/** A player's seals, one list, a row a chapter with a rank, in the bank's order: the seal (its glyph in it), the
- * chapter's name, the rank's name with the pips towards the next, and the ink. A view, never a choice: the one worn is
- * the best (play.sealOf). Nothing before a first seal: the page says what brings one. */
+/** A player's seals, one list, a row a chapter with a rank, in the bank's order: the seal (its glyph in it); the
+ * chapter's name with its ink at the row's end; under them where it stands (standing: „Страница · още 8 до
+ * „Тетрадка““ over its bar). A view, never a choice: the one worn is the best (play.sealOf). Nothing before a first
+ * seal: the page says what brings one. */
 export function sealList(ranks: ChapterRank[]): Child {
   const had = categories
     .map((c) => ranks.find((r) => r.chapter === c.id))
@@ -281,15 +320,20 @@ export function sealList(ranks: ChapterRank[]): Child {
         s,
         h(
           "span",
-          { class: "seal-row-words" },
-          h("b", null, chapterName(r.chapter)),
-          h("span", { class: "seal-row-rank" }, rankName(r.level), " ", pips(r.quarter)),
-        ),
-        h(
-          "span",
-          { class: "seal-row-ink" },
-          h("b", { class: "num" }, formatNumber(r.ink)),
-          h("span", null, " с мастило"),
+          { class: "seal-row-body" },
+          // The name and the ink on a line while they fit; the ink under the name where they don't (large text).
+          h(
+            "span",
+            { class: "seal-row-head" },
+            h("b", { class: "seal-row-name" }, chapterName(r.chapter)),
+            h(
+              "span",
+              { class: "seal-row-ink" },
+              h("b", { class: "num" }, formatNumber(r.ink)),
+              h("span", null, " с мастило"),
+            ),
+          ),
+          standing(r),
         ),
       );
     }),
@@ -423,15 +467,6 @@ export function explain(label: Child, words: string): Child {
     label,
   ) as HTMLElement;
   return [word, pop];
-}
-
-/** A thin bar, filled to percent. */
-export function meter(percent: number, label: string): Child {
-  return h(
-    "span",
-    { class: "meter", role: "img", "aria-label": label },
-    h("i", { class: "meter-fill", style: { width: `${Math.max(0, Math.min(100, percent))}%` } }),
-  );
 }
 
 const dayNames = ["понеделник", "вторник", "сряда", "четвъртък", "петък", "събота", "неделя"];

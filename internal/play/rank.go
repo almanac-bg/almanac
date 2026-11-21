@@ -19,8 +19,8 @@ import (
 //
 // A rank is kept, never worked out on view (ranks): it's counted as a day's issue is finished (afterRun: only the
 // issue writes ink), and it never falls, whatever the bank does to the facts under it later. With it is kept the
-// chapter's ink as counted and how far it is to the next rank in quarters (Quarter): the seal fills in quarters
-// between ranks. There's no check of guessing: a tapper climbs as slowly as their ink does.
+// chapter's ink as counted and how far it is to the next rank in quarters (Quarter); a player is shown the way from
+// one rank's ink to the next's (ChapterRank: From, NextAt) as a bar. There's no check of guessing: a tapper climbs as slowly as their ink does.
 //
 // A rank risen is told once, with the game's news (NewsOf: Rose), several at once as one; Бележка, the first, never.
 // A seal's reward is the seal itself: it unlocks nothing (an avatar is an animal: progress.go, SetAvatar). The player
@@ -85,13 +85,15 @@ func Quarter(level, ink int) int {
 	return min(3, max(0, 4*(ink-from)/(to-from)))
 }
 
-// ChapterRank is a player's rank in a chapter, as kept: its level and name, the quarters toward the next, the
-// chapter's ink as counted then, and the next rank and the ink it starts at.
+// ChapterRank is a player's rank in a chapter, as kept: its level and name, the ink it starts at (From), the
+// chapter's ink as counted then, and the next rank and the ink it starts at: the way from From to NextAt is the bar
+// beside a seal (web/src/ui.ts, standing). The quarters toward the next are the kept rank's own (countRanks).
 type ChapterRank struct {
 	Chapter string `json:"chapter"`
 	Level   int    `json:"level"`
 	Name    string `json:"name"`
-	Quarter int    `json:"quarter"`
+	From    int    `json:"from"`
+	Quarter int    `json:"-"`
 	Ink     int    `json:"ink"`
 	Next    string `json:"next"`
 	NextAt  int    `json:"nextAt"`
@@ -100,8 +102,8 @@ type ChapterRank struct {
 }
 
 func chapterRank(chapter string, k keptRank) ChapterRank {
-	return ChapterRank{Chapter: chapter, Level: k.level, Name: RankName(k.level), Quarter: k.quarter, Ink: k.ink,
-		Next: RankName(k.level + 1), NextAt: RankFrom(k.level + 1), Day: k.day}
+	return ChapterRank{Chapter: chapter, Level: k.level, Name: RankName(k.level), From: RankFrom(k.level),
+		Quarter: k.quarter, Ink: k.ink, Next: RankName(k.level + 1), NextAt: RankFrom(k.level + 1), Day: k.day}
 }
 
 // rightChance is the chance a guess at a question of each kind is right: one of four options; one of two; an order of
@@ -199,7 +201,7 @@ func (g *Game) RanksOf(ctx context.Context, userID int64) ([]ChapterRank, error)
 }
 
 // Worn is a seal as it shows on a player's avatar to others (Look): its chapter and level, no more (its word is
-// the Алманах's, never beside a name; its quarters show from 32px, on the player's own pages).
+// the Алманах's, never beside a name; the way to the next shows on the player's own pages).
 type Worn struct {
 	Chapter string `json:"chapter"`
 	Level   int    `json:"level"`
@@ -289,13 +291,14 @@ func roseOf(tx *sql.Tx, userID int64) (*Rose, error) {
 
 // Step is the chapter nearest its next rank, as the day's result and its reminder say it („История: още 2 до
 // Тетрадка“): the chapter, the ink it still needs (Left), and the rank's name (Next); the rank it has (Level, 0 before
-// any) and the quarters of the way to the next (Quarter), for its seal and pips.
+// any), and the ink it starts at and the next one's (From, NextAt), for its seal and the bar of the way between.
 type Step struct {
 	Chapter string `json:"chapter"`
 	Left    int    `json:"left"`
 	Next    string `json:"next"`
 	Level   int    `json:"level"`
-	Quarter int    `json:"quarter"`
+	From    int    `json:"from"`
+	NextAt  int    `json:"nextAt"`
 }
 
 // StepOf is a player's chapter nearest its next rank, by the ink their ranks are counted from (inkIn, now: an issue
@@ -322,7 +325,8 @@ func (g *Game) StepOf(ctx context.Context, userID int64) (*Step, error) {
 			left = 1 // the next rank, held for a day's count
 		}
 		if best == nil || left < best.Left {
-			best = &Step{Chapter: c.ID, Left: left, Next: RankName(level + 1), Level: level, Quarter: Quarter(level, n)}
+			best = &Step{Chapter: c.ID, Left: left, Next: RankName(level + 1), Level: level, From: RankFrom(level),
+				NextAt: RankFrom(level + 1)}
 		}
 	}
 	return best, nil
