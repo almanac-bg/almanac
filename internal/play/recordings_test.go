@@ -239,15 +239,29 @@ func TestRecordingsWords(t *testing.T) {
 func TestRecordingLevel(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	one, ana, bo := w.user(), w.user(), w.user()
-	for range 3 {
-		s, err := w.g.StartTopic(ctx, one, MixTopic)
-		if err != nil {
-			t.Fatal(err)
-		}
-		w.play(one, s.ID, append(repeat(w.right, 6), repeat(w.wrong, Length-6)...)...)
-		w.wait(time.Minute)
+	one, two, ana, bo := w.user(), w.user(), w.user(), w.user()
+	// A game stronger than Ana (all right), and one as strong: as many right as she'd get on its ten.
+	w.game(one, nil)
+	w.wait(time.Minute)
+	s, err := w.g.StartTopic(ctx, two, MixTopic)
+	if err != nil {
+		t.Fatal(err)
 	}
+	fit, err := w.g.recordingFit(ctx, ana, Even)
+	if err != nil {
+		t.Fatal(err)
+	}
+	even, nearest := -1, float64(Length)
+	for r := RecordingRights; r <= Length; r++ {
+		if off, meets := fit(w.b, w.picks(s.ID), r); meets && off < nearest {
+			even, nearest = r, off
+		}
+	}
+	if even < 0 {
+		t.Fatal("no score of that game is „равен“ to Ana")
+	}
+	w.play(two, s.ID, append(repeat(w.right, even), repeat(w.wrong, Length-even)...)...)
+	w.wait(time.Minute)
 	for _, c := range []struct{ chosen, level string }{{Stronger, Stronger}, {Even, Even}, {"", Even}, {"hard", Even}} {
 		id, err := w.g.DuelRecording(ctx, ana, c.chosen)
 		if err != nil {
@@ -265,8 +279,13 @@ func TestRecordingLevel(t *testing.T) {
 		if err != nil || len(list.Yours) == 0 || list.Yours[0].Level != c.level {
 			t.Fatalf("chosen %q, in the list: %+v %v", c.chosen, list.Yours, err)
 		}
-		// Played to its end, so the next is a new one, not this one gone on with.
-		w.playSide(ana, id, repeat(w.right, Length))
+		// Gone, with Ana's side, so the next is chosen afresh: a new one, by the same Ana, none of its questions seen.
+		if _, err := w.db.Write.Exec(`DELETE FROM duels WHERE id = ?`, id); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.db.Write.Exec(`DELETE FROM runs WHERE id = ?`, d.RunID); err != nil {
+			t.Fatal(err)
+		}
 	}
 	friendly := w.duel(ana, bo, repeat(w.right, Length), repeat(w.wrong, Length))
 	if d, err := w.g.DuelOf(ctx, bo, friendly); err != nil || d.Level != "" {

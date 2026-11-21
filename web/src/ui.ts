@@ -266,9 +266,12 @@ export interface Worn {
 }
 
 /** The seal a player wears, beside their name or on their avatar's corner, 24px (or `size`); nothing without one. Only
- * the seal: its rank's word is the Алманах's, never beside a name. */
+ * the seal: its rank's word is the Алманах's, never beside a name, nor read out there („Печат: История“). */
 export function worn(w: Worn | null | undefined, size = 24): Child {
-  return w?.chapter && w.level > 0 ? seal(w.chapter, w.level, size) : null;
+  if (!w?.chapter || w.level < 1) return null;
+  const s = seal(w.chapter, w.level, size);
+  s.setAttribute("aria-label", `Печат: ${chapterName(w.chapter)}`);
+  return s;
 }
 
 /** A page's picture, over its heading (decoration): one of the ways to play, or "almanac", "friends". */

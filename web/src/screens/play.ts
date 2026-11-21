@@ -55,7 +55,8 @@ export function topic([category = ""]: string[]) {
         { class: "screen" },
         // What was played, where the day's result has its date: every result laid out the same. (The day's state is
         // in long before a game ends: as it was then, never drawing the result again.)
-        // The chapter's sheet: its chip, the score and its tiles; under it what the game wrote („+4 в сиво“).
+        // The chapter's sheet: its chip, the score and its tiles; under it where the game wrote, with no number (grey
+        // is never counted: DECISIONS.md).
         summary(
           s,
           null,
@@ -63,7 +64,11 @@ export function topic([category = ""]: string[]) {
             main: () => nextOf(day(), again, category).main,
             also: [() => nextOf(day(), again, category).also],
           },
-          just ? [news(s.id), otherTopics(category)] : [otherTopics(category)],
+          [
+            h("p", { class: "news-met" }, "Фактите от играта са в книгата ти, в сиво."),
+            just ? news(s.id) : null,
+            otherTopics(category),
+          ],
           just,
           category,
         ),
@@ -71,23 +76,15 @@ export function topic([category = ""]: string[]) {
   });
 }
 
-/** A chapter game's result's buttons: „Още десет“, the one action; beside it the way to the chapter (its facts, the
- * new ones too), and while the day's ten wait, the way to them, plain, with the streak at stake under it. */
+/** A chapter game's result's buttons. While the day's ten wait, the way to them is the one gold action (the habit
+ * comes first), the streak at stake under it, and „Още десет“ plain beside the way to the chapter; once the day is
+ * played, „Още десет“ is the action. */
 function nextOf(d: DayWaits | null, again: () => void, chapter: string): { main: Child; also: Child[] } {
-  const more = h("button", { class: "btn primary big", onclick: again }, "Още десет");
   const book = h("a", { class: "btn", href: `/almanac/${chapter}` }, "Към главата");
-  if (!d) return { main: more, also: [book] };
+  if (!d) return { main: h("button", { class: "btn primary big", onclick: again }, "Още десет"), also: [book] };
   return {
-    main: more,
-    also: [
-      h(
-        "div",
-        { class: "stack small-gap" },
-        h("a", { class: "btn", href: "/" }, "Към въпросите на деня"),
-        stakeLine(d.streak, d.spare),
-      ),
-      book,
-    ],
+    main: [h("a", { class: "btn primary big", href: "/" }, "Към въпросите на деня"), stakeLine(d.streak, d.spare)],
+    also: [h("button", { class: "btn", onclick: again }, "Още десет"), book],
   };
 }
 

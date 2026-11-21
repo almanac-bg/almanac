@@ -29,13 +29,44 @@ test("from the second day, where no notification comes, the reminder by mail ask
     `Готово. Играта ти е запазена с имейла ${email}. Влизай с него от всяко устройство. Ще ти напомняме по имейл, ако въпросите още те чакат.`,
   );
   await expect(tomorrow).not.toContainText("само на това устройство");
-  // A player with a profile, past the first results, isn't asked again.
+  // Asked and on: not asked again.
   await page.reload();
   await expect(page.locator(".tomorrow")).toBeVisible();
   await expect(page.locator(".summary")).not.toContainText("Да ти пишем");
   // Настройки has it on, the player's to switch off.
   await page.goto("/settings");
   await expect(page.getByRole("switch", { name: "Напомняне по имейл" })).toHaveAttribute("aria-checked", "true");
+});
+
+test("a player with a profile is asked in „Утре“ to be reminded while it's off, never as a second action", async ({
+  page,
+}, info) => {
+  test.setTimeout(90_000);
+  const email = `profile-remind-${info.project.name}-${Date.now()}@example.com`;
+  await page.goto("/");
+  await daysPlayed(page, 1);
+  // The game kept with an email in Настройки, no reminder asked for.
+  await page.goto("/settings");
+  await page.getByLabel("Имейл").fill(email);
+  await page.getByRole("button", { name: "Прати ми код" }).click();
+  await expect.poll(() => mailedCode(email)).not.toBe("");
+  await page.getByLabel("Код").fill(mailedCode(email));
+  await page.getByRole("button", { name: "Потвърди" }).click();
+  await expect(page.getByText(`Играта ти е запазена с имейла ${email}`)).toBeVisible();
+  await page.goto("/");
+  await startDay(page);
+  await playRun(page);
+  const tomorrow = page.locator(".tomorrow");
+  await expect(tomorrow).toContainText(`Да ти пишем на ${email}, ако въпросите още те чакат?`);
+  // The result's one action is „Сподели“; the ask is a plain button under „Утре“.
+  await expect(page.locator(".result-first")).toHaveCount(0);
+  await expect(tomorrow.getByRole("button", { name: "Напомняй ми по имейл" })).not.toHaveClass(/primary/);
+  await tomorrow.getByRole("button", { name: "Не сега" }).click();
+  await expect(page.locator(".summary")).not.toContainText("Да ти пишем");
+  // Once a day: not again today.
+  await page.reload();
+  await expect(page.locator(".tomorrow")).toBeVisible();
+  await expect(page.locator(".summary")).not.toContainText("Да ти пишем");
 });
 
 test("a first day asks for the reminder only, not yet to keep the game; „Не сега“ holds for the day", async ({
