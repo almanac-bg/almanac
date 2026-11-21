@@ -91,7 +91,8 @@ export interface Today {
 /** The day as Днес's page came with it (server/pages.go): its first draw, without asking; every later one asks. */
 let inPage = boot.day as Today | undefined;
 
-/** A day shared (server/share.go): its day, its issue, and its shape (each question that counts: '1' right, '0' not). */
+/** A day shared (server/share.go): its day, its issue, and its shape (play.Share: each of the ten, '1' right, '2'
+ * близо, '0' wrong, '3' one that counts for nobody). */
 interface Shared {
   day: string;
   issue: number;
@@ -344,7 +345,9 @@ function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): 
   const order = t.topics?.length ? t.topics : [];
   const [, , date = 1] = t.day.split("-").map(Number);
   const top = order[0] ?? "general";
-  const sharedMarks: Mark[] = lead ? [...lead.shape].map((c) => ({ right: c === "1" })) : [];
+  const sharedMarks: Mark[] = lead
+    ? [...lead.shape].map((c) => ({ right: c === "1", close: c === "2", void: c === "3" }))
+    : [];
   return h(
     "div",
     { class: "issue day page-1" },
@@ -381,7 +384,7 @@ function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): 
             t.late
               ? "Десет въпроса от вчера"
               : lead
-                ? `Някой позна ${sharedMarks.filter((m) => m.right).length} от ${sharedMarks.length}. А ти?`
+                ? `Някой позна ${sharedMarks.filter((m) => m.right).length} от ${sharedMarks.filter((m) => !m.void).length}. А ти?`
                 : "Десет въпроса за днес",
           ),
           at

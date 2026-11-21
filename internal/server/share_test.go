@@ -72,9 +72,14 @@ func TestSharingTheDay(t *testing.T) {
 	u := me["user"].(map[string]any)
 	shape := ""
 	for _, m := range state["trail"].([]any) {
-		if m.(map[string]any)["right"] == true {
+		switch m := m.(map[string]any); {
+		case m["void"] == true:
+			shape += "3"
+		case m["right"] == true:
 			shape += "1"
-		} else {
+		case m["close"] == true:
+			shape += "2"
+		default:
 			shape += "0"
 		}
 	}
@@ -126,11 +131,23 @@ func TestSharingTheDay(t *testing.T) {
 	}
 	for _, name := range []string{
 		fmt.Sprintf("%d-%s.png", issue+1, shape), // not out yet
-		"0-1111111111.png", "1-11111111111.png", "1-2.png", "1-.png", "1-1111.jpg",
+		"0-1111111111.png", "1-11111111111.png", "1-4.png", "1-.png", "1-1111.jpg",
 	} {
 		if status, _, _ := other.get("/card/"+name, browserUA); status != 404 {
 			t.Errorf("card %s: %d", name, status)
 		}
+	}
+	// The site's own picture, what a link to any other page shows.
+	res, err = http.Get(g.url + "/og.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ = io.ReadAll(res.Body)
+	res.Body.Close()
+	img, err = png.Decode(bytes.NewReader(b))
+	if res.StatusCode != 200 || err != nil || img.Bounds().Dx() != 1200 || img.Bounds().Dy() != 630 ||
+		res.Header.Get("Cache-Control") != "public, max-age=3600" {
+		t.Fatalf("the site's picture: %d %v %v", res.StatusCode, err, res.Header)
 	}
 
 	// A link that isn't: another code, or the code with another issue.

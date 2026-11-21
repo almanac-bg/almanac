@@ -1,7 +1,8 @@
 // The card a day is shared with (DECISIONS.md, the direction: „The share“), drawn in the browser as it's shared: the
 // mark and the name, the issue and its date, the ten tiles in their chapters' colours (filled right, half близо, hollow
 // not) each with its glyph, and almanac.bg. Never an answer, never a name, never the streak. Always the day's colours,
-// whatever the screen's: it's looked at elsewhere. The server's own card (internal/card) stays for a link's preview.
+// whatever the screen's: it's looked at elsewhere. The server draws it again for a link's preview (internal/card, in
+// Go: change both together; its colours and glyphs are held equal to these in card.test.ts and card_test.go).
 
 // It imports nothing that runs: what it needs comes with the call (the pictures, the date in words), so that it
 // loads as a file of its own with nothing shared (cmd/build).
@@ -145,7 +146,10 @@ export async function drawCard(
   c.textBaseline = "alphabetic";
   c.font = '900 56px "Sofia Sans"';
   c.fillText("Брой", 64, 238);
+  // Smaller, should it ever run into the tiles (internal/card does the same).
   c.font = '900 250px "Sofia Sans Extra Condensed"';
+  const wide = c.measureText(String(issue)).width;
+  if (wide > 370) c.font = `900 ${(250 * 370) / wide}px "Sofia Sans Extra Condensed"`;
   c.fillText(String(issue), 56, 456);
   c.font = '800 44px "Sofia Sans"';
   c.fillText(date, 64, 530);
