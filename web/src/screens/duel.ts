@@ -56,6 +56,8 @@ export interface DuelView {
   recorded?: boolean;
   /** Against a recording: as it was chosen, as strong as the player („равен“) or stronger („по-силен“). */
   level?: Level;
+  /** Against a recording, the level asked for (play.DuelView.Asked), met or not: another one asks for it again. */
+  asked?: Level;
   /** Against a recording of one topic's game: the topic. */
   topic?: string;
   /** The player played first (sent it). */
@@ -481,7 +483,7 @@ export function duelOne(params: string[]) {
       d.friend && d.them
         ? again("Реванш", { friend: d.them })
         : d.recorded
-          ? again("Още един дуел срещу запис", { recording: true, level: d.level ?? "even" })
+          ? again("Още един дуел срещу запис", { recording: true, level: d.asked ?? d.level ?? "even" })
           : null;
     screen.show(() =>
       duelResult(
