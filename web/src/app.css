@@ -4913,17 +4913,6 @@
     height: 100%;
   }
 
-  /* As tall as what it holds: a chapter with no ink yet is its badge and its name, never stretched to the inked ones
-     beside it; one with ink has room for it, as tall as its row. */
-  .chapters > li:not(:has(.card-ink)) {
-    align-self: start;
-  }
-
-  /* The chapters with no ink yet start a row of their own, after the inked ones (almanac.ts, book). */
-  .chapters > .row-start {
-    grid-column-start: 1;
-  }
-
   .card-leaf {
     --fold: 34px;
     height: 100%;

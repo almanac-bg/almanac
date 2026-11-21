@@ -124,10 +124,9 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
 - **Алманах:** its head (Микс and България as two ways to play, words only, no glyph: theirs would sit apart from the chapters'; no lifetime totals), then the chapters, each a folded
   card in its colour with its seal as the badge (40px), its ink („180 с мастило“), its rank over its bar and what's left to
   the next under it („Тетрадка“, the bar, „още 15 до „Книга““: a card has no room for both under the bar); a counter at zero is hidden, and the head says once how ink is written; a
-  chapter's card with no ink yet is its glyph over its name, no taller, never stretched to the inked ones beside it.
+  chapter's card with no ink yet is its glyph over its name, as tall as the row it stands in.
   Two across on a phone, five on a big screen (the page's whole width, the head a reading width).
-  The inked chapters first, led by the one nearest its next step; those with no ink yet after them, from a row of their
-  own, so no short card stands beside a tall one. Микс and България are ways to play (`/play/mix`, `/play/bulgaria`),
+  The chapters in their numbers' order (Глава 1, 2, …), always: a book's contents, never resorted. Микс and България are ways to play (`/play/mix`, `/play/bulgaria`),
   never pages of their own: every fact as one list is what the book isn't (DECISIONS.md). A chapter's game left
   half-way today shows under the head, where it stopped, with „Продължи“ (its cross comes back here).
 - **A chapter:** its head on its sheet (glyph, name, the seal, its ink, and under them as wide as the head its bar,
