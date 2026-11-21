@@ -1,11 +1,11 @@
 // The moment of an answer on a phone, upright and on its side, and on a laptop: the answer comes into place in one
 // movement (run.ts, settle). The head holds still while the page moves, the right answer is never under the panel
-// docking at the screen's foot, and it ends between the two, in sight, its pop waiting for it to get there.
+// docking at the screen's foot, and it ends between the two, in sight, its pop waiting for it to get there. Where
+// every kind of question ends at each size is layout.spec.ts's.
 
-import { readdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { expect, type Page, test } from "@playwright/test";
-import { answer, dealt, moveOn, startDay } from "./play.ts";
+import { beside } from "./kinds.ts";
+import { answer, moveOn, startDay } from "./play.ts";
 
 /** What watching an answer come into place saw: how many times the head changed size, in how many frames the right
  * answer was under the panel, and the right answer's way and pop: where it was drawn as the panel showed and where it
@@ -179,54 +179,36 @@ test.describe("upright", () => {
   });
 });
 
-test.describe("turned", () => {
-  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
-  test.skip(({ browserName }) => browserName === "firefox", "a computer's Firefox has no touch screen");
+/** The flags the sample bank has pictures of, and their names: a day's first choice shown as pictures, as a picture
+ * choice of the bank's is (the sample's day has none). */
+const flags = ["f0f6ec7e0b258f30", "703d76f0fe3c120e", "dc6a9216ca85cb89", "087b5a8d2e985d04"];
+const flagNames = ["Литва", "Боливия", "Босна и Херцеговина", "Габон"];
 
-  test("a phone turned mid-question has the head small on its side, and its size back upright", async ({ page }) => {
-    await page.goto("/");
-    await startDay(page);
-    const head = page.locator(".question-top");
-    await expect(page.locator(".question-head")).toContainText("1 от 10");
-    await expect(head).not.toHaveClass(/stuck/);
-    await page.setViewportSize({ width: 844, height: 390 });
-    await expect(head).toHaveClass(/stuck/);
-    await page.setViewportSize({ width: 390, height: 844 });
-    await expect(head).not.toHaveClass(/stuck/);
-    await expect(head).toHaveCSS("margin-bottom", "0px");
-  });
-});
-
-test.describe("on its side", () => {
-  test.use({ viewport: { width: 844, height: 390 }, hasTouch: true });
-  // A phone on its side is a touch screen (a coarse pointer): Playwright's Firefox is a computer's.
-  test.skip(({ browserName }) => browserName === "firefox", "a computer's Firefox has no touch screen");
-
-  test("a phone on its side has the question and its answers in the screen's height, and the right one in sight", async ({
-    page,
-  }) => {
-    await playWatching(page, { before: () => sideways(page), after: () => factInSight(page) });
-  });
-
-  test("on its side, a choice of pictures is a row, the right one over the panel and the fact in it", async ({
-    page,
-  }) => {
-    // The sample's day has no choice of pictures: its choices are shown as pictures (the server's answer the same),
-    // wherever a question comes from (the day started, a run's next, an answer's), and answered with their names and
-    // how everyone answered, as a picture choice of the bank's is.
-    const flags = ["f0f6ec7e0b258f30", "703d76f0fe3c120e", "dc6a9216ca85cb89", "087b5a8d2e985d04"];
-    const pictured = new Set<number>();
-    await page.route(/\/api\/(day$|runs\/)/, async (route) => {
-      const res = await route.fetch();
-      const s = await res.json().catch(() => null);
-      if (s?.reveal && pictured.has(route.request().postDataJSON()?.n)) {
-        s.reveal.names = ["Литва", "Боливия", "Босна и Херцеговина", "Габон"];
-        s.reveal.crowd = { answers: 40, right: 0.4, picks: [0.1, 0.4, 0.3, 0.2], today: true };
-      }
-      const question = (s?.run ?? s?.state ?? s)?.question;
-      const view = question?.view;
-      if (view?.type !== "choice" || !view.choices) return route.fulfill({ response: res, json: s });
-      pictured.add(question.n);
+/** Shows the day's first choice as pictures (the server's answer the same), wherever a question comes from (the day
+ * started, a run's next, an answer's), answered with their names and how everyone answered; and, given `dated`, those
+ * questions (by their place) dealt on their own date, their answers with a day's line and the longest fact the bank
+ * takes (bank/check.go: 100 and 200 letters). The rest as they are. */
+async function aPictureChoice(page: Page, dated: number[] = []): Promise<void> {
+  let pictured: number | null = null;
+  await page.route(/\/api\/(day$|runs\/)/, async (route) => {
+    const res = await route.fetch();
+    const s = await res.json().catch(() => null);
+    const answered = route.request().postDataJSON()?.n;
+    if (s?.reveal && answered === pictured) {
+      s.reveal.names = flagNames;
+      s.reveal.crowd = { answers: 40, right: 0.4, picks: [0.1, 0.4, 0.3, 0.2], today: true };
+    }
+    if (s?.reveal && dated.includes(answered)) {
+      s.reveal.day = "През 1878 г. в Сан Стефано е подписан мирният договор, с който България се връща на картата.";
+      s.reveal.fact =
+        "Договорът е подписан в предградие на Цариград, а датата му става национален празник едва през 1990 г., " +
+        "след дълги спорове в Народното събрание, и оттогава се чества всяка година с голямо внимание.";
+    }
+    const question = (s?.run ?? s?.state ?? s)?.question;
+    if (question && dated.includes(question.n)) question.onThisDay = true;
+    const view = question?.view;
+    if (view?.type === "choice" && view.choices && (pictured ?? question.n) === question.n) {
+      pictured = question.n;
       delete view.choices;
       view.pictures = flags.map((f) => ({
         src: `/qimg/${f}-600.webp`,
@@ -235,9 +217,21 @@ test.describe("on its side", () => {
         h: 720,
         alt: "Знаме",
       }));
-      await route.fulfill({ response: res, json: s });
-    });
-    let pictures = 0;
+    }
+    await route.fulfill({ response: res, json: s });
+  });
+}
+
+test.describe("on its side", () => {
+  test.use({ viewport: { width: 844, height: 390 }, hasTouch: true });
+  // A phone on its side is a touch screen (a coarse pointer): Playwright's Firefox is a computer's.
+  test.skip(({ browserName }) => browserName === "firefox", "a computer's Firefox has no touch screen");
+
+  test("a phone on its side has the question and its answers in the screen's height, the right one in sight, and a choice of pictures in a row", async ({
+    page,
+  }) => {
+    await aPictureChoice(page);
+    let [pictures, words] = [0, 0];
     await playWatching(page, {
       before: async () => {
         await sideways(page);
@@ -247,16 +241,18 @@ test.describe("on its side", () => {
             .locator(".pic-options .option")
             .evaluateAll((all) => all.map((o) => o.getBoundingClientRect().top));
           expect(new Set(tops).size, "the pictures are a row").toBe(1);
-        }
+        } else if (await page.locator(".answering .choices > .option").count()) words++;
       },
       after: () => factInSight(page),
     });
-    expect(pictures).toBeGreaterThan(0);
+    expect(pictures, "a choice of pictures").toBeGreaterThan(0);
+    expect(words, "a choice of words").toBeGreaterThan(0);
   });
 });
 
 /** A question on a phone on its side: the header and the bar of places step aside, as upright; the head is small,
- * the topic still in it; a choice's answers start on the screen; rows of a list are a phone's on its side. */
+ * the topic still in it; a choice's answers start on the screen; rows of a list are a phone's on its side (a list of
+ * eight goes on below it: the sample's planets). */
 async function sideways(page: Page): Promise<void> {
   await expect(page.locator(".places-foot")).toBeHidden();
   await expect(page.locator(".question-top")).toHaveClass(/stuck/);
@@ -266,7 +262,7 @@ async function sideways(page: Page): Promise<void> {
   await expect
     .poll(() =>
       page
-        .locator(".answering .options .option")
+        .locator(".answering :is(.choices, .pic-options, .tf-options) > .option")
         .evaluateAll((all) => Math.max(0, ...all.map((o) => o.getBoundingClientRect().top))),
     )
     .toBeLessThan(390);
@@ -279,9 +275,10 @@ async function sideways(page: Page): Promise<void> {
 test.describe("on a laptop", () => {
   test.use({ viewport: { width: 1366, height: 650 }, isMobile: false, hasTouch: false });
 
-  test("„Готово“ and „Отговори“ stay in sight while the clock runs, and the answer comes beside the question", async ({
+  test("„Готово“ and „Отговори“ stay in sight while the clock runs, and the answer comes beside the question: a picture's, a day's line and the longest fact too", async ({
     page,
   }) => {
+    await aPictureChoice(page, [6, 9]);
     await playWatching(page, {
       before: async () => {
         const send = page.locator(".answering .btn.primary.big").first();
@@ -289,114 +286,7 @@ test.describe("on a laptop", () => {
         const box = await send.boundingBox();
         expect(box && box.y + box.height).toBeLessThanOrEqual(650);
       },
-      after: () => beside(page),
+      after: async () => expect(await beside(page)).toEqual([]),
     });
-  });
-
-  test("every kind of question has its answer beside it, the fact whole in sight, a day's line and the longest fact too", async ({
-    page,
-  }) => {
-    // A game of one of each kind (the sample's day has no choice of pictures, and a split or clues, not both): its
-    // first choice shown as pictures, as the bank's are, and two answers given a day's line and the longest fact the
-    // bank takes (bank/check.go: 100 and 200 letters), as a question dealt on its own date has.
-    const ids = oneOfEach();
-    const flags = ["f0f6ec7e0b258f30", "703d76f0fe3c120e", "dc6a9216ca85cb89", "087b5a8d2e985d04"];
-    const [pictured, dated] = [1, [6, 9]];
-    await page.route(/\/api\/runs\//, async (route) => {
-      const res = await route.fetch();
-      const s = await res.json().catch(() => null);
-      const answered = route.request().postDataJSON()?.n;
-      if (s?.reveal && answered === pictured) s.reveal.names = ["Литва", "Боливия", "Босна и Херцеговина", "Габон"];
-      if (s?.reveal && dated.includes(answered)) {
-        s.reveal.day = "През 1878 г. в Сан Стефано е подписан мирният договор, с който България се връща на картата.";
-        s.reveal.fact =
-          "Договорът е подписан в предградие на Цариград, а датата му става национален празник едва през 1990 г., " +
-          "след дълги спорове в Народното събрание, и оттогава се чества всяка година с голямо внимание.";
-      }
-      const question = (s?.run ?? s?.state ?? s)?.question;
-      if (question?.n === pictured && question.view?.choices) {
-        delete question.view.choices;
-        question.view.pictures = flags.map((f) => ({
-          src: `/qimg/${f}-600.webp`,
-          srcset: `/qimg/${f}-600.webp 600w, /qimg/${f}.webp 1200w`,
-          w: 1200,
-          h: 720,
-          alt: "Знаме",
-        }));
-      }
-      if (dated.includes(question?.n)) question.onThisDay = true;
-      await route.fulfill({ response: res, json: s });
-    });
-    const kinds = new Set<string>();
-    await playWatching(page, {
-      start: async () => {
-        await page.goto("/");
-        await dealt(page, "history", ids);
-        // The topic's game is under way (dealt), so its page goes on with it.
-        await page.goto("/play/history");
-        await page.getByRole("button", { name: "Продължи", exact: true }).click();
-        await page.getByRole("button", { name: "Започни сега" }).click();
-      },
-      before: async () => {
-        kinds.add(
-          await page.evaluate(() => {
-            const q = document.querySelector(".run-question");
-            const kind = ["pic-options", "picture", "keypad", "sortable-list", "match", "split", "clues", "tf-options"];
-            return kind.find((k) => q?.querySelector(`.${k}`)) ?? "choice";
-          }),
-        );
-      },
-      after: () => beside(page),
-    });
-    expect([...kinds].sort()).toEqual(
-      ["choice", "clues", "keypad", "match", "pic-options", "picture", "sortable-list", "split", "tf-options"].sort(),
-    );
   });
 });
-
-/** The sample bank's questions, one of each kind, in the order a game deals them here: a choice, a choice (shown as
- * pictures), a choice under a picture, „Вярно или невярно“, an order, pairs, groups, clues, a number and a choice. */
-function oneOfEach(): string[] {
-  const dir = resolve(import.meta.dirname, "../bank/sample/questions");
-  const all = readdirSync(dir).flatMap(
-    (f) => JSON.parse(readFileSync(resolve(dir, f), "utf8")) as { id: string; type: string; image?: unknown }[],
-  );
-  const of = (type: string, image = false, skip = 0) =>
-    all.filter((q) => q.type === type && !!q.image === image)[skip]?.id ?? "";
-  return [
-    of("choice"),
-    of("choice", false, 1),
-    of("choice", true),
-    of("truefalse"),
-    of("order"),
-    of("match"),
-    of("split"),
-    of("clues"),
-    of("number"),
-    of("choice", false, 2),
-  ];
-}
-
-/** Where the answer ended, on a laptop: on the left page under the question, what answered it on the right; the
- * verdict, the fact whole and „Напред“ in sight on the screen, nothing over them. */
-async function beside(page: Page): Promise<void> {
-  const at = await page.evaluate(() => {
-    const box = (s: string) => document.querySelector(s)?.getBoundingClientRect();
-    const seen = (s: string, x: number, y: number) =>
-      y >= 0 && y <= innerHeight && !!document.elementFromPoint(x, y)?.closest(s);
-    const fact = box(".after .fact");
-    const go = box(".after .up-next-go");
-    const verdict = box(".after .verdict");
-    return {
-      answers: box(".run-question .answering")?.left ?? 0,
-      panel: box(".after")?.right ?? Number.POSITIVE_INFINITY,
-      verdict: !!verdict && seen(".verdict", verdict.left + 8, verdict.top + verdict.height / 2),
-      fact: !fact || (seen(".fact", fact.left + 8, fact.top + 4) && seen(".fact", fact.left + 8, fact.bottom - 4)),
-      go: !!go && seen(".up-next-go", go.left + go.width / 2, go.top + 4) && go.bottom <= innerHeight,
-    };
-  });
-  expect(at.panel, "the answer is beside what answered it").toBeLessThan(at.answers);
-  expect(at.verdict, "the verdict is in sight").toBe(true);
-  expect(at.fact, "the fact is in sight, whole").toBe(true);
-  expect(at.go, "„Напред“ is in sight").toBe(true);
-}

@@ -33,7 +33,7 @@ this file passes the rule for later (DECISIONS.md).
 
 Three places: **Днес** (`/`), **Алманах** (`/almanac`), **Приятели** (`/friends`). Профил and Настройки open from the
 avatar in the bar (`/me`, `/settings`). Each screen holds its budget, in this order **in the HTML** (a big screen
-places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/fit.spec.ts` holds Днес's).
+places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/layout.spec.ts` holds Днес's).
 
 - **The frame** (`app.ts`): the bar holds the rosette and „АЛМАНАХ“ in spaced capitals (a way to Днес); on a big
   screen the three places as words on pills (`.places`); the avatar with the seal the player wears on its corner
@@ -49,7 +49,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/fi
     (`play.DayGrace`), comes first, with its date and „Вчерашният брой. Довърши го до 00:15.“ Come by a shared link:
     „Някой позна 7 от 10. А ти?“ and the shared tiles.
   - On a phone the cover is under half the screen (its date sized by the height), so that „Започни“ is whole by 500px
-    on 320 × 568 and 540px on 375 × 600 (`fit.spec.ts`).
+    on 320 × 568 and 540px on 375 × 600 (`layout.spec.ts`).
   - The streak (`.streak-chip`): the flame, the number and „дни в серията“, from three days; under it one line: what
     came of the days just missed (told once), a day the week forgave, or while the day waits what it makes of the
     streak (`stakeLine`). Below three days, what came of the days just missed is that line on its own, in the
@@ -214,7 +214,7 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
 - **Cards** (`.card`, `.rows`) are white surfaces on the page; rows have a hairline between them and are 48px or more.
 - **Depth:** the primary action is raised by a 4px shadow below (`--lift`); the answer's panel docked at a phone's
   foot casts a soft shadow up. Nothing else.
-- **Touch targets** are at least 44px; anything drawn smaller gets its room around it (`e2e/text.spec.ts`).
+- **Touch targets** are at least 44px; anything drawn smaller gets its room around it (`e2e/layout.spec.ts`).
 - **Focus:** one rule for everything (`:focus-visible`): a 3px ink outline, 2px off the edge.
 
 ## The pieces
@@ -309,7 +309,7 @@ under it.
 
 ## Fit and large text
 
-- **Fit** (`e2e/fit.spec.ts`, at 320 × 568, 375 × 600, 390 × 664 and 1366 × 900, by day and by night; every kind of
+- **Fit** (`e2e/layout.spec.ts`, at 320 × 568, 375 × 600, 390 × 664 and 1366 × 900, by day and by night; every kind of
   question at its longest in the sample bank, answered right, wrong and close: `e2e/kinds.ts`): nothing scrolls
   sideways; Днес shows „Започни“ whole and high; a question shows every answer or its pad and its action whole,
   nothing under the action; once answered, the player's row, the right one and „Напред“ are in sight, nothing under
@@ -319,7 +319,7 @@ under it.
   screen's width or height. One-column grids are `minmax(0, 1fr)`; a row of things wraps. `lib/prefs.ts` puts `tight`
   and `tighter` on `<html>` when the column holds few words, and rows give way to columns there. A media query's rem
   is the browser's own size, so a short screen is a phone on its side only with `(orientation: landscape)` too.
-  `e2e/text.spec.ts` holds it.
+  `e2e/layout.spec.ts` holds it at every size above.
 
 ## Motion
 
@@ -396,5 +396,5 @@ flat shapes with depth, lit from the top left, no outlines, painted from one ton
 - **Look at it** on a seeded database (CLAUDE.md) as its personas, by day and by night, at 320, 375 × 600 and 390 ×
   664 and at 1366px, and at twice the text.
 - **Run the checks:** `npm run check && npm test` (with `contrast.test.ts`), then the browser specs the change touches
-  in Chromium, `e2e/fit.spec.ts` and `e2e/a11y.spec.ts` among them.
+  in Chromium, `e2e/layout.spec.ts` and `e2e/a11y.spec.ts` among them.
 - **Keep it light:** `go run ./cmd/build` holds the first screen to its budget.

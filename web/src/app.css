@@ -4494,6 +4494,8 @@
   .pick {
     appearance: none;
     display: grid;
+    /* Its column the button's width, never its name's longest word (twice the text on a laptop ran past the page). */
+    grid-template-columns: minmax(0, 1fr);
     justify-items: center;
     gap: var(--space-2);
     width: 100%;
@@ -7595,7 +7597,7 @@
 
   /* ---- Large text on a phone ----
      The text at up to twice its size (the player's „Размер на текста“, the phone's own size: prefs.ts) on a phone
-     320px wide: nothing scrolls sideways, nothing hides under another (e2e/text.spec.ts). What has room wraps by
+     320px wide: nothing scrolls sideways, nothing hides under another (e2e/layout.spec.ts). What has room wraps by
      itself; these are the rows that give way to columns once the page's column holds too few words across: `tight`
      on <html> under 17em, `tighter` under 13.5em (lib/prefs.ts measures it; at the text's usual size even the
      narrowest phone's column is 18em, so none of this applies). */

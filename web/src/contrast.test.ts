@@ -1,7 +1,7 @@
 // The look's colours hold their contrast in both themes (DESIGN.md, Colour): text 4.5:1 on the page and its surfaces,
 // a control's line 3:1, and the dark ink on every chapter's large sheet 4.5:1, by day and by night (a sheet is darkened
 // by night only as far as that holds). And a screen's order is its HTML's: no `order` reorders what a screen reads out
-// (the budgets are held in HTML order: e2e/fit.spec.ts).
+// (the budgets are held in HTML order: e2e/layout.spec.ts).
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
