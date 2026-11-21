@@ -79,7 +79,9 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   // one first: a request is a player's.
   await b.goto("/friends");
   await b.locator(".friends").getByRole("button", { name: "Добави приятел" }).click();
-  await expect(b.getByText("Още нямаш приятели тук. Изпрати им връзката си или ги добави по потребителско име или имейл.")).toBeVisible();
+  await expect(
+    b.getByText("Още нямаш приятели тук. Изпрати им връзката си или ги добави по потребителско име или имейл."),
+  ).toBeVisible();
   // Nothing typed: said in the game's words, the cursor in the field.
   await b.getByRole("button", { name: "Добави", exact: true }).click();
   await expect(b.getByRole("alert")).toHaveText("Напиши потребителското име или имейла на приятеля си.");
@@ -154,7 +156,9 @@ test("a request turned down, a friend removed", async ({ browser }) => {
   await a.locator(".friend").getByRole("button", { name: "Премахни" }).click();
   await expect(a.locator(".friend")).toHaveCount(0);
   await b.reload();
-  await expect(b.getByText("Още нямаш приятели тук. Изпрати им връзката си или ги добави по потребителско име или имейл.")).toBeVisible();
+  await expect(
+    b.getByText("Още нямаш приятели тук. Изпрати им връзката си или ги добави по потребителско име или имейл."),
+  ).toBeVisible();
 });
 
 test("a friend just accepted is on the day's board at once, without a reload", async ({ browser }) => {
