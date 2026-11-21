@@ -141,6 +141,20 @@ const safariOnIPhone =
 const chromeOnAndroid =
   "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36";
 
+test.describe("in Messenger's own browser on an iPhone", () => {
+  test.use({
+    userAgent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/MessengerForiOS;FBAV/480.0.0.0]",
+  });
+
+  // No link opens Safari from there: the cover names the app's menu, and has no button that would do nothing.
+  test("the cover names the way to Safari, without a button", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator(".issue-exit")).toHaveText("Имаш игра в браузъра? Отвори я там: ··· → Отвори в Safari");
+    await expect(page.locator(".issue-exit button")).toHaveCount(0);
+  });
+});
+
 test.describe("in Messenger's own browser", () => {
   test.use({ userAgent: messengerOnAndroid });
 

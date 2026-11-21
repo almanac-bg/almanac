@@ -1801,7 +1801,7 @@
     width: auto;
     max-width: 100%;
     height: auto;
-    max-height: min(30vh, var(--fit, 30vh));
+    max-height: max(120px, min(30vh, var(--fit, 30vh)));
     margin-inline: auto;
     border-radius: var(--r-1);
     outline: 1px solid var(--line);
@@ -1888,6 +1888,7 @@
 
   .sortable-list > .option:has(> .row-end) > .row-words {
     flex: 1 1 auto;
+    max-width: calc(100% - 32px - var(--space-3));
   }
 
   .option > .row-end {
@@ -1895,9 +1896,9 @@
     flex: 0 1 auto;
     align-items: center;
     gap: var(--space-3);
-    min-width: 0;
-    max-width: min(48%, calc(5.5rem + 30px + var(--space-3)));
     margin-left: auto;
+    /* Never broken: beside the words, or as one under them. */
+    white-space: nowrap;
   }
 
   .option > .row-end > .value {
@@ -2037,7 +2038,7 @@
     border-width: 2px;
   }
 
-  :is(.sortable-list, .match-result, .split-result) > .option.right .sign {
+  :is(.sortable-list, .match-result, .split-result) > .option.right:not(.untaken) .sign {
     background: var(--ink);
     box-shadow: none;
     color: var(--bg);
@@ -2072,14 +2073,6 @@
     color: var(--ink-3);
     font-size: 0.875rem;
     font-weight: 700;
-  }
-
-  /* „Отговори“ and „Готово“ stay at hand on a screen too short for the whole question: at its foot, over what scrolls
-     under them. */
-  .run-question .answering .btn.primary.big {
-    position: sticky;
-    bottom: var(--app-foot, var(--space-4));
-    z-index: 1;
   }
 
   /* ---- The number: typed big on an ink line, the unit beside it; the game's own pad ---- */
@@ -2490,12 +2483,8 @@
   /* A choice's words have the row's width while it's asked; once answered, what the answer brings („ти“, how many
      gave it, its ✓ or ✕) comes after them, in that order, at the row's end and on a line with them. The shares come
      in place, hidden, with the ✓ (questions.ts, crowdOnAll), so nothing re-wraps as they show. */
-  .choices > .option > :is(.yours, .crowd-share) {
+  .choices > .option :is(.yours, .crowd-share) {
     flex: none;
-  }
-
-  .choices > .option > .yours + .crowd-share {
-    margin-left: 0;
   }
 
   .crowd-says {
@@ -2649,6 +2638,11 @@
     font-size: 0.9375rem;
     font-weight: 800;
     line-height: 1.25rem;
+  }
+
+  /* Before the answer there's no name: no room kept for it, the picture has the card. */
+  .option.pic-option > .pic-name:empty {
+    display: none;
   }
 
   /* The share that gave a picture, on its foot's corner: the tile keeps its height as the shares come. */
@@ -5246,6 +5240,23 @@
     font: 900 calc(14px + 0.875rem) / 1 var(--font-sans);
   }
 
+  /* An invite over the issue on a phone (screens/invite.ts): the cover gives it the room, „Започни“ still on the
+     first screen — the date smaller, the chapters' glyphs left for the issue itself. */
+  @media (max-width: 47.99rem) {
+    .today:has(.invite-card) .issue-day {
+      font-size: clamp(2.75rem, 8dvh, 9.5rem);
+    }
+
+    .today:has(.invite-card) .issue-leaf {
+      gap: 6px;
+      padding-block: 14px 16px;
+    }
+
+    .today:has(.invite-card) .issue-toc {
+      display: none;
+    }
+  }
+
   .issue-body {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -6534,14 +6545,55 @@
     font-weight: 900;
   }
 
-  /* Under the name on a phone, the card's width; beside it on a big screen, its own. */
+  /* On a phone one row, so that „Започни“ stays on the first screen: the avatar small, the name and the line beside
+     it, „Добави“ at the row's end. On a big screen the button says it all, a width of its own. */
   .invite-card .btn {
-    flex: 1 0 auto;
+    flex: 0 0 auto;
+    min-height: 2.75rem;
+    padding-inline: var(--space-3);
+  }
+
+  @media (max-width: 39.99rem) {
+    .invite-card {
+      flex-wrap: nowrap;
+      gap: 10px;
+      padding: 10px 12px;
+    }
+
+    .invite-card > .avatar {
+      --size: 40px;
+      flex: none;
+    }
+
+    .invite-text {
+      flex: 1 1 auto;
+    }
+
+    .invite-name {
+      font-size: 1rem;
+    }
+
+    .invite-line {
+      font-size: 0.8125rem;
+      line-height: 1.3;
+    }
+
+    .invite-more {
+      display: none;
+    }
+
+    /* With large text, „Добави“ under the name. */
+    .tight .invite-card {
+      flex-wrap: wrap;
+    }
+
+    .tight .invite-text {
+      flex-basis: calc(100% - 50px);
+    }
   }
 
   @media (min-width: 40rem) {
     .invite-card .btn {
-      flex: 0 0 auto;
       min-width: 14rem;
     }
   }
@@ -6837,6 +6889,35 @@
       margin-top: auto;
     }
 
+    /* A choice of pictures while it's asked: its cards take the room the question leaves them (no empty band over
+       them), each picture as big as its card lets it, whole (contained, never cropped). */
+    .run-question:not(.answered) .answering:has(.pic-options) {
+      flex: 1 0 auto;
+      grid-template-rows: minmax(0, 1fr);
+    }
+
+    .run-question:not(.answered) .answering > :has(> .pic-options) {
+      display: grid;
+      grid-template-rows: minmax(0, 1fr);
+    }
+
+    .run-question:not(.answered) .pic-options {
+      grid-auto-rows: minmax(0, 1fr);
+    }
+
+    .run-question:not(.answered) .option.pic-option > .pic-frame {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+
+    .run-question:not(.answered) .option.pic-option .pic-option-img {
+      height: 100%;
+      min-height: 6rem;
+      max-height: 40dvh;
+      aspect-ratio: auto;
+      background: none;
+    }
+
     /* A narrow phone: a long question in four lines at most. */
     @media (max-width: 22.5rem) {
       .run-question .ask {
@@ -6857,7 +6938,12 @@
       left: 0;
       z-index: 5;
       max-width: 40rem;
-      max-height: max(min(var(--least, 10rem), var(--give, 100dvh)), calc(100dvh - var(--keep, 9.5rem)));
+      min-height: var(--cover, 0px);
+      max-height: max(
+        min(var(--least, 10rem), var(--give, 100dvh)),
+        calc(100dvh - var(--keep, 9.5rem)),
+        var(--cover, 0px)
+      );
       margin-inline: auto;
       gap: var(--space-3);
       padding: var(--space-4) max(var(--space-4), env(safe-area-inset-right)) var(--app-foot)
@@ -6872,7 +6958,12 @@
     /* An order, pairs or groups: the panel opens at its least (the verdict, how everyone did and the fact's first two
        lines over „Напред“), so that the rows shown right stay in sight over it; the rest of the fact scrolls in it. */
     .run-question:has(.sortable-list, .match, .split) .after {
-      max-height: var(--least, 10rem);
+      min-height: var(--cover, 0px);
+      max-height: max(var(--least, 10rem), var(--cover, 0px));
+    }
+
+    .run-question .after.short {
+      align-content: end;
     }
 
     .run-question .after .fact p {
@@ -7351,7 +7442,8 @@
       margin-left: auto;
     }
 
-    .option:is(.right, .wrong, .dim) .key-hint {
+    .option:is(.right, .wrong, .dim) .key-hint,
+    .tight .key-hint {
       display: none;
     }
 
@@ -7384,10 +7476,17 @@
     line-height: 1.2;
   }
 
-  .run-question.answered .choices > .option.dim .option-words {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  /* The player's row and the right one: where the words and what the answer brings („ти“, the share, the ✓ or ✕)
+     don't fit a line together, the words keep the row's width and those go to its foot, at its end, rather than
+     squeeze the words to a word a line. */
+  .run-question.answered .choices > .option:is(.right, .wrong) {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+
+  .run-question.answered .choices > .option:is(.right, .wrong) > .option-words {
+    flex: 1 1 9rem;
+    max-width: calc(100% - 32px - var(--space-3));
   }
 
   .run-question.answered .choices > .option.dim .letter {
@@ -7491,6 +7590,26 @@
 
     .run-question .option.tf {
       min-height: 4.5rem;
+    }
+
+    /* A number: the sheet is the question beside its chapter's glyph (the day's hard one keeps its tag), so that the
+       pad and „Отговори“ fit under it. */
+    .run-question:not(.answered):has(.keypad) .q-leaf:not(:has(.hard-tag)) {
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 10px;
+      min-height: 0;
+      padding: 10px 14px;
+      border-radius: var(--r-2);
+    }
+
+    .run-question:not(.answered):has(.keypad) .q-leaf:not(:has(.hard-tag)) > .q-tags {
+      display: none;
+    }
+
+    .run-question:not(.answered):has(.keypad) .q-leaf:not(:has(.hard-tag)) > .q-mini {
+      display: inline-grid;
+      --g: 32px;
     }
 
     /* „Свържи“: its cells 44px, the right column's five and „Готово“ under the question. */
@@ -7622,28 +7741,12 @@
       --g: 32px;
     }
 
-    /* Cut by its height, never by -webkit-box's line-clamp: that box drops the spaces between a cell's whole words
-       (wholeWords) in Chromium. Its last line fades out at its end where it's cut. */
+    /* Cut, where its rows need the room, at a whole word with „…“ (answering.ts, clamp), the same in every engine. */
     .run-question:not(.answered):has(.sortable-list, .match) .ask {
       --clamp: on;
-      max-height: calc(var(--lines, 3) * 1.25em);
       padding: 0;
-      overflow: hidden;
       font-size: 1rem;
       line-height: 1.25;
-    }
-
-    .run-question:not(.answered):has(.sortable-list, .match) .ask[data-cut]:not(.whole) {
-      -webkit-mask:
-        linear-gradient(#000, #000) top / 100% calc(100% - 1.25em) no-repeat,
-        linear-gradient(to left, transparent, #000 3em) bottom / 100% 1.25em no-repeat;
-      mask:
-        linear-gradient(#000, #000) top / 100% calc(100% - 1.25em) no-repeat,
-        linear-gradient(to left, transparent, #000 3em) bottom / 100% 1.25em no-repeat;
-    }
-
-    .run-question:not(.answered):has(.sortable-list, .match) .ask.whole {
-      max-height: none;
     }
 
     .run-question:not(.answered) .ask[data-cut] {
@@ -7690,14 +7793,6 @@
 
     .run-question .match-col:last-of-type > .option.match-item {
       padding-left: 14px;
-    }
-  }
-
-  /* On a phone, how everyone guessed a number is said in a sentence under the verdict; the chart of the guesses waits
-     for a bigger screen, so that what the player said and the answer stay in sight. */
-  @media (max-width: 47.99rem) {
-    .run-question .guesses {
-      display: none;
     }
   }
 
@@ -7762,6 +7857,19 @@
     .run-question > .q-leaf {
       grid-row: 2 / span 2;
       align-self: start;
+    }
+
+    /* Moved for the answer, the page keeps the sheet whole under the stuck head (run.ts, settle: --head), never a
+       scrap of its top under it. */
+    .run-question.answered > .q-leaf {
+      position: sticky;
+      top: var(--head, 0px);
+    }
+
+    /* Answered, the stopped clock keeps its room: the spread doesn't jump up as it goes. */
+    .run-question.answered .question-top > .timer {
+      display: flex;
+      visibility: hidden;
     }
 
     .run-question > .picture {
@@ -8038,6 +8146,7 @@
 
   .tight .option > :is(.value, .row-end) {
     max-width: none;
+    white-space: normal;
   }
 
   .tight .option > .sign + .value {
@@ -8045,6 +8154,15 @@
   }
 
   /* „Вярно“ over „Невярно“, each a row. */
+  /* A number with large text: the pad is taller than the screen, so what's typed stays in sight under the head while
+     the pad is scrolled to (run.ts: --head). */
+  .tight .run-question .number-out {
+    position: sticky;
+    top: calc(var(--head, 0px) - 1px);
+    z-index: 1;
+    background: var(--bg);
+  }
+
   .tight .tf-options {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -8106,21 +8224,16 @@
     padding-bottom: calc(10px + max(30px, 1.5rem) + var(--space-1));
   }
 
-  .tight .choices > .option:is(.right, .wrong) > :is(.sign, .crowd-share, .yours) {
+  .tight .choices > .option:is(.right, .wrong) > .row-end {
     position: absolute;
     right: 14px;
     bottom: 10px;
-  }
-
-  .tight .choices > .option:is(.right, .wrong) > .crowd-share {
-    right: calc(14px + 30px + var(--space-2));
-    bottom: 14px;
-  }
-
-  .tight .choices > .option:is(.right, .wrong) > .yours {
-    right: auto;
-    bottom: 18px;
     left: 14px;
+    justify-content: flex-end;
+  }
+
+  .tight .choices > .option:is(.right, .wrong) > .row-end > .yours {
+    margin-right: auto;
   }
 
   /* The verdict on a line with its sign, and how everyone answered a size smaller: the fact's first line comes into
