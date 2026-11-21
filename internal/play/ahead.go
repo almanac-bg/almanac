@@ -34,9 +34,11 @@ import (
 // the bank has by then. The stop should never come: the day's runway (runway.go, `almanac bank check` with the days'
 // questions) warns RunwayWarn days before a place runs out: Ahead of them before the stop, and 60 more to write the
 // batch. Of the questions that fit, those nobody has answered come first. A day ahead whose question has left the
-// bank, or is due for review by its day (overdue), is drawn again; so are all the days after tomorrow when the draw's
-// rules change (DayRules) or the bank's days and Bulgarian questions do (bank.Tail.On, BG): a day drawn ahead is drawn
-// by today's rules, never an older version's.
+// bank, or is due for review by its day (overdue), has that question replaced in its own place, the rest kept as drawn
+// (mendDay), so that what was said of it stays true (tomorrow's hard question's chapter, on Днес); drawn again only if
+// a place has no question that fits it so. All the days after tomorrow are drawn again when the draw's rules change
+// (DayRules) or the bank's days and Bulgarian questions do (bank.Tail.On, BG): a day drawn ahead is drawn by today's
+// rules, never an older version's.
 //
 // Ahead is three months, not a year (the owner's call, 16 Nov 2026): long enough that the players who play most meet
 // no day as a rerun, and what the days hold out of every other game is a season's questions, not a year's 3,650; the
@@ -142,7 +144,8 @@ func (g *Game) EnsureDays(ctx context.Context) error {
 
 // drawAhead draws today if it isn't yet, voids today's questions the bank no longer plays as the day began (day.go),
 // draws the days after tomorrow again if the rules or the bank's dated and Bulgarian questions changed since they were
-// drawn, a day ahead again if a question of it left the bank or is due for review by then, and the days missing up to
+// drawn, mends a day ahead if a question of it left the bank or is due for review by then (mendDay: drawn again if it
+// can't be), and draws the days missing up to
 // Ahead (while none is short, else it warns in the log); it says what today and the days ahead hold. Of the questions
 // that fit, those not answered (by anyone) come first.
 func (g *Game) drawAhead(tx *sql.Tx, today string, b *bank.Bank, answered map[string]bool) (dayBars, error) {
@@ -173,24 +176,33 @@ func (g *Game) drawAhead(tx *sql.Tx, today string, b *bank.Bank, answered map[st
 		return dayBars{}, err
 	}
 	used := map[string]bool{}
-	for day, picks := range all {
-		// A day ahead with a question the bank no longer has, or one due for review by then, is drawn again; nobody has
-		// played it.
-		if day > today && (!allLive(b, picks) || slices.ContainsFunc(picks, func(p Pick) bool {
-			q, _ := b.Get(p.ID)
-			return overdue(q, day)
-		})) {
-			if _, err := tx.Exec(`DELETE FROM days WHERE day = ?`, day); err != nil {
-				return dayBars{}, err
-			}
-			delete(all, day)
-			continue
-		}
+	for _, picks := range all {
 		for _, p := range picks {
 			used[p.ID] = true
 		}
 	}
 	r := mrand.New(mrand.NewPCG(newSeed(), newSeed()))
+	for _, day := range slices.Sorted(maps.Keys(all)) {
+		// A day ahead with a question the bank no longer has, or one due for review by then, has it replaced in its
+		// place, else is drawn again; nobody has played it.
+		if picks := all[day]; day > today && !dealsOn(b, picks, day) {
+			if mended, ok := mendDay(b, day, picks, used, answered, recentSubjects(b, all, day), r); ok {
+				data, _ := json.Marshal(mended)
+				if _, err := tx.Exec(`UPDATE days SET questions = ? WHERE day = ?`, string(data), day); err != nil {
+					return dayBars{}, err
+				}
+				all[day] = mended
+				for _, p := range mended {
+					used[p.ID] = true
+				}
+				continue
+			}
+			if _, err := tx.Exec(`DELETE FROM days WHERE day = ?`, day); err != nil {
+				return dayBars{}, err
+			}
+			delete(all, day)
+		}
+	}
 	for range Ahead {
 		d = d.AddDate(0, 0, 1)
 		day := d.Format(time.DateOnly)
@@ -361,6 +373,75 @@ func drawnBy(b *bank.Bank) string {
 }
 
 // allLive is whether the bank has each of the picks, live.
+// dealsOn is whether a day's questions can all be dealt on it: each live (allLive), none due for review by then.
+func dealsOn(b *bank.Bank, picks []Pick, day string) bool {
+	return allLive(b, picks) && !slices.ContainsFunc(picks, func(p Pick) bool {
+		q, _ := b.Get(p.ID)
+		return overdue(q, day)
+	})
+}
+
+// mendDay replaces each question of a day drawn ahead that can't be dealt on it (dealsOn: retired, or due for review
+// by then) with another in its own place: of the same topic, difficulty, kind and picture (fitsPlace: an estimate for
+// the number), about Bulgaria if it was, dealable on the day, never a question another day has, naming no subject the
+// day's other questions do; those nobody has answered first, then those apart from the days before (recent). The rest
+// of the day stays as drawn, its shape and its topics too. Not mended (false) if a question has gone from the bank
+// altogether (its place is unknown) or a place has none that fits: the day is drawn again.
+func mendDay(b *bank.Bank, day string, picks []Pick, used, answered, recent map[string]bool,
+	r *mrand.Rand) ([]Pick, bool) {
+	bad := func(q bank.Question) bool { return q.Extra().Retired || overdue(q, day) }
+	named := map[string]bool{}
+	for _, p := range picks {
+		q, ok := b.Get(p.ID)
+		if !ok {
+			return nil, false
+		}
+		if !bad(q) {
+			for _, k := range bank.Subjects(q) {
+				named[k] = true
+			}
+		}
+	}
+	taken := map[string]bool{}
+	out := slices.Clone(picks)
+	for i, p := range picks {
+		old, _ := b.Get(p.ID)
+		if !bad(old) {
+			continue
+		}
+		h := old.Base()
+		s := slot{difficulty: h.Difficulty, typ: h.Type, picture: noPicture}
+		if bank.HasPictures(old) {
+			s.picture = withPicture
+		}
+		var found []bank.Question
+		for _, q := range b.Live(h.Category, h.Type) {
+			t, id := q.Extra(), q.Base().ID
+			if !used[id] && !taken[id] && !bad(q) && (len(t.On) == 0 || t.OnDay(day)) && fitsPlace(b, q, s, s.typ) &&
+				(t.BG || !old.Extra().BG) && !slices.ContainsFunc(bank.Subjects(q), func(k string) bool { return named[k] }) {
+				found = append(found, q)
+			}
+		}
+		if len(found) == 0 {
+			return nil, false
+		}
+		r.Shuffle(len(found), func(i, j int) { found[i], found[j] = found[j], found[i] })
+		apart := func(q bank.Question) bool {
+			return !slices.ContainsFunc(bank.Subjects(q), func(k string) bool { return recent[k] })
+		}
+		slices.SortStableFunc(found, func(x, y bank.Question) int {
+			return 2*(b2i(answered[x.Base().ID])-b2i(answered[y.Base().ID])) + b2i(!apart(x)) - b2i(!apart(y))
+		})
+		q := found[0]
+		out[i] = Pick{ID: q.Base().ID, Seed: r.Uint64()}
+		taken[q.Base().ID] = true
+		for _, k := range bank.Subjects(q) {
+			named[k] = true
+		}
+	}
+	return out, true
+}
+
 func allLive(b *bank.Bank, picks []Pick) bool {
 	for _, p := range picks {
 		if q, ok := b.Get(p.ID); !ok || q.Extra().Retired {
