@@ -22,14 +22,14 @@ import { type SharedDay, shareCard, shareDay, shareText } from "../game/share.ts
 import type { Board, Mark, Reviewed, Score, State } from "../game/types.ts";
 import { api, errorText, serverNow, tally } from "../lib/api.ts";
 import { boot } from "../lib/boot.ts";
-import { dayInBulgaria } from "../lib/day.ts";
+import { dayInBulgaria, hourInBulgaria } from "../lib/day.ts";
 import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { handToken } from "../lib/embedded.ts";
 import { reportProblem } from "../lib/errors.ts";
 import { type RemindAsks, remindAnswered, remindAsks, remindShown } from "../lib/keep.ts";
 import { pushable, pushOn, turnOn } from "../lib/push.ts";
 import { go, goBack, hold, release, title } from "../lib/router.ts";
-import { dateWords, issueOf, onDay, weekday } from "../lib/words.ts";
+import { dateWords, issueOf, onDay, stakeHour, weekday } from "../lib/words.ts";
 import { cover, notice, player, playing, user } from "../state.ts";
 import { chapterName, chip, failure, formatNumber, glyph, leaf, mini, stakeLine, tiles, who } from "../ui.ts";
 import { app, coverExit, exitWay, handedIn, haveProfile, keepLine, keepStake, mailAsk, takeHand } from "./keep.ts";
@@ -120,6 +120,9 @@ const reviewOf = (run: number): Promise<Reviewed[]> => {
   return r;
 };
 
+/** How many times Днес asks the day again after yesterday's issue's time is over and the day still offers it. */
+const lateAsks = 4;
+
 export function today() {
   title();
   // Come by a shared day's link: while it's still that day, its score and shape over the same ten, „Колко ще познаеш
@@ -147,6 +150,9 @@ export function today() {
   const screen = slot(() => h("p", { class: "muted" }, "…"));
   // When yesterday's issue, offered first (lateView), can no longer be finished.
   let lateEnds: ReturnType<typeof setTimeout> | undefined;
+  // How many times Днес has asked the day again since yesterday's time was over, and still had it (a question shown
+  // before then still in its time): each a while apart, and a few at most.
+  let lateAsked = 0;
   onCleanup(() => clearTimeout(lateEnds));
   const load = async () => {
     try {
@@ -177,13 +183,17 @@ export function today() {
       load();
     };
     // Its time over (DayGrace), Днес is today's: unless a question of it is being played (it ends by its own clock) or
-    // counted down to, when the next drawing of Днес asks the day again anyway.
-    lateEnds = setTimeout(
-      () => {
-        if (!playing.peek() && !counting) load();
-      },
-      Math.max(0, y.until - serverNow()) + 1000,
-    );
+    // counted down to, when the next drawing of Днес asks the day again anyway. Asked again with its time over already
+    // (a question shown before it ended is still in its time), the day is asked again 15 seconds on, a few times.
+    const left = y.until - serverNow();
+    lateAsked = left > 0 ? 0 : lateAsked + 1;
+    if (lateAsked <= lateAsks)
+      lateEnds = setTimeout(
+        () => {
+          if (!playing.peek() && !counting) load();
+        },
+        left > 0 ? left + 1000 : 15_000,
+      );
     return {
       ...t,
       day: y.day,
@@ -291,8 +301,9 @@ export function today() {
       fromMail && !user.peek()?.email ? haveProfile(load, undefined, true, mailedTo) : null,
     ];
     // What came of the days just missed, once: under the streak, before the day is played. The result says the streak
-    // in „Утре“, so there it's only kept as told.
-    const streakSaid = streakNotice(t);
+    // in „Утре“, so there it's only kept as told. On an evening the streak ends at midnight without the day, the
+    // streak's line says that, and what came of the days missed waits, untold, for another visit.
+    const streakSaid = !run?.done && t.streak >= 3 && endsTonight(t) ? null : streakNotice(t);
     if (run?.done) return result(t, run, just, notices);
     // The player's numbers (Профил's): the streak's week, the facts in the book.
     const stats = signal<Stats | null>(null);
@@ -453,15 +464,19 @@ function contents(t: Today): Child {
   );
 }
 
+/** Whether the streak ends at midnight without today's issue, and it's the evening (stakeWords): no day left to forgive. */
+const endsTonight = (t: Today) => t.streak >= 1 && !(t.spare ?? true) && hourInBulgaria() >= stakeHour;
+
 /** The streak: its number and „дни в серията“, and its one line under it: what came of the days just missed (`said`,
  * once), or a day the week forgave; while the day's ten wait (`done` false), it is at stake, unlit, and from the
- * evening, if it ends at midnight, that's said. Nothing below three days (direction: the streak shows from 3). */
+ * evening, if it ends at midnight, that's said, before anything else. Nothing below three days (direction: the streak
+ * shows from 3). */
 function streakSection(t: Today, stats: () => Stats | null, done: boolean, said?: StreakSaid | null): Child {
   return () => {
     const days = t.streak;
     if (days < 3) return null;
     const s = stats();
-    const forgiven = s?.forgiven?.filter(Boolean).length ?? 0;
+    const forgiven = !done && endsTonight(t) ? 0 : (s?.forgiven?.filter(Boolean).length ?? 0);
     return h(
       "a",
       {
@@ -523,9 +538,14 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   const zero = of > 0 && run.rights === 0;
   const review = reviewOf(run.id);
   const reviewList = signal<Reviewed[] | null>(null);
+  // None right: the questions missed, under the score, once they're here (none, while the review hasn't come: the
+  // button to „Въпросите и фактите“ stays, to ask for them again).
+  const missedList = signal<Reviewed[] | null>(null);
+  if (zero) review.then(missedList.set, () => {});
   let reviewHead: HTMLElement | null = null;
+  // The review asked again if it failed (reviewOf keeps only one that came).
   const openReview = async () => {
-    reviewList.set(await review.catch(() => null));
+    reviewList.set(await reviewOf(run.id).catch(() => null));
     requestAnimationFrame(() => {
       reviewHead?.focus({ preventScroll: true });
       reviewHead?.scrollIntoView({ block: "start" });
@@ -596,7 +616,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       "div",
       { class: "result-main page-1" },
       hero,
-      zero ? missed(review, openReview, reviewList) : null,
+      zero ? missed(missedList, openReview, reviewList) : null,
       first ? action : null,
       // 2. The day's entry in the book, and what the day wrote.
       () => entryOfDay(fresh().entry),
@@ -613,15 +633,16 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       first ? null : action,
       // 5. Tomorrow.
       t.late ? onToToday(t, t.late.today) : tomorrow(t, streak, stake, first ? null : ask),
-      // None right: the questions are open under the score already, with the way to the rest there.
-      zero
-        ? null
-        : h(
-            "button",
-            { class: "more", type: "button", "aria-expanded": () => !!reviewList(), onclick: openReview },
-            "Въпросите и фактите",
-            h("span", { class: "i i-right", "aria-hidden": "true" }),
-          ),
+      // None right: the questions are open under the score already, with the way to the rest there (once they came).
+      () =>
+        missedList()?.length
+          ? null
+          : h(
+              "button",
+              { class: "more", type: "button", "aria-expanded": () => !!reviewList(), onclick: openReview },
+              "Въпросите и фактите",
+              h("span", { class: "i i-right", "aria-hidden": "true" }),
+            ),
     ),
     () => {
       const all = reviewList();
@@ -633,7 +654,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
         { class: "result-review" },
         reviewHead,
         recs,
-        bulgariaToday(fresh(), run, review),
+        bulgariaToday(fresh(), run, reviewOf(run.id)),
         reviewed(all, null),
       );
     },
@@ -646,9 +667,7 @@ const missedShown = 4;
 /** None right: the first questions, each its chapter's tile, the question, the right answer and the fact, right under
  * the score; „Още 6 въпроса“ opens them all (`more`, with the rest of „Въпросите и фактите“). Never a word of praise:
  * only what the questions were. */
-function missed(review: Promise<Reviewed[]>, more: () => void, opened: () => Reviewed[] | null): Child {
-  const all = signal<Reviewed[] | null>(null);
-  review.then(all.set, () => {});
+function missed(all: () => Reviewed[] | null, more: () => void, opened: () => Reviewed[] | null): Child {
   return () => {
     const list = all();
     if (!list?.length) return null;
