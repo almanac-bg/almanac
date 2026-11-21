@@ -129,7 +129,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   exactly, and one column leaves no hole beside a tall entry (two across did; columns or masonry would read down then
   across, and reshuffle as a page comes in). From ten facts, a search over them („Търси факт“); fewer are read at a
   glance. What a search found is marked in each entry (its question, headword and fact) in a soft tone of the
-  chapter's colour under the full ink, never split by a soft hyphen. Where grey first shows: „В сиво са всички останали факти, които срещнеш. С мастило се пише само в броя на деня.“
+  chapter's colour under the full ink, never split by a soft hyphen. Where grey first shows: „С мастило са фактите от верните ти отговори в броя на деня. Всички други, които срещнеш, са в сиво.“
   Its game's result: on the chapter's sheet its chip, the score and its tiles; under it, with no number (grey is never
   counted), „Фактите от играта са в твоя Алманах, в сиво.“ While the day's issue waits, „Към днешния брой“ is the
   action, the streak's stake under it; once it's played, „Още десет въпроса“ the action. The other ways on are quiet
