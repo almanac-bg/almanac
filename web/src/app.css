@@ -3824,37 +3824,6 @@
     background: var(--tone, var(--ink));
   }
 
-  .chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  /* One row that scrolls sideways (the page itself never does). */
-  .chips.scroll {
-    flex-wrap: nowrap;
-    white-space: nowrap;
-    overflow-x: auto;
-    margin-inline: calc(-1 * var(--space-4));
-    padding: 2px var(--space-4) var(--space-1);
-    scrollbar-width: none;
-  }
-
-  /* A row that scrolls is for a finger. With a mouse, or room enough, every chip shows at once, in as many rows as it
-     takes: a row cut off at the edge that won't drag reads as broken. */
-  @media (min-width: 48rem), (hover: hover) and (pointer: fine) {
-    .chips.scroll {
-      flex-wrap: wrap;
-      white-space: normal;
-      overflow-x: visible;
-      margin-inline: 0;
-      padding: 0;
-    }
-  }
-
   /* ---- Pictures (art/pictures.ts): painted from one ramp of the tone they sit in, with the night ink and white ---- */
 
   /* By day, on paper, the light inks and the tinted disc would wash out (a flask, the streak's flame), so they take

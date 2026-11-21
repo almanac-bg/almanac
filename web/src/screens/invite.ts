@@ -22,18 +22,19 @@ interface Invite extends Look {
   friends?: boolean;
 }
 
-/** What Днес shows of an invite opened: the invite, or that the link isn't one (any more). */
-type Opened = Invite | { gone: true };
+/** What Днес shows of an invite opened: the invite, that the link isn't one (any more), or why it couldn't be looked
+ * up now (too many from here, no line: in the server's words or the API's). */
+type Opened = Invite | { gone: true } | { error: string };
 
 /** The invite the page was opened at, until Днес has taken it (inviteCard). */
 let opened: Opened | null = null;
 
 /** An invite link (/f/<code>), opened: its invite, as the page came with it or asked for, then Днес. */
 export function invited([code = ""]: string[]): Child {
-  const inPage = boot.invite as (Partial<Invite> & { gone?: boolean }) | undefined;
+  const inPage = boot.invite as (Partial<Invite> & { gone?: boolean; error?: string }) | undefined;
   boot.invite = undefined;
-  if (inPage?.gone) {
-    opened = { gone: true };
+  if (inPage?.gone || inPage?.error) {
+    opened = inPage.error ? { error: inPage.error } : { gone: true };
     go("/", true);
     return null;
   }
@@ -47,8 +48,9 @@ export function invited([code = ""]: string[]): Child {
       opened = inv;
       go("/", true);
     },
-    () => {
-      opened = { gone: true };
+    (err) => {
+      // Only a 404 is a link that isn't; anything else (too many from here, no line) is said as it is.
+      opened = err instanceof ApiError && err.status === 404 ? { gone: true } : { error: errorText(err) };
       go("/", true);
     },
   );
@@ -125,6 +127,7 @@ export function inviteCard(): Child {
     return () => (inviteSaid() ? h("p", { class: "notice", role: "status" }, inviteSaid()) : null);
   }
   if ("gone" in o) return h("p", { class: "notice", role: "status" }, "Тази покана вече не важи. Поискай нова връзка.");
+  if ("error" in o) return h("p", { class: "notice", role: "alert" }, o.error);
   const inv = o;
   // What the card says under the name, once there's something to say: the two are friends, or the add waits.
   const said = signal<{ text: string; bad?: boolean; done?: boolean } | null>(

@@ -345,6 +345,7 @@ function friendsCard(reloadBoard: () => void): Child {
     leaving.set(null);
     act(async () => {
       await api("DELETE", `/api/friends/${l.f.id}`);
+      inviter.forget();
       await load();
     });
   };
@@ -501,7 +502,7 @@ function friendsCard(reloadBoard: () => void): Child {
             );
       },
       // Outside the parts drawn again on each look (every 15 s): drawn again, its field would lose the focus mid-word.
-      when(data, () => inviter),
+      when(data, () => inviter.view),
       when(data, () => adder),
       () => {
         const out = data()?.requests.out ?? [];
@@ -533,8 +534,9 @@ function friendsCard(reloadBoard: () => void): Child {
 /** The player's invite link (server/invite.go): „Покани приятел“ sends it, with „Добави ме в АЛМАНАХ: <link>“, by the
  * share sheet on a phone, else copied (shown, where it can't be); „Нова връзка“, once said yes to, makes a new one in
  * its place, and the old one ends: offered once there is one (`had`, as the server said, or one made here). The link is
- * asked for once, the first time it's sent. */
-function inviteFriend(had: () => boolean): Child {
+ * asked for once, the first time it's sent, and again after a friend is removed (`forget`: the removal ended it,
+ * play.Unfriend). */
+function inviteFriend(had: () => boolean): { view: Child; forget: () => void } {
   const note = signal<{ text: string; bad?: boolean } | null>(null);
   const confirming = signal(false);
   const busy = signal(false);
@@ -592,7 +594,10 @@ function inviteFriend(had: () => boolean): Child {
       busy.set(false);
     }
   };
-  return h(
+  const forget = () => {
+    link = null;
+  };
+  const view = h(
     "div",
     { class: "invite-friend" },
     h(
@@ -632,6 +637,7 @@ function inviteFriend(had: () => boolean): Child {
         : h("p", { class: "small muted" }, "Който отвори връзката ти, става твой приятел с едно докосване.");
     },
   );
+  return { view, forget };
 }
 
 /** Asking someone to be friends: by their tag (@tag) or their email, on a line, „Добави“ beside it. */

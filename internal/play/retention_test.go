@@ -58,10 +58,10 @@ func TestPeopleDays(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := act.On("2026-11-12"); n != 3 {
+	if n := playedOn(act, "2026-11-12"); n != 3 {
 		t.Fatalf("people on the 12th: %d, want Ана, the one brought and the one gone", n)
 	}
-	if act.On("2026-11-10") != 0 || act.first(ana) != "2026-11-11" {
+	if playedOn(act, "2026-11-10") != 0 || act.first(ana) != "2026-11-11" {
 		t.Fatalf("Ана's first day: %q", act.first(ana))
 	}
 	// Who played before the days read isn't new in them.
@@ -124,4 +124,14 @@ func TestDayCounts(t *testing.T) {
 	if d := byDay["2026-11-25"]; d.Due != [3]bool{true, true, false} {
 		t.Fatalf("the 25th: %+v", d)
 	}
+}
+
+// playedOn is how many played on a day, as /admin's table counts them.
+func playedOn(a *Activity, day string) int {
+	for _, d := range a.DayCounts() {
+		if d.Day == day {
+			return d.Played
+		}
+	}
+	return 0
 }

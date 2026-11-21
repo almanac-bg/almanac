@@ -412,7 +412,7 @@ func TestForgetLeavesTheDaysAsNobodys(t *testing.T) {
 	if n := w.count(`SELECT count(*) FROM active_days WHERE user_id = ?`, -gone); n != 1 {
 		t.Fatalf("%d days kept as nobody's", n)
 	}
-	if a, err := w.g.Activity(ctx, w.g.Today()); err != nil || a.On(w.g.Today()) != 1 {
+	if a, err := w.g.Activity(ctx, w.g.Today()); err != nil || playedOn(a, w.g.Today()) != 1 {
 		t.Fatalf("played today: %v", err)
 	}
 }

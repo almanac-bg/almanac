@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -192,14 +193,20 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return
 	}
-	// An invite link (invite.go), looked up once, for whoever opens it: one that isn't is a 404, which Днес says.
+	// An invite link (invite.go), looked up once, for whoever opens it: one that isn't is a 404, and one past the
+	// network's budget a 429 (a link's preview fetched then isn't kept as the site's), each of which Днес says.
 	var viewer int64
 	if u != nil {
 		viewer = u.ID
 	}
-	invite, isInvite := s.inviteOf(r, viewer)
-	if invitePath.MatchString(r.URL.Path) && !isInvite {
+	invite, atInvite, inviteErr := s.inviteOf(r, viewer)
+	isInvite := atInvite && inviteErr == nil
+	switch {
+	case !atInvite || isInvite:
+	case errors.Is(inviteErr, play.ErrNoInvite):
 		status = http.StatusNotFound
+	case errors.Is(inviteErr, errInviteBusy):
+		status = http.StatusTooManyRequests
 	}
 	b := s.bank.Load()
 	m := assets.Manifest(s.client)
@@ -234,10 +241,17 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	if isShared {
 		start["shared"] = shared
 	}
-	if isInvite {
+	switch {
+	case isInvite:
 		start["invite"] = invite
-	} else if invitePath.MatchString(r.URL.Path) {
+	case !atInvite:
+	case errors.Is(inviteErr, play.ErrNoInvite):
 		start["invite"] = map[string]bool{"gone": true}
+	case errors.Is(inviteErr, errInviteBusy):
+		start["invite"] = map[string]string{"error": errInviteBusy.message}
+	default:
+		slog.Error("page", "route", route(r), "err", inviteErr)
+		start["invite"] = map[string]string{"error": "Нещо се обърка при нас. Опитай пак след малко."}
 	}
 	boot, _ := json.Marshal(start) // escapes <, > and &: safe inside the script element
 	files := filesOf(m, r.URL.Path)

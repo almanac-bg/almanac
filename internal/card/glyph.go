@@ -113,7 +113,7 @@ func alpha(c color.RGBA, a float64) color.RGBA {
 	return color.RGBA{m(c.R), m(c.G), m(c.B), m(0xff)}
 }
 
-// glyph paints a chapter's glyph size across at (x, y), at opacity a (the whole glyph, as the canvas's globalAlpha).
+// glyph paints a chapter's glyph size across at (x, y), at opacity a (the whole glyph at once, not each shape apart).
 func glyph(dst draw.Image, topic string, tone color.RGBA, x, y, size, a float64) error {
 	all, err := glyphs()
 	if err != nil {
