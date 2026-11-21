@@ -69,9 +69,12 @@ func TestAddPutsABatchIn(t *testing.T) {
 // that isn't there, is retired, or leaves with it.
 func TestAddRetiresByALiveReplacement(t *testing.T) {
 	dir := sampleCopy(t)
-	retire := func(body string) error {
+	retire := func(body string, changed ...string) error {
 		batch := t.TempDir()
 		write(t, filepath.Join(batch, RetireFile), body)
+		if len(changed) > 0 {
+			write(t, filepath.Join(batch, "general.json"), "["+strings.Join(changed, ",")+"]")
+		}
 		_, err := Add(dir, batch, "", false)
 		return err
 	}
@@ -87,15 +90,29 @@ func TestAddRetiresByALiveReplacement(t *testing.T) {
 	}
 
 	before, _ := os.ReadFile(filepath.Join(dir, QuestionsDir, "general.json"))
-	for name, body := range map[string]string{
-		"by a question the bank hasn't": `[{"id": "gen-004", "why": "weak", "by": "gen-99999"}]`,
-		"by a retired question":         `[{"id": "gen-004", "why": "weak", "by": "gen-002"}]`,
-		"by a question retired with it": `[{"id": "gen-004", "why": "weak", "by": "gen-005"}, {"id": "gen-005", "why": "weak"}]`,
-		"by itself":                     `[{"id": "gen-004", "why": "weak", "by": "gen-004"}]`,
+	// gen-005 as the bank has it, for a batch that changes it.
+	var five string
+	for _, q := range after.InCategory("general") {
+		if q.Base().ID == "gen-005" {
+			data, _ := json.Marshal(q)
+			five = string(data)
+		}
+	}
+	const gone, retired = "neither in the batch nor live in the bank", "which the batch retires too"
+	for name, c := range map[string]struct {
+		body, want string
+		changed    []string
+	}{
+		"by a question the bank hasn't": {`[{"id": "gen-004", "why": "weak", "by": "gen-99999"}]`, gone, nil},
+		"by a retired question":         {`[{"id": "gen-004", "why": "weak", "by": "gen-002"}]`, gone, nil},
+		"by a question retired with it": {`[{"id": "gen-004", "why": "weak", "by": "gen-005"}, {"id": "gen-005", "why": "weak"}]`, retired, nil},
+		"by one the batch has and retires": {`[{"id": "gen-004", "why": "weak", "by": "gen-005"}, {"id": "gen-005", "why": "weak"}]`,
+			retired, []string{five}},
+		"by itself": {`[{"id": "gen-004", "why": "weak", "by": "gen-004"}]`, retired, nil},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if err := retire(body); err == nil || !strings.Contains(err.Error(), "neither in the batch nor live in the bank") {
-				t.Fatalf("want a refusal, got %v", err)
+			if err := retire(c.body, c.changed...); err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("want a refusal (%s), got %v", c.want, err)
 			}
 			if after, _ := os.ReadFile(filepath.Join(dir, QuestionsDir, "general.json")); string(after) != string(before) {
 				t.Error("a refused batch changed the bank")

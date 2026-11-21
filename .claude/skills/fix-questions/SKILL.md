@@ -48,7 +48,8 @@ read before players meet them, and fixed the same way:
    are dated or about Bulgaria change (`play.Ahead`'s rules hash `bank.Tail.On` and `BG`): a pre-check that retires,
    adds or re-labels one of them throws away the month it read and deals one nobody read (21 Nov 2026: 243 of the 300
    questions came new). So a pre-check changes such a question only in place, its `on` and `bg` as they were, and
-   replaces only a question with neither, by one with neither; `merge.py` warns of a batch that breaks it. After
+   replaces only a question with neither, by one with neither; `merge.py` stops on a batch that breaks it (exit 1, before
+   it writes anything; `--redraw-days` only when the days are meant to be drawn again). After
    `almanac-bank`, fetch `bank days -n 30` again and check that the days are the ones judged.
 
 ## The upkeep

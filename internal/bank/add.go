@@ -142,6 +142,8 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 			fault("%s: %s: retired already", RetireFile, r.ID)
 		case !slices.Contains(RetiredWhys, r.Why):
 			fault("%s: %s: why is one of %s", RetireFile, r.ID, strings.Join(RetiredWhys, ", "))
+		case retiring[r.By]:
+			fault("%s: %s: by %s, which the batch retires too", RetireFile, r.ID, r.By)
 		case r.By != "" && !seen[r.By] && !live(r.By):
 			fault("%s: %s: by %s, which is neither in the batch nor live in the bank", RetireFile, r.ID, r.By)
 		default:
