@@ -4,13 +4,9 @@ import (
 	"database/sql"
 	"errors"
 	"testing"
-)
+	"time"
 
-// The phone the tests make their links on, and somewhere else.
-var (
-	phone     = Origin{Net: []byte("net-a"), OS: "android"}
-	elsewhere = Origin{Net: []byte("net-b"), OS: "android"}
-	desktop   = Origin{Net: []byte("net-a"), OS: "windows"}
+	"github.com/almanac-bg/almanac/internal/store"
 )
 
 // A handoff's link shares a guest's game with another browser, once: the browser it came from stays signed in, as
@@ -34,12 +30,18 @@ func TestHandoff(t *testing.T) {
 	// the link came from stays signed in, its notifications and its other links with it.
 	guest, before, _ := a.Guest(ctx)
 	notified(t, db, guest.ID, before, "before")
-	link, err := a.Handoff(ctx, guest.ID, phone)
-	if err != nil || len(link.Token) != 43 || link.Number < 10 || link.Number > 99 || !link.Fresh {
-		t.Fatalf("the link: %+v %v", link, err)
+	link, err := a.Handoff(ctx, guest.ID)
+	if err != nil || len(link) != 43 {
+		t.Fatalf("the link: %q %v", link, err)
 	}
-	another, _ := a.Handoff(ctx, guest.ID, phone)
-	u, session, err := a.TakeHandoff(ctx, link.Token, "", phone, 0)
+	var expires int64
+	_ = db.Read.QueryRow(`SELECT expires_at FROM handoffs WHERE token_hash = ?`, hashToken(link)).Scan(&expires)
+	if left := time.Until(time.UnixMilli(expires)); left > HandoffTTL || left < HandoffTTL-time.Minute ||
+		HandoffTTL != 30*time.Minute {
+		t.Fatalf("the link works for %v", left)
+	}
+	another, _ := a.Handoff(ctx, guest.ID)
+	u, session, err := a.TakeHandoff(ctx, link, "")
 	if err != nil || u.ID != guest.ID || session == "" {
 		t.Fatalf("taken as %+v %q %v", u, session, err)
 	}
@@ -52,45 +54,32 @@ func TestHandoff(t *testing.T) {
 	if d := devices(t, db, guest.ID); d != "before" {
 		t.Fatalf("the notifications of the browser the game came from: %q", d)
 	}
-	if _, _, err := a.TakeHandoff(ctx, link.Token, "", phone, 0); !errors.Is(err, ErrNoHandoff) {
+	if _, _, err := a.TakeHandoff(ctx, link, ""); !errors.Is(err, ErrNoHandoff) {
 		t.Fatalf("a link used twice: %v", err)
 	}
-	if u, s, err := a.TakeHandoff(ctx, another.Token, "", phone, 0); err != nil || u.ID != guest.ID || s == "" {
+	// A player's earlier link works on, while it's in time; out of time, none.
+	if u, s, err := a.TakeHandoff(ctx, another, ""); err != nil || u.ID != guest.ID || s == "" {
 		t.Fatalf("another link: %+v %v", u, err)
 	}
-
-	// The last few links work, the ones before them not; out of time, none.
-	var links []string
-	for range HandoffsKept + 1 {
-		l, _ := a.Handoff(ctx, guest.ID, phone)
-		links = append(links, l.Token)
-	}
-	if _, _, err := a.TakeHandoff(ctx, links[0], "", phone, 0); !errors.Is(err, ErrNoHandoff) {
-		t.Fatalf("a link past the last %d: %v", HandoffsKept, err)
-	}
-	_, _ = db.Write.Exec(`UPDATE handoffs SET expires_at = 0 WHERE token_hash = ?`, hashToken(links[1]))
-	if _, _, err := a.TakeHandoff(ctx, links[1], "", phone, 0); !errors.Is(err, ErrNoHandoff) {
+	late, _ := a.Handoff(ctx, guest.ID)
+	_, _ = db.Write.Exec(`UPDATE handoffs SET expires_at = ? WHERE token_hash = ?`, store.Now(), hashToken(late))
+	if _, _, err := a.TakeHandoff(ctx, late, ""); !errors.Is(err, ErrNoHandoff) {
 		t.Fatalf("a link out of time: %v", err)
+	}
+	if _, err := a.LookHandoff(ctx, late, ""); !errors.Is(err, ErrNoHandoff) {
+		t.Fatalf("a link out of time, looked at: %v", err)
 	}
 	// Opened in the browser it was made in (its page reloaded, the link in its address): nothing changes, and the
 	// link stays good for the browser it's meant for.
-	if u, s, err := a.TakeHandoff(ctx, links[2], before, elsewhere, 0); err != nil || u.ID != guest.ID || s != "" {
-		t.Fatalf("a link opened where it was made: %+v %q %v", u, s, err)
-	}
-	if h, err := a.LookHandoff(ctx, links[2], before, elsewhere); err != nil || h.Number {
+	link, _ = a.Handoff(ctx, guest.ID)
+	if h, err := a.LookHandoff(ctx, link, before); err != nil || h != (Handing{Name: guest.Name, Mine: true}) {
 		t.Fatalf("looked at where it was made: %+v %v", h, err)
 	}
-	if u, moved, err := a.TakeHandoff(ctx, links[2], "", phone, 0); err != nil || u.ID != guest.ID || moved == "" {
-		t.Fatalf("the link after it was opened where it was made: %+v %v", u, err)
+	if u, s, err := a.TakeHandoff(ctx, link, before); err != nil || u.ID != guest.ID || s != "" {
+		t.Fatalf("a link opened where it was made: %+v %q %v", u, s, err)
 	}
-
-	// The page says whose game a link brings, and on how many days it was played, before anything is taken.
-	if _, err := db.Write.Exec(`INSERT INTO active_days (user_id, day) VALUES (?1, '2026-11-16'), (?1, '2026-11-17')`,
-		guest.ID); err != nil {
-		t.Fatal(err)
-	}
-	link, _ = a.Handoff(ctx, guest.ID, phone)
-	if h, err := a.LookHandoff(ctx, link.Token, "", phone); err != nil || h != (Handing{Name: guest.Name, Days: 2}) {
+	// Anywhere else, the page says whose game the link brings before anything is taken.
+	if h, err := a.LookHandoff(ctx, link, ""); err != nil || h != (Handing{Name: guest.Name}) {
 		t.Fatalf("what the link brings: %+v %v", h, err)
 	}
 
@@ -98,7 +87,7 @@ func TestHandoff(t *testing.T) {
 	// own notifications, and the guest it was goes. Nothing is joined.
 	here, hereSession, _ := a.Guest(ctx)
 	notified(t, db, here.ID, hereSession, "here")
-	u, session, err = a.TakeHandoff(ctx, link.Token, hereSession, phone, 0)
+	u, session, err = a.TakeHandoff(ctx, link, hereSession)
 	if err != nil || u.ID != guest.ID || session == "" || exists(here.ID) || len(merged) > 0 {
 		t.Fatalf("a guest to a guest with nothing: %+v %q %v %v", u, session, err, merged)
 	}
@@ -114,11 +103,11 @@ func TestHandoff(t *testing.T) {
 		other.ID); err != nil {
 		t.Fatal(err)
 	}
-	link, _ = a.Handoff(ctx, guest.ID, phone)
-	if _, err := a.LookHandoff(ctx, link.Token, otherSession, phone); !errors.Is(err, ErrHandoffHere) {
+	link, _ = a.Handoff(ctx, guest.ID)
+	if _, err := a.LookHandoff(ctx, link, otherSession); !errors.Is(err, ErrHandoffHere) {
 		t.Fatalf("what the link brings to a game: %v", err)
 	}
-	if _, _, err = a.TakeHandoff(ctx, link.Token, otherSession, phone, 0); !errors.Is(err, ErrHandoffHere) || !exists(other.ID) {
+	if _, _, err = a.TakeHandoff(ctx, link, otherSession); !errors.Is(err, ErrHandoffHere) || !exists(other.ID) {
 		t.Fatalf("a guest to a guest's game: %v", err)
 	}
 	if s, _, _ := a.Session(ctx, otherSession); s == nil || s.ID != other.ID {
@@ -128,130 +117,27 @@ func TestHandoff(t *testing.T) {
 	// A guest brought to a profile: not joined (only signing in by email joins them), and the link still works for
 	// the browser it was meant for.
 	owner, ownerSession, _ := a.Verify(ctx, code(t, a, out, in, "h@example.com"), "")
-	if _, err := a.LookHandoff(ctx, link.Token, ownerSession, phone); !errors.Is(err, ErrHandoffSignedIn) {
+	if _, err := a.LookHandoff(ctx, link, ownerSession); !errors.Is(err, ErrHandoffSignedIn) {
 		t.Fatalf("what the link brings to a profile: %v", err)
 	}
-	if _, _, err = a.TakeHandoff(ctx, link.Token, ownerSession, phone, 0); !errors.Is(err, ErrHandoffSignedIn) || !exists(guest.ID) {
+	if _, _, err = a.TakeHandoff(ctx, link, ownerSession); !errors.Is(err, ErrHandoffSignedIn) || !exists(guest.ID) {
 		t.Fatalf("a guest to a profile: %v", err)
 	}
-	if u, _, err := a.TakeHandoff(ctx, link.Token, "", phone, 0); err != nil || u.ID != guest.ID {
+	if u, _, err := a.TakeHandoff(ctx, link, ""); err != nil || u.ID != guest.ID {
 		t.Fatalf("the link after: %+v %v", u, err)
 	}
-	if _, err := a.LookHandoff(ctx, link.Token, "", phone); !errors.Is(err, ErrNoHandoff) {
+	if _, err := a.LookHandoff(ctx, link, ""); !errors.Is(err, ErrNoHandoff) {
 		t.Fatalf("a link taken, looked at: %v", err)
 	}
 
 	// A profile makes no link: one would sign in whoever it reached.
-	if _, err := a.Handoff(ctx, owner.ID, phone); !errors.Is(err, ErrNoHandoff) {
+	if _, err := a.Handoff(ctx, owner.ID); !errors.Is(err, ErrNoHandoff) {
 		t.Fatalf("a profile's link: %v", err)
 	}
 }
 
-// A page that holds a link is given it again while it works for HandoffRotate more, and a new one after: the link in
-// an address isn't changed while it's being opened, nor left to die.
-func TestHandoffRotates(t *testing.T) {
-	a, db, _, _ := setup(t)
-	ctx := t.Context()
-	guest, _, _ := a.Guest(ctx)
-	other, _, _ := a.Guest(ctx)
-	link, _ := a.Handoff(ctx, guest.ID, phone)
-	if held, ok, err := a.HeldHandoff(ctx, guest.ID, link.Token); err != nil || !ok || held.Token != link.Token ||
-		held.Number != link.Number || held.Fresh {
-		t.Fatalf("held with 30 minutes left: %+v %v %v", held, ok, err)
-	}
-	if _, ok, _ := a.HeldHandoff(ctx, other.ID, link.Token); ok {
-		t.Fatal("someone else's link held")
-	}
-	if _, ok, _ := a.HeldHandoff(ctx, guest.ID, ""); ok {
-		t.Fatal("no link held")
-	}
-	_, _ = db.Write.Exec(`UPDATE handoffs SET expires_at = expires_at - ? WHERE token_hash = ?`,
-		(HandoffTTL - HandoffRotate + 1).Milliseconds(), hashToken(link.Token))
-	if _, ok, _ := a.HeldHandoff(ctx, guest.ID, link.Token); ok {
-		t.Fatal("held with under 10 minutes left")
-	}
-	// Still taken while it works.
-	if _, _, err := a.TakeHandoff(ctx, link.Token, "", phone, 0); err != nil {
-		t.Fatalf("a link with under 10 minutes left: %v", err)
-	}
-}
-
-// A browser that isn't plainly the phone the link was made on — another network, or another family of system — is
-// asked for the link's number; a wrong one counts against the link, which stops working after HandoffMisses.
-func TestHandoffNumber(t *testing.T) {
-	a, _, _, _ := setup(t)
-	ctx := t.Context()
-	guest, _, _ := a.Guest(ctx)
-	for _, at := range []Origin{elsewhere, desktop, {OS: "android"}} {
-		link, _ := a.Handoff(ctx, guest.ID, phone)
-		if h, err := a.LookHandoff(ctx, link.Token, "", at); err != nil || !h.Number {
-			t.Fatalf("looked at from %+v: %+v %v", at, h, err)
-		}
-		if _, _, err := a.TakeHandoff(ctx, link.Token, "", at, 0); !errors.Is(err, ErrHandoffNumber) {
-			t.Fatalf("taken from %+v without the number: %v", at, err)
-		}
-		wrong := link.Number%90 + 10
-		var w WrongNumber
-		if _, _, err := a.TakeHandoff(ctx, link.Token, "", at, wrong); !errors.As(err, &w) || w.Left != HandoffMisses-1 {
-			t.Fatalf("a wrong number: %v", err)
-		}
-		u, s, err := a.TakeHandoff(ctx, link.Token, "", at, link.Number)
-		if err != nil || u.ID != guest.ID || s == "" {
-			t.Fatalf("the right number from %+v: %+v %v", at, u, err)
-		}
-	}
-	// The same phone isn't asked.
-	link, _ := a.Handoff(ctx, guest.ID, phone)
-	if h, _ := a.LookHandoff(ctx, link.Token, "", phone); h.Number {
-		t.Fatal("the same phone asked for the number")
-	}
-	// Wrong numbers to the last: the link is dead, the right number too late.
-	link, _ = a.Handoff(ctx, guest.ID, phone)
-	wrong := link.Number%90 + 10
-	for i := range HandoffMisses {
-		_, _, err := a.TakeHandoff(ctx, link.Token, "", elsewhere, wrong)
-		if last := i == HandoffMisses-1; last != errors.Is(err, ErrNoHandoff) || !last && !errors.Is(err, ErrHandoffNumber) {
-			t.Fatalf("wrong number %d: %v", i+1, err)
-		}
-	}
-	if _, _, err := a.TakeHandoff(ctx, link.Token, "", elsewhere, link.Number); !errors.Is(err, ErrNoHandoff) {
-		t.Fatalf("the right number after %d wrong: %v", HandoffMisses, err)
-	}
-}
-
-// A link copied by hand asks every browser for its number, the same phone's too; the browser that made it is told
-// it's its own (nothing to take), and only the player's own link is marked.
-func TestHandoffCopied(t *testing.T) {
-	a, _, _, _ := setup(t)
-	ctx := t.Context()
-	guest, session, _ := a.Guest(ctx)
-	other, _, _ := a.Guest(ctx)
-	link, _ := a.Handoff(ctx, guest.ID, phone)
-	if err := a.CopiedHandoff(ctx, other.ID, link.Token); err != nil {
-		t.Fatal(err)
-	}
-	if h, _ := a.LookHandoff(ctx, link.Token, "", phone); h.Number {
-		t.Fatal("another player marked the link copied")
-	}
-	if err := a.CopiedHandoff(ctx, guest.ID, link.Token); err != nil {
-		t.Fatal(err)
-	}
-	if h, err := a.LookHandoff(ctx, link.Token, "", phone); err != nil || !h.Number || h.Mine || h.Name != guest.Name {
-		t.Fatalf("a copied link on the same phone: %+v %v", h, err)
-	}
-	if _, _, err := a.TakeHandoff(ctx, link.Token, "", phone, 0); !errors.Is(err, ErrHandoffNumber) {
-		t.Fatalf("a copied link taken on the same phone without the number: %v", err)
-	}
-	if h, err := a.LookHandoff(ctx, link.Token, session, phone); err != nil || !h.Mine || h.Number {
-		t.Fatalf("a copied link where it was made: %+v %v", h, err)
-	}
-	if u, s, err := a.TakeHandoff(ctx, link.Token, "", phone, link.Number); err != nil || u.ID != guest.ID || s == "" {
-		t.Fatalf("with the number: %+v %v", u, err)
-	}
-}
-
 // The takeover a handoff once let through (review 2026-11-17, S1): someone makes a link and sends it; it's opened in
-// a browser with nobody in it (the number given), which plays on and later gives its email. Whoever made the link has
+// a browser with nobody in it, which plays on and later gives its email. Whoever made the link has
 // no way into that profile: not by the session they had (a guest becoming a profile ends its other sessions), not by
 // another link they kept, and their phone gets none of its notifications.
 func TestHandoffTakeover(t *testing.T) {
@@ -259,10 +145,10 @@ func TestHandoffTakeover(t *testing.T) {
 	ctx := t.Context()
 	maker, makerSession, _ := a.Guest(ctx)
 	notified(t, db, maker.ID, makerSession, "maker")
-	link, _ := a.Handoff(ctx, maker.ID, phone)
-	spare, _ := a.Handoff(ctx, maker.ID, phone)
+	link, _ := a.Handoff(ctx, maker.ID)
+	spare, _ := a.Handoff(ctx, maker.ID)
 
-	_, opened, err := a.TakeHandoff(ctx, link.Token, "", elsewhere, link.Number)
+	_, opened, err := a.TakeHandoff(ctx, link, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +161,7 @@ func TestHandoffTakeover(t *testing.T) {
 	if s, _, _ := a.Session(ctx, makerSession); s != nil {
 		t.Fatalf("the link's maker is in the profile: %+v", s)
 	}
-	if _, _, err := a.TakeHandoff(ctx, spare.Token, "", phone, 0); !errors.Is(err, ErrNoHandoff) {
+	if _, _, err := a.TakeHandoff(ctx, spare, ""); !errors.Is(err, ErrNoHandoff) {
 		t.Fatalf("the link's maker came back by another link: %v", err)
 	}
 	if d := devices(t, db, u.ID); d != "opened" {

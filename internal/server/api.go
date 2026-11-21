@@ -75,8 +75,6 @@ var playerErrors = map[error]*apiError{
 	account.ErrNoMail: {http.StatusBadRequest, "no_mail",
 		"Писмата ни не стигат до този адрес. Провери дали е изписан вярно, или опитай с друг."},
 	account.ErrNoHandoff: {http.StatusNotFound, "no_handoff", "Тази връзка вече не работи: играта ти остана там, където я започна."},
-	account.ErrHandoffNumber: {http.StatusConflict, "handoff_number",
-		"Въведи числото, което виждаш в приложението, откъдето дойде играта."},
 	account.ErrHandoffSignedIn: {http.StatusConflict, "handoff_signed_in",
 		"Тук вече играеш с профила си. За да добавиш към него играта от другото място, влез с имейла си там, където я започна."},
 	account.ErrHandoffHere: {http.StatusConflict, "handoff_here",

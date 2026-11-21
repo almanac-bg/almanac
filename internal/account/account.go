@@ -7,7 +7,7 @@
 // (Verify) gets a new session in place of the one it had, and its notifications go along to the new one. A handoff
 // shares a guest's game with the phone's browser: the app's browser it came from stays signed in, and the one it
 // comes to becomes the same guest with a session of its own, if it had no game of its own (a link joins no two games:
-// only an email does); a browser not plainly the same phone gives the number the app's page shows. When a guest
+// only an email does). When a guest
 // becomes a profile, every other session the guest had ends (the app's browser a handoff came from too): only the
 // browser that proved the email is in it. SignOutOthers ends a player's
 // other sessions on demand. A player suspended by whoever keeps the game (Suspend) loses every session and gets no new
