@@ -187,8 +187,8 @@ const flagNames = ["Литва", "Боливия", "Босна и Херцего
 /** Shows the day's first choice as pictures (the server's answer the same), wherever a question comes from (the day
  * started, a run's next, an answer's), answered with their names and how everyone answered; and, given `dated`, those
  * questions (by their place) dealt on their own date, their answers with a day's line and the longest fact the bank
- * takes (bank/check.go: 100 and 200 letters); given `full`, every answer as full as a panel gets: its fact written in
- * ink (a right answer of the issue, met there first), how everyone answered, and „Вярно е“ on a miss. The rest as
+ * takes (bank/check.go: 100 and 200 letters); given `full`, every answer as full as a panel gets: how everyone answered,
+ * and a right one's fact written in ink (a right answer of the issue, met there first), or „Вярно е“ on a miss. The rest as
  * they are. */
 async function aPictureChoice(page: Page, { dated = [] as number[], full = false } = {}): Promise<void> {
   let pictured: number | null = null;
@@ -201,7 +201,7 @@ async function aPictureChoice(page: Page, { dated = [] as number[], full = false
       s.reveal.crowd = { answers: 40, right: 0.4, picks: [0.1, 0.4, 0.3, 0.2], today: true };
     }
     if (s?.reveal && full) {
-      s.ink = true;
+      s.ink = s.right === true; // the server writes ink only for a right answer; a miss has „Вярно е“ instead
       s.reveal.crowd ??= { answers: 40, right: 0.4, today: true };
     }
     if (s?.reveal && dated.includes(answered)) {
