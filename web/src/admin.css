@@ -1,5 +1,5 @@
 /* /admin (server/admin_page.go): a page for whoever keeps the game, loaded only there; the rest is app.css's. Wide on
-   a desktop, up to 90rem: the numbers at the top in a grid, the charts side by side. On a phone, one column: the
+   a desktop, as wide as the game's pages: the numbers at the top in a grid, the charts side by side. On a phone, one column: the
    numbers first, the long tables folded, and a table wider than the screen fades at the edge it goes on to. */
 
 @layer app {
@@ -22,14 +22,15 @@
     --series-2: #b77400;
   }
 
-  #app.admin-app {
-    max-width: 90rem;
-  }
-
+  /* The page's gutter (16px on a phone, 40px on a big screen) and its width (up to 1260px), as the game's pages. */
   main.admin {
     display: grid;
     gap: var(--space-5);
     min-width: 0;
+    max-width: calc(var(--page) + 2 * var(--gutter));
+    margin: 0 auto;
+    padding: var(--space-1) max(var(--gutter), env(safe-area-inset-right)) 0
+      max(var(--gutter), env(safe-area-inset-left));
   }
 
   main.admin > * {

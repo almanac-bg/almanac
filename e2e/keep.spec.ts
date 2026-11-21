@@ -216,13 +216,17 @@ test.describe("in Messenger's own browser", () => {
     await laptop.close();
   });
 
-  test("Профил asks for no email here: the way is the phone's browser", async ({ page }) => {
+  test("Профил and Настройки offer no email here: the way is the phone's browser, said once", async ({ page }) => {
     await page.goto("/");
     await daysPlayed(page, 1);
-    await page.goto("/me");
-    await page.getByRole("button", { name: "Запази я с имейл" }).click();
-    await expect(page.getByText("Тук не може да се влиза с имейл")).toBeVisible();
-    await expect(page.getByLabel("Имейл")).toHaveCount(0);
+    for (const path of ["/me", "/settings"]) {
+      await page.goto(path);
+      await expect(page.getByText("Тук не може да се влиза с имейл")).toHaveCount(1);
+      await expect(page.getByRole("button", { name: "Запази я с имейл" })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: "Имаш профил? Влез" })).toHaveCount(0);
+      await expect(page.getByText(/Добави имейл|Влез с имейл/)).toHaveCount(0);
+      await expect(page.getByLabel("Имейл")).toHaveCount(0);
+    }
   });
 });
 
@@ -232,7 +236,7 @@ test.describe("in Messenger's own browser on an older iPhone, with no clipboard 
       "Mozilla/5.0 (iPhone; CPU iPhone OS 13_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/MessengerForiOS;FBAV/300.0.0.0]",
   });
 
-  test("the action names the app's menu, and „Копирай връзката“ shows the link to copy by hand", async ({
+  test("the action is a button that copies the link (shown to copy by hand), the app's menu named under it", async ({
     page,
     browser,
   }) => {
@@ -245,9 +249,9 @@ test.describe("in Messenger's own browser on an older iPhone, with no clipboard 
     await startDay(page);
     await playRun(page);
     const action = page.locator(".result-share");
-    await expect(action.locator(".exit-menu")).toHaveText("··· → Отвори в Safari");
+    await expect(action.locator(".exit-menu")).toHaveText("Или от менюто на приложението: ··· → Отвори в Safari");
     await expect(page).toHaveURL(/\/#hand=[A-Za-z0-9_-]{43}$/);
-    await action.getByRole("button", { name: "Копирай връзката" }).click();
+    await action.getByRole("button", { name: "Копирай връзката за Safari" }).click();
     await expect(action.locator(".keep-said")).toContainText("/#hand=");
     // A link copied asks every browser for the number, the same phone's too.
     const url = page.url();

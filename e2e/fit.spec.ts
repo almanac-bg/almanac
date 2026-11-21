@@ -3,7 +3,7 @@
 // answers it and its action in sight, and once answered the player's row, the right one and „Напред“; and Днес keeps
 // its budget, in the HTML's order.
 import { expect, type Page, test } from "@playwright/test";
-import { dealt, knows } from "./play.ts";
+import { cutOrOverlapping, dealt, keptPlayer, knows } from "./play.ts";
 
 const sizes = [
   { width: 320, height: 568, go: 500 },
@@ -137,3 +137,41 @@ for (const scheme of ["light", "dark"] as const)
         }
       });
     });
+
+test("a player's places at every size, by day and by night: nothing sideways, no name cut, nothing over another", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(300_000);
+  const kept = await keptPlayer(page, browser);
+  const places = [
+    "/me",
+    `/players/${kept.tag}`,
+    "/friends",
+    "/almanac",
+    "/almanac/literature",
+    `/duel/${kept.duel}`,
+    "/admin",
+    "/settings",
+  ];
+  for (const size of sizes)
+    for (const scheme of ["light", "dark"] as const) {
+      await page.setViewportSize({ width: size.width, height: size.height });
+      await page.emulateMedia({ colorScheme: scheme });
+      for (const path of places) {
+        const where = `${path} at ${size.width}×${size.height}, ${scheme}`;
+        await page.goto(path);
+        await expect(page.locator("h1").first(), where).toBeVisible();
+        await page.waitForTimeout(300);
+        expect(await sideways(page), where).toBe(false);
+        expect(await cutOrOverlapping(page), where).toEqual([]);
+      }
+      // A duel's result: its ways on of one width.
+      await page.goto(`/duel/${kept.duel}`);
+      await expect(page.locator(".duel-side .actions .btn").first()).toBeVisible();
+      const widths = await page
+        .locator(".duel-side .actions .btn")
+        .evaluateAll((all) => all.map((b) => Math.round(b.getBoundingClientRect().width)));
+      expect(new Set(widths).size, `the duel's ways on, ${size.width}`).toBe(1);
+    }
+});

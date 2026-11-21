@@ -1,22 +1,21 @@
 /* A duel's result (screens/outcome.ts): the two face to face, the duel question by question, what it meant. Loaded
-   with it, the first time a duel's result shows; the rest of the page is app.css's. The edition's: a page, not a card;
-   the verdict in the serif, the two scores big in the numerals with the colon between, the marks as the day's trail. */
+   with it, the first time a duel's result shows; the rest of the page is app.css's. As the day's result: a white card,
+   the verdict its heading, the two scores the heroes in the numerals with the colon between, „от 10“ in words under
+   each, the marks as the day's trail; no hairlines. */
 
 @layer app {
   .duel-end.card.hero {
     gap: var(--space-5);
-    padding: 0;
+    padding: 20px 20px 22px;
     border: 0;
-    border-radius: 0;
-    background: transparent;
+    border-radius: var(--r-3);
+    background: var(--surface);
     box-shadow: none;
   }
 
   .duel-head {
     display: grid;
     gap: var(--space-2);
-    padding-bottom: var(--space-4);
-    border-bottom: 1.5px solid var(--ink);
   }
 
   /* Beside the marks (below): small. */
@@ -25,17 +24,11 @@
     margin: 0;
   }
 
+  /* „Победа“, „Загуба“, „Равенство“: the page's heading, as every h1. */
   .duel-verdict {
-    font: 600 calc(18px + 1.125rem) / 1.1 var(--font-sans);
-    letter-spacing: -0.02em;
-  }
-
-  .s-won .duel-verdict {
     color: var(--ink);
-  }
-
-  .s-lost .duel-verdict {
-    color: var(--ink);
+    font: 900 calc(14px + 1.125rem) / 1.08 var(--font-sans);
+    letter-spacing: -0.01em;
   }
 
   /* The two, face to face: the avatar and the name over each score, the player's on the left, the other's on the
@@ -66,14 +59,14 @@
     height: 44px;
   }
 
-  /* The seal worn, on the avatar's corner nearer the name (the other's mirrored), on a ring of the page. */
+  /* The seal worn, on the avatar's corner nearer the name (the other's mirrored), on a ring of the card. */
   .duel-avatar > .seal {
     position: absolute;
     right: -8px;
     bottom: -6px;
     border-radius: 50%;
-    background: var(--bg);
-    box-shadow: 0 0 0 2px var(--bg);
+    background: var(--surface);
+    box-shadow: 0 0 0 2px var(--surface);
   }
 
   .duel-face:last-child .duel-avatar > .seal {
@@ -81,15 +74,13 @@
     left: -8px;
   }
 
+  /* The name whole, on two lines rather than cut. */
   .duel-name {
     grid-row: 1;
     max-width: 100%;
-    overflow: hidden;
     color: var(--ink);
-    font-size: 0.9375rem;
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font: 800 0.9375rem / 1.2 var(--font-sans);
+    overflow-wrap: break-word;
   }
 
   .duel-score,
@@ -111,9 +102,10 @@
     grid-column: 1;
   }
 
+  /* The heroes: as big as two side by side can be on a phone. */
   .duel-score {
-    margin-top: var(--space-2);
-    font: 800 min(calc(32px + 2rem), 15vw) / 0.9 var(--font-numeral);
+    margin-top: var(--space-3);
+    font: 900 min(calc(48px + 2.5rem), 24vw) / 0.85 var(--font-numeral);
     font-variant-numeric: tabular-nums;
     transition: color 200ms;
   }
@@ -126,17 +118,18 @@
     color: var(--ink-3);
   }
 
+  /* „от 10“, in words' type, as the day's score has it. */
   .duel-rights {
-    color: var(--ink-3);
-    font-size: 0.8125rem;
+    color: var(--ink-2);
+    font: 800 1.0625rem / 1.2 var(--font-sans);
   }
 
   /* Level with the scores, between them. */
   .duel-colon {
     align-self: center;
     margin-top: var(--space-6);
-    color: var(--ink);
-    font: 800 2rem / 1 var(--font-numeral);
+    color: var(--ink-3);
+    font: 900 min(calc(24px + 1.5rem), 12vw) / 1 var(--font-numeral);
   }
 
   /* Question by question: the player's marks over the other's, a band behind the question that decided it. */
@@ -147,8 +140,6 @@
     gap: 5px;
     width: 100%;
     max-width: 28rem;
-    padding-top: var(--space-4);
-    border-top: 1px solid var(--line);
   }
 
   .duel-who {
@@ -198,16 +189,25 @@
   .duel-meant {
     display: grid;
     gap: var(--space-3);
-    padding-top: var(--space-4);
-    border-top: 1px solid var(--line);
   }
 
+  .duel-meant:empty {
+    display: none;
+  }
+
+  /* The words and the record on a line while they fit; with large text, the record under them. */
   .duel-record {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
     justify-content: space-between;
-    gap: var(--space-3);
+    gap: var(--space-1) var(--space-3);
     font-weight: 600;
+    overflow-wrap: break-word;
+  }
+
+  .duel-record > :first-child {
+    min-width: 0;
   }
 
   .duel-why {
@@ -253,11 +253,6 @@
       grid-column: 8 / span 5;
     }
 
-    .duel-side .duel-meant {
-      padding-top: 0;
-      border-top: 0;
-    }
-
     .duel-side .actions,
     .duel-side .result-actions {
       display: grid;
@@ -265,14 +260,16 @@
       gap: var(--space-2);
     }
 
+    /* The ways on, one width: the gold one (and the rematch's wrapper) as wide as the plain ones under it. */
+    .duel-side .actions > :not(.result-actions),
     .duel-side .actions .btn {
       width: 100%;
       max-width: none;
     }
 
-    /* The marks as wide as the two faces over them. */
-    .duel-main .duel-marks {
-      max-width: none;
+    /* The scores bigger, as the day's on a big screen. */
+    .duel-score {
+      font-size: calc(64px + 3rem);
     }
   }
 }

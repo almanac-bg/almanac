@@ -94,7 +94,7 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await b.getByLabel("Потребителско име или имейл на приятел").fill(`@${tag.toUpperCase()}`);
   await b.getByRole("button", { name: "Добави", exact: true }).click();
   await expect(b.getByText("Поканата до Ана Петрова е изпратена.")).toBeVisible();
-  await expect(b.locator(".waiting")).toContainText(`@${tag}`);
+  await expect(b.locator(".waiting")).toContainText("Ана Петрова");
 
   // Ana sees the dot on Приятели in the bar and the request there, and says yes.
   await a.goto("/");
@@ -106,7 +106,9 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await a.locator(".invitation").getByRole("button", { name: "Приеми" }).click();
   await expect(a.locator(".friend")).toHaveCount(1);
   await b.reload();
-  await expect(b.locator(".friend .friend-tag")).toHaveText(` @${tag}`);
+  // One friend of that name: the name alone, the @username left to her profile.
+  await expect(b.locator(".friend .friend-name")).toHaveText(/^Ана Петрова/);
+  await expect(b.locator(".friend .friend-tag")).toBeHidden();
 
   // Bo hears of her yes in Приятели, once, over his friends; nothing over the day (Днес is the issue and the streak).
   const yes = b.locator(".friends .accepted-notice");

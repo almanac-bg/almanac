@@ -97,7 +97,7 @@ function stepLine(s: NonNullable<News["step"]>): Child {
     "p",
     { class: "news-step" },
     s.level > 0 ? h("span", { class: "step-seal" }, seal(s.chapter, s.level, 40), pips(s.quarter)) : null,
-    h("span", null, h("b", null, `${chapterName(s.chapter)}:`), ` още ${s.left} с мастило до „${s.next}“`),
+    h("span", null, h("b", null, `${chapterName(s.chapter)}:`), ` още ${s.left}\u00a0с мастило до „${s.next}“`),
   );
 }
 

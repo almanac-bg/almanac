@@ -142,6 +142,19 @@ test("a name changed in Настройки is kept on leaving, and a deleted pro
   await expect(page.getByRole("status").filter({ hasText: "Профилът е изтрит." })).toBeVisible();
 });
 
+test("a name longer than the rule is refused in words, never cut short and saved", async ({ page }) => {
+  await becomeGuest(page);
+  const was = await page.evaluate(async () => (await (await fetch("/api/me")).json()).user.name as string);
+  await page.goto("/settings");
+  const long = "Константинова Христозова Петрова"; // 32 letters and spaces
+  await page.getByLabel("Име", { exact: true }).fill(long);
+  await expect(page.getByLabel("Име", { exact: true })).toHaveValue(long);
+  await page.getByRole("button", { name: "Запази" }).click();
+  await expect(page.getByRole("alert")).toContainText("от 2 до 30 знака");
+  const now = await page.evaluate(async () => (await (await fetch("/api/me")).json()).user.name as string);
+  expect(now).toBe(was);
+});
+
 // The browser's notifications go with a deleted profile: kept, they'd come back to whoever plays here next, unasked
 // (push.ts: a subscription the browser has is told to the server again).
 test("a deleted profile lets go of the browser's notifications", async ({ page }) => {

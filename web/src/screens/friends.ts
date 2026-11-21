@@ -461,7 +461,7 @@ function friendsCard(reloadBoard: () => void): Child {
           ? h(
               "div",
               { class: "waiting-for" },
-              h("p", { class: "kicker" }, "Чакат отговор"),
+              h("p", { class: "kicker" }, "Изпратени покани"),
               h(
                 "ul",
                 { class: "rows waiting" },
@@ -469,9 +469,7 @@ function friendsCard(reloadBoard: () => void): Child {
                   h(
                     "li",
                     null,
-                    r.email
-                      ? h("span", null, r.email)
-                      : h("a", { href: profileHref(r.tag ?? "") }, r.name, h("span", { class: "muted" }, ` @${r.tag}`)),
+                    r.email ? h("span", null, r.email) : h("a", { href: profileHref(r.tag ?? "") }, r.name),
                     h("button", { class: "link muted", type: "button", onclick: () => drop(r) }, "Отмени"),
                   ),
                 ),
@@ -553,9 +551,8 @@ function addFriend(reload: () => Promise<void>): Child {
   );
 }
 
-/** A friend: their name (with their @username always, where another friend has the same name: `same`), their day, the
- * duels between you, and a duel a tap away (while changing the list, removing
- * them instead). */
+/** A friend: their name (with their @username only where another friend has the same name: `same`), their day and the
+ * duels between you under it, and a duel a tap away (while changing the list, removing them instead). */
 function row(f: Friend, remove: () => void, challenge: () => void, editing: () => boolean, same = false): Child {
   const played = f.won + f.lost + f.drawn;
   return h(

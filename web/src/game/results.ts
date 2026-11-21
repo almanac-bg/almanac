@@ -14,12 +14,13 @@ import { trail } from "./run.ts";
 import type { Reviewed, Score, State } from "./types.ts";
 
 /** A finished run: the score as the screen's big number (its right answers), a line about it (the place), and the
- * marks; right under it what to do next (`next`: the gold action, then „Прегледай въпросите“ and the others); then
- * whatever the screen adds (`more`: what the game earned); and at the end, once opened, the questions. */
+ * marks; right under it what to do next (`next`: the gold action, then „Прегледай въпросите“ and the others, as
+ * buttons, or with `quiet` as plain links in a line); then whatever the screen adds (`more`: what the game earned);
+ * and at the end, once opened, the questions. */
 export function summary(
   s: State,
   line: Child,
-  next: { main: Child; also?: Child[] },
+  next: { main: Child; also?: Child[]; quiet?: boolean },
   more: Child[] = [],
   moment = true,
   chapter = "",
@@ -34,7 +35,9 @@ export function summary(
     "section",
     { class: "summary" },
     hero,
-    nextSteps(next.main, [questions.button, ...(next.also ?? [])]),
+    next.quiet
+      ? [h("div", { class: "actions" }, next.main), quietSteps([questions.button, ...(next.also ?? [])])]
+      : nextSteps(next.main, [questions.button, ...(next.also ?? [])]),
     more,
     questions.list,
   );
@@ -153,6 +156,12 @@ function seal(): SVGElement {
     svg.append(group);
   }
   return svg;
+}
+
+/** The ways on after a game's one action, as quiet links in a line (a button among them drawn as a link). */
+function quietSteps(ways: Child[]): Child {
+  for (const w of ways) if (w instanceof HTMLElement && w.classList.contains("btn")) w.className = "link tap";
+  return h("p", { class: "result-links" }, ways);
 }
 
 /** What to do after a game, right under its result: the one gold action, then the others, plain and the same size,

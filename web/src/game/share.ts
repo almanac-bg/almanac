@@ -32,10 +32,11 @@ export function squares(marks: Mark[]): string {
 }
 
 /** The text a day is shared with: „Брой 42 · 8/10 · серия 23 дни“ (the streak from three days), its squares, and the link
- * (`url`, said without its scheme). Unsigned: nothing in it says whose it is. */
+ * (`url`) whole, its scheme too: a messenger links „https://almanac.bg/d/…“, and not every one links it without.
+ * Unsigned: nothing in it says whose it is. */
 export function shareWords(d: SharedDay, url: string): string {
   const streak = d.streak >= 3 ? ` · серия ${d.streak} дни` : "";
-  return `Брой ${d.issue} · ${d.rights}/${d.of}${streak}\n${squares(d.marks)}\n${url.replace(/^https?:\/\//, "")}`;
+  return `Брой ${d.issue} · ${d.rights}/${d.of}${streak}\n${squares(d.marks)}\n${url}`;
 }
 
 const links = new Map<number, Promise<string>>();

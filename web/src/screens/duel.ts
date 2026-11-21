@@ -517,7 +517,7 @@ export function duelOne(params: string[]) {
       ? `Десетте въпроса от истинска игра на ${d.opponent?.name ?? "друг играч"}. След всеки отговор виждаш как е минал въпросът в записа.`
       : d.first
         ? `Десет въпроса. После ${d.opponent?.name ?? "приятелят ти"} ще изиграе същите.`
-        : `Същите десет въпроса, които изигра ${d.opponent?.name ?? "приятелят ти"}. След всеки отговор виждаш как е минал при ${d.opponent?.name ?? "приятеля ти"}.`;
+        : `Същите десет въпроса, които изигра ${d.opponent?.name ?? "приятелят ти"}. След всеки отговор виждаш отговора на ${d.opponent?.name ?? "приятеля ти"}.`;
     screen.show(() =>
       startScreen(name, lead, s?.at ? { at: s.at, total: s.total, marks: s.trail } : null, () =>
         s?.at ? void start(d) : begin(),
