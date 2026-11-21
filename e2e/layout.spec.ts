@@ -4,7 +4,8 @@
 //
 // - Днес keeps its budget in the HTML's order and shows „Започни“ whole and high; the day's first question (its head
 //   has the issue and the clock), its answer and the day's result scroll nowhere sideways, the clock never over the count, the answer's panel never squeezed.
-// - Every kind of question (the longest the sample bank has: kinds.ts), answered right, wrong and close: at the usual
+// - Every kind of question (the longest the tests' bank has, the real bank's orders and pairs where it's here:
+//   kinds.ts, bank.ts), answered right, wrong and close: at the usual
 //   text what answers it and its action whole in sight, nothing under the action; once answered the player's row,
 //   the right one and „Напред“, nothing under „Напред“ (on a laptop, the answer beside the question); at twice the
 //   text every control a scroll away; a row's sign, a punctuation mark or a short word never on a line of its own.
@@ -435,9 +436,14 @@ for (const size of sizes)
               ...(!big && size.width > 1000 ? await beside(page) : []),
             ]);
             expect.soft(said, `${where}, answered ${how}`).toEqual([]);
-            // A miss says the right answer in words, right under how many got it.
-            if (how === "wrong" && (q.type === "choice" || q.type === "clues"))
-              await expect.soft(page.locator(".after .right-said")).toHaveText(`Вярно е: ${q.answer}.`);
+            // A miss says the right answer in words, right under how many got it; not where the question names it,
+            // nor under a choice of pictures, each named under it.
+            if (how === "wrong" && (q.type === "choice" || q.type === "clues")) {
+              const word = String(q.answer).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+              const named = new RegExp(`(?<!\\p{L})${word}(?!\\p{L})`, "iu").test(q.text);
+              if (q.pictures || named) await expect.soft(page.locator(".after .right-said")).toHaveCount(0);
+              else await expect.soft(page.locator(".after .right-said")).toHaveText(`Вярно е: ${q.answer}.`);
+            }
             await next(page);
           }
         });

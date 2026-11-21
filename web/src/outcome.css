@@ -36,22 +36,24 @@
   .duel-faces {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    align-items: end;
+    align-items: stretch;
     gap: var(--space-3);
   }
 
+  /* Each side a column: the avatar, the name under it with the column's whole width, the score; the two avatars level
+     at the top and the two scores at the foot, however many lines a name takes. */
   .duel-face {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr auto auto;
+    align-items: start;
     justify-items: start;
-    gap: var(--space-1) var(--space-2);
+    gap: var(--space-2);
     min-width: 0;
   }
 
   .duel-avatar {
     position: relative;
-    grid-row: 1;
   }
 
   .duel-face .avatar {
@@ -74,32 +76,19 @@
     left: -8px;
   }
 
-  /* The name whole, on two lines rather than cut. */
+  /* The name whole, on two lines rather than cut: broken between its words (a one-word name at its syllables:
+     nameWords). */
   .duel-name {
-    grid-row: 1;
     max-width: 100%;
     color: var(--ink);
     font: 800 0.9375rem / 1.2 var(--font-sans);
     overflow-wrap: break-word;
   }
 
-  .duel-score,
-  .duel-rights {
-    grid-column: 1 / -1;
-  }
-
   /* The other's side mirrored: its avatar and name at the right edge, its score too. */
   .duel-face:last-child {
-    grid-template-columns: minmax(0, 1fr) auto;
     justify-items: end;
-  }
-
-  .duel-face:last-child .duel-avatar {
-    grid-column: 2;
-  }
-
-  .duel-face:last-child .duel-name {
-    grid-column: 1;
+    text-align: end;
   }
 
   /* The heroes: as big as two side by side can be on a phone. */

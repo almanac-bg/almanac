@@ -22,6 +22,7 @@ let {
   h,
   hands,
   landing,
+  nameWords,
   nextSteps,
   ordinal,
   play,
@@ -59,6 +60,7 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
     h,
     hands,
     landing,
+    nameWords,
     nextSteps,
     ordinal,
     play,
@@ -155,7 +157,9 @@ function face(s: Side, label: string, tag: string, won: boolean): Child {
     "div",
     { class: won ? "duel-face win" : "duel-face" },
     h("span", { class: "duel-avatar" }, avatar(look.avatar, { size: "l", name: s.name }), worn(look.seal)),
-    tag ? h("a", { class: "duel-name", href: profileHref(tag) }, label) : h("strong", { class: "duel-name" }, label),
+    tag
+      ? h("a", { class: "duel-name", href: profileHref(tag) }, nameWords(label))
+      : h("strong", { class: "duel-name" }, nameWords(label)),
     s.gone
       ? [h("b", { class: "duel-score none" }, "–"), h("span", { class: "duel-rights" }, "Играчът вече го няма")]
       : [

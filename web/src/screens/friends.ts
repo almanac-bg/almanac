@@ -18,6 +18,8 @@ let {
   errorText,
   h,
   onCleanup,
+  listen,
+  nameWords,
   signal,
   when,
   title,
@@ -41,6 +43,9 @@ let {
   mini,
   worn,
 } = {} as Kit;
+
+/** How long a friend removed can be brought back („Върни“) before it's done. */
+const undoMs = 5000;
 
 interface Friend {
   id: number;
@@ -93,6 +98,8 @@ export function friends(kit: Kit): Child {
     errorText,
     h,
     onCleanup,
+    listen,
+    nameWords,
     signal,
     when,
     title,
@@ -328,11 +335,37 @@ function friendsCard(reloadBoard: () => void): Child {
       error.set(errorText(err));
     }
   };
-  const remove = (f: Friend) =>
+  // A friend removed is out of the list at once, „Върни“ in its place for a few seconds, and only then removed (the
+  // duels open between them end with it: play.Unfriend); at once as the screen or the page closes.
+  const leaving = signal<{ f: Friend; t: number } | null>(null);
+  const removeNow = () => {
+    const l = leaving.peek();
+    if (!l) return;
+    clearTimeout(l.t);
+    leaving.set(null);
     act(async () => {
-      await api("DELETE", `/api/friends/${f.id}`);
+      await api("DELETE", `/api/friends/${l.f.id}`);
       await load();
     });
+  };
+  const remove = (f: Friend) => {
+    removeNow();
+    leaving.set({ f, t: window.setTimeout(removeNow, undoMs) });
+  };
+  const undo = () => {
+    const l = leaving.peek();
+    if (!l) return;
+    clearTimeout(l.t);
+    leaving.set(null);
+  };
+  onCleanup(removeNow);
+  listen(window, "pagehide", () => {
+    const l = leaving.peek();
+    if (!l) return;
+    clearTimeout(l.t);
+    leaving.set(null);
+    fetch(`/api/friends/${l.f.id}`, { method: "DELETE", keepalive: true }).catch(() => {});
+  });
   const accept = (r: Request) =>
     act(async () => {
       await api("POST", `/api/friends/requests/${r.id}/accept`, {});
@@ -389,6 +422,17 @@ function friendsCard(reloadBoard: () => void): Child {
           : null;
       }),
       yes,
+      () => {
+        const l = leaving();
+        return l
+          ? h(
+              "p",
+              { class: "removed-line", role: "status" },
+              `Премахна ${l.f.name} от приятелите си. `,
+              h("button", { class: "link", type: "button", onclick: undo }, "Върни"),
+            )
+          : null;
+      },
       () =>
         (data()?.requests.in ?? []).map((r) =>
           h(
@@ -434,11 +478,13 @@ function friendsCard(reloadBoard: () => void): Child {
                 ),
               ];
         }
-        return d.friends.length
+        const gone = leaving()?.f.id;
+        const shown = d.friends.filter((f) => f.id !== gone);
+        return shown.length
           ? h(
               "ol",
               { class: "rows friend-list" },
-              d.friends.map((f) =>
+              shown.map((f) =>
                 row(
                   f,
                   () => remove(f),
@@ -671,7 +717,7 @@ function row(f: Friend, remove: () => void, challenge: () => void, editing: () =
       h(
         "a",
         { class: "friend-name", href: profileHref(f.tag) },
-        f.name,
+        nameWords(f.name),
         h("span", { class: same ? "friend-tag same" : "friend-tag" }, ` @${f.tag}`),
       ),
       worn(f.seal),

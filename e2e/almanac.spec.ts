@@ -95,6 +95,8 @@ test("a chapter's entries: the latest first, each with its dateline; a statement
   // A question's answer is the headword, the question in italic under it.
   await expect(items.filter({ has: page.locator(".entry-q") })).toHaveCount(1);
   await expect(items.last().locator(".entry-q")).toHaveCount(1); // learned first
+  // Three facts are read at a glance: no search over them.
+  await expect(page.getByRole("searchbox", { name: "Търси във фактите" })).toHaveCount(0);
 });
 
 test("a chapter the book doesn't have is the page that isn't there; the book with a slash after it is the book", async ({
@@ -107,7 +109,7 @@ test("a chapter the book doesn't have is the page that isn't there; the book wit
   await expect(page.locator(".chapter-card")).toHaveCount(10);
 });
 
-test("on a big screen the book's chapters are in four columns, none over another", async ({ page }) => {
+test("on a big screen the book's chapters are five across, none over another", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/");
   await knows(page, sampleFacts().slice(0, 12));
@@ -120,7 +122,7 @@ test("on a big screen the book's chapters are in four columns, none over another
       return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
     }),
   );
-  expect(new Set(boxes.map((b) => Math.round(b.left))).size).toBe(4);
+  expect(new Set(boxes.map((b) => Math.round(b.left))).size).toBe(5);
   for (const [i, a] of boxes.entries())
     for (const b of boxes.slice(i + 1))
       expect(a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1).toBe(false);

@@ -29,7 +29,7 @@ import { reportProblem } from "../lib/errors.ts";
 import { type RemindAsks, remindAnswered, remindAsks } from "../lib/keep.ts";
 import { pushable, pushOn, turnOn } from "../lib/push.ts";
 import { go, goBack, hold, release, title } from "../lib/router.ts";
-import { dateWords, issueOf, onDay, stakeHour, weekday } from "../lib/words.ts";
+import { dateWords, hyphenate, issueOf, onDay, stakeHour, weekday } from "../lib/words.ts";
 import { cover, notice, player, playing, user } from "../state.ts";
 import { chapterName, chip, failure, formatNumber, glyph, leaf, mini, stakeLine, tiles, who } from "../ui.ts";
 import { inviteCard, takeWaiting } from "./invite.ts";
@@ -593,6 +593,8 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
     "result-score score-leaf",
   );
   if (just) land(hero, run.id, perfect, true);
+  // A best rank risen, the result's one big moment: first, right under the score.
+  const best = signal<Child>(null);
   const action = h(
     "div",
     { class: first ? "result-share result-first" : "result-share" },
@@ -613,12 +615,13 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       "div",
       { class: "result-main page-1" },
       hero,
+      best,
       zero ? missed(missedList, () => bulgariaToday(fresh(), run, reviewOf(run.id))) : null,
       first ? action : null,
       // 2. The day's entry in the book, and what the day wrote.
       () => entryOfDay(fresh().entry),
       // Asked on every visit: the ink and the nearest step are counted again; a rank risen is told once (play.NewsOf).
-      news(run.id),
+      news(run.id, 0, undefined, best.set),
     ),
     h(
       "div",
@@ -724,10 +727,10 @@ function rightAnswer(q: Reviewed): Child {
     return h(
       "ul",
       { class: "miss-a miss-lines" },
-      lines.map((l) => h("li", null, l)),
+      lines.map((l) => h("li", null, hyphenate(l))),
     );
   const answer = answerWords(v, r);
-  return answer ? h("p", { class: "miss-a" }, answer) : null;
+  return answer ? h("p", { class: "miss-a" }, hyphenate(answer)) : null;
 }
 
 /** A question of the ten by its place, as the result's line names it („Десетият“). */

@@ -13,7 +13,7 @@
 //   a restart), and what's been put in when it runs out is the answer.
 
 import { ApiError, errorText, passing, tries } from "../lib/api.ts";
-import { effect, h, lifetime, onCleanup, type Signal, signal, untracked } from "../lib/dom.ts";
+import { effect, h, lifetime, listen, onCleanup, type Signal, signal, untracked } from "../lib/dom.ts";
 import { type VerdictKind, verdictSays } from "../ui.ts";
 import { type Asked, ask, spokenAnswer, wholeWords } from "./questions.ts";
 import type { Answer, Reveal, View } from "./types.ts";
@@ -209,6 +209,7 @@ export function answering<R>(spec: AnswerSpec<R>): Answering<R> {
   });
 
   const heading = h("h1", { class: "ask", tabindex: -1 }, wholeWords(spec.view.text));
+  clamp(heading);
   if (spec.focus)
     requestAnimationFrame(() => {
       if (heading.isConnected) heading.focus({ preventScroll: true });
@@ -225,4 +226,42 @@ export function answering<R>(spec: AnswerSpec<R>): Answering<R> {
     problem,
     send,
   };
+}
+
+/** The question on a short screen while an order or pairs are asked (app.css, `--clamp`): whole where every row and
+ * „Готово“ fit under it, else cut to as many lines as leave them room (two at the least), as the screen opens and as
+ * its size changes. Cut, it's marked `data-cut`, and a tap on it reads it all (`whole`), another cuts it again. A
+ * screen reader has it all either way. */
+function clamp(heading: HTMLElement): void {
+  const fit = () => {
+    if (!heading.isConnected) return;
+    const style = getComputedStyle(heading);
+    heading.style.removeProperty("--lines");
+    const whole = heading.classList.contains("whole");
+    if (!style.getPropertyValue("--clamp").trim() || whole) {
+      heading.toggleAttribute("data-cut", whole);
+      return;
+    }
+    // Whole, how far its rows go under „Готово“, and the lines that takes off.
+    heading.style.setProperty("--lines", "none");
+    const article = heading.closest("article");
+    const action = article?.querySelector(".answering .btn.primary.big")?.getBoundingClientRect();
+    const rows = [...(article?.querySelectorAll(".answering :is(.sortable-list > .option, .match-item)") ?? [])];
+    const under = Math.max(0, ...rows.map((r) => r.getBoundingClientRect().bottom)) + 4 - (action?.top ?? Infinity);
+    if (under > 0) {
+      const line = Number.parseFloat(style.lineHeight) || 20;
+      const all = Math.round(heading.scrollHeight / line);
+      heading.style.setProperty("--lines", String(Math.max(2, all - Math.ceil(under / line))));
+    }
+    heading.toggleAttribute("data-cut", heading.scrollHeight > heading.clientHeight + 1);
+  };
+  heading.addEventListener("click", () => {
+    if (!heading.hasAttribute("data-cut")) return;
+    heading.classList.toggle("whole");
+    fit();
+  });
+  // Once it's on the screen, its fonts in; and again as the screen changes.
+  requestAnimationFrame(() => requestAnimationFrame(fit));
+  document.fonts?.ready.then(fit, () => {});
+  listen(window, "resize", fit);
 }

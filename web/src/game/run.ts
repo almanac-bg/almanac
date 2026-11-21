@@ -32,7 +32,17 @@ import {
   verdictSays,
 } from "../ui.ts";
 import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
-import { answered, answerWords, beats, crowdLine, picture, picturesIn, type Stage, wholeWords } from "./questions.ts";
+import {
+  answered,
+  answerWords,
+  beats,
+  creditsWords,
+  crowdLine,
+  picture,
+  picturesIn,
+  type Stage,
+  wholeWords,
+} from "./questions.ts";
 import type { Answer, Credit, Mark, Result, Reveal, Shown, State, TheirMark, View } from "./types.ts";
 
 /** Where the run whose question this tab showed last is kept (this tab's, for as long as it's open). */
@@ -701,6 +711,7 @@ function question(
         res.ink && res.reveal.fact ? filed(q.category) : null,
         fact(res.reveal.fact, res.reveal.day),
         res.reveal.credit ? credit(res.reveal.credit) : null,
+        res.reveal.credits?.length ? h("p", { class: "credit" }, creditsWords(res.reveal.credits)) : null,
         upNext(lasts, res.state.done ? "Към резултата…" : `Въпрос ${q.n + 2} идва след малко…`, true),
         // „Напред“ on a foot of its own, opaque to the panel's edge: what scrolls in the panel never shows under it.
         h(
@@ -846,8 +857,16 @@ function theirLine(name: string, m: TheirMark | undefined): Child {
 function rightSaid(view: View, reveal: Reveal, kind: VerdictKind): Child {
   if (kind !== "wrong" && kind !== "time") return null;
   if (view.type !== "choice" && view.type !== "clues") return null;
+  // A choice of pictures names each under it; a question that names its answer has said it.
+  if (view.type === "choice" && view.pictures?.length) return null;
   const name = answerWords(view, reveal);
-  return name ? h("p", { class: "right-said" }, "Вярно е: ", h("b", null, name), ".") : null;
+  return name && !names(view.text, name) ? h("p", { class: "right-said" }, "Вярно е: ", h("b", null, name), ".") : null;
+}
+
+/** Whether a question's words name an answer, a whole word or words of it („Кое е знамето на Литва?“: „Литва“). */
+function names(text: string, answer: string): boolean {
+  const word = answer.replaceAll("\u00ad", "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?<!\\p{L})${word}(?!\\p{L})`, "iu").test(text.replaceAll("\u00ad", ""));
 }
 
 /** How long what the player chose stays chosen before the answer shows, however quick the line. */

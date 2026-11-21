@@ -1,11 +1,13 @@
 // The browser tests: the game played as players play it, in Chromium, WebKit (Safari's engine) and Firefox, at a
-// phone's size. They start the program on the public sample bank with a fresh database.
+// phone's size. They start the program on the public sample bank with a fresh database (where the real bank is here,
+// with its longest orders and pairs added: bank.ts).
 //
 //   npx playwright test -c e2e                     all three engines
 //   npx playwright test -c e2e --project=webkit    one (with `=`: a spec after it would read as a project)
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { chromium, defineConfig, devices } from "@playwright/test";
+import { testBank } from "./bank.ts";
 
 // Each checkout (a worktree per session) gets a port of its own, so that several can run their tests at once;
 // E2E_PORT and E2E_DB choose others.
@@ -22,6 +24,7 @@ if (!process.env.TEST_WORKER_INDEX) {
   for (const f of [db, `${db}-wal`, `${db}-shm`, "test-results/mail"]) rmSync(f, { recursive: true, force: true });
   mkdirSync("test-results", { recursive: true });
 }
+const bankDir = testBank(!process.env.TEST_WORKER_INDEX);
 
 // Chromium's tests run in Playwright's own Chromium, or, on a Mac without it, in Brave; BROWSER_PATH names another.
 const brave = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser";
@@ -59,7 +62,7 @@ export default defineConfig({
       DEV: "1",
       ADDR: `127.0.0.1:${port}`,
       PUBLIC_URL: `http://127.0.0.1:${port}`,
-      BANK_DIR: "bank/sample",
+      BANK_DIR: bankDir,
       DB_PATH: db,
       MAIL_DIR: "test-results/mail",
       // How players answered a question shows from its first answer, not its tenth or twentieth.

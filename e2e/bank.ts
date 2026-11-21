@@ -1,0 +1,106 @@
+// The questions the browser tests play: the public sample bank, and, where the real bank is here (private/, or the
+// main checkout's from a worktree; never on CI, which has only the sample), the real bank's longest orders and pairs
+// with it, the kinds a phone's short screen has the least room for: the program serves them in a copy of the sample
+// bank made for the tests (playwright.config, BANK_DIR), and kinds.ts finds them there as the longest of their kind.
+import { cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+/** A question of the bank, as much of it as the tests read. */
+export interface Q {
+  id: string;
+  type: string;
+  text: string;
+  answer?: unknown;
+  wrong?: string[];
+  image?: unknown;
+  pictures?: { alt: string }[];
+  clues?: string[];
+  items?: { text: string; value?: number; group?: number }[];
+  direction?: string;
+  pairs?: { left: string; right: string }[];
+  decoy?: string;
+  groups?: string[];
+  tolerance?: number;
+  retired?: unknown;
+}
+
+const root = resolve(import.meta.dirname, "..");
+const sample = resolve(root, "bank/sample");
+/** The real bank: this checkout's, or, in a worktree (a session's), the main checkout's; null where there's none. */
+const real = ((): string | null => {
+  const here = resolve(root, "private");
+  if (existsSync(resolve(here, "questions"))) return here;
+  try {
+    // A worktree's .git is a file naming its place in the main checkout's: <main>/.git/worktrees/<name>.
+    const dir = /^gitdir: (.+)$/m.exec(readFileSync(resolve(root, ".git"), "utf8"))?.[1]?.trim();
+    const main = dir ? resolve(dir, "../../../private") : "";
+    if (main && existsSync(resolve(main, "questions"))) return main;
+  } catch {
+    // .git a folder: the main checkout, whose private/ isn't here.
+  }
+  return null;
+})();
+/** The copy the program serves when the real bank is here. */
+const served = resolve(root, "test-results/bank");
+
+/** A bank's questions, file by file (a chapter's each). */
+const files = (dir: string): Map<string, Q[]> =>
+  new Map(
+    readdirSync(resolve(dir, "questions"))
+      .filter((f) => f.endsWith(".json"))
+      .map((f) => [f, JSON.parse(readFileSync(resolve(dir, "questions", f), "utf8")) as Q[]]),
+  );
+
+/** All the words a question shows: the longest of each kind is the one a screen has the least room for. */
+export const words = (q: Q) =>
+  [
+    q.text,
+    q.answer,
+    q.wrong,
+    q.clues,
+    q.items?.map((i) => i.text),
+    q.pairs?.flatMap((p) => [p.left, p.right]),
+    q.decoy,
+    q.groups,
+  ]
+    .flat()
+    .filter((w) => typeof w === "string")
+    .join(" ").length;
+
+/** The real bank's questions the tests add to the sample: of an order and of pairs, the one with the most words and
+ * the one with the longest question (often one question), each with its chapter's file. None without the real bank. */
+function picks(): [file: string, q: Q][] {
+  if (!real) return [];
+  const all = [...files(real)].flatMap(([f, qs]) => qs.filter((q) => !q.retired).map((q) => [f, q] as [string, Q]));
+  const out = new Map<string, [string, Q]>();
+  for (const type of ["order", "match"])
+    for (const size of [words, (q: Q) => q.text.length]) {
+      const best = all.filter(([, q]) => q.type === type).sort(([, a], [, b]) => size(b) - size(a))[0];
+      if (best) out.set(best[1].id, best);
+    }
+  return [...out.values()];
+}
+
+/** The bank the program serves to the tests: the sample, or, with the real bank here, a copy of it with the real
+ * bank's longest orders and pairs (made once, by the main process: `make`). */
+export function testBank(make: boolean): string {
+  const add = picks();
+  if (!add.length) return "bank/sample";
+  if (make) {
+    rmSync(served, { recursive: true, force: true });
+    cpSync(sample, served, { recursive: true });
+    const qs = files(served);
+    const ids = new Set([...qs.values()].flat().map((q) => q.id));
+    // Each on a day long gone (bank.Tail.On): dealt to a test by its id, never drawn into a day's issue, so that the
+    // tests' days are the sample's, here as on CI.
+    for (const [f, q] of add) if (!ids.has(q.id)) qs.set(f, [...(qs.get(f) ?? []), { ...q, on: ["2000-01-01"] } as Q]);
+    for (const [f, list] of qs) writeFileSync(resolve(served, "questions", f), JSON.stringify(list, null, 2));
+  }
+  return "test-results/bank";
+}
+
+/** The questions the tests' program serves (testBank's). */
+export function bankQuestions(): Q[] {
+  const dir = existsSync(resolve(served, "questions")) && picks().length ? served : sample;
+  return [...files(dir).values()].flat();
+}

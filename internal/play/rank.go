@@ -280,19 +280,21 @@ type Rose struct {
 	Best  bool     `json:"best,omitempty"`
 }
 
-// RankUp is a chapter's rank risen: from the level last told (0: none) to the level now.
+// RankUp is a chapter's rank risen: from the level last told (0: none) to the level now, and the ink it was counted
+// from (the best rank's line says it: „40 факта от История са с мастило“).
 type RankUp struct {
 	Chapter string `json:"chapter"`
 	From    int    `json:"from"`
 	To      int    `json:"to"`
 	Name    string `json:"name"`
+	Ink     int    `json:"ink"`
 	Art     bool   `json:"art,omitempty"`
 }
 
 // roseOf tells the ranks risen since last told, and marks them told: nil if none worth telling (Бележка alone is
 // never told).
 func roseOf(tx *sql.Tx, userID int64) (*Rose, error) {
-	rows, err := tx.Query(`SELECT chapter, level, told FROM ranks WHERE user_id = ?`, userID)
+	rows, err := tx.Query(`SELECT chapter, level, told, ink FROM ranks WHERE user_id = ?`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -300,15 +302,15 @@ func roseOf(tx *sql.Tx, userID int64) (*Rose, error) {
 	before, after := 0, 0
 	for rows.Next() {
 		var chapter string
-		var level, told int
-		if err := rows.Scan(&chapter, &level, &told); err != nil {
+		var level, told, ink int
+		if err := rows.Scan(&chapter, &level, &told, &ink); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		before, after = max(before, min(told, level)), max(after, level)
 		if level > told && level > 1 {
 			r.Ranks = append(r.Ranks, RankUp{Chapter: chapter, From: told, To: level, Name: RankName(level),
-				Art: told < RankArt && level >= RankArt})
+				Ink: ink, Art: told < RankArt && level >= RankArt})
 		}
 	}
 	rows.Close()

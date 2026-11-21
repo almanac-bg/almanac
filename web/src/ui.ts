@@ -6,7 +6,7 @@ import { errorText, passing } from "./lib/api.ts";
 import { hourInBulgaria } from "./lib/day.ts";
 import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
 import { type Scheme, scheme, setScheme } from "./lib/prefs.ts";
-import { formatNumber, formatValue, stakeWords } from "./lib/words.ts";
+import { formatNumber, formatValue, nameWords, stakeWords } from "./lib/words.ts";
 import { glyphBox, rankName, rankNames, sealParts } from "./seal.ts";
 import { topics } from "./state.ts";
 
@@ -558,7 +558,7 @@ export function rankRow(
     h(
       "span",
       { class: "rank-name" },
-      opts.tag ? h("a", { href: profileHref(opts.tag) }, name) : name,
+      opts.tag ? h("a", { href: profileHref(opts.tag) }, nameWords(name)) : nameWords(name),
       worn(opts.look?.seal),
       opts.me ? h("span", { class: "rank-you" }, " ти") : null,
     ),

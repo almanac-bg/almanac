@@ -523,3 +523,45 @@ func TestRecordingByLevel(t *testing.T) {
 		t.Fatalf("„по-силен“ with none stronger: game %d (%q), want %d and no level", g, kept, weakRun)
 	}
 }
+
+// Friends no more: the duels open between them end with it, as if their time were up (none left a „Твой ред“ that
+// can't be played); the record between them stays.
+func TestUnfriendEndsTheirDuels(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo := w.user(), w.user()
+	w.befriend(ana, bo)
+	played := w.duel(ana, bo, repeat(w.right, Length), repeat(w.wrong, Length))
+	sent, _ := w.g.DuelFriend(ctx, ana, bo)
+	w.playSide(ana, sent, repeat(w.right, Length))
+	halfway, _ := w.g.DuelFriend(ctx, ana, bo)
+	w.playSide(ana, halfway, repeat(w.wrong, Length))
+	w.playSide(bo, halfway, repeat(w.right, 3))
+	unsent, _ := w.g.DuelFriend(ctx, bo, ana)
+	w.playSide(bo, unsent, repeat(w.right, 2))
+
+	if err := w.g.Unfriend(ctx, bo, ana); err != nil {
+		t.Fatal(err)
+	}
+	w.g.AftersDone(ctx)
+	for _, who := range []int64{ana, bo} {
+		if d, _ := w.g.DuelsOf(ctx, who); len(d.Yours)+len(d.Theirs) != 0 {
+			t.Fatalf("open duels left for %d: %+v", who, d)
+		}
+	}
+	if d, _ := w.g.DuelOf(ctx, bo, sent); d.State != DuelExpired {
+		t.Fatalf("the duel sent: %+v", d)
+	}
+	if _, err := w.g.PlayDuel(ctx, bo, sent); !errors.Is(err, ErrDuelOver) {
+		t.Fatalf("a duel played after unfriending: %v", err)
+	}
+	if d, _ := w.g.DuelOf(ctx, bo, halfway); d.State != DuelWon || d.You.Rights != 3 {
+		t.Fatalf("the duel half-played: %+v", d)
+	}
+	if there, _ := w.g.DuelExists(ctx, unsent); there {
+		t.Fatal("a duel never sent is still there")
+	}
+	if d, _ := w.g.DuelOf(ctx, ana, played); d.State != DuelWon {
+		t.Fatalf("a duel played: %+v", d)
+	}
+}
