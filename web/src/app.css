@@ -7119,6 +7119,17 @@
       min-width: 12rem;
       box-shadow: none;
     }
+
+    /* Where the ink went, a plain line as „Вярно е“ is: its well pushed the fact's first line under the screen. */
+    .run-question .after .filed {
+      padding: 0;
+      background: none;
+    }
+
+    .run-question .after .filed .i {
+      width: 18px;
+      height: 18px;
+    }
   }
 
   /* A laptop and up: the page takes the width. Начало in two columns (the day and the topics; beside them the streak

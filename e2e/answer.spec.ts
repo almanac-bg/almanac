@@ -187,8 +187,10 @@ const flagNames = ["Литва", "Боливия", "Босна и Херцего
 /** Shows the day's first choice as pictures (the server's answer the same), wherever a question comes from (the day
  * started, a run's next, an answer's), answered with their names and how everyone answered; and, given `dated`, those
  * questions (by their place) dealt on their own date, their answers with a day's line and the longest fact the bank
- * takes (bank/check.go: 100 and 200 letters). The rest as they are. */
-async function aPictureChoice(page: Page, dated: number[] = []): Promise<void> {
+ * takes (bank/check.go: 100 and 200 letters); given `full`, every answer as full as a panel gets: its fact written in
+ * ink (a right answer of the issue, met there first), how everyone answered, and „Вярно е“ on a miss. The rest as
+ * they are. */
+async function aPictureChoice(page: Page, { dated = [] as number[], full = false } = {}): Promise<void> {
   let pictured: number | null = null;
   await page.route(/\/api\/(day$|runs\/)/, async (route) => {
     const res = await route.fetch();
@@ -197,6 +199,10 @@ async function aPictureChoice(page: Page, dated: number[] = []): Promise<void> {
     if (s?.reveal && answered === pictured) {
       s.reveal.names = flagNames;
       s.reveal.crowd = { answers: 40, right: 0.4, picks: [0.1, 0.4, 0.3, 0.2], today: true };
+    }
+    if (s?.reveal && full) {
+      s.ink = true;
+      s.reveal.crowd ??= { answers: 40, right: 0.4, today: true };
     }
     if (s?.reveal && dated.includes(answered)) {
       s.reveal.day = "През 1878 г. в Сан Стефано е подписан мирният договор, с който България се връща на картата.";
@@ -230,7 +236,7 @@ test.describe("on its side", () => {
   test("a phone on its side has the question and its answers in the screen's height, the right one in sight, and a choice of pictures in a row", async ({
     page,
   }) => {
-    await aPictureChoice(page);
+    await aPictureChoice(page, { full: true });
     let [pictures, words] = [0, 0];
     await playWatching(page, {
       before: async () => {
@@ -278,7 +284,7 @@ test.describe("on a laptop", () => {
   test("„Готово“ and „Отговори“ stay in sight while the clock runs, and the answer comes beside the question: a picture's, a day's line and the longest fact too", async ({
     page,
   }) => {
-    await aPictureChoice(page, [6, 9]);
+    await aPictureChoice(page, { dated: [6, 9] });
     await playWatching(page, {
       before: async () => {
         const send = page.locator(".answering .btn.primary.big").first();
