@@ -6,6 +6,7 @@ import (
 	"errors"
 	"slices"
 	"strconv"
+	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
@@ -137,11 +138,12 @@ func ranksOf(ctx context.Context, db querier, userID int64) (map[string]keptRank
 }
 
 // countRanks counts a player's ranks again from their book's ink, as a day's issue finishes (afterRun): each chapter
-// of the bank's at the rank its ink makes (the ink of finished games: an issue still being played, yesterday's
-// finished after midnight or one brought by a merge, counts when it finishes), never lower than it was. A rank risen waits to be told (told below level);
-// one counted as the ranks began (quiet) is told already.
+// of the bank's at the rank its ink makes (the ink of games that can't be played on now: an issue still being played,
+// yesterday's finished after midnight or one brought by a merge, counts when it finishes, or once its day is over if
+// it's left: writtenIn), never lower than it was. A rank risen waits to be told (told below level); one counted as the
+// ranks began (quiet) is told already.
 func (g *Game) countRanks(ctx context.Context, userID int64, day string, quiet bool) error {
-	return countRanksIn(ctx, g.DB.Read, g.DB.Write, g.Bank(), userID, day, quiet)
+	return countRanksIn(ctx, g.DB.Read, g.DB.Write, g.Bank(), userID, day, g.Now(), quiet)
 }
 
 // execer is what writes: the database, or a transaction.
@@ -150,9 +152,10 @@ type execer interface {
 }
 
 // countRanksIn is countRanks, read by r and written by w (a transaction, both, where the book was just written again
-// in it: rewriteBook), by bank b.
-func countRanksIn(ctx context.Context, r querier, w execer, b *bank.Bank, userID int64, day string, quiet bool) error {
-	ink, err := inkIn(ctx, r, b, userID, true)
+// in it: rewriteBook), by bank b, at the time now (what counts: writtenIn).
+func countRanksIn(ctx context.Context, r querier, w execer, b *bank.Bank, userID int64, day string, now time.Time,
+	quiet bool) error {
+	ink, err := inkIn(ctx, r, b, userID, now)
 	if err != nil {
 		return err
 	}
@@ -339,10 +342,11 @@ type Step struct {
 	Quarter int    `json:"quarter"`
 }
 
-// StepOf is a player's chapter nearest its next rank, by their book's ink now and their ranks as kept (the fewest ink
-// still needed; the bank's order on a tie); nil before any ink. The reminders' last word names it.
+// StepOf is a player's chapter nearest its next rank, by the ink their ranks are counted from (inkIn, now: an issue
+// still being played isn't in it yet, as it isn't in the ranks) and their ranks as kept (the fewest ink still needed;
+// the bank's order on a tie); nil before any ink. The reminders' last word names it.
 func (g *Game) StepOf(ctx context.Context, userID int64) (*Step, error) {
-	ink, err := g.InkOf(ctx, userID)
+	ink, err := inkIn(ctx, g.DB.Read, g.Bank(), userID, g.Now())
 	if err != nil {
 		return nil, err
 	}

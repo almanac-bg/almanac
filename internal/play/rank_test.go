@@ -93,6 +93,16 @@ func (w *world) rankIn(user int64, chapter string) ChapterRank {
 	return ChapterRank{}
 }
 
+// mustRanks are a player's kept ranks.
+func (w *world) mustRanks(user int64) []ChapterRank {
+	w.t.Helper()
+	ranks, err := w.g.RanksOf(w.t.Context(), user)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	return ranks
+}
+
 // guessed are a player's issues: 20 geography facts right, and 60 other questions, right or not.
 func (w *world) guessed(othersRight int) []answered {
 	var all []answered
@@ -359,8 +369,9 @@ func TestMergeLeavesAnIssueUnfinishedToItsEnd(t *testing.T) {
 	}
 	w.dayHistory(owner, facts[:10])
 	w.dayHistory(guest, facts[10:])
-	if _, err := w.db.Write.Exec(`UPDATE runs SET day = '2024-06-01', finished_at = NULL WHERE user_id = ?`,
-		guest); err != nil {
+	// The guest's issue is today's, still being played.
+	if _, err := w.db.Write.Exec(`UPDATE runs SET day = ?, finished_at = NULL WHERE user_id = ?`,
+		w.g.Today(), guest); err != nil {
 		t.Fatal(err)
 	}
 	w.countRanks(owner)
@@ -373,13 +384,64 @@ func TestMergeLeavesAnIssueUnfinishedToItsEnd(t *testing.T) {
 	if ink, _ := w.g.InkOf(ctx, owner); ink["geography"] != 15 {
 		t.Fatalf("the book's ink: %v", ink)
 	}
-	if _, err := w.db.Write.Exec(`UPDATE runs SET finished_at = 2000 WHERE user_id = ? AND day = '2024-06-01'`,
-		owner); err != nil {
+	if _, err := w.db.Write.Exec(`UPDATE runs SET finished_at = 2000 WHERE user_id = ? AND day = ?`,
+		owner, w.g.Today()); err != nil {
 		t.Fatal(err)
 	}
 	w.countRanks(owner)
 	if r := w.rankIn(owner, "geography"); r.Level != 3 || r.Ink != 15 {
 		t.Fatalf("the rank once the issue finished: %+v", r)
+	}
+}
+
+// An issue left unfinished counts once its day is over: its ink stays in the book, and the ranks (and the step to the
+// next, as the reminders say it) count it at the next count after it can't be played on, never while it can.
+func TestIssueLeftUnfinishedCountsOnceItsDayIsOver(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	w.dayAs(ana, Length/2, func(int) func(int64, int) json.RawMessage { return w.right })
+	inRanks := func() int {
+		n := 0
+		for _, r := range w.mustRanks(ana) {
+			n += r.Ink
+		}
+		return n
+	}
+	ink, err := w.g.InkOf(ctx, ana)
+	if err != nil || ink[MixTopic] == 0 {
+		t.Fatalf("the half issue's ink: %v %v", ink, err)
+	}
+	w.countRanks(ana)
+	if n := inRanks(); n != 0 {
+		t.Fatalf("an issue that can still be played counted %d ink", n)
+	}
+	if s, err := w.g.StepOf(ctx, ana); s != nil || err != nil {
+		t.Fatalf("a step from an issue still being played: %+v %v", s, err)
+	}
+	// Within the grace after midnight it can still be finished; past it, it can't.
+	w.at(13, 0, 5, 0)
+	w.countRanks(ana)
+	if n := inRanks(); n != 0 {
+		t.Fatalf("an issue in its grace counted %d ink", n)
+	}
+	w.at(13, 12, 0, 0)
+	w.dayAs(ana, -1, func(int) func(int64, int) json.RawMessage { return w.wrong })
+	w.g.Settled(ctx)
+	if n := inRanks(); n != ink[MixTopic] {
+		t.Fatalf("the ranks hold %d ink, the left issue wrote %d", n, ink[MixTopic])
+	}
+	s, err := w.g.StepOf(ctx, ana)
+	if err != nil || s == nil {
+		t.Fatalf("no step: %v", err)
+	}
+	if r := w.rankIn(ana, s.Chapter); s.Left != max(1, r.NextAt-r.Ink) || s.Level != r.Level {
+		t.Fatalf("the step %+v against its rank %+v", s, r)
+	}
+	// Профил says the worn chapter's ink as its Алманах card does: the book's.
+	st, err := w.g.StatsOf(ctx, ana)
+	if err != nil || st.Seal == nil || st.Ink != ink[st.Seal.Chapter] {
+		t.Fatalf("Профил's ink %d of %+v, the book's %v (%v)", st.Ink, st.Seal, ink, err)
 	}
 }
 

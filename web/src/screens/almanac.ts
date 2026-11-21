@@ -410,8 +410,8 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
   );
 }
 
-/** Where a chapter stands: its seal with the pips towards the next rank, its ink, its rank's name and the ink still to
- * come. Before a rank, what writes its first: a right answer in the day's issue. */
+/** Where a chapter stands: its seal with the pips towards the next rank, its ink (the book's, as its card shows it), its
+ * rank's name and the ink still to come. Before a rank, what writes its first: a right answer in the day's issue. */
 function stand(id: string, r: Rank | undefined, ink: number): Child {
   const ranked = r && r.level > 0 ? r : null;
   return h(
@@ -421,9 +421,7 @@ function stand(id: string, r: Rank | undefined, ink: number): Child {
     h(
       "div",
       { class: "ch-words" },
-      (r?.ink ?? ink)
-        ? h("p", { class: "ch-ink" }, h("b", { class: "num" }, formatNumber(r?.ink ?? ink)), " с мастило")
-        : null,
+      ink ? h("p", { class: "ch-ink" }, h("b", { class: "num" }, formatNumber(ink)), " с мастило") : null,
       ranked
         ? [
             h("p", { class: "ch-rank" }, rankName(ranked.level)),
