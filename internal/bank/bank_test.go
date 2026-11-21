@@ -869,3 +869,16 @@ func TestAnswerLines(t *testing.T) {
 		}
 	}
 }
+
+// A line carries no control character: a substitution that left U+0001 where a year's digit was read as a fact of
+// „през 194 г.“ until a checker saw it.
+func TestLineControlCharacters(t *testing.T) {
+	for _, s := range []string{"Още през 194\x01 г.", "Ред\nдруг ред", "Табулация\tтук"} {
+		if got := checkLine("fact", s, 200); len(got) != 1 || !strings.Contains(got[0], "control character") {
+			t.Errorf("checkLine(%q) = %v", s, got)
+		}
+	}
+	if got := checkLine("fact", "Още през 1941 г. — „Пулицър“…", 200); len(got) != 0 {
+		t.Errorf("a clean line: %v", got)
+	}
+}

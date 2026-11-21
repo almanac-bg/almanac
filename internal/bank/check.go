@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -191,8 +192,9 @@ func checkLine(field, s string, max int) []string {
 		return []string{field + " is empty"}
 	case strings.TrimSpace(s) != s:
 		return []string{field + " has spaces around it"}
-	case strings.ContainsAny(s, "\n\r\t"):
-		return []string{field + " has a line break or tab"}
+	case strings.IndexFunc(s, unicode.IsControl) >= 0:
+		r, _ := utf8.DecodeRuneInString(s[strings.IndexFunc(s, unicode.IsControl):])
+		return []string{fmt.Sprintf("%s has a control character (U+%04X): a line break, a tab, or a byte a substitution left", field, r)}
 	case strings.Contains(s, "  "):
 		return []string{field + " has a double space"}
 	case utf8.RuneCountInString(s) > max:
