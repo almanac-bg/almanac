@@ -21,7 +21,7 @@ interface Who {
  * game here joins. */
 export function keptWords(before: Who | null | undefined, after: Who): string {
   if (before && !before.email && before.id === after.id)
-    return `Готово. Играта ти е запазена с имейла ${after.email}. Влизай с него от всяко устройство.`;
+    return `Готово. Играта ти е запазена с имейла ${after.email}. Влизай с него на всяко устройство.`;
   if (before && !before.email) return `Влезе като ${after.name}. Играта оттук е добавена към профила ти.`;
   return `Влезе като ${after.name}.`;
 }

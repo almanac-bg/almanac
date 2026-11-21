@@ -147,8 +147,8 @@ function book(p: Page): Child {
         { class: "deck" },
         // At zero, said once here, not on each chapter.
         Object.values(p.ink).some(Boolean)
-          ? "С мастило са верните отговори от броя на деня. В сиво са останалите срещнати факти."
-          : "Всеки верен отговор в броя на деня пише факт с мастило в главата си.",
+          ? "С мастило са фактите от верните ти отговори в броя на деня. В сиво са всички останали факти, които срещнеш."
+          : "Всеки верен отговор в броя на деня вписва един факт с мастило в твоя Алманах.",
       ),
       h(
         "div",
@@ -199,7 +199,7 @@ function card(id: string, ink: number, r: Rank | undefined, nearest: boolean): C
         ink
           ? h("span", { class: "card-ink" }, h("b", { class: "num" }, formatNumber(ink)), h("span", null, "с мастило"))
           : null,
-        ranked ? h("span", { class: "card-rank" }, `${ranked.name} · още ${left} до ${ranked.next}`) : null,
+        ranked ? h("span", { class: "card-rank" }, `${ranked.name} · още ${left} с мастило до „${ranked.next}“`) : null,
       ],
       "card-leaf",
       { next: "" },
@@ -331,7 +331,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
             "div",
             { class: "chapter-play" },
             h("a", { class: "btn primary", href: `/play/${id}` }, () =>
-              left() ? "Продължи главата" : "Игра на главата",
+              left() ? "Продължи играта" : "Игра на главата",
             ),
             () => {
               const l = left();
@@ -345,11 +345,16 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
       { class: "sect chapter-facts page-2" },
       h("div", { class: "sect-head" }, h("h2", null, "Фактите"), () => {
         const p = data();
-        return p
+        // A count at zero is hidden (DESIGN.md, Copy); one fact has no order to name.
+        return p && (p.found > 0 || query().trim())
           ? h(
               "span",
               { class: "sect-note" },
-              query().trim() ? `намерени ${formatNumber(p.found)}` : `${formatNumber(p.found)}, най-новите първи`,
+              query().trim()
+                ? `намерени: ${formatNumber(p.found)}`
+                : p.found === 1
+                  ? "1\u00a0факт"
+                  : `${formatNumber(p.found)}\u00a0факта, най-новите първи`,
             )
           : null;
       }),
@@ -372,7 +377,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
         : null,
       (): Child => {
         if (!user())
-          return h("p", { class: "entries-none" }, "Изиграй първите си въпроси и фактите ще се записват тук.");
+          return h("p", { class: "entries-none" }, "Изиграй първите си въпроси и фактите им ще се записват тук.");
         const p = data();
         if (!p) return failed() ? failure(failed(), load, null) : h("p", { class: "muted" }, "…");
         if (!p.facts.length)
@@ -381,13 +386,17 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
             { class: "entries-none" },
             query().trim()
               ? "Нищо не е намерено. Опитай с друга дума."
-              : "Тук още няма факти. Всеки въпрос от главата, който срещнеш, записва своя.",
+              : "Тук още няма факти. Всеки въпрос от тази глава, който срещнеш, записва тук своя факт.",
           );
         // Where grey first shows, what it is: once, over the list.
         const grey = p.facts.some((f) => !f.ink);
         return [
           grey
-            ? h("p", { class: "grey-note" }, "В сиво са останалите срещнати факти. С мастило пише само броят на деня.")
+            ? h(
+                "p",
+                { class: "grey-note" },
+                "В сиво са всички останали факти, които срещнеш. С мастило се пише само в броя на деня.",
+              )
             : null,
           h(
             "ol",
@@ -418,9 +427,13 @@ function stand(id: string, r: Rank | undefined, ink: number): Child {
       ranked
         ? [
             h("p", { class: "ch-rank" }, rankName(ranked.level)),
-            h("p", { class: "ch-next" }, `още ${Math.max(1, ranked.nextAt - ranked.ink)} до ${ranked.next}`),
+            h(
+              "p",
+              { class: "ch-next" },
+              `още ${Math.max(1, ranked.nextAt - ranked.ink)} с мастило до „${ranked.next}“`,
+            ),
           ]
-        : h("p", { class: "ch-next" }, "Всеки верен отговор в броя на деня пише факт с мастило."),
+        : h("p", { class: "ch-next" }, "Всеки верен отговор в броя на деня вписва факт с мастило."),
     ),
   );
 }
@@ -445,7 +458,7 @@ function entry(f: Learned): Child {
       { class: "entry-when" },
       f.ink
         ? h("span", { class: "tag ink" }, h("span", { class: "i i-nib", "aria-hidden": "true" }), "мастило")
-        : h("span", { class: "tag grey" }, "срещнат"),
+        : h("span", { class: "tag grey" }, "в сиво"),
       whence(f),
     ),
     h("p", { class: "entry-word" }, f.untrue ? h("span", { class: "entry-untrue" }, "Невярно: ") : null, f.answer),

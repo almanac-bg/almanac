@@ -24,7 +24,7 @@ const day: SharedDay = {
     { right: true },
   ],
 };
-const text = "Брой 9 · 7/10 · 23 дни\n■■◧■□■■□■■\nalmanac.bg/d/9-k4f2m7qa";
+const text = "Брой 9 · 7/10 · серия 23 дни\n■■◧■□■■□■■\nalmanac.bg/d/9-k4f2m7qa";
 
 /** The server, giving the link; what was asked of it. */
 function serve(): string[] {

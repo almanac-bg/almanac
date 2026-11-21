@@ -38,18 +38,6 @@ func (s Share) Rights() int { return strings.Count(s.Shape, "1") }
 // Path is the link's path: /d/9-k4f2m7qa.
 func (s Share) Path() string { return fmt.Sprintf("/d/%d-%s", s.Issue, s.Code) }
 
-// Squares is the shape in squares: ■ right, □ not.
-func (s Share) Squares() string {
-	return strings.NewReplacer("1", "■", "0", "□").Replace(s.Shape)
-}
-
-// Text is what's shared, ending with the link (`link`, the address without its scheme: almanac.bg/d/9-k4f2m7qa):
-// „Алманах, брой 9 · 20 ноември“, „7 от 10 ■■■□■■■□■□“.
-func (s Share) Text(link string) string {
-	return fmt.Sprintf("Алманах, брой %d · %s\n%d от %d %s\n%s", s.Issue, DateWords(s.Day), s.Rights(), len(s.Shape),
-		s.Squares(), link)
-}
-
 // IssueWords is a day's issue as its dateline says it: „Брой 9 · 20 ноември“.
 func IssueWords(day string) string {
 	return fmt.Sprintf("Брой %d · %s", Issue(day), DateWords(day))

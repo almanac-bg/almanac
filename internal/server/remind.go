@@ -300,7 +300,7 @@ func (s *Server) dayReminder(ctx context.Context, today string, userID int64) (l
 // lastReminder says the reminders stop, and that the day's issue waits, with the nearest step in the player's book
 // (stepWords): never a question's text, nor the number of a streak that ended (DECISIONS.md, the direction).
 func (s *Server) lastReminder(ctx context.Context, userID int64) push.Message {
-	return push.Message{Title: "Спираме напомнянията засега", Body: s.stepWords(ctx, userID), URL: "/", Kind: "stop"}
+	return push.Message{Title: "Спираме напомнянията, докато не играеш пак", Body: s.stepWords(ctx, userID), URL: "/", Kind: "stop"}
 }
 
 // rhythm is the weekdays a player has played the day's questions on, from their first week: a reminder left on one
@@ -363,7 +363,7 @@ func dayGap(from, to string) int {
 // reminder is the day's word to a player who hasn't played the day's questions: the best of their friends who have
 // played, and their streak; or, while none of their friends has, just the streak.
 func (s *Server) reminder(ctx context.Context, today string, userID int64) push.Message {
-	m := push.Message{Title: "Въпросите на деня те чакат", URL: "/"}
+	m := push.Message{Title: "Днешният брой те чака", URL: "/"}
 	streak, _ := s.game.Streak(ctx, userID)
 	board, _ := s.game.FriendsBoard(ctx, today, userID)
 	var best *play.Score
@@ -379,7 +379,7 @@ func (s *Server) reminder(ctx context.Context, today string, userID int64) push.
 	case best != nil:
 		m.Body = fmt.Sprintf("%s позна %d от %d днес. А ти?", best.Name, best.Rights, play.Length)
 	case streak > 0:
-		m.Body = fmt.Sprintf("Серията ти е %s. Не я прекъсвай: десет въпроса, до полунощ.", days(streak))
+		m.Body = fmt.Sprintf("Серията ти е %s. Десет въпроса, до полунощ.", days(streak))
 	default:
 		m.Body = "Десет въпроса, един опит. До полунощ."
 	}

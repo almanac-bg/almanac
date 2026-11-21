@@ -1,5 +1,5 @@
 // Sharing the day's result (server/share.go, play/share.go): its issue, the score and its tiles, never an answer, and
-// the link that brings whoever opens it to the same ten: „Брой 42 · 8/10 · 23 дни“, the tiles as squares (■ right,
+// the link that brings whoever opens it to the same ten: „Брой 42 · 8/10 · серия 23 дни“, the tiles as squares (■ right,
 // ◧ близо, □ not), the link. The link is made as the day is first shared (the server's), and kept for the page's life,
 // so a second tap shares at once; where there's no sheet, the text is copied. The card (game/card.ts), drawn here as
 // it's shared, goes on its own, where the device's share sheet takes a picture: never with the text, which an app
@@ -31,10 +31,10 @@ export function squares(marks: Mark[]): string {
     .join("");
 }
 
-/** The text a day is shared with: „Брой 42 · 8/10 · 23 дни“ (the streak from three days), its squares, and the link
+/** The text a day is shared with: „Брой 42 · 8/10 · серия 23 дни“ (the streak from three days), its squares, and the link
  * (`url`, said without its scheme). Unsigned: nothing in it says whose it is. */
 export function shareWords(d: SharedDay, url: string): string {
-  const streak = d.streak >= 3 ? ` · ${d.streak} дни` : "";
+  const streak = d.streak >= 3 ? ` · серия ${d.streak} дни` : "";
   return `Брой ${d.issue} · ${d.rights}/${d.of}${streak}\n${squares(d.marks)}\n${url.replace(/^https?:\/\//, "")}`;
 }
 

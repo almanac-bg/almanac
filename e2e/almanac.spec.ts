@@ -44,7 +44,7 @@ test("a chapter comes a page at a time, by its numbers, and finds its facts by t
   await page.goto("/almanac/mix");
   const entries = page.locator(".entry");
   await expect(entries).toHaveCount(30);
-  await expect(page.locator(".chapter-facts .sect-note")).toHaveText(`${facts.length}, най-новите първи`);
+  await expect(page.locator(".chapter-facts .sect-note")).toHaveText(`${facts.length}\u00a0факта, най-новите първи`);
   await page.locator(".pager").getByRole("link", { name: "По-стари" }).click();
   await expect(page).toHaveURL(/\/almanac\/mix\?page=2$/);
   await expect(page.locator('.pager-n[aria-current="page"]')).toHaveText("2");
@@ -101,7 +101,7 @@ test("a chapter the book doesn't have is the page that isn't there; the book wit
   page,
 }) => {
   await page.goto("/almanac/nosuch");
-  await expect(page.getByRole("heading", { level: 1, name: "Тази страница я няма" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Няма такава страница" })).toBeVisible();
   await page.goto("/almanac/");
   await expect(page).toHaveURL(/\/almanac$/);
   await expect(page.locator(".chapter-card")).toHaveCount(10);

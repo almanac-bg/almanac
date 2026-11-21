@@ -235,7 +235,7 @@ function nameForm(): Child {
         oninput: typed(name.set),
       }),
       // Seen by everyone (the boards, a duel, a link's preview): no more than a player means to show.
-      h("small", { class: "muted", id: "name-how" }, "Вижда се от всички в играта. Прякор или малкото ти име стигат."),
+      h("small", { class: "muted", id: "name-how" }, "Виждат го всички в играта. Стига прякор или малкото ти име."),
     ),
     h(
       "label",
@@ -263,7 +263,7 @@ function nameForm(): Child {
       h(
         "small",
         { class: "muted", id: "tag-how" },
-        "Само твое: по него приятелите те намират. Латински букви, цифри и _.",
+        "Само твое е: по него те намират приятелите. Латински букви, цифри и долна черта (_).",
       ),
     ),
     h("button", { class: "btn", disabled: busy }, "Запази"),
@@ -298,7 +298,7 @@ function account(): Child {
         h(
           "p",
           { class: "muted" },
-          "Засега играта ти се пази само на това устройство. Добави имейл и ще я имаш навсякъде, където влезеш с него. Имаш профил от друго устройство? Влез с неговия имейл и играта оттук ще се добави към профила.",
+          "Засега играта ти е само на това устройство. Добави имейл и ще я имаш навсякъде, където влезеш с него. Вече имаш профил? Влез с имейла му и играта оттук ще се добави към него.",
         ),
         signIn({ enter: "Потвърди", done: (said) => signedIn.set(said) }),
       ],
@@ -342,7 +342,7 @@ function sounds(): Child {
       "p",
       { class: "muted" },
       quietWhenSilent()
-        ? "Важи за това устройство. Когато телефонът е в безшумен режим, звуците мълчат."
+        ? "Важи за това устройство. Когато телефонът е в безшумен режим, звуци няма."
         : "Важи за това устройство.",
     ),
     switchRow("Звуци", "Часовникът, отговорите, серията.", soundOn, setSound),
@@ -368,7 +368,7 @@ function access(): Child {
     null,
     h("h2", null, "Достъпност"),
     h("p", { class: "muted" }, "Важи за това устройство."),
-    switchRow("По-малко движение", "Без анимации; часовникът пак тече.", calm, setCalm),
+    switchRow("По-малко движение", "Без анимации. Часовникът върви както винаги.", calm, setCalm),
     h(
       "div",
       { class: "text-size" },
@@ -446,13 +446,13 @@ function byMail(ask: () => boolean) {
         ? [
             switchRow(
               "Напомняне по имейл",
-              "Веднъж на ден, около часа, в който играеш, ако въпросите още те чакат.",
+              "Веднъж на ден, около часа, в който играеш, ако броят още те чака.",
               () => prefs()?.day ?? false,
               set("day"),
             ),
             switchRow(
-              "Имейл, когато серията ти прекъсне",
-              "Едно писмо, ако серия от 5 дни или повече прекъсне. Най-много едно на 30 дни.",
+              "Писмо, когато серията ти прекъсне",
+              "Ако прекъсне серия от 5 или повече дни. Най-много едно писмо на 30 дни.",
               () => prefs()?.streak ?? false,
               set("streak"),
             ),
@@ -553,16 +553,16 @@ function reminders(): Child {
                   ? h(
                       "div",
                       null,
-                      kind("day", "Въпросите на деня", "Веднъж на ден, около часа, в който играеш, ако още те чакат."),
-                      kind("friends", "Приятели", "Покани за приятелство."),
+                      kind("day", "Днешният брой", "Веднъж на ден, около часа, в който играеш, ако още те чака."),
+                      kind("friends", "Приятели", "Покани за приятелство и дуели."),
                     )
                   : null,
               // The night's quiet (server/pushes.go): what's due then comes at 8:00.
-              h("p", { class: "muted" }, "Нощем, от 22:00 до 8:00, не идват известия."),
+              h("p", { class: "muted" }, "От 22:00 до 8:00 не пращаме известия."),
               h("button", { class: "link", onclick: toggle }, "Спри известията тук"),
             ]
           : [
-              h("p", { class: "muted" }, "Въпросите на деня, приятели: ти избираш за какво."),
+              h("p", { class: "muted" }, "Днешният брой, приятели: ти избираш за какво."),
               h("button", { class: "btn", onclick: toggle }, "Включи известията"),
             ],
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
@@ -587,7 +587,7 @@ function deleteAccount(): Child {
                 el.scrollIntoView({ block: "nearest", behavior: calm.peek() ? "auto" : "smooth" }),
               ),
           },
-          h("p", null, "Профилът, името и всички игри ще се изтрият завинаги."),
+          h("p", null, "Профилът, името и всичките ти игри ще бъдат изтрити завинаги."),
           h(
             "button",
             {
@@ -634,7 +634,7 @@ function signOutOthers(): Child {
     try {
       await api("POST", "/api/auth/signout-others", {});
       bad.set(false);
-      said.set("Готово: профилът ти е отворен само на това устройство.");
+      said.set("Готово. Профилът ти вече е отворен само на това устройство.");
       // Notifications turned on here before they were kept with this session ended with the others: told again,
       // they're kept (push.ts).
       if (pushable()) pushOn().catch(() => {});

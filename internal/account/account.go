@@ -751,7 +751,7 @@ func onlyDigits(s string) string {
 // codeMail is the mail that brings a code.
 func codeMail(email, code string) mailer.Message {
 	text := "Кодът ти за вход в АЛМАНАХ е:\n\n    " + spaced(code) + "\n\n" +
-		fmt.Sprintf("Важи %d минути и само там, където го поиска. ", int(CodeTTL/time.Minute)) +
+		fmt.Sprintf("Важи %d минути и само в браузъра, от който го поиска. ", int(CodeTTL/time.Minute)) +
 		"Ако не очакваш такъв код, просто не обръщай внимание на писмото.\n\n"
 	if len(code) > CodeDigits {
 		text += "Този път кодът е по-дълъг: напоследък някой въвежда грешни кодове за този имейл.\n\n"

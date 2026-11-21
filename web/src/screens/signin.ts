@@ -37,7 +37,11 @@ export function signIn({
   email: filled = "",
 }: SignInOptions = {}): Child {
   if (embedded && !embedded.forms)
-    return h("p", { class: "muted" }, "Тук не питаме за имейл: отвори играта в браузъра на телефона и я запази там.");
+    return h(
+      "p",
+      { class: "muted" },
+      "Тук не може да се влиза с имейл. Отвори играта в браузъра на телефона и я запази там.",
+    );
   // A code sent from this form a little while ago, in this tab: a reload comes back to the step that takes it.
   const was = sentBefore(enter);
   const email = signal(was?.email ?? filled);
@@ -164,11 +168,11 @@ export function signIn({
             dead()
               ? null
               : [
-                  "Няма го? Виж в спама или ",
+                  "Няма го? Виж в папката за спам или ",
                   h(
                     "button",
                     { type: "button", class: "link", onclick: send, disabled: () => busy() || wait() > 0 },
-                    "прати нов код",
+                    "поискай нов код",
                   ),
                   () => (wait() ? ` след ${wait()}\u00a0с` : ""),
                   ". ",

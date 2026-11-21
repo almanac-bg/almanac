@@ -29,7 +29,7 @@ export function report(id: string): Child {
       case "closed":
         return h("button", { class: "link muted tap", onclick: () => state.set("open") }, "Нещо не е наред с въпроса?");
       case "sent":
-        return h("p", { class: "muted", role: "status" }, "Благодарим! Ще го прегледаме.");
+        return h("p", { class: "muted", role: "status" }, "Благодарим ти! Ще го прегледаме.");
       case "open":
         return h(
           "form",

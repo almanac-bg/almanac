@@ -110,15 +110,15 @@ function stepLine(s: NonNullable<News["step"]>): Child {
     "p",
     { class: "news-step" },
     s.level > 0 ? h("span", { class: "step-seal" }, seal(s.chapter, s.level, 40), pips(s.quarter)) : null,
-    h("span", null, h("b", null, `${chapterName(s.chapter)}:`), ` още ${s.left} до ${s.next}`),
+    h("span", null, h("b", null, `${chapterName(s.chapter)}:`), ` още ${s.left} с мастило до „${s.next}“`),
   );
 }
 
 /** Ranks risen, the best not among them (or beside a ten of ten): the seals risen, drawn, and one line for them all,
  * a tap from the book: „Нов печат: Страница в История, Тетрадка в Наука.“ */
 function roseLine(r: NonNullable<News["rose"]>): Child {
-  const said = r.ranks.map((x) => `${x.name} в ${chapterName(x.chapter)}`).join(", ");
-  const art = r.ranks.some((x) => x.art) ? " Картината на главата вече може да е твоят аватар." : "";
+  const said = r.ranks.map((x) => `„${x.name}“ в глава „${chapterName(x.chapter)}“`).join(", ");
+  const art = r.ranks.some((x) => x.art) ? " Вече можеш да избереш картината на тази глава за аватар." : "";
   return h(
     "div",
     { class: "news-step news-rose" },
@@ -137,14 +137,14 @@ function rankUp(r: NonNullable<News["rose"]>): Child {
   const top = r.ranks[0];
   if (!top) return null;
   const level = top.to ?? rankNames.indexOf(top.name) + 1;
-  const others = r.ranks.slice(1).map((x) => `${x.name} в ${chapterName(x.chapter)}`);
+  const others = r.ranks.slice(1).map((x) => `„${x.name}“ в глава „${chapterName(x.chapter)}“`);
   return h(
     "section",
     { class: `rankup t-${top.chapter}`, role: "status" },
     seal(top.chapter, level, 96, "rimmed rankup-seal"),
     h("p", { class: "kicker" }, chapterName(top.chapter)),
     h("h2", { class: "rankup-name" }, level > 0 ? rankName(level) : top.name),
-    top.art ? h("p", { class: "rankup-art" }, "Картината на главата вече може да е твоят аватар.") : null,
+    top.art ? h("p", { class: "rankup-art" }, "Вече можеш да избереш картината на тази глава за аватар.") : null,
     others.length ? h("p", { class: "rankup-more" }, `И още: ${others.join(", ")}.`) : null,
   );
 }

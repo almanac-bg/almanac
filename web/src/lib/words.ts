@@ -141,5 +141,5 @@ export function stakeWords(days: number, spare: boolean, hour: number): string {
   if (days < 1) return "";
   return hour >= stakeHour && !spare
     ? "Без днешния брой серията прекъсва в полунощ."
-    : `С днешния брой серията става ${days + 1}.`;
+    : `С днешния брой серията ти става ${days + 1}.`;
 }

@@ -25,7 +25,7 @@ import (
 // The mail when a streak ends: the one word the game sends a player it can't reach otherwise — one with an email (one
 // they proved: only the sign-in code sets it) and notifications on no device (an iPhone in Safari, say) — when a streak
 // of StreakMailFrom days or more has ended. It never names the streak's number (DECISIONS.md, the direction: an ended
-// streak's number is never named): „Въпросите на деня те чакат“, and its link lands on Днес as from a mail. It
+// streak's number is never named): „Днешният брой те чака“, and its link lands on Днес as from a mail. It
 // goes the day after the day missed that ended it, at the player's own hour (RemindMinute), never in the night
 // (quietFrom: pushes.go), unless they've played by then. At most one in StreakMailEvery days, claimed in streak_mails before it's queued in the outbox, so a restart
 // never sends two. A player held out of the reminders (play.HeldReminders) is claimed the same, marked held, and never
@@ -187,8 +187,8 @@ func (s *Server) streakMailOf(ctx context.Context, today string, userID int64) (
 	if st.Days != 0 || e == nil || e.On != play.DayShift(today, -1) || e.Days < StreakMailFrom {
 		return m, false, nil
 	}
-	m = mail.Message{To: email.String, Subject: "Въпросите на деня те чакат", Unsubscribe: s.mailOffURL(userID, mailStreak)}
-	m.Text = "Въпросите на деня те чакат на almanac.bg. Днес можеш да започнеш нова серия."
+	m = mail.Message{To: email.String, Subject: "Започни нова серия днес", Unsubscribe: s.mailOffURL(userID, mailStreak)}
+	m.Text = "Днешният брой те чака на almanac.bg. Днес можеш да започнеш нова серия."
 	// The link says it came from the mail: a browser signed out is asked to sign in first (screens/today.ts).
 	m.Text += "\n\n" + s.mailLink(userID) + "\n\n—\nСпри тези писма: " + m.Unsubscribe + "\n"
 	return m, true, nil
@@ -257,15 +257,15 @@ func (s *Server) mailOffURL(userID int64, kind mailKind) string {
 }
 
 var mailOffPage = template.Must(template.New("off").Parse(`{{if .Done}}
-<p role="status">Готово. {{if .Day}}Няма да ти пишем, когато въпросите на деня те чакат.{{else}}Няма да ти пращаме писма, когато серията ти прекъсне.{{end}}</p>
+<p role="status">Готово. {{if .Day}}Няма да ти пишем, когато броят на деня те чака.{{else}}Няма да ти пращаме писма, когато серията ти прекъсне.{{end}}</p>
 <p class="muted">Ако размислиш, включи писмата пак от <a href="/settings">Профил → Настройки → Известия</a>.</p>
 {{else if .Bad}}
-<p>Тази връзка не работи. Писмата можеш да спреш и от <a href="/settings">Профил → Настройки → Известия</a>.</p>
+<p>Тази връзка не работи. Можеш да спреш писмата от <a href="/settings">Профил → Настройки → Известия</a>.</p>
 {{else if .Day}}
-<p>Пишем ти веднъж на ден, около часа, в който играеш, ако въпросите на деня още те чакат.</p>
+<p>Пишем ти веднъж на ден, около часа, в който играеш, ако броят на деня още те чака.</p>
 <form method="post"><button class="btn" type="submit">Спри писмата</button></form>
 {{else}}
-<p>Пращаме ти писмо, когато прекъсне серия от поне {{.From}} дни, и само ако не получаваш известия.</p>
+<p>Пращаме ти писмо, когато прекъсне твоя серия от поне {{.From}} дни – и само ако не получаваш известия.</p>
 <form method="post"><button class="btn" type="submit">Спри писмата</button></form>
 {{end}}`))
 

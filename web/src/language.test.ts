@@ -53,3 +53,30 @@ test("everything a player may read is in Bulgarian letters and words, not loanwo
   }
   assert.deepEqual(found, []);
 });
+
+/**
+ * One thing, one name (DECISIONS.md, the closed list of nouns): the names a thing was once called beside its own, each
+ * with the one to use. The day's ten are „броят“; the streak counts the days played, which needn't be in a row.
+ */
+const retired: [RegExp, string][] = [
+  [/въпроси(те)? на деня|днешните въпроси/iu, "„днешният брой“ or „броят на деня“"],
+  [/изиграни дни|дни поред/iu, "„дни в серията“ (the streak forgives missed days: not „поред“, not a total)"],
+  [/игри на главите/iu, "what the game is: „игра на главата“ reads as a head's to one who hasn't played"],
+];
+
+test("a thing is called by its one name", () => {
+  const found: string[] = [];
+  for (const place of ["web/src", "web/public", "internal", "cmd"]) {
+    for (const path of files(place)) {
+      readFileSync(join(root, path), "utf8")
+        .split("\n")
+        .forEach((line, i) => {
+          for (const [was, now] of retired) {
+            const m = line.match(was);
+            if (m) found.push(`${path}:${i + 1}: „${m[0]}“; say ${now}`);
+          }
+        });
+    }
+  }
+  assert.deepEqual(found, []);
+});

@@ -115,7 +115,7 @@ export async function startDuel(to: To): Promise<DuelView | null> {
  * „още 2 дни“, „още 5 часа“, „под час“. */
 export function leftWords(until: number, now = Date.now()): string {
   const left = until - now;
-  if (left < 3_600_000) return "под час";
+  if (left < 3_600_000) return "остава под час";
   const hours = Math.ceil(left / 3_600_000);
   if (hours > 24) {
     const days = Math.ceil(hours / 24);
@@ -124,15 +124,15 @@ export function leftWords(until: number, now = Date.now()): string {
   return hours === 1 ? "още 1 час" : `още ${hours} часа`;
 }
 
-/** What broke a tie on even right answers (DuelView.tieBy), as a duel's row and its result say it: „равни верни ·
- * по-близо числото“, „равни верни · 34,5 с срещу 40,1 с“; a draw, „равни верни и под секунда разлика“; "" for a
+/** What broke a tie on even right answers (DuelView.tieBy), as a duel's row and its result say it: „равен брой верни ·
+ * реши по-близкото число“, „равен брой верни · по-бързо: 34,5 с срещу 40,1 с“; a draw, „равен брой верни и под секунда разлика“; "" for a
  * duel won on right answers, or none ended. */
 export function tieWords(d: DuelView): string {
-  if (d.state === "draw") return "равни верни и под секунда разлика";
+  if (d.state === "draw") return "равен брой верни и под секунда разлика";
   if (d.state !== "won" && d.state !== "lost") return "";
-  if (d.tieBy === "number") return "равни верни · по-близо числото";
+  if (d.tieBy === "number") return "равен брой верни · реши по-близкото число";
   if (d.tieBy === "time" && d.you && d.opponent)
-    return `равни верни · ${seconds(d.you.ms)} срещу ${seconds(d.opponent.ms)}`;
+    return `равен брой верни · по-бързо: ${seconds(d.you.ms)} срещу ${seconds(d.opponent.ms)}`;
   return "";
 }
 
@@ -142,7 +142,7 @@ const seconds = (ms: number) => `${(ms / 1000).toLocaleString("bg", { maximumFra
 /** What a duel's end is called. */
 const ends: Record<DuelView["state"], string> = {
   yours: "Твой ред",
-  theirs: "Чака",
+  theirs: "Чака се",
   won: "Победа",
   lost: "Загуба",
   draw: "Равенство",
@@ -156,12 +156,12 @@ function rowLine(d: DuelView): string {
   const versus = d.recorded ? " · срещу запис" : "";
   switch (d.state) {
     case "yours":
-      if (d.first && !d.you?.started) return `Не е започнат · ${leftWords(d.until ?? 0)}`;
+      if (d.first && !d.you?.started) return `Още не е започнат · ${leftWords(d.until ?? 0)}`;
       return d.first
         ? `Довърши своята игра · ${leftWords(d.until ?? 0)}`
-        : `Изиграй същите десет · ${leftWords(d.until ?? 0)}`;
+        : `Изиграй същите десет въпроса · ${leftWords(d.until ?? 0)}`;
     case "theirs":
-      return `Не е изигран · ${leftWords(d.until ?? 0)}`;
+      return `Още не е изигран · ${leftWords(d.until ?? 0)}`;
     case "expired":
       if (d.lapsed === "they") return `${them?.name ?? "Приятелят"} не го изигра навреме`;
       if (d.lapsed === "you") return "Не го изигра навреме";
@@ -169,7 +169,7 @@ function rowLine(d: DuelView): string {
   }
   if (them?.gone) return "Играчът вече го няма"; // their game went with them: no score of theirs to set beside the player's
   const tie = tieWords(d);
-  return `${formatNumber(d.you?.rights ?? 0)} : ${formatNumber(them?.rights ?? 0)}${versus}${tie ? ` · ${tie}` : ""}`;
+  return `${formatNumber(d.you?.rights ?? 0)}:${formatNumber(them?.rights ?? 0)}${versus}${tie ? ` · ${tie}` : ""}`;
 }
 
 /** A duel as a row: the other player, where it stands, and a word on it. */
@@ -211,7 +211,7 @@ export function duelLists(d: Duels): Child {
   const [turn, ...more] = d.yours;
   return [
     part("Твой ред", more, turn ? duelTurn(shown(turn)) : null),
-    part("Чакаш", d.theirs),
+    part("Чакаш отговор", d.theirs),
     part("Изиграни", d.played.slice(0, playedShown)),
   ];
 }
@@ -324,7 +324,7 @@ export function duelNew() {
       back("/friends", "Приятели"),
       pageArt("duel", "tone-rose"),
       h("h1", null, "Нов дуел"),
-      h("p", { class: "lead" }, "Десет въпроса. Изиграй ги сега, а другият ги играе, когато може."),
+      h("p", { class: "lead" }, "Десет въпроса. Ти ги играеш сега, а приятелят ти – когато може."),
     ),
     h("section", { class: "stack small-gap" }, h("h2", { class: "section-title" }, "С приятел"), () => {
       const list = friends();
@@ -371,7 +371,7 @@ export function duelNew() {
             h(
               "p",
               { class: "muted" },
-              "Същите десет въпроса като в истинска игра на друг играч, с отговорите в нея, както са дадени: равен запис е горе-долу колкото теб, по-силен е малко над теб.",
+              "Играеш десетте въпроса от истинска игра на друг играч и след всеки виждаш как е отговорено в нея. Равният запис е на твоето ниво, по-силният – малко над него.",
             ),
             (["even", "stronger"] as const).map((level) =>
               h(
@@ -398,8 +398,8 @@ function notHere(signedIn: () => void): Child {
         "div",
         { class: "intro" },
         h("p", { class: "kicker" }, "Дуел"),
-        h("h1", null, "Този дуел не е тук"),
-        h("p", { class: "lead" }, "Или е на друг профил, или вече го няма."),
+        h("h1", null, "Не намираме този дуел"),
+        h("p", { class: "lead" }, "Или е в друг профил, или вече го няма."),
       ),
       h("a", { class: "btn primary big", href: "/friends" }, "Към Приятели"),
     );
@@ -443,7 +443,7 @@ function sent(d: DuelView, s: State, just: boolean): Child {
         h(
           "p",
           { class: "duel-sent" },
-          `Изпратен. ${them} ще изиграе същите десет въпроса: има време ${leftWords(d.until ?? Date.now() + 7 * 86_400_000)}. Ще видиш резултата, щом играе.`,
+          `Дуелът е изпратен. ${them} ще изиграе същите десет въпроса: има време ${leftWords(d.until ?? Date.now() + 7 * 86_400_000)}. Ще видиш резултата, щом ги изиграе.`,
         ),
       ],
       {
@@ -514,7 +514,7 @@ export function duelOne(params: string[]) {
       d.friend && d.them
         ? again("Реванш", { friend: d.them })
         : d.recorded
-          ? again("Още един срещу запис", { recording: true, level: d.level ?? "even" })
+          ? again("Още един дуел срещу запис", { recording: true, level: d.level ?? "even" })
           : null;
     screen.show(() =>
       duelResult(
@@ -545,10 +545,10 @@ export function duelOne(params: string[]) {
     };
     if (tap && !s?.at) return begin();
     const lead = d.recorded
-      ? `Десет въпроса като в истинската игра на ${d.opponent?.name ?? "друг играч"}. След всеки отговор виждаш как е минал въпросът в записа.`
+      ? `Десетте въпроса от истинска игра на ${d.opponent?.name ?? "друг играч"}. След всеки отговор виждаш как е минал въпросът в записа.`
       : d.first
         ? `Десет въпроса. После ${d.opponent?.name ?? "приятелят ти"} ще изиграе същите.`
-        : `Същите десет въпроса като на ${d.opponent?.name ?? "приятеля ти"}. След всеки отговор виждаш как е минал въпросът за ${d.opponent?.name ?? "приятеля ти"}.`;
+        : `Същите десет въпроса, които изигра ${d.opponent?.name ?? "приятелят ти"}. След всеки отговор виждаш как е минал при ${d.opponent?.name ?? "приятеля ти"}.`;
     screen.show(() =>
       startScreen(name, lead, s?.at ? { at: s.at, total: s.total, marks: s.trail } : null, () =>
         s?.at ? void start(d) : begin(),

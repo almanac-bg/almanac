@@ -46,7 +46,7 @@ test("the browser's back in a topic asks, its address kept while it does; „И�
   }
   await page.getByRole("button", { name: "Излез" }).click();
   await expect(page).toHaveURL(/\/almanac\/history$/);
-  await expect(page.getByRole("link", { name: "Продължи главата" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Продължи играта" })).toBeVisible();
 });
 
 test("a topic counts in only after a tap; a reload goes back to its question, and keeps its result", async ({

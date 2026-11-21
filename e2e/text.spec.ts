@@ -410,10 +410,10 @@ test("a switch in Настройки is its whole row to tap, words and all", as
   await page.goto("/settings");
   const calm = page.getByRole("switch", { name: "По-малко движение" });
   const was = await calm.getAttribute("aria-checked");
-  await page.getByText("Без анимации; часовникът пак тече.").click();
+  await page.getByText("Без анимации. Часовникът върви както винаги.").click();
   await expect(calm).not.toHaveAttribute("aria-checked", was ?? "");
   // What it does is read with it.
-  await expect(calm).toHaveAccessibleDescription("Без анимации; часовникът пак тече.");
+  await expect(calm).toHaveAccessibleDescription("Без анимации. Часовникът върви както винаги.");
 });
 
 /** Controls on their own (not a link inside a sentence) whose tap reaches them less than 44px high: tried by

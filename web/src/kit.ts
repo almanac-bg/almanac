@@ -290,8 +290,9 @@ export function later(load: () => Promise<(kit: Kit, params: string[]) => Child>
       const s = screen();
       if (s) return untracked(() => s(kit, params));
       return failed()
-        ? failure(new ApiError("offline", "Страницата не се зареди. Провери интернета си и опитай пак."), () =>
-            location.reload(),
+        ? failure(
+            new ApiError("offline", "Страницата не се зареди. Провери връзката си с интернет и опитай пак."),
+            () => location.reload(),
           )
         : h("p", { class: "muted" }, "…");
     };

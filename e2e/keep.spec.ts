@@ -17,7 +17,7 @@ test("from the second day, where no notification comes, the reminder by mail ask
   await playRun(page);
   const tomorrow = page.locator(".tomorrow");
   await expect(tomorrow).toContainText("Серията ти от 2 дни е само на това устройство.");
-  await expect(tomorrow).toContainText("Да ти пишем, ако въпросите още те чакат?");
+  await expect(tomorrow).toContainText("Да ти пишем, ако броят още те чака?");
   // One ask for the email, not two.
   await expect(tomorrow.getByRole("button", { name: "Запази я с имейл" })).toHaveCount(0);
   await tomorrow.getByLabel("Имейл").fill(email);
@@ -26,7 +26,7 @@ test("from the second day, where no notification comes, the reminder by mail ask
   await tomorrow.getByLabel("Код").fill(mailedCode(email));
   await tomorrow.getByRole("button", { name: "Потвърди" }).click();
   await expect(tomorrow.getByRole("status")).toHaveText(
-    `Готово. Играта ти е запазена с имейла ${email}. Влизай с него от всяко устройство. Ще ти напомняме по имейл, ако въпросите още те чакат.`,
+    `Готово. Играта ти е запазена с имейла ${email}. Влизай с него на всяко устройство. Ще ти напомняме по имейл, ако броят още те чака.`,
   );
   await expect(tomorrow).not.toContainText("само на това устройство");
   // A player with a profile, past the first results, isn't asked again.
@@ -47,7 +47,7 @@ test("a first day asks for the reminder only, not yet to keep the game; „Не 
   await playRun(page);
   // The first result's action, right under the score.
   const ask = page.locator(".result-share.result-first");
-  await expect(ask).toContainText("Да ти пишем, ако въпросите още те чакат?");
+  await expect(ask).toContainText("Да ти пишем, ако броят още те чака?");
   await expect(ask).not.toContainText("само на това устройство");
   // Sharing stays, a quiet link beside the tiles.
   await expect(page.locator(".score-leaf .result-share-link")).toBeVisible();
@@ -68,7 +68,7 @@ test("„Не сега“ to the reminder by mail is one to the email: the line 
   await startDay(page);
   await playRun(page);
   const tomorrow = page.locator(".tomorrow");
-  await expect(tomorrow).toContainText("Да ти пишем, ако въпросите още те чакат?");
+  await expect(tomorrow).toContainText("Да ти пишем, ако броят още те чака?");
   await tomorrow.getByRole("button", { name: "Не сега" }).click();
   await expect(tomorrow).not.toContainText("Да ти пишем");
   await expect(tomorrow.getByRole("button", { name: "Запази я с имейл" })).toHaveCount(0);
@@ -98,7 +98,7 @@ test("the reminder by mail turned on from Настройки says the game is ke
   await mail.getByLabel("Код").fill(mailedCode(email));
   await mail.getByRole("button", { name: "Потвърди" }).click();
   await expect(mail.getByRole("status")).toHaveText(
-    `Готово. Играта ти е запазена с имейла ${email}. Влизай с него от всяко устройство. Ще ти напомняме по имейл, ако въпросите още те чакат.`,
+    `Готово. Играта ти е запазена с имейла ${email}. Влизай с него на всяко устройство. Ще ти напомняме по имейл, ако броят още те чака.`,
   );
   await expect(mail.getByRole("switch", { name: "Напомняне по имейл" })).toHaveAttribute("aria-checked", "true");
 });
@@ -115,7 +115,7 @@ test.describe("in Messenger's own browser", () => {
 
   test("the cover has a line for a game kept in the phone's browser", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator(".issue-exit")).toHaveText("Имаш игра в браузъра? Отвори там");
+    await expect(page.locator(".issue-exit")).toHaveText("Имаш игра в браузъра? Отвори я там");
   });
 
   test("the result's action takes the game to the phone's browser; both keep it", async ({ page, browser }) => {
@@ -144,12 +144,12 @@ test.describe("in Messenger's own browser", () => {
     const phone = await browser.newContext({ userAgent: chromeOnAndroid });
     const there = await phone.newPage();
     await there.goto(url);
-    await expect(there.locator(".hand-number")).toContainText(`Връзката носи играта на ${name}.`);
+    await expect(there.locator(".hand-number")).toContainText(`Тази връзка пренася тук играта на ${name}.`);
     await there.getByRole("button", { name: "Продължи тук" }).click();
     await expect(there.getByRole("status").filter({ hasText: "Готово: играта ти е тук." })).toBeVisible();
     await expect(there).toHaveURL(/\/$/);
     await expect(there.locator(".score-n")).toHaveText(rights ?? "");
-    await expect(there.locator(".result-share")).toContainText("Да ти пишем, ако въпросите още те чакат?");
+    await expect(there.locator(".result-share")).toContainText("Да ти пишем, ако броят още те чака?");
     // Messenger's browser keeps the game too: the same player.
     const still = await page.evaluate(
       async () => ((await (await fetch("/api/me")).json()) as { user: { name: string } | null }).user?.name,
@@ -190,7 +190,7 @@ test.describe("in Messenger's own browser", () => {
     await daysPlayed(page, 1);
     await page.goto("/me");
     await page.getByRole("button", { name: "Запази я с имейл" }).click();
-    await expect(page.getByText("Тук не питаме за имейл")).toBeVisible();
+    await expect(page.getByText("Тук не може да се влиза с имейл")).toBeVisible();
     await expect(page.getByLabel("Имейл")).toHaveCount(0);
   });
 });
@@ -247,7 +247,7 @@ test("a guest's Профил asks to keep the game and says it's kept; the way i
   await page.getByLabel("Код").fill(mailedCode(email));
   await page.getByRole("button", { name: "Потвърди" }).click();
   await expect(page.getByRole("status")).toHaveText(
-    `Готово. Играта ти е запазена с имейла ${email}. Влизай с него от всяко устройство.`,
+    `Готово. Играта ти е запазена с имейла ${email}. Влизай с него на всяко устройство.`,
   );
   await expect(page.getByRole("button", { name: "Запази я с имейл" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Имаш профил? Влез" })).toHaveCount(0);
@@ -260,7 +260,7 @@ test("Профил names Настройки in words, and a name still drawn lea
   await expect(page.getByText("Това име е избрано наслуки.")).toBeVisible();
   await expect(page.locator(".me-settings strong")).toHaveText("Настройки");
   await expect(page.locator(".me-settings")).toHaveAttribute("href", "/settings");
-  await page.getByRole("link", { name: "Смени го" }).click();
+  await page.getByRole("link", { name: "Смени името" }).click();
   await expect(page.getByLabel("Име", { exact: true })).toBeFocused();
   // Известия are there wherever notifications can't come, and say why.
   await expect(page.locator("section.stack", { has: page.getByRole("heading", { name: "Известия" }) })).toContainText(

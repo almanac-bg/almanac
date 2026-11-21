@@ -110,7 +110,7 @@ function kicker(d: DuelView): string {
 
 const headings: Record<DuelView["state"], string> = {
   yours: "Твой ред",
-  theirs: "Чака",
+  theirs: "Чака се",
   won: "Победа",
   lost: "Загуба",
   draw: "Равенство",
@@ -160,7 +160,7 @@ function face(s: Side, label: string, tag: string, won: boolean): Child {
       ? [h("b", { class: "duel-score none" }, "–"), h("span", { class: "duel-rights" }, "Играчът вече го няма")]
       : [
           h("b", { class: "duel-score", "data-n": s.rights }, formatNumber(s.rights)),
-          h("span", { class: "duel-rights" }, `от ${total} верни`),
+          h("span", { class: "duel-rights" }, `от\u00a0${total}`),
         ],
   );
 }
@@ -179,9 +179,10 @@ function marks(d: DuelView, mine: DuelMark[], theirs: DuelMark[]): Child {
       title: m ? `${i + 1}: ${words(m)}` : null,
     });
   const rights = (list: DuelMark[]) => list.filter((m) => m.right).length;
+  const rightWords = (n: number) => `${n} ${n === 1 ? "верен" : "верни"} от ${total}`;
   const label = [
-    `Въпрос по въпрос. Ти: ${rights(mine)} от ${total} верни`,
-    theirs.length ? `; ${them}: ${rights(theirs)} от ${total} верни` : "",
+    `Въпрос по въпрос. Ти: ${rightWords(rights(mine))}`,
+    theirs.length ? `; ${them}: ${rightWords(rights(theirs))}` : "",
     d.decided ? `; ${d.state === "won" ? "ти" : them} водеше от ${ordinal(d.decided)}я въпрос до края` : "",
   ].join("");
   // Small beside the marks: the avatar alone, without its frame.
@@ -228,20 +229,20 @@ function meant(d: DuelView): Child {
     "div",
     { class: "duel-meant" },
     d.recorded && d.opponent
-      ? h("p", { class: "duel-why" }, `Записът е от истинска игра на ${them}${topic ? ` на главата „${topic}“` : ""}.`)
+      ? h("p", { class: "duel-why" }, `Записът е от истинска игра на ${them}${topic ? ` в глава „${topic}“` : ""}.`)
       : null,
     rec && them && rec.won + rec.lost + rec.drawn > 0
       ? h(
           "p",
           { class: "duel-record" },
-          h("span", null, `Срещу ${them}`),
+          h("span", null, `Срещу ${them} досега:`),
           h(
             "span",
             { class: "duel-record-end" },
             h(
               "b",
               { class: "duel-record-n", "aria-label": record(rec.won, rec.lost, rec.drawn) },
-              `${rec.won} : ${rec.lost}`,
+              `${rec.won}:${rec.lost}`,
             ),
             rec.drawn
               ? h("span", { class: "duel-why" }, `и ${rec.drawn} ${rec.drawn === 1 ? "равенство" : "равенства"}`)
@@ -259,10 +260,10 @@ function plain(d: DuelView): Child {
   const them = d.opponent?.name ?? "Приятелят ти";
   const why =
     d.lapsed === "they"
-      ? `${them} не изигра дуела за седемте дни.`
+      ? `${them} не изигра дуела в срок от седем дни.`
       : d.lapsed === "you"
-        ? "Не изигра дуела за седемте дни."
-        : "Без резултат: дуелът прекъсна.";
+        ? "Не изигра дуела в срок от седем дни."
+        : "Без резултат: дуелът беше прекъснат.";
   return [
     h(
       "div",
@@ -280,7 +281,7 @@ function plain(d: DuelView): Child {
             "p",
             { class: "duel-mine-score" },
             h("b", { class: "duel-mine-n" }, formatNumber(you.rights)),
-            ` от ${total} верни`,
+            ` от\u00a0${total}`,
           ),
           trail(you.marks ?? [], total),
         )

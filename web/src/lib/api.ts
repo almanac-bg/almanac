@@ -22,7 +22,7 @@ export class ApiError extends Error {
   }
 }
 
-const offline = "Няма връзка със сървъра. Провери интернета си и опитай пак.";
+const offline = "Няма връзка със сървъра. Провери връзката си с интернет и опитай пак.";
 const ours = "Нещо се обърка при нас. Опитай пак.";
 
 /** What hears every answer of the server's, as it comes (fresh.ts: its version, a session ended): the answer, and the

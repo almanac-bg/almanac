@@ -31,7 +31,7 @@ func (e *apiError) Error() string { return e.code }
 
 var (
 	errNotFound   = &apiError{http.StatusNotFound, "not_found", "Не намираме това, което търсиш."}
-	errBadRequest = &apiError{http.StatusBadRequest, "bad_request", "Нещо не е наред. Опитай пак."}
+	errBadRequest = &apiError{http.StatusBadRequest, "bad_request", "Нещо се обърка. Опитай пак."}
 	errSignedOut  = &apiError{http.StatusUnauthorized, "signed_out", "Първо влез в профила си."}
 	errTooMany    = &apiError{http.StatusTooManyRequests, "too_many", "Твърде много опити. Опитай пак малко по-късно."}
 )
@@ -41,37 +41,37 @@ var playerErrors = map[error]*apiError{
 	play.ErrNoRun:       {http.StatusNotFound, "no_run", "Няма такава игра."},
 	play.ErrNoTopic:     {http.StatusNotFound, "no_topic", "Няма такава глава."},
 	play.ErrOutOfStep:   {http.StatusConflict, "out_of_step", "Играта е продължила другаде. Зареждаме я наново."},
-	play.ErrBadAnswer:   {http.StatusBadRequest, "bad_answer", "Този отговор не става за този въпрос."},
+	play.ErrBadAnswer:   {http.StatusBadRequest, "bad_answer", "Този отговор не е за този въпрос."},
 	play.ErrNoQuestion:  {http.StatusServiceUnavailable, "no_questions", "В момента няма въпроси за игра."},
-	play.ErrDayOver:     {http.StatusGone, "day_over", "Денят на тази игра свърши. Днешните въпроси те чакат в Днес."},
-	play.ErrReviewOver:  {http.StatusGone, "review_over", "Въпросите на игра се преглеждат само в деня ѝ."},
-	play.ErrNotShared:   {http.StatusConflict, "not_shared", "Споделя се само завършен ден."},
-	play.ErrSelf:        {http.StatusConflict, "self", "Това си ти. Добави някой друг."},
+	play.ErrDayOver:     {http.StatusGone, "day_over", "Денят на тази игра свърши. Днешният брой те чака."},
+	play.ErrReviewOver:  {http.StatusGone, "review_over", "Въпросите на една игра могат да се преглеждат само в деня, в който е играна."},
+	play.ErrNotShared:   {http.StatusConflict, "not_shared", "Споделя се само завършен брой."},
+	play.ErrSelf:        {http.StatusConflict, "self", "Това си ти. Добави друг играч."},
 	play.ErrNotFriends:  {http.StatusNotFound, "not_friends", "Не сте приятели в играта."},
-	play.ErrManyFriends: {http.StatusConflict, "many_friends", "Списъкът с приятели е пълен: в него има място за 200."},
+	play.ErrManyFriends: {http.StatusConflict, "many_friends", "Списъкът с приятели е пълен: побира до 200 души."},
 	play.ErrNoAvatar:    {http.StatusBadRequest, "no_avatar", "Няма такъв аватар."},
 	play.ErrNoSeal:      {http.StatusBadRequest, "no_seal", "В тази глава още нямаш печат."},
 	play.ErrNotice:      {http.StatusBadRequest, "no_notice", "Няма такова известие."},
 	play.ErrNoPlayer:    {http.StatusNotFound, "no_player", "Няма играч с такова потребителско име."},
-	play.ErrNoDuel:      {http.StatusNotFound, "no_duel", "Този дуел не е в този профил."},
+	play.ErrNoDuel:      {http.StatusNotFound, "no_duel", "Този дуел е в друг профил."},
 	play.ErrDuelGone:    {http.StatusNotFound, "duel_gone", "Този дуел вече го няма."},
 	play.ErrNobody:      {http.StatusConflict, "nobody", "Още няма запис на игра, срещу който да играеш. Опитай по-късно."},
 	play.ErrDuelOver:    {http.StatusGone, "duel_over", "Този дуел вече свърши."},
 	play.ErrDuelsToOne: {http.StatusConflict, "duels_to_one",
-		"Вече чакат три твои дуела с този приятел. Изчакай да изиграе някой от тях."},
-	play.ErrDuelsADay:      {http.StatusTooManyRequests, "duels_a_day", "Днес започна много дуели. Утре можеш пак."},
+		"Три твои дуела с този приятел вече чакат. Изчакай да бъде изигран някой от тях."},
+	play.ErrDuelsADay:      {http.StatusTooManyRequests, "duels_a_day", "Днес започна твърде много дуели. Утре можеш да започнеш нови."},
 	play.ErrNoRequest:      {http.StatusNotFound, "no_request", "Поканата вече я няма."},
 	play.ErrManyRequests:   {http.StatusConflict, "many_requests", "Твърде много покани чакат отговор. Изчакай да отговорят на някоя от тях."},
-	account.ErrBadEmail:    {http.StatusBadRequest, "bad_email", "Това не прилича на имейл адрес."},
+	account.ErrBadEmail:    {http.StatusBadRequest, "bad_email", "Това не прилича на имейл."},
 	account.ErrTooSoon:     {http.StatusTooManyRequests, "too_soon", "Току-що ти пратихме код. Провери пощата си."},
 	account.ErrBadCode:     {http.StatusBadRequest, "bad_code", "Грешен код."},
 	account.ErrCodeExpired: {http.StatusBadRequest, "code_expired", "Кодът вече не важи. Поискай нов."},
 	account.ErrCodeTries:   {http.StatusBadRequest, "code_tries", "Твърде много опити. Поискай нов код."},
 	account.ErrCodesBusy:   {http.StatusServiceUnavailable, "codes_busy", "Точно сега пращаме много кодове. Опитай пак след минута."},
 	account.ErrAddressBusy: {http.StatusTooManyRequests, "address_busy",
-		"Вече пратихме няколко кода на този адрес. Провери пощата си, и папката за спам, или опитай пак по-късно."},
+		"Вече пратихме няколко кода на този адрес. Провери пощата си (и папката за спам) или опитай пак по-късно."},
 	account.ErrNoMail: {http.StatusBadRequest, "no_mail",
-		"Писмата ни до този адрес не стигат. Провери дали е изписан вярно или опитай с друг."},
+		"Писмата ни не стигат до този адрес. Провери дали е изписан вярно, или опитай с друг."},
 	account.ErrNoHandoff: {http.StatusNotFound, "no_handoff", "Тази връзка вече не работи: играта ти остана там, където я започна."},
 	account.ErrHandoffNumber: {http.StatusConflict, "handoff_number",
 		"Въведи числото, което виждаш в приложението, откъдето дойде играта."},
@@ -385,7 +385,7 @@ func (s *Server) sendCode(w http.ResponseWriter, r *http.Request) error {
 	asked, err := s.accounts.SendCode(r.Context(), email, s.asked(r), s.clientSite(r))
 	if soon := (account.TooSoon{}); errors.As(err, &soon) {
 		return &apiError{http.StatusTooManyRequests, "too_soon",
-			fmt.Sprintf("Току-що ти пратихме код. Нов можеш да поискаш след %d с.", seconds(soon.Wait))}
+			"Току-що ти пратихме код. Нов можеш да поискаш след " + secondsWords(seconds(soon.Wait)) + "."}
 	}
 	if errors.Is(err, account.ErrCodesBusy) {
 		s.problems.add("sign-in codes: a site past its share of the minute (account.SiteShare, CodesAMinuteMost); a flood?")
@@ -412,6 +412,14 @@ func (s *Server) asked(r *http.Request) string {
 
 // seconds is a wait in whole seconds, rounded up: never "0 с" while there's still a wait.
 func seconds(d time.Duration) int { return int((d + time.Second - 1) / time.Second) }
+
+// secondsWords is a number of seconds in words: „1 секунда“, „30 секунди“.
+func secondsWords(n int) string {
+	if n == 1 {
+		return "1 секунда"
+	}
+	return strconv.Itoa(n) + " секунди"
+}
 
 // wrongCodeWords say a code was wrong and, once the tries left are few, how many.
 func wrongCodeWords(left int) string {

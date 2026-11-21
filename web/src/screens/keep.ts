@@ -20,7 +20,7 @@ import { signIn } from "./signin.ts";
 export const app = embedded;
 
 /** What keeping the game is for, under the email's field. */
-const keepNote = "Пращаме ти код, за да потвърдиш имейла. Серията и Алманахът ти остават с теб на всяко устройство.";
+const keepNote = "Ще ти пратим код, за да потвърдиш имейла. Така серията и Алманахът ти са с теб на всяко устройство.";
 
 /** What a guest's game risks, while they're to be asked to keep it (`days`: the days played as far as they count, 1
  * or 2; `streak` with today's): the game in this app's browser only, or on this device. Null once it's kept. */
@@ -104,7 +104,7 @@ export function mailAsk({
     try {
       const r = await api<MailPrefs>("PATCH", "/api/mail/prefs", { kind: "day", on: true });
       said.set(
-        `${kept || "Готово."} ${r.can ? "Ще ти напомняме по имейл, ако въпросите още те чакат." : "Напомнянията ще идват като известия, както досега."}`,
+        `${kept || "Готово."} ${r.can ? "Ще ти напомняме по имейл, ако броят още те чака." : "Напомнянията ще идват като известия, както досега."}`,
       );
       yes?.(r);
     } catch (err) {
@@ -117,7 +117,7 @@ export function mailAsk({
     h(
       "p",
       { class: "muted" },
-      `Да ти пишем${to ? ` на ${to}` : ""}, ако въпросите още те чакат? Веднъж на ден, около часа, в който играеш.`,
+      `Да ти пишем${to ? ` на ${to}` : ""}, ако броят още те чака? Веднъж на ден, около часа, в който играеш.`,
     );
   const nope = () => (no ? h("button", { class: "link tap", type: "button", onclick: no }, "Не сега") : null);
   return [
@@ -275,7 +275,7 @@ export function exitWay(stake: () => string | null): Child {
     "div",
     { class: "stack keep-line exit-way" },
     h("p", { class: "muted" }, () =>
-      [stake(), "Продължи в браузъра на телефона и утре ще те чака там."].filter(Boolean).join(" "),
+      [stake(), "Продължи в браузъра на телефона и утре играта ще те чака там."].filter(Boolean).join(" "),
     ),
     android
       ? h("button", { class: "btn primary", type: "button", onclick: open }, "Отвори в браузъра")
@@ -310,7 +310,7 @@ export function coverExit(): Child {
     "p",
     { class: "small issue-exit" },
     "Имаш игра в браузъра? ",
-    h("button", { class: "link", type: "button", onclick: go }, "Отвори там"),
+    h("button", { class: "link", type: "button", onclick: go }, "Отвори я там"),
     () => (named() ? h("b", null, ` ${menuWay()}`) : null),
   );
 }
@@ -377,7 +377,7 @@ function confirmTake(game: Handing, take: () => Promise<void>, finish: (words: s
       },
     },
     h("div", { class: "intro" }, h("h1", null, "Продължи играта тук")),
-    h("p", { class: "lead" }, "Връзката носи играта на ", h("strong", null, game.name), "."),
+    h("p", { class: "lead" }, "Тази връзка пренася тук играта на ", h("strong", null, game.name), "."),
     h("button", { class: "btn primary", disabled: busy }, "Продължи тук"),
     h("button", { class: "link tap", type: "button", onclick: () => finish("") }, "Откажи"),
   );

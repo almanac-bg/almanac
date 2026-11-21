@@ -156,7 +156,7 @@ function dayBoard(): { view: Child; load: () => void } {
     () =>
       day()
         ? segmented<"friends" | "all">(
-            "Сред кого",
+            "Класация сред",
             [
               ["friends", "Приятели"],
               ["all", "България"],
@@ -210,10 +210,10 @@ function everyone(d: Day): Child {
       "p",
       { class: "board-empty" },
       b.players
-        ? `Днес играха ${formatNumber(b.players)} ${b.players === 1 ? "човек" : "души"}. Изиграй днешния брой и ще видиш класацията.`
-        : "Още никой не е играл днешните въпроси.",
+        ? `${b.players === 1 ? "Днес игра 1\u00a0човек" : `Днес играха ${formatNumber(b.players)}\u00a0души`}. Изиграй днешния брой и ще видиш класацията.`
+        : "Още никой не е играл днешния брой.",
     );
-  if (!b.top.length) return h("p", { class: "board-empty" }, "Още никой не е играл днешните въпроси.");
+  if (!b.top.length) return h("p", { class: "board-empty" }, "Още никой не е играл днешния брой.");
   const mine = b.mine && b.place && !b.top.some((s) => s.me) ? b.mine : null;
   return [
     // First how all of България did and where the player stands (alone on the board, a place says nothing); then the
@@ -222,7 +222,11 @@ function everyone(d: Day): Child {
     b.players < 2
       ? null
       : b.place
-        ? h("p", { class: "board-note" }, `В България си ${ordinal(b.place)} от ${formatNumber(b.players)}.`)
+        ? h(
+            "p",
+            { class: "board-note" },
+            `В България си на ${ordinal(b.place, "n")} място от ${formatNumber(b.players)}.`,
+          )
         : h("p", { class: "board-note" }, `Днес играха ${formatNumber(b.players)}\u00a0души.`),
     h(
       "ol",
@@ -245,7 +249,7 @@ function spreadOf(b: Board): Child {
     {
       class: "board-spread",
       role: "img",
-      "aria-label": `Колко играчи на колко верни: най-много на ${spread.indexOf(Math.max(...spread))}.${mine >= 0 ? ` Ти: ${mine}.` : ""}`,
+      "aria-label": `Колко играчи имат по колко верни отговора: най-много имат ${spread.indexOf(Math.max(...spread))}.${mine >= 0 ? ` Ти: ${mine}.` : ""}`,
     },
     h(
       "div",
@@ -352,7 +356,7 @@ function friendsCard(reloadBoard: () => void): Child {
         "section",
         { class: "sect duels page-2" },
         h("div", { class: "sect-head" }, h("h2", null, "Дуели")),
-        h("p", { class: "sect-lead" }, "Същите десет въпроса, всеки когато може."),
+        h("p", { class: "sect-lead" }, "Едни и същи десет въпроса. Всеки ги играе, когато може."),
         any ? duelLists(d) : null,
         h("a", { class: "btn", href: "/duel/new" }, "Нов дуел"),
         h("p", { class: "small sect-foot" }, "С приятел или срещу запис на истинска игра."),
@@ -371,7 +375,7 @@ function friendsCard(reloadBoard: () => void): Child {
               "span",
               { class: "sect-note" },
               h("button", { class: "link muted", type: "button", onclick: () => editing.update((e) => !e) }, () =>
-                editing() ? "Готово" : "Промени",
+                editing() ? "Готово" : "Премахни приятел",
               ),
             )
           : null;
@@ -405,7 +409,7 @@ function friendsCard(reloadBoard: () => void): Child {
           return user()
             ? null
             : [
-                h("p", { class: "muted friends-none" }, "Добави приятели: ще виждате резултатите си за деня."),
+                h("p", { class: "muted friends-none" }, "Добави приятели и ще виждате резултатите си всеки ден."),
                 h(
                   "button",
                   {
@@ -574,7 +578,7 @@ function row(f: Friend, remove: () => void, challenge: () => void, editing: () =
         ? h(
             "span",
             { class: "record", title: `Дуели помежду ви: ${record(f.won, f.lost, f.drawn)}` },
-            `дуели\u00a0${f.won}\u00a0:\u00a0${f.lost}`,
+            `дуели\u00a0${f.won}:${f.lost}`,
           )
         : null,
     ),

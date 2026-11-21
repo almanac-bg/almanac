@@ -32,12 +32,12 @@ test("a page that isn't there says so, with a way on", async ({ page }) => {
   await page.evaluate(() => fetch("/api/guest", { method: "POST", body: "{}" }));
   // An old link of something the game no longer has (a challenge's): said so, with the way to the day.
   await page.goto("/c/abc234");
-  await expect(page.getByRole("heading", { name: "Тази страница я няма" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Няма такава страница" })).toBeVisible();
 
   // A topic the game doesn't have (an old link): said so, not a blank page.
   await page.goto("/play/nothing");
-  await expect(page.getByRole("heading", { name: "Тази страница я няма" })).toBeVisible();
-  await page.getByRole("link", { name: "Към въпросите на деня" }).click();
+  await expect(page.getByRole("heading", { name: "Няма такава страница" })).toBeVisible();
+  await page.getByRole("link", { name: "Към днешния брой" }).click();
   await expect(page.locator(".issue")).toBeVisible();
 });
 

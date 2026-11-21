@@ -139,7 +139,7 @@ var shell = template.Must(template.New("shell").Parse(`<!doctype html>
 </head>
 <body>
 <div id="app">{{if not .Files.JS}}<p style="padding:2rem;font-family:system-ui">The client isn't built: go run ./cmd/build</p>{{end}}</div>
-<noscript><p>АЛМАНАХ има нужда от JavaScript.</p></noscript>
+<noscript><p>За да играеш АЛМАНАХ, включи JavaScript в браузъра си.</p></noscript>
 </body>
 </html>
 `))
@@ -286,11 +286,11 @@ func (s *Server) there(r *http.Request) bool {
 // page, whose it is, and nothing it would have to claim of them (never a rank's word beside a name: DECISIONS.md, the
 // seal); a shared day, its score and its card (share.go), never whose it was.
 func (s *Server) preview(r *http.Request, shared play.Share) (title, description, image string) {
-	title, description = "АЛМАНАХ", "Десет въпроса на ден, игри на главите и дуели. Всеки отговор носи по нещо ново."
+	title, description = "АЛМАНАХ", "Десет въпроса на ден, едни и същи за цяла България. Всеки верен отговор вписва факт в твоя Алманах."
 	image = "/og.png"
 	switch path := r.URL.Path; {
 	case shared.Code != "":
-		title = fmt.Sprintf("%d от %d · АЛМАНАХ, брой %d", shared.Rights(), len(shared.Shape), shared.Issue)
+		title = fmt.Sprintf("%d от %d · АЛМАНАХ, Брой %d", shared.Rights(), len(shared.Shape), shared.Issue)
 		description = "Десет въпроса на ден, едни и същи за цяла България. Колко ще познаеш ти?"
 		image = cardOf(shared)
 	case strings.HasPrefix(path, "/players/"):

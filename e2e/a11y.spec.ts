@@ -160,7 +160,7 @@ for (const scheme of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: scheme });
     await page.goto(`/players/${user.tag}`);
     // A stranger with no game yet: asked to play one first (or sign in) to add friends.
-    await expect(page.getByRole("link", { name: "Към играта" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Към днешния брой" })).toBeVisible();
     const { violations } = await new AxeBuilder({ page }).analyze();
     expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
   });

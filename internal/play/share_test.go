@@ -4,7 +4,7 @@ import "testing"
 
 // A shared day is its score and its shape: a question that counts for nobody has no square, as it has no place in the
 // score, and a close answer is not a right one.
-func TestShareText(t *testing.T) {
+func TestShareShape(t *testing.T) {
 	s := State{Trail: []Mark{
 		{Right: true}, {Right: true}, {}, {Right: true}, {Void: true},
 		{Right: true}, {Close: true}, {Right: true}, {Right: true}, {},
@@ -13,9 +13,8 @@ func TestShareText(t *testing.T) {
 	if sh.Shape != "110110110" || sh.Rights() != 6 {
 		t.Fatalf("shape %q, %d right", sh.Shape, sh.Rights())
 	}
-	want := "Алманах, брой 9 · 20 ноември\n6 от 9 ■■□■■□■■□\nalmanac.bg/d/9-k4f2m7qa"
-	if got := sh.Text("almanac.bg" + sh.Path()); got != want {
-		t.Fatalf("%q, not %q", got, want)
+	if got := sh.Path(); got != "/d/9-k4f2m7qa" {
+		t.Fatalf("the path: %q", got)
 	}
 }
 

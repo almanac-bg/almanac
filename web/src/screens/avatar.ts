@@ -40,7 +40,7 @@ export function avatarChoice(kit: Kit) {
     when(
       () => user(),
       () => choice(ranks),
-      () => h("p", { class: "lead" }, "Аватарът е твой от първата игра. Изиграй първите си въпроси."),
+      () => h("p", { class: "lead" }, "Аватар избираш след първата си игра. Изиграй първите си въпроси."),
     ),
   );
 }
@@ -95,16 +95,20 @@ function choice(ranks: () => Rank[]): Child {
               type: "button",
               "aria-pressed": () => worn(c.id),
               "aria-disabled": open ? null : "true",
-              "aria-label": open ? chapterName(c.id) : `${chapterName(c.id)} · от Страница`,
+              "aria-label": open ? chapterName(c.id) : `${chapterName(c.id)} · от печат „Страница“`,
               onclick: () => (open ? wear(`${c.id}-natural`) : null),
             },
             avatar(`${c.id}-natural`),
-            h("span", { class: "pick-name" }, open ? chapterName(c.id) : `${chapterName(c.id)} · от\u00a0Страница`),
+            h(
+              "span",
+              { class: "pick-name" },
+              open ? chapterName(c.id) : `${chapterName(c.id)} · от печат\u00a0„Страница“`,
+            ),
           );
         }),
       ),
     ),
-    h("p", { class: "small" }, "Картината на всяка глава става твой аватар от печата Страница."),
+    h("p", { class: "small" }, "Картината на глава можеш да избереш за аватар, щом стигнеш печата „Страница“ в нея."),
     () => error() && h("p", { class: "bad", role: "alert" }, error()),
   ];
 }

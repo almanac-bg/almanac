@@ -74,7 +74,7 @@ export function topic([category = ""]: string[]) {
 /** A chapter game's result's buttons: „Още десет“, the one action; beside it the way to the chapter (its facts, the
  * new ones too), and while the day's ten wait, the way to them, plain, with the streak at stake under it. */
 function nextOf(d: DayWaits | null, again: () => void, chapter: string): { main: Child; also: Child[] } {
-  const more = h("button", { class: "btn primary big", onclick: again }, "Още десет");
+  const more = h("button", { class: "btn primary big", onclick: again }, "Още десет въпроса");
   const book = h("a", { class: "btn", href: `/almanac/${chapter}` }, "Към главата");
   if (!d) return { main: more, also: [book] };
   return {
@@ -83,7 +83,7 @@ function nextOf(d: DayWaits | null, again: () => void, chapter: string): { main:
       h(
         "div",
         { class: "stack small-gap" },
-        h("a", { class: "btn", href: "/" }, "Към въпросите на деня"),
+        h("a", { class: "btn", href: "/" }, "Към днешния брой"),
         stakeLine(d.streak, d.spare),
       ),
       book,

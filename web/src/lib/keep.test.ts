@@ -15,7 +15,7 @@ test("the code put in says what came of it: a guest's game kept, or the profile 
   const guest = { id: 7, name: "Таралеж 123" };
   assert.equal(
     keptWords(guest, { ...guest, email: "ana@example.bg" }),
-    "Готово. Играта ти е запазена с имейла ana@example.bg. Влизай с него от всяко устройство.",
+    "Готово. Играта ти е запазена с имейла ana@example.bg. Влизай с него на всяко устройство.",
   );
   const ana = { id: 3, name: "Ана", email: "ana@example.bg" };
   assert.equal(keptWords(guest, ana), "Влезе като Ана. Играта оттук е добавена към профила ти.");
