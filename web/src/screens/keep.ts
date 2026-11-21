@@ -9,7 +9,7 @@
 // code is put in, what came of it is said (lib/keep.ts, keptWords); in Meta's and TikTok's browsers no email or code
 // is asked for at all (signIn).
 
-import { type ApiError, api, errorText } from "../lib/api.ts";
+import { api, errorText } from "../lib/api.ts";
 import { type Child, computed, h, onCleanup, signal, slot, when } from "../lib/dom.ts";
 import { embedded, handMark, handToken, outsideLink } from "../lib/embedded.ts";
 import { askToKeep } from "../lib/keep.ts";
@@ -234,27 +234,28 @@ export function haveProfile(
 /** The menu that opens a page in the phone's own browser, as an app's browser has it, named: on an iPhone, Safari. */
 const menuWay = () => (app?.platform === "ios" ? "··· → Отвори в Safari" : "··· → Отвори в браузъра");
 
+/** How often a page left on screen asks for a new link: well within a link's half hour (account.HandoffTTL), so that
+ * the one in the address doesn't die while it's being opened. */
+const handFresh = 20 * 60_000;
+
 /** The way out of an app's own browser, with the game (account.Handoff): the result's action there. The link's token
  * is written into Днес's address (its fragment) while this is on screen, and only then, so that the app's own „Open
- * in browser“ takes it along; it's asked for again as the page comes back into view, and changes only when it has
- * less than 10 minutes left (account.HandoffRotate). On Android a button opens the phone's browser at that address;
- * elsewhere (an iPhone), where no link can, a button copies it for the phone's browser; under either, the app's menu,
- * named. The number another browser may ask for is said under it. Where the app's browser may be trusted with a form (lib/embedded.ts, forms), keeping the game with an
- * email is a tap away too. `stake`: what the game risks here. */
+ * in browser“ takes it along; a new one is asked for as the page comes back into view (the one before may have been
+ * used there), and every 20 minutes on screen; the ones before work on till they're used or out of time. On Android a button opens the phone's browser at that
+ * address; elsewhere (an iPhone), where no link can, a button copies it for the phone's browser; under either, the
+ * app's menu, named. Where the app's browser may be trusted with a form (lib/embedded.ts, forms), keeping the game
+ * with an email is a tap away too. `stake`: what the game risks here. */
 export function exitWay(stake: () => string | null): Child {
-  const offer = signal<{ token: string; number: number } | null>(null);
   const said = signal("");
   let gone = false;
-  const hold = async (): Promise<string> => {
-    const r = await api<{ token: string; number: number }>("POST", "/api/auth/handoff", {
-      token: offer.peek()?.token ?? "",
-    });
+  let held = false;
+  const hold = async (): Promise<void> => {
+    const r = await api<{ token: string }>("POST", "/api/auth/handoff");
     if (!gone) {
-      offer.set(r);
+      held = true;
       // On the page's own entry, even while the game's end is still going back to it (router.ts).
       fragment(`${handMark}${r.token}`, () => !gone);
     }
-    return r.token;
   };
   const fail = (err: unknown) => said.set(errorText(err));
   hold().catch(fail);
@@ -262,7 +263,7 @@ export function exitWay(stake: () => string | null): Child {
     if (!document.hidden) hold().catch(() => {});
   };
   document.addEventListener("visibilitychange", back);
-  const every = setInterval(back, 5 * 60_000);
+  const every = setInterval(back, handFresh);
   onCleanup(() => {
     gone = true;
     document.removeEventListener("visibilitychange", back);
@@ -271,15 +272,12 @@ export function exitWay(stake: () => string | null): Child {
   });
   const android = app?.platform === "android";
   const open = () => {
-    if (offer.peek()) location.assign(outsideLink(location.href));
+    if (held) location.assign(outsideLink(location.href));
     else hold().then(() => location.assign(outsideLink(location.href)), fail);
   };
-  // Where no menu says it (an app that has none), the address to copy by hand into the phone's browser. A link copied
-  // goes wherever a paste can: every browser that opens it is asked for the number (account.CopiedHandoff).
+  // Where no menu says it (an app that has none), the address to copy by hand into the phone's browser.
   const copy = () => {
     const at = () => `${location.origin}/${location.hash}`;
-    const token = offer.peek()?.token;
-    if (token) api("POST", "/api/auth/handoff/copied", { token }).catch(() => {});
     let done: Promise<void>;
     try {
       done = navigator.clipboard.writeText(at());
@@ -311,10 +309,6 @@ export function exitWay(stake: () => string | null): Child {
           app?.platform === "ios" ? "Копирай връзката за Safari" : "Копирай връзката за браузъра",
         ),
     h("p", { class: "exit-menu" }, "Или от менюто на приложението: ", h("b", null, menuWay())),
-    () => {
-      const o = offer();
-      return o ? h("p", { class: "small exit-number" }, `Ако браузърът поиска число, въведи ${o.number}.`) : null;
-    },
     app?.forms
       ? h(
           "div",
@@ -352,29 +346,25 @@ export function coverExit(): Child {
  * to keep it and be reminded (screens/today.ts). */
 export const handedIn = signal(false);
 
-/** The game a handoff's link brings (account.Handing): whose, on how many days it was played, whether the number
- * its page shows is asked for here, and whether this is the browser that made it. */
+/** The game a handoff's link brings (account.Handing): whose, and whether this is the browser that made it. */
 interface Handing {
   name: string;
-  days: number;
-  number?: boolean;
   mine?: boolean;
 }
 
 /** A game brought by a Handoff's token found in Днес's address (handToken, which Днес takes out of it at once):
- * taken here with one tap that names the game, or with the number the app's page shows where it's asked for; then
- * `done` draws Днес as it is, the day's result with the ask to keep the game and be reminded, and the notice says what
- * came of it. The app's browser it came from stays signed in (account.TakeHandoff). Opened where it was made, nothing
- * changes and nothing is asked. */
+ * taken here with one tap that names the game; then `done` draws Днес as it is, the day's result with the ask to keep
+ * the game and be reminded, and the notice says what came of it. The app's browser it came from stays signed in
+ * (account.TakeHandoff). Opened where it was made, nothing changes and nothing is asked. */
 export function takeHand(token: string, done: () => void): Child {
   const screen = slot(() => h("p", { class: "muted" }, "…"));
   const finish = (words: string) => {
     if (words) notice.set(words);
     done();
   };
-  const take = async (number = 0) => {
+  const take = async () => {
     const before = user.peek();
-    const r = await api<{ user: User }>("POST", "/api/auth/hand", { token, number });
+    const r = await api<{ user: User }>("POST", "/api/auth/hand", { token });
     const same = before?.id === r.user.id;
     user.set(r.user);
     if (!same) handedIn.set(true);
@@ -384,7 +374,7 @@ export function takeHand(token: string, done: () => void): Child {
     (r) =>
       r.game.mine
         ? take().catch((err) => finish(errorText(err)))
-        : screen.show(() => (r.game.number ? numberForm(r.game, take, finish) : confirmTake(r.game, take, finish))),
+        : screen.show(() => confirmTake(r.game, take, finish)),
     (err) => finish(errorText(err)),
   );
   return h("section", { class: "screen" }, screen);
@@ -396,7 +386,7 @@ function confirmTake(game: Handing, take: () => Promise<void>, finish: (words: s
   return h(
     "form",
     {
-      class: "stack hand-number",
+      class: "stack hand-take",
       onsubmit: async (e: SubmitEvent) => {
         e.preventDefault();
         busy.set(true);
@@ -412,63 +402,6 @@ function confirmTake(game: Handing, take: () => Promise<void>, finish: (words: s
     h("div", { class: "intro" }, h("h1", null, "Продължи играта тук")),
     h("p", { class: "lead" }, "Тази връзка пренася тук играта на ", h("strong", null, game.name), "."),
     h("button", { class: "btn primary", disabled: busy }, "Продължи тук"),
-    h("button", { class: "link tap", type: "button", onclick: () => finish("") }, "Откажи"),
-  );
-}
-
-/** The number the app's page shows, asked for in a browser that isn't plainly the same phone (account.Origin): a
- * link that reached someone else is no way into the game without it. A wrong one says the tries left; the last one
- * spent, the link is dead and Днес says so (`finish`). */
-function numberForm(game: Handing, take: (n: number) => Promise<void>, finish: (words: string) => void): Child {
-  const value = signal("");
-  const error = signal("");
-  const busy = signal(false);
-  return h(
-    "form",
-    {
-      class: "stack hand-number",
-      onsubmit: async (e: SubmitEvent) => {
-        e.preventDefault();
-        if (value.peek().length !== 2) return error.set("Числото е от 2 цифри.");
-        busy.set(true);
-        error.set("");
-        try {
-          await take(Number(value.peek()));
-        } catch (err) {
-          if ((err as ApiError).code === "no_handoff") return finish(errorText(err));
-          error.set(errorText(err));
-        } finally {
-          busy.set(false);
-        }
-      },
-    },
-    h("div", { class: "intro" }, h("h1", null, "Продължи играта тук")),
-    h(
-      "p",
-      { class: "lead" },
-      "Играта на ",
-      h("strong", null, game.name),
-      " идва от друго място. Въведи числото, което виждаш там, под играта.",
-    ),
-    h(
-      "label",
-      { class: "field" },
-      h("span", null, "Число"),
-      h("input", {
-        class: "code",
-        inputmode: "numeric",
-        autocomplete: "off",
-        value,
-        oninput: (e: Event) => {
-          const el = e.target as HTMLInputElement;
-          el.value = el.value.replace(/\D/g, "").slice(0, 2);
-          value.set(el.value);
-        },
-        ref: (el) => queueMicrotask(() => (el as HTMLInputElement).focus()),
-      }),
-    ),
-    h("button", { class: "btn primary", disabled: busy }, "Продължи тук"),
-    () => error() && h("p", { class: "bad", role: "alert" }, error()),
     h("button", { class: "link tap", type: "button", onclick: () => finish("") }, "Откажи"),
   );
 }

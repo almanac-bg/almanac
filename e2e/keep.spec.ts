@@ -159,12 +159,11 @@ test.describe("in Messenger's own browser", () => {
     await expect(action.getByRole("button", { name: "Отвори в браузъра" })).toBeVisible();
     // No email or code is asked for in Meta's browsers, here nor on Профил.
     await expect(action.getByRole("button", { name: "Или я запази с имейл" })).toHaveCount(0);
-    await expect(action.locator(".exit-number")).toHaveText(/^Ако браузърът поиска число, въведи \d\d\.$/);
+    await expect(action).not.toContainText("число");
     // The link's token is in the address, its fragment, while the way out is offered: the app's „Open in browser“
     // takes it along. Nothing else in the page says it.
     await expect(page).toHaveURL(/\/#hand=[A-Za-z0-9_-]{43}$/);
     const url = page.url();
-    const number = ((await action.locator(".exit-number").textContent()) ?? "").replace(/\D/g, "");
     const rights = await page.locator(".summary .score-n").textContent();
     const name = await page.evaluate(
       async () => ((await (await fetch("/api/me")).json()) as { user: { name: string } }).user.name,
@@ -175,7 +174,7 @@ test.describe("in Messenger's own browser", () => {
     const phone = await browser.newContext({ userAgent: chromeOnAndroid });
     const there = await phone.newPage();
     await there.goto(url);
-    await expect(there.locator(".hand-number")).toContainText(`Тази връзка пренася тук играта на ${name}.`);
+    await expect(there.locator(".hand-take")).toContainText(`Тази връзка пренася тук играта на ${name}.`);
     await there.getByRole("button", { name: "Продължи тук" }).click();
     await expect(there.getByRole("status").filter({ hasText: "Готово: играта ти е тук." })).toBeVisible();
     await expect(there).toHaveURL(/\/$/);
@@ -192,26 +191,23 @@ test.describe("in Messenger's own browser", () => {
     await expect(late.locator(".notice")).toContainText("Тази връзка вече не работи");
     await late.context().close();
 
-    // Another link, opened somewhere else (a computer): asked for the number first.
+    // Another link, made as the page comes back: opened elsewhere, it names the game, and „Откажи“ takes nothing.
     await page.reload();
     await expect(page).toHaveURL(/\/#hand=[A-Za-z0-9_-]{43}$/);
     const other = page.url();
-    const now = ((await page.locator(".exit-number").textContent()) ?? "").replace(/\D/g, "");
+    expect(other).not.toBe(url);
     const laptop = await browser.newContext({
       userAgent:
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
     });
     const desk = await laptop.newPage();
     await desk.goto(other);
-    await expect(desk.locator(".hand-number")).toContainText(`Играта на ${name} идва от друго място.`);
-    await desk.getByLabel("Число").fill(now === "10" ? "11" : "10");
-    await desk.getByRole("button", { name: "Продължи тук" }).click();
-    await expect(desk.getByRole("alert")).toContainText("Грешно число.");
-    await desk.getByLabel("Число").fill(now);
-    await desk.getByRole("button", { name: "Продължи тук" }).click();
-    await expect(desk.getByRole("status").filter({ hasText: "Готово: играта ти е тук." })).toBeVisible();
-    await expect(desk.locator(".score-n")).toHaveText(rights ?? "");
-    expect(number).toMatch(/^\d\d$/);
+    await expect(desk.locator(".hand-take")).toContainText(`Тази връзка пренася тук играта на ${name}.`);
+    await desk.getByRole("button", { name: "Откажи" }).click();
+    await expect(desk.locator(".hand-take")).toHaveCount(0);
+    expect(
+      await desk.evaluate(async () => ((await (await fetch("/api/me")).json()) as { user: unknown }).user ?? null),
+    ).toBeNull();
     await phone.close();
     await laptop.close();
   });
@@ -253,12 +249,14 @@ test.describe("in Messenger's own browser on an older iPhone, with no clipboard 
     await expect(page).toHaveURL(/\/#hand=[A-Za-z0-9_-]{43}$/);
     await action.getByRole("button", { name: "Копирай връзката за Safari" }).click();
     await expect(action.locator(".keep-said")).toContainText("/#hand=");
-    // A link copied asks every browser for the number, the same phone's too.
+    // Pasted into Safari, the link names the game and takes it with a tap.
     const url = page.url();
     const safari = await browser.newContext({ userAgent: safariOnIPhone });
     const there = await safari.newPage();
     await there.goto(url);
-    await expect(there.getByLabel("Число")).toBeVisible();
+    await expect(there.locator(".hand-take")).toContainText("Тази връзка пренася тук играта на ");
+    await there.getByRole("button", { name: "Продължи тук" }).click();
+    await expect(there.getByRole("status").filter({ hasText: "Готово: играта ти е тук." })).toBeVisible();
     await safari.close();
   });
 });
