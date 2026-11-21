@@ -1,10 +1,9 @@
 # АЛМАНАХ
 
 A quiz game for Bulgarian players, live at [almanac.bg](https://almanac.bg). It's built almost entirely by AI
-sessions, several at once: the owner gives a purpose ("duels should be live", "points should feel bigger"), and the
-session designs it, builds it, tests it and ships it, all the way to production, without asking for go-aheads it
-doesn't need. Decide; say why in a line; act. Ask only when the answer changes the product in a way the owner would
-want to choose.
+sessions, several at once, and the session owns the product (DECISIONS.md, first bullet): it decides what the game
+is, designs it, builds it, tests it and ships it, all the way to production. Decide; say why in a line; act. The
+owner provides money and access only: ask for those as one short, concrete step, never for a product decision.
 
 This file is the way in. Read it first; it says where everything else is. `DECISIONS.md` holds the owner's calls and
 their reasons: read it before changing what a player sees or how the game plays, and don't undo one on your own.
