@@ -192,9 +192,12 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   so never on the page: a sheet (`screens/avatar.ts`) opened by the avatar with „Смени“ under it (one button), the one
   worn ringed; a tap wears one and, once it's kept, puts the sheet away. Another player's page (`/players/<tag>`) is
   laid out the same, one column (`profileHead`, `sealsSection`): the same head without a way to change it („Играе от
-  …“ in the line under the @username), their streak by the @username as Профил has it (only as it is now: never the
+  6 ноември 2026 г.“, the day they started, in the line under the @username), their streak by the @username as Профил has it (only as it is now: never the
   longest nor an ended one's, nothing while none runs, and not what the week forgives: that's theirs), right under
-  the head a card of how you stand (ask to be friends, answer their asking, or friends and „Дуел“), the same seals; nothing of one's own
+  the head a card of how you stand: its kicker („Приятели“, „Покана за приятелство“, „Не сте приятели“); as
+  friends the duels between you as heavy numerals with their words under them („3 / победи“, „0 / загуби“, and
+  „равенства“ only where there are any; „Още нямате дуели.“ before any) and „Дуел“ its one primary button, the row's
+  width on a phone; else a line and its buttons (ask to be friends, answer their asking, call it off); the same seals; nothing of one's own
   (Смени, Настройки). One's own, opened by its @username, is simply the page as others see it, with no card of how
   you stand. Where no email may be asked for (an app's browser that reads what's typed: `noEmail`), Профил and
   Настройки offer none, only the line that says so.

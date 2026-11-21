@@ -43,8 +43,8 @@ func TestProfileShowsSealAndRanks(t *testing.T) {
 			t.Errorf("the profile says %s: %s", total, out)
 		}
 	}
-	if since := time.UnixMilli(p.Since).In(Bulgaria); !since.Equal(time.Date(2026, 9, 1, 12, 0, 0, 0, Bulgaria)) {
-		t.Fatalf("since: %v", since)
+	if p.Since != "2026-09-17" { // the day in Bulgaria, never the moment
+		t.Fatalf("since: %v", p.Since)
 	}
 }
 

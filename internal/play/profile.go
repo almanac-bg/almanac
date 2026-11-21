@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"time"
-
-	"github.com/almanac-bg/almanac/internal/store"
 )
 
 // A profile is a player as anyone may see them, found by their tag: how they look, the seal they wear, their ranks by
@@ -14,7 +12,7 @@ import (
 // streak as it is now (runs.go: its days, nothing more): never an ended one's, nor the longest (an ended streak's
 // number is never named), nor what their week has forgiven (theirs). No lifetime totals, and nothing of how well they
 // know a topic (mastery is the game's own). What only they see stays theirs: their games one by one, their Алманах,
-// their email, their friends. Its time is a date, the month they started, never the moment (review 2026-11-18, S12).
+// their email, their friends. Its time is a date, the day they started, never the moment (review 2026-11-18, S12).
 // The privacy page says what it shows; the server limits how many anyone looks at (server.profileOf).
 
 // Profile is a player as another sees them, and how the viewer stands with them.
@@ -24,8 +22,8 @@ type Profile struct {
 	// Me says it's the viewer's own.
 	Me bool `json:"me,omitempty"`
 	Look
-	// Since is when they started playing: the month (its first day, at noon in Bulgaria).
-	Since int64 `json:"since"`
+	// Since is the day they started playing, in Bulgaria (YYYY-MM-DD).
+	Since string `json:"since"`
 	// Seal is the seal they wear (none before a rank), whole (its name, the way to the next): over the look's, which says
 	// only its chapter and level. Ranks their ranks in the bank's chapters.
 	Seal  *Seal         `json:"seal,omitempty"`
@@ -43,19 +41,6 @@ type Profile struct {
 	ID int64 `json:"id,omitempty"`
 }
 
-// dayOnly is the day of a moment (ms), as noon of it in Bulgaria: the same date wherever a screen shows it, within
-// eleven hours of Bulgaria's time.
-func dayOnly(ms int64) int64 {
-	t := time.UnixMilli(ms).In(Bulgaria)
-	return store.Ms(time.Date(t.Year(), t.Month(), t.Day(), 12, 0, 0, 0, Bulgaria))
-}
-
-// monthOnly is the month of a moment (ms), as noon of its first day in Bulgaria.
-func monthOnly(ms int64) int64 {
-	t := time.UnixMilli(ms).In(Bulgaria)
-	return store.Ms(time.Date(t.Year(), t.Month(), 1, 12, 0, 0, 0, Bulgaria))
-}
-
 // Record is the duels between two players, from one's side.
 type Record struct {
 	Won   int `json:"won"`
@@ -70,8 +55,9 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 	var p Profile
 	var id int64
 	var avatar string
+	var since int64
 	err := db.QueryRowContext(ctx, `SELECT u.id, u.name, u.tag, u.created_at, `+lookColumns+` FROM users u WHERE u.tag = ?`, tag).
-		Scan(&id, &p.Name, &p.Tag, &p.Since, &avatar)
+		Scan(&id, &p.Name, &p.Tag, &since, &avatar)
 	if errors.Is(err, sql.ErrNoRows) {
 		return p, ErrNoPlayer
 	}
@@ -83,7 +69,7 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 		return p, err
 	}
 	p.Seal = sealOf(p.Ranks)
-	p.Since = monthOnly(p.Since)
+	p.Since = dayOf(time.UnixMilli(since))
 	if p.Streak, err = g.Streak(ctx, id); err != nil {
 		return p, err
 	}
