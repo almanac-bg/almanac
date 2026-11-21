@@ -6,7 +6,7 @@ import type { Credit } from "./game/types.ts";
 import { errorText, passing } from "./lib/api.ts";
 import { hourInBulgaria } from "./lib/day.ts";
 import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
-import { type Scheme, scheme, setScheme } from "./lib/prefs.ts";
+import { calm, type Scheme, scheme, setScheme } from "./lib/prefs.ts";
 import { formatNumber, formatValue, found, hyphenate, keepNumbers, stakeWords } from "./lib/words.ts";
 import { glyphBox, rankName, rankNames, sealParts } from "./seal.ts";
 import { topics } from "./state.ts";
@@ -262,7 +262,8 @@ export function pips(quarters: number): HTMLElement {
 
 /** The ladder of a chapter's ranks, Бележка to Летопис, each its seal and its name: the one reached (`rank`; Летопис
  * for „Летопис · 2“ and on, named so) ringed in ink and its name heavy, those below as they are, those to come faded.
- * On a rank-up and Профил. On a narrow screen only the reached one's name shows (app.css); every seal stays. */
+ * On a rank-up and Профил. A narrow ladder names only the reached one, by its own width (app.css, a container
+ * query); every seal stays. */
 export function ladder(chapter: string, rank: number, size = 24): HTMLElement {
   const at = Math.min(rank, rankNames.length);
   return h(
@@ -584,10 +585,40 @@ export const rightsOf = (rights: number, of: number): Child => [
   h("small", null, ` от ${of}`),
 ];
 
-/** A word that may break (hyphenate: seven letters and more) held whole (`.whole-word`): it goes to the next line
- * whole where it fits there, and breaks at its syllables, with a hyphen, only where it's wider than its line. */
+const latinVowel = /[aeiouyàáâãäåæèéêëìíîïòóôõöøùúûüý]/i;
+
+/** Where a word in Latin letters (a player's name: „Maximilian“) may break, as soft hyphens, by hyphenate's rule for
+ * Bulgarian (lib/words.ts): one consonant between two vowels goes to the next line, of more the last (two that make
+ * one sound, „ch“, „sh“, „th“, „ph“, together), no line keeps or takes a single letter, and a word under seven
+ * letters fits whole. Not a dictionary's breaks, but always at a syllable's edge, never at any letter. */
+function latinSyllables(text: string): string {
+  return text.replace(/\p{Script=Latin}{7,}/gu, (word) => {
+    let out = "";
+    let from = 0;
+    let prev = -1;
+    for (let i = 0; i < word.length; i++) {
+      if (!latinVowel.test(word.charAt(i))) continue;
+      if (prev >= 0 && i - prev > 1) {
+        const cut = i - prev > 2 && /^[cstp]h$/i.test(word.slice(i - 2, i)) ? i - 2 : i - 1;
+        if (cut - from >= 2 && word.length - cut >= 2) {
+          out += `${word.slice(from, cut)}­`;
+          from = cut;
+        }
+      }
+      prev = i;
+    }
+    return out + word.slice(from);
+  });
+}
+
+/** A word's syllables as soft hyphens, in either alphabet. */
+const syllables = (word: string): string => latinSyllables(hyphenate(word));
+
+/** A word that may break (seven letters and more, in either alphabet) held whole (`.whole-word`): it goes to the
+ * next line whole where it fits there, and breaks at its syllables, with a hyphen, only where it's wider than its
+ * line. */
 const wholeWord = (word: string, find: string[] = []): Child => {
-  const w = hyphenate(word);
+  const w = syllables(word);
   const shown = marked(w, find);
   return w === word ? shown : h("span", { class: "whole-word" }, shown);
 };
@@ -630,23 +661,24 @@ export function pictureCredit(c: Credit): Child {
 
 /** A player's name as a line holds it (DESIGN.md, Names): it breaks between its words first, each word held whole,
  * going to the next line whole where it fits there; only a word wider than its line breaks, at its syllables, with a
- * hyphen (a surname too). What follows the name (`tail`: the seal worn, „ти“) stays with its last word, never alone
- * on a line (`.name-end`). CSS keeps `overflow-wrap: break-word` for a word no syllable can save (Latin letters,
- * figures). */
+ * hyphen (a surname too), in either alphabet („Maximi-lian“). What follows the name (`tail`: the seal worn, „ти“)
+ * stays with its last word, never alone on a line (`.name-end`). CSS keeps `overflow-wrap: break-word` for a word no
+ * syllable can save (figures). */
 export function nameWords(name: string, ...tail: Child[]): Child {
   const words = name.trim().split(/\s+/);
   const lastWord = words.pop() ?? "";
   const after = tail.filter((t) => t != null && t !== false && t !== "");
   // What follows goes with the last word's last syllable: the word still breaks at its other syllables where it must,
   // and never runs past its line.
-  const w = hyphenate(lastWord);
+  const w = syllables(lastWord);
   const cut = w.lastIndexOf("­") + 1;
   const last = !after.length
     ? wholeWord(lastWord)
     : cut
       ? h("span", { class: "whole-word" }, w.slice(0, cut), h("span", { class: "name-end" }, w.slice(cut), ...after))
       : h("span", { class: "name-end" }, lastWord, ...after);
-  return [...words.flatMap((x) => [wholeWord(x), " "]), last];
+  // One span for the whole name: a link around it takes one rule, whatever its words (app.css, .name-words).
+  return h("span", { class: "name-words" }, ...words.flatMap((x) => [wholeWord(x), " "]), last);
 }
 
 /** An email address as a narrow line holds it: broken after its @ or before a dot, never inside a word. */
@@ -693,6 +725,14 @@ export function failure(
     again ? h("button", { class: "btn primary", type: "button", onclick: () => again() }, "Опитай пак") : null,
     way ? h("a", { class: again ? "btn" : "btn primary", href: way[0] }, way[1]) : null,
   );
+}
+
+/** What a tap brings up under it (an ask, an answer: „Нова връзка“'s, „Добави“'s, „Изтрий профила“'s), brought into
+ * sight whole, clear of a phone's places at its foot (`.in-sight`'s scroll margin, their height): given as its `ref`.
+ * Already in sight, it stays where it is. */
+export function inSight(el: Element): void {
+  el.classList.add("in-sight");
+  requestAnimationFrame(() => el.scrollIntoView({ block: "nearest", behavior: calm.peek() ? "auto" : "smooth" }));
 }
 
 /** The way back to where a screen is reached from (a way to play, from Начало; Настройки, from Профил): back in the

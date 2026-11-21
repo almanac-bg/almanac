@@ -82,11 +82,7 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 	if p.Ranks, err = g.RanksOf(ctx, id); err != nil {
 		return p, err
 	}
-	var chosen sql.NullString
-	if err := db.QueryRowContext(ctx, `SELECT seal FROM users WHERE id = ?`, id).Scan(&chosen); err != nil {
-		return p, err
-	}
-	p.Seal = sealOf(p.Ranks, chosen.String)
+	p.Seal = sealOf(p.Ranks)
 	p.Since = monthOnly(p.Since)
 	if viewer == 0 || p.Me {
 		return p, nil

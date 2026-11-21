@@ -55,18 +55,17 @@ type Look struct {
 	Seal   *Worn  `json:"seal,omitempty"`
 }
 
-// lookColumns read a player's look in a query over users u, as one text for lookOf: the avatar chosen, the chapter
-// whose seal they chose, and their ranks as kept (rank.go), each "chapter level ink". A player's ranks are a dozen rows
-// read by their key: a board of N names is N such reads, never a count of anyone's ink.
-const lookColumns = `coalesce(u.avatar, '') || char(31) || coalesce(u.seal, '') || char(31) ||
-	coalesce((SELECT group_concat(k.chapter || ' ' || k.level || ' ' || k.ink, ',') FROM ranks k
+// lookColumns read a player's look in a query over users u, as one text for lookOf: the avatar chosen, and their
+// ranks as kept (rank.go), each "chapter level ink day". A player's ranks are a dozen rows read by their key: a board
+// of N names is N such reads, never a count of anyone's ink.
+const lookColumns = `coalesce(u.avatar, '') || char(31) ||
+	coalesce((SELECT group_concat(k.chapter || ' ' || k.level || ' ' || k.ink || ' ' || k.day, ',') FROM ranks k
 		WHERE k.user_id = u.id AND k.level > 0), '')`
 
 // lookOf makes a look from what lookColumns read: the avatar chosen, or the one the game gives; and the seal worn, by
 // the one rule (sealOf) over the bank's chapters.
 func (g *Game) lookOf(userID int64, read string) Look {
-	avatar, rest, _ := strings.Cut(read, "\x1f")
-	chosen, kept, _ := strings.Cut(rest, "\x1f")
+	avatar, kept, _ := strings.Cut(read, "\x1f")
 	look := Look{Avatar: cmp.Or(avatar, DefaultAvatar(userID))}
 	if kept == "" {
 		return look
@@ -74,7 +73,7 @@ func (g *Game) lookOf(userID int64, read string) Look {
 	byChapter := map[string]ChapterRank{}
 	for e := range strings.SplitSeq(kept, ",") {
 		var r ChapterRank
-		if _, err := fmt.Sscan(e, &r.Chapter, &r.Level, &r.Ink); err == nil {
+		if _, err := fmt.Sscan(e, &r.Chapter, &r.Level, &r.Ink, &r.Day); err == nil {
 			byChapter[r.Chapter] = r
 		}
 	}
@@ -84,7 +83,7 @@ func (g *Game) lookOf(userID int64, read string) Look {
 			ranks = append(ranks, r)
 		}
 	}
-	if s := sealOf(ranks, chosen); s != nil {
+	if s := sealOf(ranks); s != nil {
 		look.Seal = &Worn{Chapter: s.Chapter, Level: s.Level}
 	}
 	return look

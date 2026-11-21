@@ -146,9 +146,11 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   are friends or duels, or the day is played: „Нов дуел“ against a recording needs no friend; „Твой ред“ the page's
   action, „Чакаш“, „Изиграни“: an open one how it stands under the name, „Изиграй същите десет въпроса · още 6 дни“,
   „Довърши своята игра“ once its first question was shown, „Ти: 8 · още 6 дни“; a played one at the right its end
-  („Победа“) over its score, a heavy numeral („8:6“), and on a line of its own under the row, the row's width, what
-  more there is to say: that it was against a recording, and what broke a tie on even right answers („Равен брой
-  верни · реши по-близкото число“: nothing else does; even in that too, „Равенство“ and nothing more); one that ran out „Изтече“ alone at
+  as a chip, told apart at a glance by fill and line, never red or green („✓ Победа“ filled in ink, „Загуба“ outlined
+  and quiet, „Равенство“ outlined in ink), its score beside it, a heavy numeral („8:6“), and on a line of its own
+  under the row, the row's width, what more there is to say: that it was against a recording, and what broke a tie on
+  even right answers („Равен брой верни · реши по-близкото число“: nothing else does; even in that too, „Равенство“
+  and nothing more); one that ran out „Изтече“ alone at
   the right, why under the row („Иво не го изигра навреме.“); the record between two is the friend's
   row's alone). Friends are added by the player's invite link, „Покани приятел“
   (`.invite-friend`, an outlined `.btn`: a phone's share sheet with „Добави ме в АЛМАНАХ: <link>“, a big screen's copy,
@@ -165,9 +167,10 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   ти е само на това устройство. Запази я с имейл · Имаш профил? Влез · Как те виждат другите“, each opening its form
   in the line's place); the longest streak and what the week forgives (that it's used up, only while a streak runs);
   the seal worn on its ladder („Печатът на География“, its ink, Бележка to Летопис, the one reached ringed); the seals
-  by chapter, the one worn ringed in ink, another chosen behind „избери друг“; the avatars (every animal,
-  and a chapter's art from its Страница, hollow with a grey ring and its name until then, the rule said once under
-  them); the seals two to a row, one under 340px and with large text, a long name wrapping; the avatars chosen here,
+  by chapter (only those earned), a view of the ranks: nothing to tap, none ringed (the one worn is the best, never
+  chosen: on the avatar's corner and its ladder); the avatars (every animal, and a chapter's art from its Страница,
+  hollow with a grey ring until then, „при „Страница““ under its name, and a tap on it says how far it is: „Картината
+  на История става твоя при печата „Страница“: още 3 с мастило.“); the seals two to a row, one under 340px and with large text, a long name wrapping; the avatars chosen here,
   their one place (no page of their own); Настройки last; no list of past games (a game isn't gone over after its day). No
   duplicate avatar in the bar's corner on this page. Another player's page (`/players/<tag>`) is the same head,
   streak and seals, with the way to be friends. Where no email may be asked for (an app's browser that reads what's
@@ -290,10 +293,13 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   result's line only. By day a fine
   outline in the deep colour; on a sheet (its own colour, often) a 2px ink rim (`.rimmed`), and a filled seal there a
   lighter disc of its colour, so Бележка, a thin open ring, shows the sheet through it and Страница doesn't. Beside a
-  player's name only the seal shows, never its rank's word (`worn()`); the word is the Алманах's and a rank-up's.
+  player's name only the seal shows, never its rank's word (`worn()`); the word is the Алманах's and a rank-up's. The
+  seal worn is the player's best, never chosen (play.sealOf).
 - **The ladder** (`ladder()`, `.ladder`): a chapter's six ranks in a row, each its seal and name; the one reached ringed
-  in ink, its name heavy; those to come faded (with large text, two rows of three). On a rank-up and Профил. Under 380px only the reached one is named;
-  every seal stays.
+  in ink, its name heavy; those to come faded (with large text, two rows of three). On a rank-up and Профил. Six equal
+  columns, the reached seal's ring inside its own; sized by the ladder's own width (a container query), so that under
+  24rem only the reached one is named, over its neighbours' room (from the ladder's edge at a row's end); every seal
+  stays.
 - **Buttons:** `.btn` (outlined in `--line-2`), `.btn.primary` (the one action), `.btn.danger`, `.link` (`.tap` for a
   finger's height). Fields (`input`) are white boxes with a 2px `--line-2` frame, a button's height. `.segmented`: tabs
   or a setting's few choices on a well, the chosen one a raised surface, of one width unless a word needs more (never broken inside one). A switch is a 52 × 30 track. Never a native
@@ -304,7 +310,11 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
 - **Names** (`nameWords()`): a name breaks between its words first; a single word wider than its line, and only
   then, at its syllables with a hyphen. The seal worn and „ти“ stay on its last word's line, never alone. Never cut
   with an ellipsis. Outside the play screen a fact or an entry holds its words the same way (`textWords()`), and an
-  email address breaks after its @ or before a dot (`emailWords()`). A chart's axis labels never wrap („10“).
+  email address breaks after its @ or before a dot (`emailWords()`). A chart's axis labels never wrap („10“). A name
+  in Latin letters breaks at its syllables too („Maximi-lian“). A name that links to its player is never underlined
+  at rest (its row or place says whose it is), and under a pointer underlined whole.
+- **What a tap brings up** under it (an ask, an answer: „Нова връзка“, „Добави“, „Изтрий профила“) is scrolled into
+  sight whole, clear of a phone's places at the foot (`inSight()`).
 - **Rows of players:** `who()` (avatar and name, the worn seal after it), `rankRow()`, `.fd-row`, `.friend`,
   `.duel-row`. **Avatars** (`avatar()`): the drawn animal in a round medallion of its scene; a chapter's art becomes an
   avatar at Страница.
@@ -490,7 +500,7 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
 ## In code
 
 - `ui.ts`: `leaf`, `glyph`, `chip`, `tiles`, `mini`, `seal`, `pips`, `ladder`, `worn`, `avatar`, `who`, `rankRow`, `verdict`,
-  `fact`, `filed`, `segmented`, `failure`, `rosette`, `back`, `nameWords`, `textWords`, `emailWords`.
+  `fact`, `filed`, `segmented`, `failure`, `rosette`, `back`, `nameWords`, `textWords`, `emailWords`, `inSight`.
 - `game/run.ts`: `trail`, `questionHead`, `timer`, `settle`; `game/questions.ts` each kind; `game/news.ts` what a game
   wrote; `game/share.ts` the share.
 - **Selectors:** a part has its own class (`.status-n`), not a tag under a class; Biome flags the other kind. A class

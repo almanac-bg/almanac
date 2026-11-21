@@ -165,13 +165,11 @@ func TestMergeBringsProgress(t *testing.T) {
 		_, _ = w.db.Write.Exec(`DELETE FROM users WHERE id = ?`, from) // as signing in does
 	}
 
-	// The guest's ranks: the higher of the two in each chapter, as a rank never falls; the seal the guest chose, as the
-	// account chose none.
+	// The guest's ranks: the higher of the two in each chapter, as a rank never falls; the seal worn their best.
 	for _, q := range []string{
 		`INSERT INTO ranks (user_id, chapter, level, quarter, ink, day, told) VALUES
 			(?1, 'geography', 3, 1, 18, '2026-11-10', 3), (?1, 'history', 1, 0, 2, '2026-11-09', 1)`,
 		`INSERT INTO ranks (user_id, chapter, level, quarter, ink, day, told) VALUES (?2, 'history', 2, 0, 6, '2026-11-11', 2)`,
-		`UPDATE users SET seal = 'geography' WHERE id = ?1`,
 	} {
 		if _, err := w.db.Write.Exec(q, guest, owner); err != nil {
 			t.Fatal(err)

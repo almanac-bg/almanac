@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 )
@@ -229,8 +230,8 @@ func TestRanksToldOnce(t *testing.T) {
 	}
 }
 
-// The seal worn is the chapter chosen, while there's a rank in it; else the best, the more ink on a tie. A chapter's
-// art is an avatar from its Страница; the animals are everyone's.
+// The seal worn is the best, never chosen (the more ink on a tie). A chapter's art is an avatar from its Страница; the
+// animals are everyone's.
 func TestSealAndArt(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -255,21 +256,6 @@ func TestSealAndArt(t *testing.T) {
 	if s, _ := w.g.SealOf(ctx, ana); s == nil || s.Chapter != "history" || s.Name != "Страница" {
 		t.Fatalf("the best seal, on a tie the more ink: %+v", s)
 	}
-	if err := w.g.SetSeal(ctx, ana, "music"); err != nil {
-		t.Fatal(err)
-	}
-	if s, _ := w.g.SealOf(ctx, ana); s == nil || s.Chapter != "music" || s.Name != "Бележка" {
-		t.Fatalf("the seal chosen: %+v", s)
-	}
-	if err := w.g.SetSeal(ctx, ana, "sports"); !errors.Is(err, ErrNoSeal) {
-		t.Fatalf("a seal without a rank: %v", err)
-	}
-	if err := w.g.SetSeal(ctx, ana, ""); err != nil {
-		t.Fatal(err)
-	}
-	if s, _ := w.g.SealOf(ctx, ana); s == nil || s.Chapter != "history" {
-		t.Fatalf("the best again: %+v", s)
-	}
 	if err := w.g.SetAvatar(ctx, ana, "geography-natural"); err != nil {
 		t.Fatalf("a chapter's art at its Страница: %v", err)
 	}
@@ -278,6 +264,63 @@ func TestSealAndArt(t *testing.T) {
 	}
 	if err := w.g.SetAvatar(ctx, ana, "lynx-gold"); err != nil {
 		t.Fatalf("an animal: %v", err)
+	}
+}
+
+// Профил says under a chapter's art how much ink is left to its Страница (web/src/screens/avatar.ts) by the client's
+// artFrom: the rank's ink as the server has it.
+func TestArtFromTheClient(t *testing.T) {
+	src, err := os.ReadFile("../../web/src/seal.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := fmt.Sprintf("export const artFrom = %d;", RankFrom(RankArt))
+	if !strings.Contains(string(src), want) {
+		t.Fatalf("web/src/seal.ts: want %q", want)
+	}
+}
+
+// The badge is the player's best seal, never chosen (DECISIONS.md): the highest rank; on a tie the more ink in its
+// chapter; then the chapter whose rank came first; then the bank's order. The look beside a name, read from the
+// ranks kept in one query, says the same.
+func TestBestSeal(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	for _, c := range []struct {
+		name  string
+		ranks []ChapterRank
+		want  string
+	}{
+		{"the highest rank, whatever its ink", []ChapterRank{
+			{Chapter: "geography", Level: 2, Ink: 14}, {Chapter: "history", Level: 3, Ink: 15}}, "history"},
+		{"a tie on rank: the more ink", []ChapterRank{
+			{Chapter: "geography", Level: 3, Ink: 20}, {Chapter: "history", Level: 3, Ink: 16}}, "geography"},
+		{"a tie on rank and ink: the rank that came first", []ChapterRank{
+			{Chapter: "geography", Level: 3, Ink: 16, Day: "2026-11-03"},
+			{Chapter: "history", Level: 3, Ink: 16, Day: "2026-11-12"}}, "geography"},
+		{"a tie on all of it: the bank's order", []ChapterRank{
+			{Chapter: "history", Level: 3, Ink: 16, Day: "2026-11-03"},
+			{Chapter: "geography", Level: 3, Ink: 16, Day: "2026-11-03"}}, ""},
+	} {
+		u := w.user()
+		w.kept(u, c.ranks...)
+		want := c.want
+		if want == "" {
+			// The bank's order between the two.
+			for _, cat := range w.b.Categories {
+				if cat.ID == "history" || cat.ID == "geography" {
+					want = cat.ID
+					break
+				}
+			}
+		}
+		s, err := w.g.SealOf(ctx, u)
+		if err != nil || s == nil || s.Chapter != want {
+			t.Errorf("%s: %+v %v, want %s", c.name, s, err, want)
+		}
+		if l, err := w.g.LookOf(ctx, u); err != nil || l.Seal == nil || l.Seal.Chapter != want {
+			t.Errorf("%s, the look: %+v %v, want %s", c.name, l.Seal, err, want)
+		}
 	}
 }
 

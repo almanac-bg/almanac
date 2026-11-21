@@ -57,15 +57,13 @@ var mergeSteps = []mergeStep{
 	{carries: []string{"facts.user_id"}, sql: `DELETE FROM facts WHERE user_id IN (?1, ?2)`},
 	// The guest's ranks are the account's, the higher of the two in each chapter (a rank never falls), told as the
 	// higher was; then they're counted again from the book the two share now (Merge: rewriteBook), and a rank that rises
-	// by it is told with the next news. The seal the account chose stays, else the guest's.
+	// by it is told with the next news.
 	{carries: []string{"ranks.user_id"}, sql: `INSERT INTO ranks (user_id, chapter, level, quarter, ink, day, told)
 		SELECT ?1, chapter, level, quarter, ink, day, told FROM ranks WHERE user_id = ?2 AND true
 		ON CONFLICT (user_id, chapter) DO UPDATE SET level = max(ranks.level, excluded.level),
 			quarter = CASE WHEN excluded.level > ranks.level THEN excluded.quarter ELSE ranks.quarter END,
 			ink = max(ranks.ink, excluded.ink), day = CASE WHEN excluded.level > ranks.level THEN excluded.day ELSE ranks.day END,
 			told = max(ranks.told, excluded.told)`},
-	{carries: []string{"users.seal"}, sql: `UPDATE users SET seal = coalesce(users.seal, g.seal)
-		FROM (SELECT seal FROM users WHERE id = ?2) g WHERE users.id = ?1`},
 	// The guest's notifications come along, with what they chose of them (unless the account has chosen), the days
 	// they were reminded on, and those on their way (but a day's reminder the account has one of). So does what they chose of mails, though a guest gets none.
 	{carries: []string{"push_subs.user_id"}, sql: `UPDATE push_subs SET user_id = ?1 WHERE user_id = ?2`},

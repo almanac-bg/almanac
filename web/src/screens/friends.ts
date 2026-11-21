@@ -42,6 +42,8 @@ let {
   withWord,
   mini,
   worn,
+  who,
+  inSight,
 } = {} as Kit;
 
 interface Friend {
@@ -119,6 +121,8 @@ export function friends(kit: Kit): Child {
     withWord,
     mini,
     worn,
+    who,
+    inSight,
   } = kit);
   title("Приятели");
   const board = dayBoard();
@@ -224,12 +228,12 @@ function everyone(d: Day): Child {
   if (!b.top.length) return h("p", { class: "board-empty" }, "Още никой не е играл днешния брой.");
   const mine = b.mine && b.place && !b.top.some((s) => s.me) ? b.mine : null;
   return [
-    // First how all of България did and where the player stands (alone on the board, a place says nothing); then the
-    // top rows.
+    // First how all of България did and where the player stands (alone on the board, a place says nothing; with none
+    // right, it would only rub the day in: how many played instead); then the top rows.
     spreadOf(b),
     b.players < 2
       ? null
-      : b.place
+      : b.place && b.mine?.rights
         ? h(
             "p",
             { class: "board-note" },
@@ -427,14 +431,13 @@ function friendsCard(reloadBoard: () => void, played: () => boolean): Child {
           h(
             "div",
             { class: "invitation" },
+            // Who asks as every row of players has them (their avatar, name and seal, a way to their profile), and
+            // what they ask on a line of its own under the name.
             h(
-              "p",
-              null,
-              r.tag
-                ? h("a", { href: profileHref(r.tag) }, h("strong", null, nameWords(r.name ?? "", worn(r.look?.seal))))
-                : h("strong", null, nameWords(r.name ?? "", worn(r.look?.seal))),
-              h("span", { class: "muted" }, ` @${r.tag}`),
-              " иска да сте приятели.",
+              "div",
+              { class: "invitation-who" },
+              who(r.name ?? "", r.look ?? {}, null, r.name ?? "", r.tag ?? ""),
+              h("p", { class: "invitation-line" }, "Иска да сте приятели."),
             ),
             h(
               "div",
@@ -614,7 +617,7 @@ function inviteFriend(had: () => boolean): { view: Child; forget: () => void; ha
       confirming()
         ? h(
             "div",
-            { class: "invite-renew", role: "group", "aria-label": "Нова връзка" },
+            { class: "invite-renew", role: "group", "aria-label": "Нова връзка", ref: inSight },
             h("p", { class: "small" }, "Старата връзка ще спре да работи."),
             h("button", { class: "btn inline", type: "button", disabled: busy, onclick: renew }, "Направи нова"),
             h("button", { class: "link", type: "button", onclick: () => confirming.set(false) }, "Отказ"),
@@ -623,7 +626,7 @@ function inviteFriend(had: () => boolean): { view: Child; forget: () => void; ha
     () => {
       const n = note();
       return n
-        ? h("p", { class: n.bad ? "bad" : "muted invite-note", role: n.bad ? "alert" : "status" }, n.text)
+        ? h("p", { class: n.bad ? "bad" : "muted invite-note", role: n.bad ? "alert" : "status", ref: inSight }, n.text)
         : h("p", { class: "small muted" }, "Който отвори връзката ти, става твой приятел с едно докосване.");
     },
   );
@@ -695,7 +698,7 @@ function addFriend(reload: () => Promise<void>): Child {
     ),
     () => {
       const n = note();
-      return n && h("p", { class: n.bad ? "bad" : "muted", role: n.bad ? "alert" : "status" }, n.text);
+      return n && h("p", { class: n.bad ? "bad" : "muted", role: n.bad ? "alert" : "status", ref: inSight }, n.text);
     },
   );
 }

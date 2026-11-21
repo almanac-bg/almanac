@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { befriend, playedBefore, playedFair, playRun, readText, startDay } from "./play.ts";
+import { expect, type Locator, test } from "@playwright/test";
+import { befriend, linkedNames, playedBefore, playedFair, playRun, readText, startDay } from "./play.ts";
 
 test("friends on the day: who has played it, and how each went", async ({ browser }) => {
   test.setTimeout(240_000);
@@ -99,6 +99,8 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await b.getByRole("button", { name: "Добави", exact: true }).click();
   await expect(b.getByText("Поканата до Ана Петрова е изпратена.")).toBeVisible();
   await expect(b.locator(".waiting")).toContainText("Ана Петрова");
+  // Its name a link as every player's name is: one rule for all of them, never underlined only in part.
+  expect(await linkedNames(b)).toEqual([]);
 
   // Ana sees the dot on Приятели in the bar and the request there, and says yes.
   await a.goto("/");
@@ -106,7 +108,9 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await expect(bar.getByRole("link", { name: /Приятели/ })).toHaveClass(/news/);
   await bar.getByRole("link", { name: /Приятели/ }).click();
   await expect(a).toHaveURL(/\/friends$/);
-  await expect(a.locator(".invitation")).toContainText("иска да сте приятели");
+  // Who asks, as every row of players has them: the avatar, the name (a way to their profile), and the ask under it.
+  await expect(a.locator(".invitation a.who .avatar")).toHaveCount(1);
+  await expect(a.locator(".invitation .invitation-line")).toHaveText("Иска да сте приятели.");
   await a.locator(".invitation").getByRole("button", { name: "Приеми" }).click();
   await expect(a.locator(".friend")).toHaveCount(1);
   await b.reload();
@@ -236,4 +240,83 @@ test("Приятели at 320 px, the day played: the rows hold their squares, a
       expect(flaws, `${tab} at ${percent} %`).toEqual([]);
     }
   }
+});
+
+test("a day of none right isn't rubbed in: no place on the board of all България, only how many played", async ({
+  page,
+}) => {
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" }).format(new Date());
+  const row = (name: string, rights: number, me = false) => ({ name, rights, of: 10, ms: 60_000, me });
+  const board = (rights: number) => ({
+    day,
+    issue: 10,
+    run: { done: true },
+    friends: [],
+    befriended: false,
+    board: {
+      players: 53,
+      place: rights ? 20 : 53,
+      top: [row("Ана", 9), row("Бо", 8)],
+      mine: row("Аз", rights, true),
+    },
+  });
+  for (const rights of [3, 0]) {
+    await page.route("**/api/day", (route) => route.fulfill({ json: board(rights) }));
+    await page.goto("/friends");
+    await page.getByRole("tab", { name: "България" }).click();
+    await expect(page.locator(".day-board .board-note")).toHaveText(
+      rights ? /^В България си на 20\S* място от 53\.$/ : "Днес играха 53 души.",
+    );
+    await page.unroute("**/api/day");
+  }
+});
+
+test.describe("on a 320 × 568 phone", () => {
+  test.use({ viewport: { width: 320, height: 568 }, hasTouch: true });
+
+  test("what a tap brings up shows above the places at the foot, never behind them", async ({ page }) => {
+    test.setTimeout(90_000);
+    // What came up, scrolled into sight by the one helper (ui.ts, inSight), whose margin keeps it clear of the places
+    // wherever it is on the page: its foot over theirs once it has scrolled there.
+    const clear = (what: string) =>
+      expect
+        .poll(
+          () =>
+            page
+              .locator(what)
+              .last()
+              .evaluate((el) => {
+                const places = document.querySelector(".places-foot")?.getBoundingClientRect();
+                const top = places?.top ?? innerHeight;
+                const room = Number.parseFloat(getComputedStyle(el.closest(".in-sight") ?? el).scrollMarginBottom);
+                return el.getBoundingClientRect().bottom <= top && room >= (places?.height ?? 0);
+              }),
+          { message: what },
+        )
+        .toBe(true);
+    // A tap as a thumb makes it: on what it taps, just over the places, where what it brings up has no room below.
+    const tap = async (what: Locator) => {
+      await what.evaluate((el) => {
+        const foot = document.querySelector(".places-foot")?.getBoundingClientRect().top ?? innerHeight;
+        scrollBy(0, el.getBoundingClientRect().bottom - foot + 4);
+      });
+      await what.click();
+    };
+    await page.goto("/friends");
+    await page.locator(".friends").getByRole("button", { name: "Добави приятел" }).click();
+    await playedBefore(page, 1);
+    await page.reload();
+    // „Добави“'s answer, under the field.
+    await page.getByLabel("Потребителско име или имейл на приятел").fill("@nobody_here_at_all");
+    await tap(page.getByRole("button", { name: "Добави", exact: true }));
+    await clear(".add-friend .bad");
+    // „Нова връзка“'s ask, once there's a link.
+    await page.getByRole("button", { name: "Покани приятел" }).click();
+    await tap(page.getByRole("button", { name: "Нова връзка" }));
+    await clear(".invite-renew");
+    // „Изтрий профила“'s ask, at Настройки' foot.
+    await page.goto("/settings");
+    await tap(page.getByRole("button", { name: "Изтрий профила" }));
+    await clear(".settings .btn.danger");
+  });
 });

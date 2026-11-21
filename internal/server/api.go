@@ -50,7 +50,6 @@ var playerErrors = map[error]*apiError{
 	play.ErrNotFriends:  {http.StatusNotFound, "not_friends", "Не сте приятели в играта."},
 	play.ErrManyFriends: {http.StatusConflict, "many_friends", "Списъкът с приятели е пълен: побира до 200 души."},
 	play.ErrNoAvatar:    {http.StatusBadRequest, "no_avatar", "Няма такъв аватар."},
-	play.ErrNoSeal:      {http.StatusBadRequest, "no_seal", "В тази глава още нямаш печат."},
 	play.ErrNotice:      {http.StatusBadRequest, "no_notice", "Няма такова известие."},
 	play.ErrNoPlayer:    {http.StatusNotFound, "no_player", "Няма играч с такова потребителско име."},
 	play.ErrNoDuel:      {http.StatusNotFound, "no_duel", "Този дуел не е в този профил."},

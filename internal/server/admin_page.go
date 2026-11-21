@@ -56,14 +56,15 @@ func (s *Server) adminPage(w http.ResponseWriter, title string, body template.HT
 }
 
 var adminBody = template.Must(template.New("admin").Funcs(template.FuncMap{"n": sayInt}).Parse(`
-<p>{{n .Players}} {{if eq .Players 1}}играч{{else}}играча{{end}} ({{n .WithEmail}} с имейл). Днес броя на деня са изиграли {{n .DayToday}}.{{if .DayScripted}}
+<p>{{n .Players}} {{if eq .Players 1}}играч{{else}}играча{{end}} ({{n .WithEmail}} с имейл). Днес броя на деня са изиграли докрай {{n .DayToday}}.{{if .DayScripted}}
 По-бързо, отколкото играе човек: {{n .DayScripted}} (другите не ги виждат).{{end}}
 В банката: {{n .Questions}} въпроса, {{n .Live}} в игра.</p>
 
 <section class="admin-section" id="days">
 <h2>По дни</h2>
 <p class="muted">Играч тук е човек: отговорил на въпрос с човешка скорост, без тези, които водят играта. Нови: играли
-за първи път този ден. След 1, 7 и 30 дни: колко от новите са играли пак точно тогава.</p>
+за първи път този ден. Играли: отговорили на поне един въпрос в коя да е игра, не само в броя. След 1, 7 и 30 дни:
+колко от новите са играли пак точно тогава.</p>
 <div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th><th class="num">Играли</th><th class="num">Нови</th><th class="num">След 1 ден</th><th class="num">След 7 дни</th><th class="num">След 30 дни</th></tr></thead><tbody>
 {{range .Days}}<tr><td>{{.Day}}</td><td class="num">{{n .Played}}</td><td class="num">{{n .New}}</td>{{range .Back}}<td class="num">{{.}}</td>{{end}}</tr>{{end}}
 </tbody></table></div>

@@ -65,6 +65,13 @@ test("a duel with a friend: played first and sent, played back when they can, th
   await a.reload();
   await expect(a.locator(".duels")).toContainText("Изиграни");
   await expect(a.locator(".duels .duel-row").first()).toHaveClass(/s-(won|lost|draw)/);
+  // Its end a chip, told apart at a glance: a win filled in ink with its ✓, a loss and a draw outlined.
+  const chip = a.locator(".duels .duel-row").first().locator(".duel-chip");
+  const end = ((await a.locator(".duels .duel-row").first().getAttribute("class")) ?? "").match(/s-(\w+)/)?.[1];
+  await expect(chip).toHaveClass(new RegExp(`\\b${end}\\b`));
+  await expect(chip).toHaveText({ won: "✓ Победа", lost: "Загуба", draw: "Равенство" }[end ?? ""] ?? "");
+  const fill = await chip.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(fill === "rgba(0, 0, 0, 0)", `${end}'s chip filled: ${fill}`).toBe(end !== "won");
   await b.getByRole("button", { name: "Реванш" }).click();
   await meetAs(b);
   await countIn(b);

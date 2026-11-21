@@ -3,7 +3,6 @@ package play
 import (
 	"context"
 	"database/sql"
-	"errors"
 
 	"slices"
 	"strconv"
@@ -166,12 +165,7 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, aq AlmanacQuery) (Al
 		if out.Ranks, err = g.RanksOf(ctx, userID); err != nil {
 			return out, err
 		}
-		var chosen sql.NullString
-		if err := g.DB.Read.QueryRowContext(ctx, `SELECT seal FROM users WHERE id = ?`, userID).Scan(&chosen); err != nil &&
-			!errors.Is(err, sql.ErrNoRows) {
-			return out, err
-		}
-		out.Seal = sealOf(out.Ranks, chosen.String)
+		out.Seal = sealOf(out.Ranks)
 	}
 	return out, nil
 }

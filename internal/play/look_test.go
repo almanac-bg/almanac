@@ -11,9 +11,13 @@ import (
 func (w *world) kept(user int64, ranks ...ChapterRank) {
 	w.t.Helper()
 	for _, r := range ranks {
+		day := r.Day
+		if day == "" {
+			day = "2026-01-01"
+		}
 		if _, err := w.db.Write.Exec(`INSERT INTO ranks (user_id, chapter, level, quarter, ink, day, told)
-			VALUES (?, ?, ?, 0, ?, '2026-01-01', ?) ON CONFLICT (user_id, chapter) DO UPDATE SET level = excluded.level,
-			ink = excluded.ink`, user, r.Chapter, r.Level, r.Ink, r.Level); err != nil {
+			VALUES (?, ?, ?, 0, ?, ?, ?) ON CONFLICT (user_id, chapter) DO UPDATE SET level = excluded.level,
+			ink = excluded.ink, day = excluded.day`, user, r.Chapter, r.Level, r.Ink, day, r.Level); err != nil {
 			w.t.Fatal(err)
 		}
 	}
@@ -35,8 +39,8 @@ func (w *world) wears(user int64) *Worn {
 func sameSeal(a, b *Worn) bool { return a == nil && b == nil || a != nil && b != nil && *a == *b }
 
 // The seal shows beside a player's name wherever others see it — their friends' list, the day's boards, a friend
-// request, a duel, their profile — and it's the one they wear (SealOf's rule: the chosen chapter while it has a rank,
-// else the best, the more ink on a tie, the bank's order after that), read from the ranks kept.
+// request, a duel, their profile — and it's the one they wear (SealOf's rule: their best, never chosen), read from the
+// ranks kept.
 func TestSealBesideTheName(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -72,13 +76,6 @@ func TestSealBesideTheName(t *testing.T) {
 		t.Fatalf("a friend's row: %s", data)
 	}
 
-	if err := w.g.SetSeal(ctx, ana, "music"); err != nil {
-		t.Fatal(err)
-	}
-	want = &Worn{Chapter: "music", Level: 1}
-	if f := friendOf(bo, ana); !sameSeal(f.Seal, want) || !sameSeal(f.Seal, w.wears(ana)) {
-		t.Fatalf("Ana's chosen seal in Bo's friends: %+v, want %+v", f.Seal, want)
-	}
 	if l, err := w.g.LookOf(ctx, ana); err != nil || !sameSeal(l.Seal, want) {
 		t.Fatalf("Ana's look: %+v %v", l, err)
 	}
@@ -138,11 +135,11 @@ func TestSealBesideTheName(t *testing.T) {
 		t.Fatal(err)
 	}
 	p, err := w.g.ProfileOf(ctx, anaTag, bo)
-	if err != nil || p.Seal == nil || p.Seal.Chapter != "music" || p.Seal.Name != "Бележка" {
-		t.Fatalf("Ana's profile: %+v %v", p.Seal, err)
+	if err != nil || p.Seal == nil || !sameSeal(&Worn{p.Seal.Chapter, p.Seal.Level}, want) || p.Seal.Name == "" {
+		t.Fatalf("Ana's profile: %+v %v, want %+v", p.Seal, err, want)
 	}
 	data, _ = json.Marshal(p)
-	if !strings.Contains(string(data), `"seal":{"chapter":"music","level":1,"name":"Бележка"`) {
+	if !strings.Contains(string(data), `"seal":{"chapter":"`+want.Chapter+`","level":`) {
 		t.Fatalf("the profile says the seal whole: %s", data)
 	}
 

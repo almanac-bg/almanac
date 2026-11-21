@@ -3,7 +3,6 @@ package play
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"slices"
 	"strconv"
 	"time"
@@ -24,8 +23,8 @@ import (
 //
 // A rank risen is told once, with the game's news (NewsOf: Rose), several at once as one; Бележка, the first, never.
 // At Страница a chapter's art becomes the player's to wear as their avatar (progress.go: SetAvatar); the animals are
-// everyone's. The player wears one chapter's seal beside their name, the one they choose (users.seal, SetSeal), or else
-// their best (the highest, the more ink on a tie). It goes with their look (progress.go: Look) wherever others see
+// everyone's. The player wears their best seal beside their name, never chosen (sealOf: the highest rank, the more ink
+// on a tie, then the chapter whose rank came first). It goes with their look (progress.go: Look) wherever others see
 // their name (boards, friends, requests, duels, the profile), read from the ranks kept like all of this.
 
 // Rank is a step of the ladder: its name, and the ink it starts at.
@@ -99,11 +98,13 @@ type ChapterRank struct {
 	Ink     int    `json:"ink"`
 	Next    string `json:"next"`
 	NextAt  int    `json:"nextAt"`
+	// Day is the day it rose to its level (YYYY-MM-DD): of two best seals alike, the one that came first is worn.
+	Day string `json:"-"`
 }
 
-func chapterRank(chapter string, level, quarter, ink int) ChapterRank {
-	return ChapterRank{Chapter: chapter, Level: level, Name: RankName(level), Quarter: quarter, Ink: ink,
-		Next: RankName(level + 1), NextAt: RankFrom(level + 1)}
+func chapterRank(chapter string, k keptRank) ChapterRank {
+	return ChapterRank{Chapter: chapter, Level: k.level, Name: RankName(k.level), Quarter: k.quarter, Ink: k.ink,
+		Next: RankName(k.level + 1), NextAt: RankFrom(k.level + 1), Day: k.day}
 }
 
 // rightChance is the chance a guess at a question of each kind is right (not its score: calibrate.go's chance): one of
@@ -116,11 +117,13 @@ var rightChance = map[string]float64{"choice": 0.25, "clues": 0.25, "truefalse":
 // keptRank is a chapter's rank as the ranks table keeps it.
 type keptRank struct {
 	level, quarter, ink, told int
+	day                       string
 }
 
 // ranksOf reads a player's kept ranks, by chapter.
 func ranksOf(ctx context.Context, db querier, userID int64) (map[string]keptRank, error) {
-	rows, err := db.QueryContext(ctx, `SELECT chapter, level, quarter, ink, told FROM ranks WHERE user_id = ?`, userID)
+	rows, err := db.QueryContext(ctx, `SELECT chapter, level, quarter, ink, told, day FROM ranks WHERE user_id = ?`,
+		userID)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +132,7 @@ func ranksOf(ctx context.Context, db querier, userID int64) (map[string]keptRank
 	for rows.Next() {
 		var c string
 		var k keptRank
-		if err := rows.Scan(&c, &k.level, &k.quarter, &k.ink, &k.told); err != nil {
+		if err := rows.Scan(&c, &k.level, &k.quarter, &k.ink, &k.told, &k.day); err != nil {
 			return nil, err
 		}
 		out[c] = k
@@ -193,8 +196,7 @@ func (g *Game) RanksOf(ctx context.Context, userID int64) ([]ChapterRank, error)
 	}
 	ranks := []ChapterRank{}
 	for _, c := range g.Bank().Categories {
-		k := kept[c.ID]
-		ranks = append(ranks, chapterRank(c.ID, k.level, k.quarter, k.ink))
+		ranks = append(ranks, chapterRank(c.ID, kept[c.ID]))
 	}
 	return ranks, nil
 }
@@ -206,62 +208,33 @@ type Worn struct {
 	Level   int    `json:"level"`
 }
 
-// ErrNoSeal is a seal of a chapter the player has no rank in.
-var ErrNoSeal = errors.New("no rank in that chapter")
-
 // Seal is the seal a player wears: a chapter's rank (ChapterRank), drawn.
 type Seal = ChapterRank
 
-// SealOf is the seal a player wears: the chapter they chose (users.seal), while they have a rank in it; else their
-// best (the highest level, the more ink on a tie, the bank's order after that); nil with no rank at all.
+// SealOf is the seal a player wears: their best (sealOf); nil with no rank at all.
 func (g *Game) SealOf(ctx context.Context, userID int64) (*Seal, error) {
-	var chosen sql.NullString
-	if err := g.DB.Read.QueryRowContext(ctx, `SELECT seal FROM users WHERE id = ?`, userID).Scan(&chosen); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
-	}
 	ranks, err := g.RanksOf(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	return sealOf(ranks, chosen.String), nil
+	return sealOf(ranks), nil
 }
 
-// sealOf is the seal of a player's ranks: the chosen chapter's, if they have a rank there, else the best.
-func sealOf(ranks []ChapterRank, chosen string) *Seal {
+// sealOf is the seal a player's ranks make theirs, never chosen (DECISIONS.md: the badge is the best seal): the
+// highest rank, then the more ink in its chapter, then the chapter whose rank came first (its day), then the bank's
+// order (ranks are in it); nil before any rank.
+func sealOf(ranks []ChapterRank) *Seal {
 	var best *Seal
 	for i, r := range ranks {
 		if r.Level == 0 {
 			continue
 		}
-		if r.Chapter == chosen {
-			return &ranks[i]
-		}
-		if best == nil || r.Level > best.Level || r.Level == best.Level && r.Ink > best.Ink {
+		if best == nil || r.Level > best.Level || r.Level == best.Level && (r.Ink > best.Ink ||
+			r.Ink == best.Ink && r.Day != "" && (best.Day == "" || r.Day < best.Day)) {
 			best = &ranks[i]
 		}
 	}
 	return best
-}
-
-// SetSeal chooses the chapter whose seal the player wears: one they have a rank in (ErrNoSeal otherwise); "" for
-// their best, whichever it is.
-func (g *Game) SetSeal(ctx context.Context, userID int64, chapter string) error {
-	if chapter != "" {
-		var level int
-		err := g.DB.Read.QueryRowContext(ctx, `SELECT level FROM ranks WHERE user_id = ? AND chapter = ?`, userID, chapter).
-			Scan(&level)
-		if errors.Is(err, sql.ErrNoRows) || err == nil && level == 0 {
-			return ErrNoSeal
-		}
-		if err != nil {
-			return err
-		}
-	}
-	_, err := g.DB.Write.ExecContext(ctx, `UPDATE users SET seal = nullif(?, '') WHERE id = ?`, chapter, userID)
-	return err
 }
 
 // HasArt is whether a player may wear a chapter's art as their avatar: their rank there is RankArt or more.

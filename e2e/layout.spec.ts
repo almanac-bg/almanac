@@ -20,7 +20,7 @@
 // that's over isn't kept in memory. FIT_SHOTS=<folder> keeps a picture of each question before and after its answer.
 import { expect, type Page, test } from "@playwright/test";
 import { answerAs, beside, closeable, flaws, kinds, panelFlaws, type Q, unseenAnswers } from "./kinds.ts";
-import { cutOrOverlapping, daysPlayed, dealt, keptPlayer, knows, moveOn, startDay } from "./play.ts";
+import { cutOrOverlapping, daysPlayed, dealt, keptPlayer, knows, linkedNames, moveOn, startDay } from "./play.ts";
 
 const sizes = [
   { width: 320, height: 568, go: 500 },
@@ -233,6 +233,39 @@ async function brokenWords(page: Page, selector: string): Promise<string[]> {
   }, selector);
 }
 
+/** The long words of players' names in `selector` broken anywhere but at a syllable, where a hyphen shows (a soft
+ * hyphen: ui.ts, nameWords), in either alphabet („Maximilia / n“ once). */
+async function offSyllable(page: Page, selector: string): Promise<string[]> {
+  return page.evaluate((selector) => {
+    const out: string[] = [];
+    for (const cell of document.querySelectorAll(selector)) {
+      const walk = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+      for (let node = walk.nextNode(); node; node = walk.nextNode()) {
+        const text = node.textContent ?? "";
+        const top = (i: number) => {
+          const range = document.createRange();
+          range.setStart(node, i);
+          range.setEnd(node, i + 1);
+          // Its last box: Chromium gives a letter after a broken soft hyphen the hyphen's box too, on the line before.
+          const r = [...range.getClientRects()].filter((r) => r.width).at(-1);
+          return r ? Math.round(r.top) : null;
+        };
+        for (const m of text.matchAll(/[\p{L}\p{N}­]{7,}/gu)) {
+          let was = top(m.index);
+          for (let i = m.index + 1; i < m.index + m[0].length; i++) {
+            const now = top(i);
+            if (now === null) continue;
+            if (was !== null && now > was + 2 && text[i - 1] !== "­")
+              out.push(`a name broken off its syllables: ${m[0].replaceAll("­", "")}`);
+            was = now;
+          }
+        }
+      }
+    }
+    return out;
+  }, selector);
+}
+
 /** What of a place is wrong at this size: the page sideways, a name cut or run into its neighbour (play.ts), a short
  * word of a name or a button broken, a friend's „Дуел“ or a tab past the screen's edge, a place's name at the foot cut
  * („Алмана…“). */
@@ -247,7 +280,14 @@ async function placeFlaws(page: Page): Promise<string[]> {
         out.push(`a place's name cut: ${a.textContent}`);
     return out;
   });
-  return [...(await sideways(page)), ...(await cutOrOverlapping(page)), ...(await brokenWords(page, names)), ...off];
+  return [
+    ...(await sideways(page)),
+    ...(await cutOrOverlapping(page)),
+    ...(await linkedNames(page)),
+    ...(await brokenWords(page, names)),
+    ...(await offSyllable(page, ".name-words")),
+    ...off,
+  ];
 }
 
 /** Answers whatever question shows, without the pointer's checks: at twice the text „Готово“ and „Отговори“ stay at

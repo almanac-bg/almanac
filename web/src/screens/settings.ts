@@ -11,6 +11,7 @@ import type { MailPrefs } from "./keep.ts";
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
 let {
+  inSight,
   api,
   emailWords,
   errorText,
@@ -57,6 +58,7 @@ let signedIn: Signal<string>;
 
 export function settings(kit: Kit) {
   ({
+    inSight,
     api,
     emailWords,
     errorText,
@@ -588,12 +590,8 @@ function deleteAccount(): Child {
           "div",
           {
             class: "stack",
-            // The ask, at the page's foot: brought into view whole, its button clear of a phone's bar of places
-            // (app.css, scroll-padding).
-            ref: (el) =>
-              requestAnimationFrame(() =>
-                el.scrollIntoView({ block: "nearest", behavior: calm.peek() ? "auto" : "smooth" }),
-              ),
+            // The ask, at the page's foot: brought into view whole, its button clear of a phone's places.
+            ref: inSight,
           },
           h("p", null, "Профилът, името и всичките ти игри ще бъдат изтрити завинаги."),
           h(

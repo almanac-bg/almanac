@@ -179,7 +179,11 @@ export function duelRow(d: DuelView): Child {
         : h(
             "span",
             { class: "duel-row-end" },
-            h("strong", { class: "duel-state" }, ends[d.state]),
+            // Its end as a chip, told apart at a glance: a win filled in ink with its ✓ (right is ink, filled), a loss
+            // outlined and quiet (never red: a loss isn't punished), a draw outlined in ink; one that ran out, its word.
+            d.state === "expired"
+              ? h("strong", { class: "duel-state" }, ends[d.state])
+              : h("strong", { class: `duel-chip ${d.state}` }, d.state === "won" ? "✓ Победа" : ends[d.state]),
             scored
               ? h(
                   "b",
@@ -302,7 +306,7 @@ export function duelNew() {
       back("/friends", "Приятели"),
       pageArt("duel", "tone-rose"),
       h("h1", null, "Нов дуел"),
-      h("p", { class: "lead" }, "Десет въпроса. Ти ги играеш сега, а приятелят ти – когато може."),
+      h("p", { class: "lead" }, "Десет въпроса. Ти ги играеш сега, а приятелят ти — когато може."),
     ),
     h("section", { class: "stack small-gap" }, h("h2", { class: "section-title" }, "С приятел"), () => {
       const list = friends();

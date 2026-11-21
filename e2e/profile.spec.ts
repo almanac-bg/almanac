@@ -1,5 +1,31 @@
 import { expect, test } from "@playwright/test";
-import { playedBefore, playRun } from "./play.ts";
+import { playedBefore, playRun, ranked } from "./play.ts";
+
+test("Профил: the seal worn is the best, never chosen; locked art says when it opens, and how far", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await ranked(page, 1);
+  await page.goto("/me");
+  // The seals a view of the ranks: nothing to tap, nothing ringed as worn, no way to choose.
+  await expect(page.locator(".me-seals .seal-list .rk")).toHaveCount(10);
+  await expect(page.locator(".me-seals button")).toHaveCount(0);
+  await expect(page.locator(".me-seals")).not.toContainText(/избери|Носиш/);
+  // The badge is the best: every chapter alike (rank, ink, day), the bank's first.
+  await expect(page.locator(".me-avatar .seal")).toHaveClass(/\bt-general\b/);
+  expect((await page.request.patch("/api/me/seal", { data: { chapter: "music" } })).ok()).toBe(false);
+  // Each chapter's art not the player's yet says when it opens under its name; a tap, how far it is, its real count
+  // (Бележка, 1 with ink: 4 more to Страница's 5).
+  const art = page.locator(".me-avatars .pick.locked");
+  await expect(art).toHaveCount(10);
+  await expect(art.first().locator(".pick-when")).toHaveText("при „Страница“");
+  await page.locator(".me-avatars .pick.locked", { hasText: "История" }).click();
+  await expect(page.locator(".me-avatars .pick-why")).toHaveText(
+    "Картината на История става твоя при печата „Страница“: още 4 с\u00a0мастило.",
+  );
+  // The rule isn't said again under the grid.
+  await expect(page.locator(".me-avatars")).not.toContainText("можеш да избереш за аватар");
+});
 
 test("a player's profile: asked to be friends from it, and friends there", async ({ browser }) => {
   test.setTimeout(120_000);

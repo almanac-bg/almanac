@@ -1,6 +1,6 @@
 // Профил: who you are in the game, in its budget's order (DESIGN.md, Places): your avatar with the seal you wear on its
 // corner, your name and tag; the longest streak; the seal you wear on its ladder of ranks; your seals, a chapter's each,
-// the one worn ringed and a tap wearing another; the avatars (every animal yours, a chapter's art yours from its
+// a view of them (the one worn is the best: never chosen); the avatars (every animal yours, a chapter's art yours from its
 // Страница); and Настройки, last. A guest is asked to keep their game, and the way in for a profile from elsewhere is
 // apart from it. No lifetime totals.
 
@@ -23,7 +23,6 @@ let {
   avatar,
   look,
   failure,
-  errorText,
   profileHref,
   haveProfile,
   keepGame,
@@ -60,7 +59,6 @@ export function me(kit: Kit) {
     avatar,
     look,
     failure,
-    errorText,
     profileHref,
     haveProfile,
     keepGame,
@@ -119,7 +117,7 @@ export function me(kit: Kit) {
           h(
             "div",
             { class: "me-side page-2" },
-            () => seals(ranks(), data(), data.set),
+            () => seals(ranks()),
             h(
               "section",
               { class: "sect me-avatars" },
@@ -239,91 +237,39 @@ function wornLadder(s: Stats | null): Child {
   );
 }
 
-/** The seals: a chapter's each, once it has a rank, its name under it; the one worn ringed, and a tap wears another
- * (Профил's numbers, and with them the head's seal, asked again: `told`). Before any: what brings the first. */
-function seals(ranks: Rank[] | null, s: Stats | null, told: (s: Stats) => void): Child {
+/** The seals: a chapter's each, once it has a rank, its name under it: a view of the ranks, no choice (the one worn
+ * beside the name is the best: play.sealOf). Before any: what brings the first. */
+function seals(ranks: Rank[] | null): Child {
   if (!ranks) return null;
   const had = categories.map((c) => ranks.find((r) => r.chapter === c.id)).filter((r): r is Rank => !!r && r.level > 0);
-  const wearing = signal(s?.seal?.chapter ?? "");
-  // Choosing another: the seals become buttons, and a tap wears one.
-  const choosing = signal(false);
-  const error = signal("");
-  const choose = () => choosing.update((c) => !c);
-  const wear = async (chapter: string) => {
-    error.set("");
-    const was = wearing.peek();
-    wearing.set(chapter);
-    choosing.set(false);
-    try {
-      await api("PATCH", "/api/me/seal", { chapter });
-      loadStats().then(told, () => {});
-    } catch (err) {
-      wearing.set(was);
-      error.set(errorText(err));
-    }
-  };
-  const item = (r: Rank) => [
-    seal(r.chapter, r.level, 40),
-    h("span", { class: "rk-words" }, h("b", null, chapterName(r.chapter)), h("span", null, r.name)),
-  ];
   return h(
     "section",
     { class: "sect me-seals" },
     h("div", { class: "sect-head" }, h("h2", null, "Печати")),
     had.length
-      ? [
-          h("p", { class: "seal-worn" }, () =>
-            choosing()
-              ? [
-                  "Докосни печата, който искаш да носиш. ",
-                  h("button", { class: "link", type: "button", onclick: choose }, "Готово"),
-                ]
-              : [
-                  wearing() ? `Носиш печата на глава „${chapterName(wearing())}“ ` : "",
-                  // The dot goes with what follows it, never at a line's end.
-                  had.length > 1 || !wearing()
-                    ? h(
-                        "span",
-                        { class: "seal-choose" },
-                        wearing() ? "· " : "",
-                        h(
-                          "button",
-                          { class: "link", type: "button", onclick: choose },
-                          wearing() ? "избери друг" : "избери",
-                        ),
-                      )
-                    : null,
-                ],
-          ),
-          h("ul", { class: "seal-list" }, () =>
-            had.map((r) =>
+      ? h(
+          "ul",
+          { class: "seal-list" },
+          had.map((r) =>
+            h(
+              "li",
+              null,
               h(
-                "li",
-                null,
-                choosing()
-                  ? h(
-                      "button",
-                      {
-                        class: "rk",
-                        type: "button",
-                        "aria-pressed": wearing() === r.chapter,
-                        onclick: () => wear(r.chapter),
-                      },
-                      item(r),
-                    )
-                  : h("span", { class: wearing() === r.chapter ? "rk worn" : "rk" }, item(r)),
+                "span",
+                { class: "rk" },
+                seal(r.chapter, r.level, 40),
+                h("span", { class: "rk-words" }, h("b", null, chapterName(r.chapter)), h("span", null, r.name)),
               ),
             ),
           ),
-        ]
+        )
       : [
           h("p", { class: "seal-worn" }, "Още нямаш печат."),
           h(
             "p",
             { class: "small" },
-            "Печат на глава получаваш с първия ѝ факт с мастило – при верен отговор в броя на деня.",
+            "Печат на глава получаваш с първия ѝ факт с мастило — при верен отговор в броя на деня.",
           ),
         ],
-    () => error() && h("p", { class: "bad", role: "alert" }, error()),
   );
 }
