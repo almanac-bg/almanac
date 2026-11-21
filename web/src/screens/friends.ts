@@ -1,7 +1,7 @@
 // Приятели, one of the three places, in its budget's order (DESIGN.md, Places): the day's board (among friends, or all
 // of България: its spread and the player's place first, then the top rows); the friends (who asks to be friends, each
-// friend with their day, the duels between you and a duel a tap away, and the ways to make more: the player's invite
-// link, sent by „Покани приятел“, and by потребителско име or email); and the duels (a friend's waiting for you, yours waiting for them, those played: screens/duel.ts)
+// friend with their day, the duels between you and a duel a tap away, and the one way to make more: by потребителско
+// име or email); and the duels (a friend's waiting for you, yours waiting for them, those played: screens/duel.ts)
 // and a new one.
 
 import type { Board, Score } from "../game/types.ts";
@@ -73,8 +73,6 @@ interface Friends {
   requests: { in: Request[]; out: Request[] };
   /** A friend said yes to the player's request: told once (play/lines.go). */
   accepted?: Accepted | null;
-  /** Whether the player has an invite link already (server/invite.go). */
-  link?: boolean;
 }
 
 /** The day's boards, as /api/day has them. */
@@ -335,13 +333,12 @@ function friendsCard(reloadBoard: () => void, played: () => boolean): Child {
     }
   };
   // A friend removed, once the player says so on a sheet over the page: at once, the duels open between them ending
-  // with it (play.Unfriend), and the player's link with it (a new one in its place: inviteFriend's forget).
+  // with it (play.Unfriend).
   const remove = (f: Friend) => {
     const yes = () => {
       box.close();
       act(async () => {
         await api("DELETE", `/api/friends/${f.id}`);
-        inviter.forget();
         await load();
       });
     };
@@ -353,8 +350,6 @@ function friendsCard(reloadBoard: () => void, played: () => boolean): Child {
         { class: "card sheet-panel stack" },
         h("h2", { id: "remove-title" }, `Премахваш ли ${f.name} от приятелите си?`),
         h("p", { class: "muted" }, "Незавършените дуели между вас свършват."),
-        // The player's link ends with the removal (play.Unfriend): said only to one who has one.
-        inviter.has() ? h("p", { class: "muted" }, "Връзката ти за покана спира да работи.") : null,
         h("button", { class: "btn danger big", type: "button", onclick: yes }, "Премахни"),
         h("button", { class: "link tap sheet-skip", type: "button", onclick: () => box.close() }, "Отказ"),
       ),
@@ -385,7 +380,6 @@ function friendsCard(reloadBoard: () => void, played: () => boolean): Child {
     });
   // Made once: what it says after a request stays while the list around it is drawn again.
   const adder = addFriend(load);
-  const inviter = inviteFriend(() => !!data()?.link);
 
   return [
     friendsList(),
@@ -487,11 +481,10 @@ function friendsCard(reloadBoard: () => void, played: () => boolean): Child {
           : h(
               "p",
               { class: "muted friends-none" },
-              "Още нямаш приятели тук. Изпрати им връзката си или ги добави по потребителско име или имейл.",
+              "Още нямаш приятели тук. Добави ги по потребителско име или имейл.",
             );
       },
       // Outside the parts drawn again on each look (every 15 s): drawn again, its field would lose the focus mid-word.
-      when(data, () => inviter.view),
       when(data, () => adder),
       () => {
         const out = data()?.requests.out ?? [];
@@ -520,116 +513,6 @@ function friendsCard(reloadBoard: () => void, played: () => boolean): Child {
       () => error() && h("p", { class: "bad", role: "alert" }, error()),
     );
   }
-}
-
-/** The player's invite link (server/invite.go): „Покани приятел“ sends it, with „Добави ме в АЛМАНАХ: <link>“, by the
- * share sheet on a phone, else copied (shown, where it can't be); „Нова връзка“, once said yes to, makes a new one in
- * its place, and the old one ends: offered once there is one (`had`, as the server said, or one made here). The link is
- * asked for once, the first time it's sent, and again after a friend is removed (`forget`: the removal ended it,
- * play.Unfriend). */
-function inviteFriend(had: () => boolean): { view: Child; forget: () => void; has: () => boolean } {
-  const note = signal<{ text: string; bad?: boolean } | null>(null);
-  const confirming = signal(false);
-  const busy = signal(false);
-  const made = signal(false);
-  let link: Promise<string> | null = null;
-  const linkOf = (fresh: boolean) => {
-    if (fresh || !link) {
-      link = api<{ url: string }>("POST", fresh ? "/api/invite/new" : "/api/invite").then((r) => {
-        made.set(true);
-        return r.url;
-      });
-      link.catch(() => {
-        link = null;
-      });
-    }
-    return link;
-  };
-  const send = async () => {
-    note.set(null);
-    confirming.set(false);
-    let url: string;
-    try {
-      url = await linkOf(false);
-    } catch (err) {
-      note.set({ text: errorText(err), bad: true });
-      return;
-    }
-    const text = `Добави ме в АЛМАНАХ: ${url}`;
-    // A phone's share sheet; a big screen's copy, which is what's wanted there.
-    if (typeof navigator.share === "function" && matchMedia("(pointer: coarse)").matches) {
-      try {
-        await navigator.share({ text });
-        return;
-      } catch (err) {
-        if ((err as Error)?.name === "AbortError") return;
-        // Refused (the tap too long ago, a browser that won't): copied instead.
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-      note.set({ text: "Връзката е копирана. Изпрати я на приятел." });
-    } catch {
-      note.set({ text: `Изпрати тази връзка на приятел: ${url}` });
-    }
-  };
-  const renew = async () => {
-    busy.set(true);
-    try {
-      await linkOf(true);
-      confirming.set(false);
-      note.set({ text: "Готово. Старата връзка вече не работи." });
-    } catch (err) {
-      note.set({ text: errorText(err), bad: true });
-    } finally {
-      busy.set(false);
-    }
-  };
-  const forget = () => {
-    link = null;
-  };
-  const view = h(
-    "div",
-    { class: "invite-friend" },
-    h(
-      "div",
-      { class: "invite-friend-row" },
-      h("button", { class: "btn inline", type: "button", onclick: send }, "Покани приятел"),
-      () =>
-        confirming() || !(had() || made())
-          ? null
-          : h(
-              "button",
-              {
-                class: "link muted",
-                type: "button",
-                onclick: () => {
-                  note.set(null);
-                  confirming.set(true);
-                },
-              },
-              "Нова връзка",
-            ),
-    ),
-    () =>
-      confirming()
-        ? h(
-            "div",
-            { class: "invite-renew", role: "group", "aria-label": "Нова връзка", ref: inSight },
-            h("p", { class: "small" }, "Старата връзка ще спре да работи."),
-            h("button", { class: "btn inline", type: "button", disabled: busy, onclick: renew }, "Направи нова"),
-            h("button", { class: "link", type: "button", onclick: () => confirming.set(false) }, "Отказ"),
-          )
-        : null,
-    () => {
-      const n = note();
-      return n
-        ? h("p", { class: n.bad ? "bad" : "muted invite-note", role: n.bad ? "alert" : "status", ref: inSight }, n.text)
-        : h("p", { class: "small muted" }, "Който отвори връзката ти, става твой приятел с едно докосване.");
-    },
-  );
-  // Whether the player has a link: as the server said, or one made here.
-  return { view, forget, has: () => had() || made.peek() };
 }
 
 /** Asking someone to be friends: by their tag (@tag) or their email, on a line, „Добави“ beside it. */

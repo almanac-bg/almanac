@@ -216,10 +216,6 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/friends/requests/{id}/accept", s.answerRequest(true))
 	api("DELETE /api/friends/requests/{id}", s.answerRequest(false))
 	api("DELETE /api/friends/{id}", s.unfriend)
-	api("POST /api/invite", s.inviteLink(false))
-	api("POST /api/invite/new", s.inviteLink(true))
-	api("GET /api/invites/{code}", s.inviteOne)
-	api("POST /api/invites/{code}", s.takeInvite)
 	api("POST /api/told", s.told)
 	mux.Handle("/api/", s.apiHandler(func(http.ResponseWriter, *http.Request) error { return errNotFound }))
 
@@ -241,6 +237,8 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /admin/players/{id}/reports/resolve", s.resolvePlayer)
 	mux.HandleFunc("POST /admin/players/{id}/{act}", s.adminPlayerAct)
 	mux.HandleFunc("GET /.well-known/security.txt", s.securityTxt)
+	// A personal invite link (/f/<code>, removed 21 Nov 2026), opened still from an old chat: the day.
+	mux.Handle("GET /f/", http.RedirectHandler("/", http.StatusMovedPermanently))
 	mux.HandleFunc("/", s.page)
 
 	var h http.Handler = mux

@@ -44,7 +44,6 @@ import {
   tiles,
   who,
 } from "../ui.ts";
-import { inviteCard, takeWaiting, takeWaitingOnce } from "./invite.ts";
 import { app, coverExit, exitWay, handedIn, haveProfile, keepLine, keepStake, mailAsk, takeHand } from "./keep.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
@@ -111,7 +110,7 @@ interface Shared {
 }
 
 /** The day shared by the link the page was opened at, until Днес has taken it (sharedDay). */
-let invite = (boot.shared as Shared | undefined) ?? null;
+let sharedIn = (boot.shared as Shared | undefined) ?? null;
 
 /** A shared day's link (/d/<issue>-<code>), opened: Днес, which says the day shared once (today). The address
  * becomes Днес's, so that a reload, or the address copied from the bar, is the day's and not the share's. */
@@ -139,8 +138,8 @@ export function today() {
   title();
   // Come by a shared day's link: while it's still that day, its score and shape over the same ten, „Колко ще познаеш
   // ти?“; once it's over, a line that it is, over today's.
-  const shared = invite;
-  invite = null;
+  const shared = sharedIn;
+  sharedIn = null;
   // A profile just deleted, or a game just brought here, is said once, over the day.
   let bye = notice.peek();
   notice.set("");
@@ -163,8 +162,6 @@ export function today() {
     gone = true;
     clearTimeout(lateEnds);
   });
-  // A tap on an invite kept for the player's first game, taken if a game has ended since (on another visit, say).
-  takeWaitingOnce();
   const load = async () => {
     try {
       const t = inPage ?? (await api<Today>("GET", "/api/day"));
@@ -311,8 +308,6 @@ export function today() {
       said ? h("p", { class: "notice", role: "status" }, said) : null,
       // Come from the streak's mail to a browser signed out: the way in comes first, open.
       fromMail && !user.peek()?.email ? haveProfile(load, undefined, true) : null,
-      // Come by an invite link: whose it is, and the way to be friends; or what came of one taken after a game.
-      inviteCard(!!run?.done),
     ];
     // What came of the days just missed, once: under the streak, before the day is played. The result says the streak
     // in „Утре“, so there it's only kept as told. On an evening the streak ends at midnight without the day, the
@@ -550,9 +545,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   // The day as it stands with the game just played (its streak, its friends): until it's here, the streak with today's
   // isn't known, and the share (which says it) waits for it.
   const known = signal(!just || !!t.late);
-  // An invite tapped before the player's first game is taken as it ends (screens/invite.ts): first, so that the day's
-  // friends have the new one.
-  const now = just && !t.late ? takeWaiting().then(() => api<Today>("GET", "/api/day")) : null;
+  const now = just && !t.late ? api<Today>("GET", "/api/day") : null;
   now?.then(fresh.set, () => {}).finally(() => known.set(true));
   const of = outOf(run);
   const perfect = of > 0 && run.rights === of;

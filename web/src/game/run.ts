@@ -16,7 +16,6 @@ import { calm, tickOn } from "../lib/prefs.ts";
 import { beforeLeaving, hold, release } from "../lib/router.ts";
 import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { issueOf } from "../lib/words.ts";
-import { takeWaiting } from "../screens/invite.ts";
 import { playingWhile } from "../state.ts";
 import {
   chapterName,
@@ -138,8 +137,6 @@ export function playRun(initial: State, done: (s: State) => Child, versus = "", 
     last = s;
     over.set(s.done);
     if (s.done) {
-      // An invite tapped before the player's first game: taken now (screens/invite.ts).
-      void takeWaiting();
       release({ result: s.id });
       screen.show(() => done(s));
       scrollTo(0, 0);

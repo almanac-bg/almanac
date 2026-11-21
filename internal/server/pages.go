@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -37,8 +36,7 @@ var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/(me|friends|settings|almanac)$`),
 	regexp.MustCompile(`^/duel/([0-9]{1,12}|new)$`),
 	regexp.MustCompile(`^/players/[A-Za-z0-9_]{3,20}$`),
-	sharePath,  // a shared day (share.go)
-	invitePath, // a player's invite link (invite.go)
+	sharePath, // a shared day (share.go)
 }
 
 // isAppPath is whether a path is one of the app's pages (appPaths).
@@ -193,21 +191,6 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return
 	}
-	// An invite link (invite.go), looked up once, for whoever opens it: one that isn't is a 404, and one past the
-	// network's budget a 429 (a link's preview fetched then isn't kept as the site's), each of which Днес says.
-	var viewer int64
-	if u != nil {
-		viewer = u.ID
-	}
-	invite, atInvite, inviteErr := s.inviteOf(r, viewer)
-	isInvite := atInvite && inviteErr == nil
-	switch {
-	case !atInvite || isInvite:
-	case errors.Is(inviteErr, play.ErrNoInvite):
-		status = http.StatusNotFound
-	case errors.Is(inviteErr, errInviteBusy):
-		status = http.StatusTooManyRequests
-	}
 	b := s.bank.Load()
 	m := assets.Manifest(s.client)
 	start := map[string]any{
@@ -231,9 +214,8 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	}
 	// Днес draws the day as the page comes, without asking for it first: a round trip less on every visit. Should
 	// it fail, the page asks for it as any other.
-	// A shared day's link is Начало too, with the day shared: its issue, its date and its shape; and an invite link,
-	// with whose it is (or that it's gone).
-	if (r.URL.Path == "/" || isShared || invitePath.MatchString(r.URL.Path)) && r.Method == http.MethodGet {
+	// A shared day's link is Начало too, with the day shared: its issue, its date and its shape.
+	if (r.URL.Path == "/" || isShared) && r.Method == http.MethodGet {
 		if day, err := s.todayOf(r.Context(), u); err == nil {
 			start["day"] = day
 		}
@@ -241,21 +223,9 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	if isShared {
 		start["shared"] = shared
 	}
-	switch {
-	case isInvite:
-		start["invite"] = invite
-	case !atInvite:
-	case errors.Is(inviteErr, play.ErrNoInvite):
-		start["invite"] = map[string]bool{"gone": true}
-	case errors.Is(inviteErr, errInviteBusy):
-		start["invite"] = map[string]string{"error": errInviteBusy.message}
-	default:
-		slog.Error("page", "route", route(r), "err", inviteErr)
-		start["invite"] = map[string]string{"error": "Нещо се обърка при нас. Опитай пак след малко."}
-	}
 	boot, _ := json.Marshal(start) // escapes <, > and &: safe inside the script element
 	files := filesOf(m, r.URL.Path)
-	title, description, image := s.preview(r, shared, invite)
+	title, description, image := s.preview(r, shared)
 	canonical := ""
 	if r.URL.Path == "/" {
 		canonical = s.cfg.PublicURL + "/"
@@ -315,9 +285,8 @@ func (s *Server) there(r *http.Request) bool {
 
 // preview is what a link to this page shows when it's sent (Viber, Messenger, WhatsApp), and its picture: a player's
 // page, whose it is, and nothing it would have to claim of them (never a rank's word beside a name: DECISIONS.md, the
-// seal); a shared day, its score and its card (share.go), never whose it was; an invite link, whose it is (its player
-// sent it).
-func (s *Server) preview(r *http.Request, shared play.Share, invite play.Invite) (title, description, image string) {
+// seal); a shared day, its score and its card (share.go), never whose it was.
+func (s *Server) preview(r *http.Request, shared play.Share) (title, description, image string) {
 	title, description = "АЛМАНАХ", "Десет въпроса на ден, едни и същи за цяла България. Всеки верен отговор вписва факт в твоя Алманах."
 	image = "/og.png"
 	switch path := r.URL.Path; {
@@ -325,9 +294,6 @@ func (s *Server) preview(r *http.Request, shared play.Share, invite play.Invite)
 		title = fmt.Sprintf("%d от %d · АЛМАНАХ, Брой %d", shared.Rights(), shared.Counted(), shared.Issue)
 		description = "Десет въпроса на ден, едни и същи за цяла България. Колко ще познаеш ти?"
 		image = cardOf(shared)
-	case invite.Code != "":
-		title = invite.Name + " те кани в АЛМАНАХ"
-		description = "Десет въпроса на ден, едни и същи за цяла България. Станете приятели и сравнявайте резултатите си."
 	case strings.HasPrefix(path, "/players/"):
 		if tag, err := account.NormalTag(strings.TrimPrefix(path, "/players/")); err == nil {
 			if p, err := s.profileOf(r, tag, 0); err == nil {
@@ -340,7 +306,7 @@ func (s *Server) preview(r *http.Request, shared play.Share, invite play.Invite)
 }
 
 // Search engines get the front page and the privacy notice, and nothing else: every other page is the game itself,
-// the same empty page until it starts, or something of one player's or one game's (a duel, a profile, an invite), so those say "noindex". The API is closed to them. Both files carry the site's own address, so they're
+// the same empty page until it starts, or something of one player's or one game's (a duel, a profile), so those say "noindex". The API is closed to them. Both files carry the site's own address, so they're
 // drawn here, not kept in web/public.
 var indexed = []string{"/", "/privacy"}
 

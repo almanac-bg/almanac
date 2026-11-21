@@ -61,17 +61,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   - A new visitor: the cover, „Започни“, and under it „Едни и същи за цяла България.“ In an app's own browser, one
     line under „Започни“: on Android „Имаш игра в браузъра? Отвори я там“, a tap that opens it; on an iPhone, where no
     link can, „Имаш игра в браузъра? Отвори я там: ··· → Отвори в Safari“, no button (`coverExit`).
-  - Come by an invite link (`/f/<code>`, the address the link's until the invite is answered, then Днес's: an app's
-    own browser opens the invite in the phone's): over the issue, the invite (`.invite-card`, on the cover too): the
-    inviter's avatar, name and worn seal, „те кани да сте приятели в АЛМАНАХ.“ and „Добави като приятел“ (an outlined
-    `.btn`: „Започни“ stays the action). On a phone it's one row (the avatar small, the button „Добави“), the issue's
-    date smaller and its glyphs left out under it, so that „Започни“ stays on the first screen (`layout.spec.ts`). The tap says what came of it in the card's line: „Вече сте приятели с Ана.“
-    and „Към Приятели“; before any game, „Първо изиграй днешния брой. След него ще сте приятели с Ана.“ (the tap kept
-    on the device a week), and as that game ends „Вече сте приятели с Ана.“ is the result's notice, in the card's
-    place. The player's own link: „Това е твоята връзка. Който я отвори, може да те добави с едно докосване.“, no
-    button; a link gone: „Тази връзка вече не важи. Поискай нова.“
-  - Nothing over the issue but what came of the player's own step (a profile signed in to, a game brought here, an
-    invite opened).
+  - Nothing over the issue but what came of the player's own step (a profile signed in to, a game brought here).
     Others' news is Приятели's: its dot for a request, a duel or a duel's result since the last look, its line for a
     friend's yes.
 - **The day's result** (Днес once the day is played):
@@ -155,10 +145,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   even right answers („Равен брой верни · реши по-близкото число“: nothing else does; even in that too, „Равенство“
   and nothing more); one that ran out „Изтече“ alone at
   the right, why under the row („Иво не го изигра навреме.“); the record between two is the friend's
-  row's alone). Friends are added by the player's invite link, „Покани приятел“
-  (`.invite-friend`, an outlined `.btn`: a phone's share sheet with „Добави ме в АЛМАНАХ: <link>“, a big screen's copy,
-  „Връзката е копирана. Изпрати я на приятел.“; one quiet line under it, and „Нова връзка“ beside it, which asks once,
-  „Старата връзка ще спре да работи.“), and in one field, „име или имейл“; a
+  row's alone). Friends are added in one field, „име или имейл“; a
   friend's yes to a request is one line over the friends, told once; requests sent wait under „Изпратени покани“.
   Only two friends of one name show their @username. A duel's result, as the day's: a white card, the kicker, the
   verdict („Победа“, „Загуба“, „Равенство“) as its h1, the two face to face, each a column (the avatar, the name under
@@ -404,7 +391,7 @@ to show it whole; nothing over the question.
   question at its longest in the sample bank, and beside them the real bank's longest orders, pairs, choices, clues,
   numbers and groups and its longest choice under a portrait where it's here (`private/`; CI has only the sample),
   answered right, wrong and close: `e2e/kinds.ts`, `e2e/bank.ts`): nothing scrolls sideways; Днес shows „Започни“
-  whole and high, an invite over it too; from 375 × 600 a question shows every answer or its pad and its action
+  whole and high; from 375 × 600 a question shows every answer or its pad and its action
   whole; at 320 × 568 every control is a scroll away, under nothing, the first answer in sight; a picture never under
   120px; once answered, the player's row, the right one, the verdict and „Напред“ are in sight, nothing under „Напред“,
   nothing under the panel nor a scrap under the head, the panel packed; a row's sign never on a line of its own, nor a punctuation mark.
@@ -512,7 +499,7 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
   `.verdict`, `.right-said`, `.after`, `.up-next-go`; `.issue`, `.issue-go`, `.today-side`, `.result`, `.result-main`, `.score-n`,
   `.tiles .tile`, `.tomorrow`, `.result-share`, `.share-sheet`, `.streak-chip`, `.streak-notice`, `.day-entry`, `.friends-day`, `.missed-day`;
   `.summary`, `.reviewed`, `.news-facts`; `.toc-row`, `.entry`; `.day-board`, `.rank-row`, `.friend`, `.invitation`,
-  `.accepted-notice`, `.invite-card`, `.invite-friend`, `.duels`, `.duel-turn`, `.duel-row`, `.their-line`; `.me-ladder`, `.ladder`.
+  `.accepted-notice`, `.duels`, `.duel-turn`, `.duel-row`, `.their-line`; `.me-ladder`, `.ladder`.
 
 ## Before a UI change ships
 

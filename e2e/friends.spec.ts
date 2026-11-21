@@ -81,9 +81,7 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   // one first: a request is a player's.
   await b.goto("/friends");
   await b.locator(".friends").getByRole("button", { name: "Добави приятел" }).click();
-  await expect(
-    b.getByText("Още нямаш приятели тук. Изпрати им връзката си или ги добави по потребителско име или имейл."),
-  ).toBeVisible();
+  await expect(b.getByText("Още нямаш приятели тук. Добави ги по потребителско име или имейл.")).toBeVisible();
   // Nothing typed: said in the game's words, the cursor in the field.
   await b.getByRole("button", { name: "Добави", exact: true }).click();
   await expect(b.getByRole("alert")).toHaveText("Напиши потребителското име или имейла на приятеля си.");
@@ -173,9 +171,7 @@ test("a request turned down, a friend removed", async ({ browser }) => {
   await a.getByRole("dialog").getByRole("button", { name: "Премахни" }).click();
   await expect(a.locator(".friend")).toHaveCount(0);
   await b.reload();
-  await expect(
-    b.getByText("Още нямаш приятели тук. Изпрати им връзката си или ги добави по потребителско име или имейл."),
-  ).toBeVisible();
+  await expect(b.getByText("Още нямаш приятели тук. Добави ги по потребителско име или имейл.")).toBeVisible();
 });
 
 test("a friend just accepted is on the day's board at once, without a reload", async ({ browser }) => {
@@ -312,10 +308,6 @@ test.describe("on a 320 × 568 phone", () => {
     await page.getByLabel("Потребителско име или имейл на приятел").fill("@nobody_here_at_all");
     await tap(page.getByRole("button", { name: "Добави", exact: true }));
     await clear(".add-friend .bad");
-    // „Нова връзка“'s ask, once there's a link.
-    await page.getByRole("button", { name: "Покани приятел" }).click();
-    await tap(page.getByRole("button", { name: "Нова връзка" }));
-    await clear(".invite-renew");
     // „Изтрий профила“'s ask, at Настройки' foot.
     await page.goto("/settings");
     await tap(page.getByRole("button", { name: "Изтрий профила" }));

@@ -16,7 +16,6 @@ import { askToKeep } from "../lib/keep.ts";
 import { fragment } from "../lib/router.ts";
 import { notice, type User, user } from "../state.ts";
 import { emailWords } from "../ui.ts";
-import { invitePath } from "./invite.ts";
 import { noEmail, noEmailLine, signIn } from "./signin.ts";
 
 /** This page's app browser, if it's in one. */
@@ -339,16 +338,13 @@ export function exitWay(stake: () => string | null): Child {
 }
 
 /** The cover's one small line in an app's own browser, under „Започни“: a game kept in the phone's browser is there.
- * On Android a tap opens it (at the invite the page is at, while it is: screens/invite.ts); elsewhere (an iPhone),
+ * On Android a tap opens it; elsewhere (an iPhone),
  * where no link can, the line names the app's menu instead, no button that would do nothing. */
 export function coverExit(): Child {
   if (!app) return null;
   if (app.platform !== "android")
     return h("p", { class: "small issue-exit" }, "Имаш игра в браузъра? Отвори я там: ", h("b", null, menuWay()));
-  const go = () => {
-    const at = invitePath.test(location.pathname) ? location.pathname : "/";
-    location.assign(outsideLink(`${location.origin}${at}`));
-  };
+  const go = () => location.assign(outsideLink(`${location.origin}/`));
   return h(
     "p",
     { class: "small issue-exit" },
