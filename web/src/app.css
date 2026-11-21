@@ -152,7 +152,7 @@
     --i-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
     --i-cross: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M7 7l10 10M17 7L7 17'/%3E%3C/svg%3E");
     --i-close: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round'%3E%3Cpath d='M5 5l14 14M19 5L5 19'/%3E%3C/svg%3E");
-    --i-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5h11v14H9l-6-7z'/%3E%3Cpath d='M12.5 9.5l5 5M17.5 9.5l-5 5'/%3E%3C/svg%3E");
+    --i-back: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8.5 5H20a1.5 1.5 0 0 1 1.5 1.5v11A1.5 1.5 0 0 1 20 19H8.5L2.5 12z'/%3E%3Cpath d='M12.25 9.75l4.5 4.5M16.75 9.75l-4.5 4.5'/%3E%3C/svg%3E");
     --i-left: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 5l-7 7 7 7'/%3E%3C/svg%3E");
     --i-right: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 5l7 7-7 7'/%3E%3C/svg%3E");
     --i-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5'/%3E%3Cpath d='M15.5 15.5L21 21'/%3E%3C/svg%3E");
@@ -1416,6 +1416,12 @@
     --seal-outline: transparent;
   }
 
+  /* The glyph, an <svg> inside the seal's, kept to its own box: every picture is drawn inside its 64 × 64, and
+     Firefox measures a nested <svg> that may overflow as far wider than it paints (past a card's edge). */
+  .seal .pic {
+    overflow: hidden;
+  }
+
   .seal .f-vivid {
     fill: var(--tv);
   }
@@ -2230,8 +2236,8 @@
 
   .key.erase::before {
     content: "";
-    width: 26px;
-    height: 26px;
+    width: 30px;
+    height: 30px;
     background: currentColor;
     -webkit-mask: var(--i-back) center / contain no-repeat;
     mask: var(--i-back) center / contain no-repeat;
@@ -3992,6 +3998,20 @@
     stroke: var(--k5);
   }
 
+  /* An avatar's own accents (an iris, a beak, antlers), each set with its other inks (.tone-natural.sh-<shape>). */
+  .ka {
+    fill: var(--ka, var(--k3));
+  }
+  .kb {
+    fill: var(--kb, var(--k4));
+  }
+  .la {
+    fill: none;
+    stroke: var(--ka, var(--k3));
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
   /* ---- Avatars: the drawn animal in its own colours, in a round medallion of its scene ---- */
 
   .avatar {
@@ -4021,9 +4041,9 @@
 
   /* The natural tone: no tone over the picture, every part in its own colour, as the thing looks (a fox orange with a
      white chest, a stork white with a black wing and a red beak), on a tile of its own scene (a meadow, the sky, the
-     night). Each shape sets its inks; a part that shares an ink with another but differs in life (the cat's eyes, the
-     stork's wing lines) is picked by its place among the picture's layers (art/pictures.ts: keep them in order, or
-     move its number here). pictures.test.ts holds every avatar coloured. */
+     sand). Each shape sets its inks: its furs and pale parts (k1, k2, k4, k5) and its own accents (ka, kb: an iris, a
+     beak, a nose, a shell), which art/pictures.ts paints its parts with by name, never by a part's place among the
+     picture's layers. pictures.test.ts holds every avatar coloured. */
   .tone-natural {
     --tone: #9fd0f2;
   }
@@ -4057,14 +4077,8 @@
     --k2: #f29a45;
     --k4: #f6c1a6;
     --k5: #fff7ec;
-  }
-
-  .tone-natural.sh-cat > .avatar-pic > :nth-child(7) {
-    fill: #b9d03c;
-  }
-
-  .tone-natural.sh-cat > .avatar-pic > :nth-child(10) {
-    fill: #e5808f;
+    --ka: #b9d03c;
+    --kb: #e5808f;
   }
 
   .tone-natural.sh-hare {
@@ -4076,10 +4090,7 @@
     --k2: #b08d6e;
     --k4: #f2c2c2;
     --k5: #f6efe6;
-  }
-
-  .tone-natural.sh-hare > .avatar-pic > :nth-child(7) {
-    fill: #e5808f;
+    --ka: #e5808f;
   }
 
   .tone-natural.sh-hedgehog {
@@ -4100,8 +4111,8 @@
   .tone-natural.sh-dog > .avatar-pic {
     --k1: #7a4a26;
     --k2: #d99b5c;
-    --k4: #ee7c8b;
     --k5: #fff6ea;
+    --ka: #ee7c8b;
   }
 
   .tone-natural.sh-deer {
@@ -4112,10 +4123,7 @@
     --k1: #7a4f2e;
     --k2: #b8784a;
     --k4: #f4e7d4;
-  }
-
-  .tone-natural.sh-deer > .avatar-pic > :nth-child(3) {
-    stroke: #d9c09a;
+    --ka: #a67c4e;
   }
 
   .tone-natural.sh-stork {
@@ -4123,12 +4131,8 @@
   }
 
   .tone-natural.sh-stork > .avatar-pic {
-    --k1: #e14a2c;
     --k5: #fbfbfd;
-  }
-
-  .tone-natural.sh-stork > .avatar-pic > :nth-child(3) {
-    stroke: #4a4a5e;
+    --ka: #e14a2c;
   }
 
   .tone-natural.sh-frog {
@@ -4136,14 +4140,10 @@
   }
 
   .tone-natural.sh-frog > .avatar-pic {
-    --k1: #2e8a3d;
+    --k1: #2a7a36;
     --k2: #55b84f;
     --k4: #f1a3a0;
     --k5: #eaf6c6;
-  }
-
-  .tone-natural.sh-frog > .avatar-pic > :nth-child(10) {
-    stroke: #2a6a30;
   }
 
   .tone-natural.sh-mouse {
@@ -4173,8 +4173,8 @@
   }
 
   .tone-natural.sh-sheep > .avatar-pic {
-    --k1: #3b3330;
-    --k2: #8a6f63;
+    --k1: #4a3d38;
+    --k2: #a38a7d;
     --k5: #f7f3ea;
   }
 
@@ -4183,17 +4183,11 @@
   }
 
   .tone-natural.sh-turtle > .avatar-pic {
-    --k1: #6b4a24;
+    --k1: #5f7a3c;
     --k2: #8fa65a;
     --k4: #c3d48a;
-  }
-
-  .tone-natural.sh-turtle > .avatar-pic > :nth-child(9) {
-    fill: #b8893f;
-  }
-
-  .tone-natural.sh-turtle > .avatar-pic > :nth-child(10) {
-    stroke: #d9b56a;
+    --ka: #6b4a24;
+    --kb: #b8893f;
   }
 
   .tone-natural.sh-badger {
@@ -4201,12 +4195,13 @@
   }
 
   .tone-natural.sh-badger > .avatar-pic {
-    --k1: #7d7f86;
+    --k1: #3f3d4a;
+    --k2: #7d7f86;
     --k5: #f5f3ee;
   }
 
   .tone-natural.sh-lynx {
-    --tone: #d6e4f0;
+    --tone: #c3d0ee;
   }
 
   .tone-natural.sh-lynx > .avatar-pic {
@@ -4214,10 +4209,8 @@
     --k2: #c99a5e;
     --k4: #f0dcbc;
     --k5: #fbf3e6;
-  }
-
-  .tone-natural.sh-lynx > .avatar-pic > :nth-child(9) {
-    fill: #b9c43c;
+    --ka: #b9c43c;
+    --kb: #a8563f;
   }
 
   .avatar.s {
@@ -4662,7 +4655,7 @@
     align-items: center;
     gap: 10px;
     min-height: 64px;
-    padding: 8px 14px 8px 8px;
+    padding: 8px 14px;
     border: 2px solid var(--line);
     border-radius: var(--r-2);
     background: var(--surface);
@@ -4825,10 +4818,9 @@
       font-size: 2.125rem;
     }
 
-    /* Микс and България: closer to the edge, the name whole beside its glyph. */
+    /* Микс and България: closer to the edge, the name whole. */
     .way {
-      gap: 8px;
-      padding-right: 8px;
+      padding-inline: 8px;
     }
 
     .way-words b {
@@ -4958,7 +4950,9 @@
     font: 700 0.875rem / 1.4 var(--font-sans);
   }
 
-  /* The facts: ink a card with an ink edge, grey a thin solid outline and lighter words. */
+  /* The facts: ink a card with an ink edge, grey a thin solid outline and lighter words. An entry reads in the order
+     it was lived: the dateline, the question small and muted (a kicker), the answer big between it and the fact, the
+     fact in body text; three things told apart at a glance by size and weight, in grey as in ink. */
   .entries {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -5018,8 +5012,22 @@
     font: 600 0.9375rem / 1.35 var(--font-sans);
   }
 
+  .entry .entry-q {
+    margin-top: 2px;
+    color: var(--ink-3);
+    font: 600 0.875rem / 1.35 var(--font-sans);
+  }
+
   .entry-fact {
     font: 500 1rem / 1.45 var(--font-sans);
+  }
+
+  .entry .entry-fact {
+    margin-top: 4px;
+  }
+
+  .entry .credit {
+    font-size: 0.8125rem;
   }
 
   .entry.met {
@@ -5028,12 +5036,45 @@
     color: var(--grey);
   }
 
-  .entry.met :is(.entry-word, .entry-q, .entry-fact) {
+  .entry.met :is(.entry-q, .entry-word, .entry-fact) {
     color: var(--grey);
   }
 
   .entry.met .entry-word {
-    font-weight: 700;
+    font-weight: 800;
+  }
+
+  /* A picture question's picture, beside its dateline, question and headword: a thumbnail at the entry's right, its
+     whole shape (a flag is never cut). */
+  .entry-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 14px;
+  }
+
+  .entry-head {
+    display: grid;
+    align-content: start;
+    gap: 6px;
+  }
+
+  .entry-pic {
+    width: 88px;
+    height: auto;
+    max-height: 132px;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+
+  /* What a search found: a soft tone of the chapter's colour under the full ink (4.5:1 on both themes' surfaces:
+     contrast.test.ts), in grey as in ink. */
+  .entry mark {
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--tv) 35%, transparent);
+    color: var(--ink);
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
   }
 
   .tag.ink {
@@ -5154,14 +5195,17 @@
       grid-column: 1 / span 5;
     }
 
+    /* The facts in one column, a reading width (its head and search with it): a book reads top to bottom, the latest
+       first exactly, and no hole beside a tall entry (two across left them; columns would read down then across). */
     .chapter.spread > .page-2 {
       grid-column: 6 / span 7;
+      width: 100%;
+      max-width: 44rem;
     }
 
-    /* Two across, each its own height: never stretched to its neighbour's, its lines spread apart. */
-    .entries {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      align-items: start;
+    .entry-pic {
+      width: 112px;
+      max-height: 168px;
     }
   }
 

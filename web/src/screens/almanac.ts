@@ -5,6 +5,7 @@
 // latest first, a page at a time, found by their words. How well a player knows a chapter (mastery) is the game's own,
 // never shown.
 
+import type { Credit, Picture } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
 
@@ -23,11 +24,13 @@ let {
   missing,
   nameWords,
   onCleanup,
+  pictureCredit,
   textWords,
   pips,
   rankName,
   rename,
   seal,
+  searchWords,
   signal,
   title,
   categories,
@@ -63,6 +66,9 @@ interface Learned {
   /** Where it was met: the day's ten (its issue), a chapter's game, a duel. */
   kind?: "day" | "topic" | "duel";
   issue?: number;
+  /** A picture question's picture (a choice of pictures', its answer's), as the play screen has it, and whose it is. */
+  image?: Picture;
+  credit?: Credit;
 }
 
 /** A page of the book (play.Almanac): its facts, how many the chapter (and the search) lists, each chapter's ink (its
@@ -97,11 +103,13 @@ function setKit(kit: Kit) {
     missing,
     nameWords,
     onCleanup,
+    pictureCredit,
     textWords,
     pips,
     rankName,
     rename,
     seal,
+    searchWords,
     signal,
     title,
     categories,
@@ -218,7 +226,6 @@ function way(id: string, name: string, note: string): Child {
   return h(
     "a",
     { class: `way t-${id}`, href: `/play/${id}` },
-    glyph(id, 36),
     h("span", { class: "way-words" }, h("b", null, name), h("small", null, note)),
   );
 }
@@ -290,6 +297,8 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
   // The chapter's facts in all, unsearched: the search shows from `searchFrom` of them.
   const total = signal(0);
   let asked = "";
+  // The words the page shown was found by, marked in its entries (none unsearched).
+  let find: string[] = [];
   const load = () => {
     const q = new URLSearchParams({ topic: id, page: String(page.peek()) });
     if (query.peek().trim()) q.set("q", query.peek().trim());
@@ -306,6 +315,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
           load();
           return;
         }
+        find = searchWords(q.get("q") ?? "");
         data.set(p);
         if (p.ranks) first.set(p);
         if (!ask.includes("q=")) total.set(p.found);
@@ -462,7 +472,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
           h(
             "ol",
             { class: "entries" },
-            p.facts.map((f) => entry(f)),
+            p.facts.map((f) => entry(f, find)),
           ),
           pager(page(), Math.ceil(p.found / perPage), pageHref),
         ];
@@ -502,13 +512,18 @@ function whence(f: Learned): string {
   return from ? `${shortDate(day)} ·\u00a0${from}` : shortDate(day);
 }
 
-/** A fact as an entry of the book: ink (a card with an ink edge and „с мастило“), or grey („в сиво“, outlined thin,
- * lighter); its dateline, the answer as its headword (a statement to judge is its own headword, „Невярно:“ before one
- * that isn't so; an answer of parts a line each), the question, and the fact. */
-function entry(f: Learned): Child {
-  return h(
-    "li",
-    { class: f.ink ? `entry ink t-${f.category}` : `entry met t-${f.category}` },
+/** How wide an entry's picture is drawn (app.css, .entry-pic): a thumbnail at its right on a phone, beside its
+ * question and headword on a big screen. */
+const entryPicSizes = "(min-width: 56.25rem) 112px, 88px";
+
+/** A fact as an entry of the book, in the order it was lived: its dateline, the question small (a kicker), the answer
+ * as its headword between it and the fact (a statement to judge is its own headword, „Невярно:“ before one that isn't
+ * so; an answer of parts a line each), then the fact. Ink (a card with an ink edge and „с мастило“), or grey („в сиво“,
+ * outlined thin, lighter). A picture question's picture beside the question and headword, its credit at the foot. What
+ * a search found (`find`) is marked. */
+function entry(f: Learned, find: string[]): Child {
+  const im = f.image;
+  const head = [
     h(
       "p",
       { class: "entry-when" },
@@ -517,20 +532,43 @@ function entry(f: Learned): Child {
         : h("span", { class: "tag grey" }, "в сиво"),
       whence(f),
     ),
+    f.question ? h("p", { class: "entry-q" }, textWords(f.question, find)) : null,
     f.lines?.length
       ? h(
           "ul",
           { class: "entry-lines" },
-          f.lines.map((l) => h("li", null, textWords(l))),
+          f.lines.map((l) => h("li", null, textWords(l, find))),
         )
       : h(
           "p",
           { class: "entry-word" },
           f.untrue ? h("span", { class: "entry-untrue" }, "Невярно: ") : null,
-          textWords(f.answer),
+          textWords(f.answer, find),
         ),
-    f.question ? h("p", { class: "entry-q" }, textWords(f.question)) : null,
-    h("p", { class: "entry-fact" }, textWords(f.fact)),
+  ];
+  return h(
+    "li",
+    { class: `entry ${f.ink ? "ink" : "met"} t-${f.category}` },
+    im
+      ? h(
+          "div",
+          { class: "entry-top" },
+          h("div", { class: "entry-head" }, head),
+          h("img", {
+            class: "entry-pic",
+            src: im.src,
+            srcset: im.srcset,
+            sizes: entryPicSizes,
+            width: im.w,
+            height: im.h,
+            alt: im.alt,
+            loading: "lazy",
+            decoding: "async",
+          }),
+        )
+      : head,
+    h("p", { class: "entry-fact" }, textWords(f.fact, find)),
+    f.credit ? pictureCredit(f.credit) : null,
   );
 }
 

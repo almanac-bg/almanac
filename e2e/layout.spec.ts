@@ -544,6 +544,7 @@ for (const size of sizes)
                     // answers (the right one, the whole order) a scroll of the page away, above the panel.
                     ...(await outOfReach(page, ".after > :not(.up-next)", ".after")),
                     ...(await outOfReach(page, "article.question .options .option")),
+                    ...(laptop ? [] : await landed(page)),
                   ]
                 : [...(await panelFlaws(page)), ...(await answerInPlace(page)), ...(await packed(page))]),
               ...(!big && laptop ? await beside(page) : []),
@@ -637,6 +638,38 @@ for (const size of sizes)
         }
       });
     });
+
+/** Where the page landed for an answer with large text on a phone (the panel under the answers, „Напред“ stuck at
+ * the screen's foot over what scrolls under it): the head's foot between two parts, never across one; the verdict
+ * under the head; the fact's first line whole over „Напред“'s foot (its fade with it), or, where the verdict and what
+ * it says leave no room for it, the fact whole under the foot, a scroll away (DESIGN.md, Play). */
+async function landed(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out: string[] = [];
+    const box = (s: string) => document.querySelector(s)?.getBoundingClientRect();
+    const head = box(".question-top")?.bottom ?? 0;
+    for (const el of document.querySelectorAll(
+      "article.question > :is(.q-leaf, .picture), article.question .answering :is(.option, .hint, .clues > *, .clues-next)",
+    )) {
+      const r = el.getBoundingClientRect();
+      if (r.height && r.top < head - 1 && r.bottom > head + 1)
+        out.push(`cut by the head: ${el.className} [${Math.round(r.top)}–${Math.round(r.bottom)}]`);
+    }
+    const verdict = box(".after > .verdict");
+    const foot = box(".after .after-foot")?.top ?? innerHeight;
+    if (!verdict) return [...out, "no verdict"];
+    if (verdict.top < head - 1) out.push(`the verdict under the head [${Math.round(verdict.top)}]`);
+    const line = document.querySelector<HTMLElement>(".after .fact p:last-child");
+    const told = line
+      ? line.getBoundingClientRect().top + (Number.parseFloat(getComputedStyle(line).lineHeight) || 24)
+      : verdict.bottom;
+    const fact = line?.parentElement?.getBoundingClientRect();
+    const room = told - verdict.top <= foot - head - 12;
+    if (told > foot + 1 && (room || !fact || fact.top < foot - 1))
+      out.push(`the fact's first line under „Напред“ [${Math.round(told)} > ${Math.round(foot)}]`);
+    return out;
+  });
+}
 
 /** Where an answer ended, at the usual text: the player's row and the right one under the head and over „Напред“;
  * nothing over the answers (the panel under them, never across a row: a docked panel cut them); the verdict in sight

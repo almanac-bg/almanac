@@ -19,10 +19,10 @@ import (
 // met, in ink where it was a right answer in the issue the first time they met it, else in grey (ink.go), and says one
 // number, its ink.
 
-// Learned is one fact in a player's almanac: the question, its answer, and the fact behind it; in ink or in grey
-// (ink.go); when it was written, and where: the day's ten (its issue), a chapter's game, a duel. A statement to judge
-// true or not has no question: its answer is the statement itself, Untrue if it isn't so (the bank keeps no
-// corrected one).
+// Learned is one fact in a player's almanac: the question (its picture too), its answer, and the fact behind it; in
+// ink or in grey (ink.go); when it was written, and where: the day's ten (its issue), a chapter's game, a duel. A
+// statement to judge true or not has no question: its answer is the statement itself, Untrue if it isn't so (the bank
+// keeps no corrected one).
 type Learned struct {
 	ID       string `json:"id"`
 	Category string `json:"category"`
@@ -38,6 +38,10 @@ type Learned struct {
 	// Kind is the game it was learned in ("day", "topic", "duel"), and Issue the day's, for one of the day's ten.
 	Kind  string `json:"kind,omitempty"`
 	Issue int    `json:"issue,omitempty"`
+	// Image is a picture question's picture (bank.Picture: a choice of pictures', its answer's), as the play screen
+	// has it, and Credit whose it is: without it „Кой е този остров?“ says nothing in the book.
+	Image  *bank.ImageView   `json:"image,omitempty"`
+	Credit *bank.ImageCredit `json:"credit,omitempty"`
 }
 
 // AlmanacPage is how many facts a page of a chapter shows: a few screens' worth on a phone. A chapter grows to
@@ -90,6 +94,7 @@ type learnedAt struct {
 func learnedAs(q bank.Question, at learnedAt, ink bool) Learned {
 	l := Learned{ID: q.Base().ID, Category: q.Base().Category, Question: q.Base().Text, Answer: bank.AnswerText(q),
 		Lines: bank.AnswerLines(q), Fact: q.Extra().Fact, At: at.at, Kind: at.kind, Ink: ink}
+	l.Image, l.Credit = bank.Picture(q)
 	if at.kind == "day" {
 		l.Issue = Issue(at.day)
 	}

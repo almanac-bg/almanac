@@ -397,7 +397,9 @@ export async function keptPlayer(page: Page, browser: Browser): Promise<{ tag: s
 export async function cutOrOverlapping(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const out: string[] = [];
-    const say = (el: Element) => `${el.className}: „${(el.textContent ?? "").trim().slice(0, 40)}“`;
+    // An element by its tag and class attribute (an SVG's className is an object, not its words), and its words.
+    const say = (el: Element) =>
+      `${el.tagName.toLowerCase()}.${el.getAttribute("class") ?? ""}: „${(el.textContent ?? "").trim().slice(0, 40)}“`;
     // A name in a wide row whole: never clipped or ended with „…“. A name set inline (its words wrapping in its row)
     // has no box of its own to be cut in: its row's box is the one measured (and an inline box's own widths are
     // nothing to go by: Chromium has none, Firefox its words' run against a clientWidth of 0).
@@ -419,7 +421,7 @@ export async function cutOrOverlapping(page: Page): Promise<string[]> {
       for (const el of card.querySelectorAll("*")) {
         const r = el.getBoundingClientRect();
         if (r.width && (r.right > box.right + 1 || r.left < box.left - 1)) {
-          out.push(`past its card ${say(el)}`);
+          out.push(`past its card ${card.getAttribute("class")}: ${say(el)}`);
           break;
         }
       }

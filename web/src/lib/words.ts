@@ -142,6 +142,48 @@ export function keepNumbers(text: string): string {
     .replace(/(\d)[ \t]+(?=(?:[°%‰]\S*|\p{L}{1,4}\.?)(?=[\s,;:.!?)“”»]|$))/gu, "$1 ");
 }
 
+/** How long a search of the book may be, in letters (play.AlmanacSearch). */
+const searchLetters = 60;
+
+/** A search of the book's facts as the server takes it (play.AlmanacOf): its first 60 letters in lower case, a word
+ * between spaces each; a fact is found where it has every one. */
+export function searchWords(query: string): string[] {
+  return Array.from(query.trim().toLowerCase()).slice(0, searchLetters).join("").split(/\s+/).filter(Boolean);
+}
+
+/** Where a search's words (`searchWords`) are in a text, as [from, to) of it, in order and none over another: in any
+ * case, as the server finds them, and across the soft hyphens `hyphenate` puts in a word (one at a match's edge stays
+ * out of it). */
+export function found(text: string, words: string[]): [number, number][] {
+  if (!words.length) return [];
+  // The text in lower case without its soft hyphens, and where each of its letters is in the text.
+  let plain = "";
+  const from: number[] = [];
+  const to: number[] = [];
+  let i = 0;
+  for (const ch of text) {
+    if (ch !== "­")
+      for (const c of ch.toLowerCase()) {
+        plain += c;
+        from.push(i);
+        to.push(i + ch.length);
+      }
+    i += ch.length;
+  }
+  const spans: [number, number][] = [];
+  for (const w of words)
+    for (let at = plain.indexOf(w); at >= 0; at = plain.indexOf(w, at + 1))
+      spans.push([from[at] ?? 0, to[at + w.length - 1] ?? 0]);
+  spans.sort((a, b) => a[0] - b[0]);
+  const out: [number, number][] = [];
+  for (const s of spans) {
+    const last = out.at(-1);
+    if (last && s[0] <= last[1]) last[1] = Math.max(last[1], s[1]);
+    else out.push(s);
+  }
+  return out;
+}
+
 /** The hour (in Bulgaria) from which a streak at stake says it ends at midnight. */
 export const stakeHour = 18;
 

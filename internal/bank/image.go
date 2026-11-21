@@ -267,6 +267,17 @@ func picturesOf(q Question) []*Image {
 	return out
 }
 
+// Picture is the picture an entry of the book shows beside its question, and its credit: the one over the question,
+// or a choice of pictures' answer (its first); none for a question without one. As the play screen has them (View,
+// Reveal): the same sizes, the same address.
+func Picture(q Question) (*ImageView, *ImageCredit) {
+	im := q.Extra().Image
+	if c, ok := q.(*Choice); ok && im == nil && len(c.Pictures) > 0 {
+		im = &c.Pictures[0]
+	}
+	return im.view(), im.credit()
+}
+
 // HasPictures says whether a question shows a picture: over it, or as its options.
 func HasPictures(q Question) bool { return len(picturesOf(q)) > 0 }
 

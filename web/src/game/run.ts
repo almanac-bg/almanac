@@ -18,7 +18,19 @@ import { play, playAnswer, playCount } from "../lib/sound.ts";
 import { issueOf } from "../lib/words.ts";
 import { takeWaiting } from "../screens/invite.ts";
 import { playingWhile } from "../state.ts";
-import { chapterName, chip, fact, failure, filed, glyph, leaf, type VerdictKind, verdict, verdictSays } from "../ui.ts";
+import {
+  chapterName,
+  chip,
+  fact,
+  failure,
+  filed,
+  glyph,
+  leaf,
+  pictureCredit,
+  type VerdictKind,
+  verdict,
+  verdictSays,
+} from "../ui.ts";
 import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
 import {
   answered,
@@ -31,7 +43,7 @@ import {
   type Stage,
   wholeWords,
 } from "./questions.ts";
-import type { Answer, Credit, Mark, Result, Reveal, Shown, State, TheirMark, View } from "./types.ts";
+import type { Answer, Mark, Result, Reveal, Shown, State, TheirMark, View } from "./types.ts";
 
 /** Where the run whose question this tab showed last is kept (this tab's, for as long as it's open). */
 const showingKey = "almanac.showing";
@@ -671,7 +683,7 @@ function question(
         // Ink, said where it was written, as the server says it was (in the issue, met there first): grey isn't said.
         res.ink && res.reveal.fact ? filed(q.category) : null,
         fact(res.reveal.fact, res.reveal.day),
-        res.reveal.credit ? credit(res.reveal.credit) : null,
+        res.reveal.credit ? pictureCredit(res.reveal.credit) : null,
         res.reveal.credits?.length ? h("p", { class: "credit" }, creditsWords(res.reveal.credits)) : null,
         upNext(lasts, res.state.done ? "Резултатът идва след малко…" : `Въпрос ${q.n + 2} идва след малко…`, true),
         // „Напред“ on a foot of its own, opaque to the panel's edge: what scrolls in the panel never shows under it.
@@ -817,12 +829,12 @@ function laidTop(el: HTMLElement): number {
   return y;
 }
 
-/** How a question went for the other side of a duel, as a line under the player's verdict: „Мария: вярно за 4,2 с“.
- * Their mark for it comes with the player's own answer (play.State.Against): none, nothing to say. */
+/** How a question went for the other side of a duel, as a line under the player's verdict: „Мария: вярно“ (never how
+ * long it took: time never counts). Their mark for it comes with the player's own answer (play.State.Against): none,
+ * nothing to say. */
 function theirLine(name: string, m: TheirMark | undefined): Child {
   if (!name || !m) return null;
-  const secs = (m.ms / 1000).toLocaleString("bg", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  const how = m.right ? `вярно за ${secs}\u00a0с` : m.close ? "близо" : m.missed ? "без отговор" : "грешно";
+  const how = m.right ? "вярно" : m.close ? "близо" : m.missed ? "без отговор" : "грешно";
   return h("p", { class: `their-line${m.right ? " right" : ""}` }, h("b", null, `${name}: `), how);
 }
 
@@ -908,6 +920,9 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
   // row: app.css).
   const foot = after.querySelector<HTMLElement>(".after-foot");
   const footing = foot && getComputedStyle(foot).position === "sticky" ? foot.offsetHeight : 0;
+  // Whether the fact's first line fits over „Напред“ with the verdict (by says); large text (app.css, `tight`).
+  let fits = true;
+  const large = () => document.documentElement.classList.contains("tight");
   // How far the page moves down (or up) for it, the head's foot where it'll be.
   const by = (headFoot: number) => {
     const clear = (top: number) => top - headFoot - 12;
@@ -917,10 +932,17 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
       const up = clear(box.top);
       return over > 0 ? Math.max(0, right ? Math.min(over, up) : over) : Math.min(0, Math.max(up, over));
     }
-    // (Over an order's rows, all of them the answer, the fact's first line too: its first rows go under the head.)
-    const must = told(right ? 0 : 1) + footing + 8 - innerHeight;
-    const want = told(2) + footing + 8 - innerHeight;
-    return Math.max(must, Math.min(Math.max(0, want), clear(box.top)));
+    const over = (y: number) => y + footing + 8 - innerHeight;
+    let must = over(told(0));
+    // Over an order's rows (all of them the answer), and with large text (the rows can't all show with the panel),
+    // the fact's first line too, ahead of the rows: whole over „Напред“, or, where the verdict leaves it no room, the
+    // fact whole under it, a scroll away.
+    if (fact?.parentElement && (!right || large())) {
+      fits = over(told(1)) <= clear(onScreen(verdict));
+      must = fits ? over(told(1)) : Math.min(clear(onScreen(verdict)), over(onScreen(fact.parentElement) - 8));
+      if (!fits) return Math.max(over(told(0)), must);
+    }
+    return Math.max(must, Math.min(Math.max(0, over(told(2))), clear(box.top)));
   };
   const most = Math.max(0, document.documentElement.scrollHeight - innerHeight);
   const to = (d: number) => Math.round(Math.min(Math.max(was + d, 0), most));
@@ -936,15 +958,21 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
   if (y !== was) scrollTo({ top: y, behavior: "instant" });
   // Moved, the head's foot falls between two parts, never across one: what it would cut there (the sheet's foot, the
   // picture's, a row, a clue) goes whole under it, the page made a little longer where it ends short of that
-  // (app.css, --past).
+  // (app.css, --past); or, where the fact is to stay whole under „Напред“, comes back whole from under the head.
   if (y > 0) {
     const edge = head.node.getBoundingClientRect().bottom;
     let cut = 0;
+    // (Under the answers, the panel first: the right answer itself goes whole under the head too.)
     for (const el of page.querySelectorAll(
-      ":scope > .q-leaf, :scope > .picture, .answering :is(.hint, .options > *, .clues > *, .clues-next)",
+      ":scope > .q-leaf, :scope > .picture, .answering :is(.hint, .option, .options > *, .clues > *, .clues-next)",
     )) {
       const r = el.getBoundingClientRect();
-      if (r.height && r.top < edge - 1 && r.bottom > edge + 1) cut = Math.max(cut, r.bottom - edge);
+      if (r.height && r.top < edge - 1 && r.bottom > edge + 1)
+        cut = fits ? Math.max(cut, r.bottom - edge) : Math.min(cut, r.top - edge);
+    }
+    if (cut < 0) {
+      y = Math.max(0, y + Math.floor(cut));
+      scrollTo({ top: y, behavior: "instant" });
     }
     if (cut > 0) {
       const want = y + Math.ceil(cut);
@@ -1062,15 +1090,4 @@ function kindOf(r: Result, given: Answer | null): VerdictKind {
   if (r.exact) return "exact";
   if (r.right) return "right";
   return r.score > 0 ? "partial" : "wrong";
-}
-
-function credit(c: Credit): Child {
-  return h(
-    "p",
-    { class: "credit" },
-    "Снимка: ",
-    h("a", { href: c.source, target: "_blank", rel: "noopener" }, c.credit),
-    " · ",
-    c.licenseUrl ? h("a", { href: c.licenseUrl, target: "_blank", rel: "noopener" }, c.license) : c.license,
-  );
 }

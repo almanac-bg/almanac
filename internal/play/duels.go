@@ -16,9 +16,9 @@ import (
 
 // Duels are two players on the same ten questions, each played on one's own time, as any game is (play.go: the run's
 // own clock, a question at a time); more right answers wins, and between the same, what breaks a tie on the day's
-// board (tiebreak: how close the hard number came), then the quicker by a second or
-// more (TieBand); anything closer is a draw (duelScore). Nothing moves but the record between two people: there's no
-// rating (owner, 2026-11-20, DECISIONS.md „The redesign“).
+// board (tiebreak: how close the hard number came); even in both, it's a draw, as the board would share their place
+// (duelScore): time never counts (DECISIONS.md, „The direction“). Nothing moves but the record between two people:
+// there's no rating (owner, 2026-11-20, DECISIONS.md „The redesign“).
 //
 // A duel with a friend (DuelFriend): the player picks a friend and plays ten questions drawn for the two of them
 // (drawFor: „Микс“, at their pair's level, questions neither has seen first). Once their side is played, the duel is
@@ -38,13 +38,12 @@ import (
 // is never told who played it.
 //
 // A duel the player started and left unfinished is gone on with when they start one the same way again (with the same
-// friend, or against a recording); one never finished goes at its time, as if never started (SettleDue). A friend's
+// friend, or against a recording); one never finished goes at its time, as if never started (SettleDue). One left
+// before its first question showed (a tap, then „Отказ“ or away) isn't a duel yet: it isn't listed, and goes with its
+// run DuelUnbegun after it was made (SettleDue), so that nothing lingers as „Твой ред“ that nobody played. A friend's
 // side left half-way counts as it stood when the time runs out.
 
 const (
-	// TieBand is how much quicker (ms, over the whole game) one of two with the same right answers, and nothing else to
-	// break the tie, must be to win: less is a draw.
-	TieBand = 1000
 	// DuelFor is how long a friend has to play a duel sent to them, a week from when it was sent (DECISIONS.md, „The
 	// direction“), and how long the first side has to play theirs, from its start.
 	DuelFor = 7 * 24 * time.Hour
@@ -54,6 +53,9 @@ const (
 	// DuelsADay is how many duels a player may start with friends in a day (in Bulgaria): more than anyone plays, and
 	// a bound on what one player can send others.
 	DuelsADay = 20
+	// DuelUnbegun is how long a duel the player made and left before its first question showed is kept (unlisted, to be
+	// gone on with by a tap on the same duel again) before it goes: long past its count, should its screen still be open.
+	DuelUnbegun = 10 * time.Minute
 )
 
 var (
@@ -109,9 +111,8 @@ type DuelView struct {
 	// (decided); 0 when the right answers were even and the tie was broken (or nothing did). One duel's view (DuelOf)
 	// only.
 	Decided int `json:"decided,omitempty"`
-	// TieBy is, of a duel with a result on even right answers, what broke the tie (duelScore): TieNumber (the number
-	// nearer) or TieTime (quicker by TieBand or more); "" for a draw, or a duel
-	// won on right answers.
+	// TieBy is, of a duel won on even right answers, what broke the tie (duelScore): TieNumber, the number nearer;
+	// "" for a draw, or a duel won on right answers.
 	TieBy string `json:"tieBy,omitempty"`
 	// Record is how the player's duels against this person went, this one with them (not a recording's).
 	Record *Record `json:"record,omitempty"`
@@ -128,11 +129,10 @@ type DuelSide struct {
 	Name   string `json:"name"`
 	Tag    string `json:"tag,omitempty"`
 	Rights int    `json:"rights"`
-	Ms     int64  `json:"ms"`
 	Done   bool   `json:"done"`
 	// Started is whether the side's game has begun: a question shown (its time running, or run out), or answered (a
-	// duel sent first may be made and never begun).
-	Started bool  `json:"started,omitempty"`
+	// duel made first may be left before it begins: not listed, and gone DuelUnbegun after).
+	Started bool  `json:"-"`
 	Look    *Look `json:"look,omitempty"`
 	// Gone is a player who has gone since (play.Forget): their game went with them, so their score isn't known.
 	Gone bool `json:"gone,omitempty"`
@@ -143,11 +143,9 @@ type DuelSide struct {
 	score duelScore
 }
 
-// What broke a tie on even right answers (DuelView.TieBy).
-const (
-	TieNumber = "number"
-	TieTime   = "time"
-)
+// TieNumber is what broke a tie on even right answers (DuelView.TieBy): the hard number nearer, the only thing that
+// does.
+const TieNumber = "number"
 
 // DuelMark is how one question of a duel went for one side: right, or close („близо“: closeAnswer), how long it took,
 // and whether nothing was given (Missed: the time ran out).
@@ -625,17 +623,17 @@ func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 		followed = nil
 		var bID, bRun sql.NullInt64
 		var bName sql.NullString
-		var bRights, bClose, bMs sql.NullInt64
+		var bRights, bClose sql.NullInt64
 		var bDone sql.NullBool
-		err := tx.QueryRow(`SELECT d.kind, d.a_id, ua.name, ra.id, ra.rights, ra.closeness, ra.ms,
+		err := tx.QueryRow(`SELECT d.kind, d.a_id, ua.name, ra.id, ra.rights, ra.closeness,
 				ra.finished_at IS NOT NULL,
-				rb.user_id, ub.name, rb.id, rb.rights, rb.closeness, rb.ms, rb.finished_at IS NOT NULL
+				rb.user_id, ub.name, rb.id, rb.rights, rb.closeness, rb.finished_at IS NOT NULL
 			FROM duels d JOIN users ua ON ua.id = d.a_id JOIN runs ra ON ra.id = d.a_run
 			LEFT JOIN runs rb ON rb.id = CASE d.kind WHEN 'recording' THEN d.ghost_run ELSE d.b_run END
 			LEFT JOIN users ub ON ub.id = rb.user_id
 			WHERE d.id = ? AND d.ended_at IS NULL`, duelID).
 			Scan(&kind, &a.id, &a.name, &a.run, &a.score.rights, &a.score.tie.closeness,
-				&a.score.ms, &a.done, &bID, &bName, &bRun, &bRights, &bClose, &bMs, &bDone)
+				&a.done, &bID, &bName, &bRun, &bRights, &bClose, &bDone)
 		if errors.Is(err, sql.ErrNoRows) {
 			settled = true // the other side's last answer settled it a moment ago: it's done
 			return nil
@@ -644,8 +642,7 @@ func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 			return err
 		}
 		b = side{id: bID.Int64, run: bRun.Int64, name: bName.String, done: bDone.Bool, present: bRun.Valid,
-			score: duelScore{rights: int(bRights.Int64), ms: bMs.Int64,
-				tie: tiebreak{closeness: int(bClose.Int64)}}}
+			score: duelScore{rights: int(bRights.Int64), tie: tiebreak{closeness: int(bClose.Int64)}}}
 		if !a.done || !b.present || !b.done {
 			settled = true // not played to its end yet: nothing to settle
 			return nil
@@ -705,8 +702,12 @@ func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 
 // SettleDue ends the duels whose time is up. A friend's side left half-way counts as it stood: it's finished there,
 // and the duel has its result. One the friend never started lapses, without a result. One whose first side was never
-// finished goes, as if never started (its run stays the player's, a game left half-way). Run every few minutes.
+// finished goes, as if never started (its run stays the player's, a game left half-way). One whose first question never
+// showed goes with its run DuelUnbegun after it was made (dropUnbegun). Run every few minutes.
 func (g *Game) SettleDue(ctx context.Context) error {
+	if err := g.dropUnbegun(ctx); err != nil {
+		return err
+	}
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, d.kind, d.sent_at IS NOT NULL, coalesce(d.b_run, 0),
 			coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = d.a_run), 0)
 		FROM duels d WHERE d.ended_at IS NULL AND d.expires_at <= ?`, store.Ms(g.Now()))
@@ -748,6 +749,53 @@ func (g *Game) SettleDue(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// dropUnbegun deletes the duels made more than DuelUnbegun ago whose first side never showed a question (a tap that
+// made one, then „Отказ“ or away), and their runs: nothing of them was played, nor sent (the friend never knew of it).
+// Each is looked at again as it goes, in one write: a question shown meanwhile keeps it.
+func (g *Game) dropUnbegun(ctx context.Context) error {
+	const unbegun = `r.finished_at IS NULL AND r.at = 0 AND r.shown_at IS NULL
+		AND NOT EXISTS (SELECT 1 FROM answers WHERE run_id = r.id)`
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id FROM duels d JOIN runs r ON r.id = d.a_run
+		WHERE d.ended_at IS NULL AND d.sent_at IS NULL AND d.created_at <= ? AND `+unbegun,
+		store.Ms(g.Now().Add(-DuelUnbegun)))
+	if err != nil {
+		return err
+	}
+	var due []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		due = append(due, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil || len(due) == 0 {
+		return err
+	}
+	return g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		for _, id := range due {
+			var run int64
+			err := tx.QueryRow(`SELECT r.id FROM duels d JOIN runs r ON r.id = d.a_run
+				WHERE d.id = ? AND d.ended_at IS NULL AND d.sent_at IS NULL AND `+unbegun, id).Scan(&run)
+			if errors.Is(err, sql.ErrNoRows) {
+				continue // begun meanwhile
+			}
+			if err != nil {
+				return err
+			}
+			if _, err := tx.Exec(`DELETE FROM duels WHERE id = ?`, id); err != nil {
+				return err
+			}
+			if _, err := tx.Exec(`DELETE FROM runs WHERE id = ?`, run); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // endDue settles a duel whose time is up, its last side finished where it stood (run; 0: played already).
@@ -876,6 +924,10 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 			v.Opponent = &DuelSide{Name: GoneName, Done: true, Gone: true}
 		}
 		mine := v.First
+		// The player's own, left before its first question showed: not a duel yet, in the lists (SettleDue drops it).
+		if only == 0 && v.EndedAt == 0 && mine && v.You != nil && !v.You.Started {
+			continue
+		}
 		switch {
 		case v.EndedAt == 0:
 			v.Until = r.expires
@@ -903,7 +955,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 		}
 		// The other's score shows once there's a result.
 		if result := v.State == DuelWon || v.State == DuelLost || v.State == DuelDraw; !result && v.Opponent != nil {
-			v.Opponent.Rights, v.Opponent.Ms = 0, 0
+			v.Opponent.Rights = 0
 		}
 		// A result on even right answers says what broke the tie, in a list too (Приятели's rows).
 		if (v.State == DuelWon || v.State == DuelLost) && v.You != nil && !v.Opponent.Gone {
@@ -929,10 +981,10 @@ func (g *Game) duelSide(ctx context.Context, userID, runID int64) (*DuelSide, er
 	look := g.lookOf(userID, avatar)
 	s.Look = &look
 	if runID != 0 {
-		err = g.DB.Read.QueryRowContext(ctx, `SELECT finished_at IS NOT NULL, rights, closeness, ms,
+		err = g.DB.Read.QueryRowContext(ctx, `SELECT finished_at IS NOT NULL, rights, closeness,
 			at > 0 OR shown_at IS NOT NULL OR EXISTS (SELECT 1 FROM answers WHERE run_id = runs.id) FROM runs WHERE id = ?`, runID).
-			Scan(&s.Done, &s.Rights, &s.score.tie.closeness, &s.Ms, &s.Started)
-		s.score.rights, s.score.ms = s.Rights, s.Ms
+			Scan(&s.Done, &s.Rights, &s.score.tie.closeness, &s.Started)
+		s.score.rights = s.Rights
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
@@ -1116,40 +1168,27 @@ func decided(a, b []DuelMark, rightsA, rightsB int) int {
 	return at
 }
 
-// duelScore is one side's game in a duel as its result goes: its right answers, what breaks a tie between the same
-// (tiebreak, as on the day's board), and its time.
+// duelScore is one side's game in a duel as its result goes: its right answers and what breaks a tie between the
+// same (tiebreak, as on the day's board). Not its time: that never counts.
 type duelScore struct {
 	rights int
 	tie    tiebreak
-	ms     int64
 }
 
 // against is -1 if s wins against o, 1 if it loses, 0 for a draw: more right answers wins; the same, what breaks a tie
-// on the board (tiebreak); nothing there, the quicker by TieBand or more.
+// on the board (tiebreak); even in that too, a draw.
 func (s duelScore) against(o duelScore) int {
-	switch {
-	case s.rights != o.rights:
+	if s.rights != o.rights {
 		return cmpInt(o.rights, s.rights)
-	case s.tie != o.tie:
-		return s.tie.cmp(o.tie)
-	case s.ms <= o.ms-TieBand:
-		return -1
-	case s.ms >= o.ms+TieBand:
-		return 1
 	}
-	return 0
+	return s.tie.cmp(o.tie)
 }
 
-// tieBy is what breaks a tie between two games of even right answers (TieBy), "" if their right answers differ or
-// nothing does.
+// tieBy is what broke a tie between two games of even right answers (TieBy), "" if their right answers differ or
+// nothing did (a draw).
 func (s duelScore) tieBy(o duelScore) string {
-	switch {
-	case s.rights != o.rights:
-		return ""
-	case s.tie.closeness != o.tie.closeness:
+	if s.rights == o.rights && s.tie != o.tie {
 		return TieNumber
-	case s.against(o) != 0:
-		return TieTime
 	}
 	return ""
 }

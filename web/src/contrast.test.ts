@@ -66,6 +66,20 @@ for (const [name, t] of [
     assert.ok(c >= 4.5, `${name}: the action's text is ${c.toFixed(2)}`);
   });
 
+  test(`${name}: what a search found in the book (its chapter's tone under the ink) holds 4.5:1`, () => {
+    const share = Number(/\.entry mark \{[^}]*color-mix\(in srgb, var\(--tv\) (\d+)%, transparent\)/.exec(css)?.[1]);
+    assert.ok(share > 0, "no tone for .entry mark");
+    const ch3 = (hex: string) => [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16));
+    const hex = (c: number[]) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
+    for (const ch of chapters)
+      for (const ground of ["bg", "surface"]) {
+        const [v, g] = [ch3(t[`t-${ch}`] ?? ""), ch3(t[ground] ?? "")];
+        const tone = hex(v.map((x, i) => (x * share + (g[i] ?? 0) * (100 - share)) / 100));
+        const c = contrast(t.ink ?? "", tone);
+        assert.ok(c >= 4.5, `${name}: ink on ${ch}'s mark on --${ground} is ${c.toFixed(2)}`);
+      }
+  });
+
   test(`${name}: the ink on every chapter's sheet holds 4.5:1`, () => {
     for (const ch of chapters) {
       const sheet = t[`s-${ch}`];

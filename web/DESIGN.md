@@ -107,7 +107,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   row over the bars, clear of „ти“ over the player's; the question fewest knew named by its number, „най-малко от
   десетте“, never „най-трудният“, which is the issue's tenth), and each question with its fact (its verdict never a
   true-or-not's answer: „Точно“, „Грешно“).
-- **Алманах:** its head (Микс and България as two ways to play, no lifetime totals), then the chapters, each a folded
+- **Алманах:** its head (Микс and България as two ways to play, words only, no glyph: theirs would sit apart from the chapters'; no lifetime totals), then the chapters, each a folded
   card in its colour with its seal as the badge (40px), its ink („180 с мастило“) and its rank, what's left to the
   next under it („Тетрадка“, „още 15 до „Книга““: a line each, no dot to hang at a line's end); a counter at zero is hidden, and the head says once how ink is written; a
   chapter's card with no ink yet is its glyph over its name, no taller, never stretched to the inked ones beside it.
@@ -117,9 +117,17 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   never pages of their own: every fact as one list is what the book isn't (DECISIONS.md). A chapter's game left
   half-way today shows under the head, where it stopped, with „Продължи“ (its cross comes back here).
 - **A chapter:** its head on its sheet (glyph, name, the seal, its ink, the rank, how much to the next „още 16 до
-  „Книга““ and the pips under it), „Игра на главата“, then its facts, the latest first, each as tall as it holds
-  (two across on a big screen): ink black, facts met in grey (a thin solid 1.5px grey outline, lighter text). From
-  ten facts, a search over them („Търси факт“); fewer are read at a glance. Where grey first shows: „В сиво са всички останали факти, които срещнеш. С мастило се пише само в броя на деня.“
+  „Книга““ and the pips under it), „Игра на главата“, then its facts, the latest first, each as tall as it holds: ink
+  black, facts met in grey (a thin solid 1.5px grey outline, lighter text). An entry reads in the order it was lived:
+  the dateline, the question small and muted (a kicker), the answer as the headword (big, bold) between it and the
+  fact, then the fact in body text; a statement has no question, its headword right under the dateline; an answer of
+  parts a line each. A picture question shows its picture (a choice of pictures, its answer's) beside the question and
+  headword, its whole shape (88px wide on a phone, 112px on a big screen), credited in the entry's small text. One
+  column on a big screen too, 44rem at most, the head at the left: a book reads top to bottom, the latest first
+  exactly, and one column leaves no hole beside a tall entry (two across did; columns or masonry would read down then
+  across, and reshuffle as a page comes in). From ten facts, a search over them („Търси факт“); fewer are read at a
+  glance. What a search found is marked in each entry (its question, headword and fact) in a soft tone of the
+  chapter's colour under the full ink, never split by a soft hyphen. Where grey first shows: „В сиво са всички останали факти, които срещнеш. С мастило се пише само в броя на деня.“
   Its game's result: on the chapter's sheet its chip, the score and its tiles; under it, with no number (grey is never
   counted), „Фактите от играта са в твоя Алманах, в сиво.“ While the day's issue waits, „Към днешния брой“ is the
   action, the streak's stake under it; once it's played, „Още десет въпроса“ the action. The other ways on are quiet
@@ -128,7 +136,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   action, the ways on and that line on the right, „Прегледай въпросите“ under both in a reading column. Its start
   (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name.
 - **Приятели:** the board (friends by default, or all of България: its spread and the player's place first, then the
-  top rows: the place, the avatar, the name with the row's width and the seal and „ти“ after it, the score and the
+  top rows: the place (shared by those as many right and as close on the number, never told apart by time: 1, 2, 2,
+  4; the player first among their equals), the avatar, the name with the row's width and the seal and „ти“ after it, the score and the
   small squares on a line under it, on a line of their own under the score below 340 px or in large text; the
   squares once the player has played the day, on both boards); the friends (a row each: avatar, the name and seal
   across the row, never cut, today's score and the duels between you „дуели 3 : 1“ under it; the column a third of a
@@ -138,8 +147,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   action, „Чакаш“, „Изиграни“: an open one how it stands under the name, „Изиграй същите десет въпроса · още 6 дни“,
   „Довърши своята игра“ once its first question was shown, „Ти: 8 · още 6 дни“; a played one at the right its end
   („Победа“) over its score, a heavy numeral („8:6“), and on a line of its own under the row, the row's width, what
-  more there is to say: that it was against a recording, what broke a tie on even right answers and who was quicker by
-  name („Равен брой верни · по-бързо отговаря Иво: 116,9 с срещу твоите 135,1 с“); one that ran out „Изтече“ alone at
+  more there is to say: that it was against a recording, and what broke a tie on even right answers („Равен брой
+  верни · реши по-близкото число“: nothing else does; even in that too, „Равенство“ and nothing more); one that ran out „Изтече“ alone at
   the right, why under the row („Иво не го изигра навреме.“); the record between two is the friend's
   row's alone). Friends are added by the player's invite link, „Покани приятел“
   (`.invite-friend`, an outlined `.btn`: a phone's share sheet with „Добави ме в АЛМАНАХ: <link>“, a big screen's copy,
@@ -151,7 +160,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   it broken only between its words, the score), their scores as the heroes and „от 10“ in words, the marks, no
   hairlines; a spread on a big screen, the ways on (one width) and the record under them on the right (a phone has
   them in that order too: the next duel in sight under the result); its marks as the tiles (близо half filled),
-  nothing ringed: speed only breaks a tie.
+  nothing ringed, no time on any of them: time never counts.
 - **Профил:** the avatar with the seal worn on its corner, the name; a guest's ways in one quiet line under it („Играта
   ти е само на това устройство. Запази я с имейл · Имаш профил? Влез · Как те виждат другите“, each opening its form
   in the line's place); the longest streak and what the week forgives (that it's used up, only while a streak runs);
@@ -361,7 +370,8 @@ to show it whole; nothing over the question.
   whose time ran out with nothing given show the right ones with a ✓ in a ring: none of it the player's.
 - **The answer** (`.after`): under the answers, never over them; on a phone at the screen's foot, edge to edge, a
   surface. The page moves once (run.ts, `settle`), as little as it can: to show the verdict over „Напред“ (under an
-  order's rows, the fact's first line too), and the fact's first two lines where that leaves the player's row and the
+  order's rows, and with large text, the fact's first line too, whole, or where the verdict leaves it no room the fact
+  whole under „Напред“, a scroll away), and the fact's first two lines where that leaves the player's row and the
   right one (an order's rows) clear of the head. Where the panel goes on past the screen's foot, „Напред“ stays there on a foot of the panel's colour down
   to its edge (`.after-foot`), what goes on under it fading out over it: nothing shows under it. In it, the verdict,
   a choice
@@ -417,6 +427,30 @@ Drawn by hand as paths (`art/pictures.ts`), placed with `picture(id)`, loaded as
 (everyone's avatars), a picture per chapter (its glyph), the book, the duels, Рила for България, the flame. One style:
 flat shapes with depth, lit from the top left, no outlines, painted from one tone in its inks (`k0`–`k5`, `kw`, `ks`,
 `kh`, `kt`). Art never changes the rules. A new picture is checked at its smallest (24px) in both themes.
+
+Every picture is drawn to one sheet, so that none stands out as another hand's:
+
+- **An avatar is a bust, front on**, on a round tile of its scene (the tile's edge is a circle of radius 36.4 about
+  the grid's middle). Its skull, without ears, wool or quills, is 34–38 wide about x = 32, its eyes at y 32–36 and 7–9
+  from the middle; ears, antlers and tufts start inside the skull, so nothing floats. Its body is the same shoulders
+  for all, in its darkest fur; what stands in for them keeps their place (the turtle's shell, the sheep's wool, the
+  stork's breast). Only what the animal is changes this: the stork is in profile, the frog's eyes are on top.
+- **One eye:** a night-ink circle (radius 2.3–2.8) with a white glint up and to its left, on both eyes alike; the cat
+  and the lynx have it on an iris. No lids, brows or whites.
+- **One light**, from the top left: a crescent of light inside the head's upper left edge, the head's shadow on the
+  chest under the chin, the glint. A white animal takes a crescent of shade down its right instead.
+- **Filled shapes, never outlines.** A stroke is only what is a line in life (a whisker, a mouth, an antler, a seam),
+  round-ended, 1.2 wide or more. Symmetric parts are drawn once and mirrored; only the light is one-sided.
+- **Colours by name:** an animal's furs and pale parts are its inks (`k1`, `k2`, `k4`, `k5`), its own accents `ka` and
+  `kb` (an iris, a beak), all set under `.tone-natural.sh-<shape>`; never by a part's place among the layers
+  (`pictures.test.ts`).
+- **At 32px** (a friend's row; a grid unit is under half a pixel) an avatar is its silhouette (ears, antlers, a tail,
+  a beak, each 6 or more wide where it starts), two eyes and one pale muzzle or mask. Finer detail may fade there, but
+  not break into specks; fur and tile differ in hue and in lightness.
+- **A glyph** is one object, upright, within the ground (30 from the middle), in the chapter's tone with its dark and
+  white, never pale on pale; a highlight up left, a shade down right.
+
+Look at all of them together after changing one: 200, 64, 40 and 32px, by day and by night.
 
 ## The share
 

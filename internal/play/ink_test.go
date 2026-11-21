@@ -106,7 +106,7 @@ func TestInkAndGrey(t *testing.T) {
 		t.Fatalf("the day's news: %+v %v", news, err)
 	}
 	ink, err := w.g.InkOf(ctx, ana)
-	if err != nil || ink[MixTopic] != news.Ink {
+	if err != nil || inkTotal(ink) != news.Ink {
 		t.Fatalf("the book's ink: %v %v, want %d", ink, err, news.Ink)
 	}
 
@@ -349,4 +349,13 @@ func TestVoidTakesBackItsFact(t *testing.T) {
 		t.Fatal("the void question's fact stayed")
 	}
 	w.consistent(ana)
+}
+
+// inkTotal is a book's ink in all its chapters.
+func inkTotal(ink map[string]int) int {
+	n := 0
+	for _, c := range ink {
+		n += c
+	}
+	return n
 }

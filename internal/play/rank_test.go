@@ -385,7 +385,7 @@ func TestIssueLeftUnfinishedCountsOnceItsDayIsOver(t *testing.T) {
 		return n
 	}
 	ink, err := w.g.InkOf(ctx, ana)
-	if err != nil || ink[MixTopic] == 0 {
+	if err != nil || inkTotal(ink) == 0 {
 		t.Fatalf("the half issue's ink: %v %v", ink, err)
 	}
 	w.countRanks(ana)
@@ -404,8 +404,8 @@ func TestIssueLeftUnfinishedCountsOnceItsDayIsOver(t *testing.T) {
 	w.at(13, 12, 0, 0)
 	w.dayAs(ana, -1, func(int) func(int64, int) json.RawMessage { return w.wrong })
 	w.g.Settled(ctx)
-	if n := inRanks(); n != ink[MixTopic] {
-		t.Fatalf("the ranks hold %d ink, the left issue wrote %d", n, ink[MixTopic])
+	if n := inRanks(); n != inkTotal(ink) {
+		t.Fatalf("the ranks hold %d ink, the left issue wrote %d", n, inkTotal(ink))
 	}
 	s, err := w.g.StepOf(ctx, ana)
 	if err != nil || s == nil {

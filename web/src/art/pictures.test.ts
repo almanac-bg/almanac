@@ -40,7 +40,16 @@ test("every avatar is drawn and named, and the choice offers no other", () => {
       new RegExp(`\\.tone-natural\\.sh-${s} > \\.avatar-pic \\{`),
       `${s} has no natural colours in app.css`,
     );
+    // A part's own colour is an ink with a name (ka, kb; la the first as a stroke), set with the shape's others.
+    const inks = new RegExp(`\\.tone-natural\\.sh-${s} > \\.avatar-pic \\{([^}]*)\\}`).exec(css)?.[1] ?? "";
+    for (const [ink, uses] of [
+      ["ka", /class="[kl]a"/],
+      ["kb", /class="kb"/],
+    ] as const)
+      if (uses.test(pictures[s] ?? "")) assert.match(inks, new RegExp(`--${ink}: #`), `${s} paints with ${ink}`);
   }
+  // Never by a part's place among the picture's layers: the next change to the drawing would colour another part.
+  assert.doesNotMatch(css, /avatar-pic\s*>\s*:nth-/, "an avatar's part is coloured by its ink, not by :nth-child");
   const named = ui.slice(ui.indexOf("export const shapeNames"), ui.indexOf("export const toneNames"));
   const names = [...named.matchAll(/\n {2}([a-z]+): "/g)].map((m) => m[1] ?? "");
   assert.deepEqual(names, animals, "shapeNames are the server's animals, in its order");

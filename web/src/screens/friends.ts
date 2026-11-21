@@ -132,8 +132,8 @@ export function friends(kit: Kit): Child {
 }
 
 /** The day's board: among the player and their friends (first, once they have any), or all of България. A row says
- * what places it: the right answers big („8 от 10“; a tie between them broken as play/board.go says); the player's own
- * row washed, „ти“ after the name, and under the best twenty if further down. */
+ * what places it: the right answers big („8 от 10“; a tie between them broken as play/board.go says, never by time:
+ * those still equal share a place, the server's); the player's own row washed, „ти“ after the name, and under the best twenty if further down. */
 function dayBoard(): { view: Child; load: () => void; played: () => boolean } {
   const day = signal<Day | null>(null);
   const failed = signal<unknown>(null);
@@ -205,7 +205,7 @@ function ofFriends(d: Day): Child {
   return h(
     "ol",
     { class: "rows ranks" },
-    rows.map((s, i) => scoreRow(s, i + 1)),
+    rows.map((s, i) => scoreRow(s, s.place ?? i + 1)),
   );
 }
 
@@ -239,7 +239,7 @@ function everyone(d: Day): Child {
     h(
       "ol",
       { class: "rows ranks" },
-      b.top.map((s, i) => scoreRow(s, i + 1)),
+      b.top.map((s, i) => scoreRow(s, s.place ?? i + 1)),
       mine && b.place ? scoreRow(mine, b.place, b.place > b.top.length + 1) : null,
     ),
   ];
