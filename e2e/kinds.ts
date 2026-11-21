@@ -1,5 +1,5 @@
 // Every kind of question, as the sample bank has it at its longest, answered as a test wants it (right, wrong or
-// close), and what a question's screen must never do whatever its size (fit.spec.ts, text.spec.ts).
+// close), and what a question's screen must never do whatever its size (layout.spec.ts, answer.spec.ts).
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, type Page } from "@playwright/test";
@@ -312,4 +312,30 @@ export async function panelFlaws(page: Page): Promise<string[]> {
     }
     return [...new Set(out)];
   });
+}
+
+/** Where the answer ended, on a laptop: on the left page under the question, what answered it on the right; the
+ * verdict, the fact whole and „Напред“ in sight on the screen, nothing over them. */
+export async function beside(page: Page): Promise<string[]> {
+  const at = await page.evaluate(() => {
+    const box = (s: string) => document.querySelector(s)?.getBoundingClientRect();
+    const seen = (s: string, x: number, y: number) =>
+      y >= 0 && y <= innerHeight && !!document.elementFromPoint(x, y)?.closest(s);
+    const fact = box(".after .fact");
+    const go = box(".after .up-next-go");
+    const verdict = box(".after .verdict");
+    return {
+      answers: box(".run-question .answering")?.left ?? 0,
+      panel: box(".after")?.right ?? Number.POSITIVE_INFINITY,
+      verdict: !!verdict && seen(".verdict", verdict.left + 8, verdict.top + verdict.height / 2),
+      fact: !fact || (seen(".fact", fact.left + 8, fact.top + 4) && seen(".fact", fact.left + 8, fact.bottom - 4)),
+      go: !!go && seen(".up-next-go", go.left + go.width / 2, go.top + 4) && go.bottom <= innerHeight,
+    };
+  });
+  return [
+    at.panel < at.answers ? "" : "the answer isn't beside what answered it",
+    at.verdict ? "" : "the verdict is out of sight",
+    at.fact ? "" : "the fact isn't whole in sight",
+    at.go ? "" : "„Напред“ is out of sight",
+  ].filter(Boolean);
 }

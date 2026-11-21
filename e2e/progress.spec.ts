@@ -37,7 +37,7 @@ test("a topic's game never tells how well the topic is known, and the avatar is 
   await page.reload();
   await expect(page.getByRole("switch", { name: "Звуци" })).toHaveAttribute("aria-checked", "false");
 
-  // Достъпност: less motion and the text's size stay on this device too (the sizes: text.spec.ts).
+  // Достъпност: less motion and the text's size stay on this device too (the sizes: layout.spec.ts).
   await page.getByRole("switch", { name: "По-малко движение" }).click();
   await page.getByRole("radio", { name: "Едър", exact: true }).click();
   await page.reload();
