@@ -95,7 +95,7 @@ func TestWhereGuestsCameFrom(t *testing.T) {
 		}
 		return from.String
 	}
-	for path, want := range map[string]string{"/f/abcd1234": "other", "/": "home",
+	for path, want := range map[string]string{"/f/abcd1234": "invite", "/": "home",
 		"/players/ana": "player", "/duel": "other"} {
 		_, out := g.player().call("POST", "/api/guest", map[string]any{"from": path})
 		if got := cameFrom(out); got != want {
@@ -139,7 +139,7 @@ func TestFunnelWeek(t *testing.T) {
 }
 
 func TestLanding(t *testing.T) {
-	for path, want := range map[string]string{"/": "home", "/f/x": "other", "/players/x": "player",
+	for path, want := range map[string]string{"/": "home", "/f/x": "invite", "/players/x": "player",
 		"/duel": "other"} {
 		if got := landing(path); got != want {
 			t.Errorf("%s: %s, want %s", path, got, want)

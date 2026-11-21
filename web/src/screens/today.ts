@@ -32,6 +32,7 @@ import { go, goBack, hold, release, title } from "../lib/router.ts";
 import { dateWords, issueOf, onDay, stakeHour, weekday } from "../lib/words.ts";
 import { cover, notice, player, playing, user } from "../state.ts";
 import { chapterName, chip, failure, formatNumber, glyph, leaf, mini, stakeLine, tiles, who } from "../ui.ts";
+import { inviteCard, takeWaiting } from "./invite.ts";
 import { app, coverExit, exitWay, handedIn, haveProfile, keepLine, keepStake, mailAsk, takeHand } from "./keep.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
@@ -300,6 +301,8 @@ export function today() {
       said ? h("p", { class: "notice", role: "status" }, said) : null,
       // Come from the streak's mail to a browser signed out: the way in comes first, open.
       fromMail && !user.peek()?.email ? haveProfile(load, undefined, true, mailedTo) : null,
+      // Come by an invite link: whose it is, and the way to be friends; or what came of one taken after a game.
+      inviteCard(),
     ];
     // What came of the days just missed, once: under the streak, before the day is played. The result says the streak
     // in „Утре“, so there it's only kept as told. On an evening the streak ends at midnight without the day, the
@@ -533,7 +536,9 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   // The day as it stands with the game just played (its streak, its friends): until it's here, the streak with today's
   // isn't known, and the share (which says it) waits for it.
   const known = signal(!just || !!t.late);
-  const now = just && !t.late ? api<Today>("GET", "/api/day") : null;
+  // An invite tapped before the player's first game is taken as it ends (screens/invite.ts): first, so that the day's
+  // friends have the new one.
+  const now = just && !t.late ? takeWaiting().then(() => api<Today>("GET", "/api/day")) : null;
   now?.then(fresh.set, () => {}).finally(() => known.set(true));
   const of = outOf(run);
   const perfect = of > 0 && run.rights === of;

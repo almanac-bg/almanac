@@ -31,6 +31,8 @@ func landing(path string) string {
 		return "home"
 	case strings.HasPrefix(path, "/d/"):
 		return "share"
+	case strings.HasPrefix(path, "/f/"):
+		return "invite"
 	case strings.HasPrefix(path, "/players/"):
 		return "player"
 	}
@@ -249,7 +251,8 @@ func decimal(x float64) string { return strings.Replace(fmt.Sprintf("%.1f", x), 
 
 // landingNames are the landings as the admin page says them.
 var landingNames = map[string]string{
-	"home": "Началната страница", "share": "Споделен резултат", "player": "Профил на играч", "other": "Друга страница",
+	"home": "Началната страница", "share": "Споделен резултат", "invite": "Покана от приятел",
+	"player": "Профил на играч", "other": "Друга страница",
 	"": "Не се знае",
 }
 

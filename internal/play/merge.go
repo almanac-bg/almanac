@@ -94,6 +94,9 @@ var mergeSteps = []mergeStep{
 		sql: `UPDATE OR IGNORE friend_requests SET from_id = ?1 WHERE from_id = ?2 AND (to_id IS NULL OR to_id <> ?1)`},
 	{sql: `UPDATE OR IGNORE friend_requests SET to_id = ?1 WHERE to_id = ?2 AND from_id <> ?1`},
 	{sql: `DELETE FROM friend_requests WHERE from_id = ?2 OR to_id = ?2`},
+	// The guest's invite link, unless the account has one: one link a player (invite.go). The account's own stays, and
+	// the guest's ends with the guest.
+	{carries: []string{"invites.user_id"}, sql: `UPDATE OR IGNORE invites SET user_id = ?1 WHERE user_id = ?2`},
 	// The questions the guest reported, still theirs.
 	{carries: []string{"reports.user_id"}, sql: `UPDATE reports SET user_id = ?1 WHERE user_id = ?2`},
 	// What the guest has been told, so that nothing is told twice: of Начало's lines, of the duels against their

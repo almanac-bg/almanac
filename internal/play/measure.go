@@ -29,9 +29,9 @@ import (
 //     friends, the streaks (walkStreak), the reminders and mails sent or held (push_reminded, streak_mails:
 //     experiment.go).
 
-// Landings are where a player can first come in (users.came_from): the front page, a shared day's link (share.go), a
-// player's page, and anywhere else.
-var Landings = []string{"home", "share", "player", "other"}
+// Landings are where a player can first come in (users.came_from): the front page, a shared day's link (share.go), an
+// invite link (invite.go), a player's page, and anywhere else.
+var Landings = []string{"home", "share", "invite", "player", "other"}
 
 // Tally counts n of something today (daily_counts).
 func (g *Game) Tally(ctx context.Context, key string, n int) error {
