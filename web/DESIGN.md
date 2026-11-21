@@ -95,7 +95,9 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      its seal, its name and where it stands (`standing()`: „Тетрадка · още 2 до „Книга““ over its bar); or ranks
      risen, their seals and one line, each rank once with its chapters, their names the links („Нови печати: „Страница“ в География и в Технологии и игри.“; one chapter's: its
      ladder under it).
-  4. Friends who played it, up to five (`.friends-day`): avatar with its seal, name, their small squares, their score.
+  4. Friends who played it, up to five (`.friends-day`), each a board's row as in Приятели (`scoreRow()`): their
+     place among the player and their friends, the avatar with its seal, the name, and under it „7 от 10“ and their
+     small squares. Never a friend who hasn't played, and never before the player has (the squares are the answers).
   5. The action, past the first results: „Сподели“.
   6. Tomorrow: the next issue's date set big (over its words with large text), „Утре, неделя · Брой 32“ (a line each
      with large text, no dot), the chapter of its hard question with its
@@ -330,8 +332,8 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   at rest (its row or place says whose it is), and under a pointer underlined whole.
 - **What a tap brings up** under it (an ask, an answer: „Нова връзка“, „Добави“, „Изтрий профила“) is scrolled into
   sight whole, clear of a phone's places at the foot (`inSight()`).
-- **Rows of players:** `who()` (the avatar with its seal, and the name), `playerRow()` in Приятели (a friend's
-  `.friend` and a board's `.rank-row`, one build), `.fd-row`, `.duel-row`. **Avatars** (`avatar()`): the drawn animal
+- **Rows of players:** `who()` (the avatar with its seal, and the name), `playerRow()` (a friend's
+  `.friend` and a board's `.rank-row`, one build: Приятели, and Днес's friends), `.duel-row`. **Avatars** (`avatar()`): the drawn animal
   on a rounded tile of its scene, the seal worn on its corner. Only the fifteen animals: an avatar is a face.
 - **What went wrong** is never a dead end: `failure()` says what happened, offers „Опитай пак“ where it can help, and
   always a way on.

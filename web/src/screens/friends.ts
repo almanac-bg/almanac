@@ -29,7 +29,6 @@ let {
   go,
   player,
   user,
-  avatar,
   failure,
   formatNumber,
   ordinal,
@@ -38,9 +37,10 @@ let {
   rightsOf,
   segmented,
   withWord,
-  mini,
   who,
   inSight,
+  playerRow,
+  scoreRow,
 } = {} as Kit;
 
 interface Friend {
@@ -103,7 +103,6 @@ export function friends(kit: Kit): Child {
     go,
     player,
     user,
-    avatar,
     failure,
     formatNumber,
     ordinal,
@@ -112,9 +111,10 @@ export function friends(kit: Kit): Child {
     rightsOf,
     segmented,
     withWord,
-    mini,
     who,
     inSight,
+    playerRow,
+    scoreRow,
   } = kit);
   title("Приятели");
   // Opened: what has come here is seen, on every device, and the dot on Приятели goes.
@@ -269,45 +269,6 @@ function spreadOf(b: Board): Child {
       { class: "board-ticks", "aria-hidden": "true" },
       spread.map((_, i) => h("span", { class: i === mine ? "me" : undefined }, String(i))),
     ),
-  );
-}
-
-/** A board's row, built as a friend's (`playerRow`): its place before the avatar, „ти“ after the player's own name
- * (their row washed), and under the name the score, the day's small squares after it. */
-const scoreRow = (s: Score, place: number, gap = false) =>
-  playerRow(
-    ["rank-row", s.me && "me", gap && "gap"].filter(Boolean).join(" "),
-    s,
-    s.tag,
-    nameWords(s.name, s.me ? h("span", { class: "rank-you" }, " ти") : null),
-    [h("span", { class: "rank-score" }, rightsOf(s.rights, s.of)), s.trail?.length ? mini(s.trail) : null],
-    h("span", { class: "rank-place" }, String(place)),
-  );
-
-/** A player's row, a friend's or a board's: what comes before the avatar (a board's place), the avatar with its seal,
- * the name across the row (a way to their profile; on a second line rather than cut), their day on a line under it,
- * and what comes after (a friend's duel). */
-function playerRow(
-  cls: string,
-  look: { name: string; avatar?: string; seal?: Score["seal"] },
-  tag: string | undefined,
-  name: Child,
-  day: Child,
-  before: Child = null,
-  after: Child = null,
-): HTMLElement {
-  return h(
-    "li",
-    { class: cls },
-    before,
-    avatar(look.avatar, { name: look.name, seal: look.seal }),
-    h(
-      "div",
-      { class: "friend-text" },
-      tag ? h("a", { class: "friend-name", href: profileHref(tag) }, name) : h("span", { class: "friend-name" }, name),
-    ),
-    h("span", { class: "friend-day" }, day),
-    after,
   );
 }
 

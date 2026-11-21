@@ -5946,31 +5946,6 @@
     }
   }
 
-  /* The friends who played the day: a row each, the name, their small squares under it (127px whatever the text: beside
-     the name they'd squeeze it to a letter on a phone), their score at the end. */
-  .fd-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 6px 10px;
-    min-height: 54px;
-    padding: var(--space-2) 0;
-  }
-
-  .fd-row > .mini {
-    grid-column: 1;
-    grid-row: 2;
-    margin-left: 38px; /* under the name, past the avatar (28px) and its gap */
-  }
-
-  .fd-score {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-    min-width: 26px;
-    font: 900 1.375rem / 1 var(--font-numeral);
-    text-align: right;
-  }
-
   .result-share {
     display: grid;
     gap: var(--space-3);
@@ -6366,9 +6341,9 @@
     margin-top: var(--space-2);
   }
 
-  /* ---- Rows of players: a board, the friends; Приятели ---- */
+  /* ---- Rows of players: a board, the friends; Приятели, and Днес's friends ---- */
 
-  /* A player's row, a friend's or a board's (friends.ts, playerRow), one build: the avatar with its seal on its
+  /* A player's row, a friend's or a board's (ui.ts, playerRow), one build: the avatar with its seal on its
      corner; the name across the row (on two lines rather than cut); their day on a line under it; and what comes
      before the avatar (a board's place) or at the row's end (a friend's duel). */
   .friend,
