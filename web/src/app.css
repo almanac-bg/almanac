@@ -4937,7 +4937,9 @@
     font: 700 0.875rem / 1.4 var(--font-sans);
   }
 
-  /* The facts: ink a card with an ink edge, grey a thin solid outline and lighter words. */
+  /* The facts: ink a card with an ink edge, grey a thin solid outline and lighter words. An entry reads in the order
+     it was lived: the dateline, the question small and muted (a kicker), the answer big between it and the fact, the
+     fact in body text; three things told apart at a glance by size and weight, in grey as in ink. */
   .entries {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -4997,8 +4999,22 @@
     font: 600 0.9375rem / 1.35 var(--font-sans);
   }
 
+  .entry .entry-q {
+    margin-top: 2px;
+    color: var(--ink-3);
+    font: 600 0.875rem / 1.35 var(--font-sans);
+  }
+
   .entry-fact {
     font: 500 1rem / 1.45 var(--font-sans);
+  }
+
+  .entry .entry-fact {
+    margin-top: 4px;
+  }
+
+  .entry .credit {
+    font-size: 0.8125rem;
   }
 
   .entry.met {
@@ -5007,12 +5023,45 @@
     color: var(--grey);
   }
 
-  .entry.met :is(.entry-word, .entry-q, .entry-fact) {
+  .entry.met :is(.entry-q, .entry-word, .entry-fact) {
     color: var(--grey);
   }
 
   .entry.met .entry-word {
-    font-weight: 700;
+    font-weight: 800;
+  }
+
+  /* A picture question's picture, beside its dateline, question and headword: a thumbnail at the entry's right, its
+     whole shape (a flag is never cut). */
+  .entry-top {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 14px;
+  }
+
+  .entry-head {
+    display: grid;
+    align-content: start;
+    gap: 6px;
+  }
+
+  .entry-pic {
+    width: 88px;
+    height: auto;
+    max-height: 132px;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+
+  /* What a search found: a soft tone of the chapter's colour under the full ink (4.5:1 on both themes' surfaces:
+     contrast.test.ts), in grey as in ink. */
+  .entry mark {
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--tv) 35%, transparent);
+    color: var(--ink);
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
   }
 
   .tag.ink {
@@ -5133,14 +5182,17 @@
       grid-column: 1 / span 5;
     }
 
+    /* The facts in one column, a reading width (its head and search with it): a book reads top to bottom, the latest
+       first exactly, and no hole beside a tall entry (two across left them; columns would read down then across). */
     .chapter.spread > .page-2 {
       grid-column: 6 / span 7;
+      width: 100%;
+      max-width: 44rem;
     }
 
-    /* Two across, each its own height: never stretched to its neighbour's, its lines spread apart. */
-    .entries {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      align-items: start;
+    .entry-pic {
+      width: 112px;
+      max-height: 168px;
     }
   }
 

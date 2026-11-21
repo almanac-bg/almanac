@@ -47,7 +47,7 @@ import { calm, setCalm, setTextSize, setTick, textSize, tickOn } from "./lib/pre
 import { needsHomeScreen, pushable, pushOn, pushPrefs, setPushPref, turnOff, turnOn } from "./lib/push.ts";
 import { byTap, go, goBack, rename, title } from "./lib/router.ts";
 import { feelKit, loadFeel, play, playAnswer, playCount, quietWhenSilent, setSound, soundOn } from "./lib/sound.ts";
-import { dateWords, issueWords, listWords, weekday, withWord } from "./lib/words.ts";
+import { dateWords, issueWords, listWords, searchWords, weekday, withWord } from "./lib/words.ts";
 import { acceptedLine, type DuelView, duelLists, recordingName, startDuel, tieWords } from "./screens/duel.ts";
 import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
 import { missing } from "./screens/missing.ts";
@@ -87,6 +87,7 @@ import {
   mini,
   nameWords,
   pageArt,
+  pictureCredit,
   pips,
   profileHref,
   questions,
@@ -157,6 +158,8 @@ export const kit = {
   nameWords,
   emailWords,
   textWords,
+  pictureCredit,
+  searchWords,
   loadDuelResult,
   loadStats,
   mailAsk,

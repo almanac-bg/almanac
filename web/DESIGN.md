@@ -117,9 +117,17 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   never pages of their own: every fact as one list is what the book isn't (DECISIONS.md). A chapter's game left
   half-way today shows under the head, where it stopped, with „Продължи“ (its cross comes back here).
 - **A chapter:** its head on its sheet (glyph, name, the seal, its ink, the rank, how much to the next „още 16 до
-  „Книга““ and the pips under it), „Игра на главата“, then its facts, the latest first, each as tall as it holds
-  (two across on a big screen): ink black, facts met in grey (a thin solid 1.5px grey outline, lighter text). From
-  ten facts, a search over them („Търси факт“); fewer are read at a glance. Where grey first shows: „В сиво са всички останали факти, които срещнеш. С мастило се пише само в броя на деня.“
+  „Книга““ and the pips under it), „Игра на главата“, then its facts, the latest first, each as tall as it holds: ink
+  black, facts met in grey (a thin solid 1.5px grey outline, lighter text). An entry reads in the order it was lived:
+  the dateline, the question small and muted (a kicker), the answer as the headword (big, bold) between it and the
+  fact, then the fact in body text; a statement has no question, its headword right under the dateline; an answer of
+  parts a line each. A picture question shows its picture (a choice of pictures, its answer's) beside the question and
+  headword, its whole shape (88px wide on a phone, 112px on a big screen), credited in the entry's small text. One
+  column on a big screen too, 44rem at most, the head at the left: a book reads top to bottom, the latest first
+  exactly, and one column leaves no hole beside a tall entry (two across did; columns or masonry would read down then
+  across, and reshuffle as a page comes in). From ten facts, a search over them („Търси факт“); fewer are read at a
+  glance. What a search found is marked in each entry (its question, headword and fact) in a soft tone of the
+  chapter's colour under the full ink, never split by a soft hyphen. Where grey first shows: „В сиво са всички останали факти, които срещнеш. С мастило се пише само в броя на деня.“
   Its game's result: on the chapter's sheet its chip, the score and its tiles; under it, with no number (grey is never
   counted), „Фактите от играта са в твоя Алманах, в сиво.“ While the day's issue waits, „Към днешния брой“ is the
   action, the streak's stake under it; once it's played, „Още десет въпроса“ the action. The other ways on are quiet

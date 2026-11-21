@@ -26,6 +26,7 @@ import {
   filed,
   glyph,
   leaf,
+  pictureCredit,
   reachable,
   type VerdictKind,
   verdict,
@@ -43,7 +44,7 @@ import {
   type Stage,
   wholeWords,
 } from "./questions.ts";
-import type { Answer, Credit, Mark, Result, Reveal, Shown, State, TheirMark, View } from "./types.ts";
+import type { Answer, Mark, Result, Reveal, Shown, State, TheirMark, View } from "./types.ts";
 
 /** Where the run whose question this tab showed last is kept (this tab's, for as long as it's open). */
 const showingKey = "almanac.showing";
@@ -731,7 +732,7 @@ function question(
         // Ink, said where it was written, as the server says it was (in the issue, met there first): grey isn't said.
         res.ink && res.reveal.fact ? filed(q.category) : null,
         fact(res.reveal.fact, res.reveal.day),
-        res.reveal.credit ? credit(res.reveal.credit) : null,
+        res.reveal.credit ? pictureCredit(res.reveal.credit) : null,
         res.reveal.credits?.length ? h("p", { class: "credit" }, creditsWords(res.reveal.credits)) : null,
         upNext(lasts, res.state.done ? "Резултатът идва след малко…" : `Въпрос ${q.n + 2} идва след малко…`, true),
         // „Напред“ on a foot of its own, opaque to the panel's edge: what scrolls in the panel never shows under it.
@@ -1201,15 +1202,4 @@ function kindOf(r: Result, given: Answer | null): VerdictKind {
   if (r.exact) return "exact";
   if (r.right) return "right";
   return r.score > 0 ? "partial" : "wrong";
-}
-
-function credit(c: Credit): Child {
-  return h(
-    "p",
-    { class: "credit" },
-    "Снимка: ",
-    h("a", { href: c.source, target: "_blank", rel: "noopener" }, c.credit),
-    " · ",
-    c.licenseUrl ? h("a", { href: c.licenseUrl, target: "_blank", rel: "noopener" }, c.license) : c.license,
-  );
 }
