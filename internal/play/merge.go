@@ -25,10 +25,8 @@ var mergeSteps = []mergeStep{
 	// ever an account's. A day's run the guest played while the account was there already comes as a shadow
 	// (ShadowGuest, fair.go): the player's own, for their streak and their numbers, never on the others' boards, so
 	// that the day played as several guests, and signed in from the best of them, races nobody.
-	// (A throwaway guest's day, ShadowThrowaway, is one too: brought to the account, it would be let out of the shadow
-	// as a guest's who came back.)
 	{sql: `UPDATE runs SET shadow = ` + strconv.Itoa(ShadowGuest) + ` WHERE user_id = ?2 AND kind = 'day'
-		AND shadow IN (0, ` + strconv.Itoa(ShadowThrowaway) + `) AND started_at >= (SELECT created_at FROM users WHERE id = ?1)`},
+		AND shadow = 0 AND started_at >= (SELECT created_at FROM users WHERE id = ?1)`},
 	{carries: []string{"runs.user_id"}, sql: `UPDATE runs SET user_id = ?1 WHERE user_id = ?2
 		AND NOT (kind = 'day' AND day IN (SELECT day FROM runs WHERE user_id = ?1 AND kind = 'day'))`},
 	// The guest's friends become the account's (the two aren't friends with themselves), as many as the account has
@@ -101,15 +99,10 @@ var mergeSteps = []mergeStep{
 			> substr(users.streak_told, instr(users.streak_told, ':') + 1) THEN g.streak_told ELSE users.streak_told END
 		FROM (SELECT streak_told FROM users WHERE id = ?2) g
 		WHERE users.id = ?1`},
-	// The player came in when, and where, the earlier of the two did, and met the version that one met; and was last
-	// seen when the later was.
-	{carries: []string{"users.created_at", "users.came_from", "users.first_version", "users.seen_at"},
-		sql: `UPDATE users SET came_from = CASE WHEN g.created_at < users.created_at
-			THEN coalesce(g.came_from, users.came_from) ELSE coalesce(users.came_from, g.came_from) END,
-			first_version = CASE WHEN g.created_at < users.created_at
-				THEN coalesce(g.first_version, users.first_version) ELSE coalesce(users.first_version, g.first_version) END,
-		created_at = min(users.created_at, g.created_at), seen_at = max(users.seen_at, g.seen_at)
-		FROM (SELECT created_at, came_from, first_version, seen_at FROM users WHERE id = ?2) g WHERE users.id = ?1`},
+	// The player came in when the earlier of the two did, and was last seen when the later was.
+	{carries: []string{"users.created_at", "users.seen_at"},
+		sql: `UPDATE users SET created_at = min(users.created_at, g.created_at), seen_at = max(users.seen_at, g.seen_at)
+		FROM (SELECT created_at, seen_at FROM users WHERE id = ?2) g WHERE users.id = ?1`},
 }
 
 // mergeLeft are the references to a player that Merge leaves with the guest, to go with them, and why.
@@ -119,8 +112,6 @@ var mergeLeft = map[string]string{
 	"users.tag":        "the account's: friends know it by it",
 	"users.email":      "the account's (a guest has none)",
 	"users.admin":      "the account's (a guest is never one)",
-	"users.used_week":  "the account's: a week's marks only count (Used); a guest's that week is at most counted twice",
-	"users.used":       "the account's, with its week (users.used_week)",
 	"sessions.user_id": "a guest's sessions end: the browser that signed in gets the account's (account.Verify)",
 	"handoffs.user_id": "a link that moves the guest to another device: nothing to move once it's the account",
 	"suspensions.user_id": "a suspended guest has no session to sign in from, so is never merged; the account's " +

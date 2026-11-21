@@ -155,7 +155,7 @@ func (s *Server) streakMail(ctx context.Context, today string, at time.Time, use
 	if err != nil || !sent {
 		return false, err
 	}
-	return true, s.game.Tally(ctx, "mail:streak:sent", 1)
+	return true, nil
 }
 
 // streakMailOf is the mail a player is due today, if they are: they have an email, want the mail, have notifications

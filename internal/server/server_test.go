@@ -628,8 +628,8 @@ func TestReportsAndTheAdminPage(t *testing.T) {
 		t.Fatalf("the admin page: %d %s", status, body)
 	}
 	_, main := at("/admin")
-	for _, part := range []string{"Връщане", "Посещения без профил", "Кои се връщат", "Навик",
-		"Серии", "Части на играта", "Устройства", "Честна игра", "Играчи", `href="/admin/questions"`} {
+	for _, part := range []string{"По дни", "След 30 дни", `<td>` + short(g.srv.game.Today()) + `</td>`, "Играчи",
+		`href="/admin/questions"`} {
 		if !strings.Contains(main, part) {
 			t.Fatalf("the admin page has no %q", part)
 		}
@@ -872,9 +872,6 @@ func TestNotifications(t *testing.T) {
 	}
 	if n := s.remindSent(t.Context(), evening.Add(time.Minute)); n != 0 {
 		t.Fatal("reminded twice in a day")
-	}
-	if g.counted("push:sent:day") != 1 {
-		t.Fatalf("reminders counted: %d", g.counted("push:sent:day"))
 	}
 	if n := s.remindSent(t.Context(), evening.Add(-2*time.Hour)); n != 0 {
 		t.Fatal("reminded before the hour")

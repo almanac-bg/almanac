@@ -62,7 +62,7 @@ func TestLimitByLength(t *testing.T) {
 }
 
 // An answer the screen timed within the question's limit is taken while it reaches the server within LateGrace of
-// the limit's end, and kept for /admin's count; one the screen didn't time so counts within Grace only; none after
+// the limit's end; one the screen didn't time so counts within Grace only; none after
 // LateGrace.
 func TestLateAnswers(t *testing.T) {
 	w := setup(t)
@@ -106,19 +106,6 @@ func TestLateAnswers(t *testing.T) {
 	w.wait(Limit(w.question(s.ID, 5)) + 10*time.Second)
 	if res, err := w.g.AnswerTimed(ctx, u, s.ID, 5, json.RawMessage("null"), true); err != nil || !res.TimedOut {
 		t.Fatalf("no answer, late: %+v %v", res, err)
-	}
-	// Only the one taken past Grace is counted, by player.
-	late, err := w.g.LateAnswerers(ctx, 10)
-	if err != nil || len(late) != 1 || late[0].Late != 1 || late[0].Answers != 6 || late[0].MostMs != 10_000 {
-		t.Fatalf("the late answers: %+v %v", late, err)
-	}
-	// Let go of after LateKept.
-	w.wait(LateKept + time.Hour)
-	if _, err := w.g.JudgeNets(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if late, err := w.g.LateAnswerers(ctx, 10); err != nil || len(late) != 0 {
-		t.Fatalf("a month on: %+v %v", late, err)
 	}
 }
 

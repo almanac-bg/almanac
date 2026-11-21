@@ -247,10 +247,7 @@ function seals(ranks: Rank[] | null, s: Stats | null, told: (s: Stats) => void):
   // Choosing another: the seals become buttons, and a tap wears one.
   const choosing = signal(false);
   const error = signal("");
-  const choose = () => {
-    choosing.update((c) => !c);
-    if (choosing.peek()) api("POST", "/api/me/used", { noun: "seal" }).catch(() => {});
-  };
+  const choose = () => choosing.update((c) => !c);
   const wear = async (chapter: string) => {
     error.set("");
     const was = wearing.peek();

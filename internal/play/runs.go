@@ -71,34 +71,6 @@ func (g *Game) DayQuestions(ctx context.Context) (map[string]bool, error) {
 	return barred, err
 }
 
-// Devices are what a game can be started on, as runs.device keeps them: for /admin to tell phones, tablets and
-// desktops apart.
-var Devices = []string{"phone", "tablet", "desktop"}
-
-// devicesKey keeps in a context the device each of its players plays on (FromDevice), by player.
-type devicesKey struct{}
-
-// FromDevice is ctx with the device a player plays on (one of Devices): a game started for them in it keeps it
-// (runs.device). Nothing for "" (one that can't be told).
-func FromDevice(ctx context.Context, userID int64, device string) context.Context {
-	if device == "" {
-		return ctx
-	}
-	was, _ := ctx.Value(devicesKey{}).(map[int64]string)
-	devices := make(map[int64]string, len(was)+1)
-	maps.Copy(devices, was)
-	devices[userID] = device
-	return context.WithValue(ctx, devicesKey{}, devices)
-}
-
-// deviceOf is the device a player plays on in ctx (FromDevice), or none (nil).
-func deviceOf(ctx context.Context, userID int64) any {
-	if d, _ := ctx.Value(devicesKey{}).(map[int64]string); d[userID] != "" {
-		return d[userID]
-	}
-	return nil
-}
-
 // secondKey keeps in a context the players whose day's issue is played a second time in one browser (SecondPlay).
 type secondKey struct{}
 
@@ -113,21 +85,17 @@ func SecondPlay(ctx context.Context, userID int64) context.Context {
 	return context.WithValue(ctx, secondKey{}, second)
 }
 
-// insertRun starts a game for a player, with the network they play from if ctx has it (FromNet, fair.go), the device
-// (FromDevice), and, of a day's issue, whether it's a second play in this browser (SecondPlay).
+// insertRun starts a game for a player, and, of a day's issue, whether it's a second play in this browser (SecondPlay).
 func (g *Game) insertRun(ctx context.Context, tx *sql.Tx, userID int64, kind string, day, category any, picks []Pick) (*run, error) {
 	data, _ := json.Marshal(picks)
 	second, _ := ctx.Value(secondKey{}).(map[int64]bool)
-	res, err := tx.Exec(`INSERT INTO runs (user_id, kind, day, category, questions, started_at, device, pencil)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, userID, kind, day, category, string(data), store.Ms(g.Now()),
-		deviceOf(ctx, userID), kind == "day" && second[userID])
+	res, err := tx.Exec(`INSERT INTO runs (user_id, kind, day, category, questions, started_at, pencil)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`, userID, kind, day, category, string(data), store.Ms(g.Now()),
+		kind == "day" && second[userID])
 	if err != nil {
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
-	if err := g.keepNet(ctx, tx, userID, id); err != nil {
-		return nil, err
-	}
 	return load(tx, userID, id)
 }
 

@@ -36,10 +36,6 @@ export const pushKey = boot.push ?? "";
 /** The style of a duel's result (outcome.css): loaded with it (kit.ts). */
 export const outcomeCss = boot.outcomeCss ?? "";
 
-/** Where the page was first opened: a new guest says it, so the admin page can tell where players come from (a
- * player's page …), whatever pages they went through before their first game. */
-const landing = location.pathname;
-
 /** A guest on its way: one, however many ask for the player meanwhile (a double tap on a first „Започни“). */
 let making: Promise<User> | null = null;
 
@@ -47,7 +43,7 @@ let making: Promise<User> | null = null;
 export function player(): Promise<User> {
   const u = user.peek();
   if (u) return Promise.resolve(u);
-  making ??= api<{ user: User }>("POST", "/api/guest", { from: landing })
+  making ??= api<{ user: User }>("POST", "/api/guest", {})
     .then((r) => {
       user.set(r.user);
       return r.user;

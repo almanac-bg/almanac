@@ -138,12 +138,6 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.bank.Store(d.Bank)
 	s.game = play.New(d.DB, s.bank.Load)
 	s.nearestStep = s.stepOf
-	if strings.HasPrefix(cfg.Version, "v") { // a release, not a developer's build
-		s.game.Version = cfg.Version
-		if err := s.released(context.Background()); err != nil {
-			return nil, err
-		}
-	}
 	if err := s.game.Keep(context.Background(), d.Bank); err != nil { // its versions, before anything is shown
 		return nil, err
 	}
@@ -183,7 +177,6 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/me/streak-told", s.streakTold)
 	api("PATCH /api/me/look", s.setLook)
 	api("PATCH /api/me/seal", s.setSeal)
-	api("POST /api/me/used", s.used)
 	api("POST /api/push", s.subscribe)
 	api("DELETE /api/push", s.unsubscribe)
 	api("GET /api/push/prefs", s.pushPrefs)
@@ -192,7 +185,6 @@ func (s *Server) routes() http.Handler {
 	api("PATCH /api/mail/prefs", s.setMailPrefs)
 	api("POST /api/errors", s.clientError)
 	api("POST /api/guest", s.guest)
-	api("POST /api/tally", s.tally)
 	api("POST /api/auth/code", s.sendCode)
 	api("POST /api/auth/verify", s.verify)
 	api("POST /api/auth/signout", s.signOut)
@@ -297,20 +289,6 @@ func (s *Server) Run(ctx context.Context, grace time.Duration) error {
 	go safe.Every(ctx, "duels: settling", time.Minute, func() {
 		if err := s.game.SettleDue(ctx); err != nil && ctx.Err() == nil {
 			slog.Error("duels", "err", err)
-		}
-	})
-	go safe.Every(ctx, "fair play: the day's networks", 5*time.Minute, func() {
-		n, err := s.game.JudgeNets(ctx)
-		if err != nil && ctx.Err() == nil {
-			slog.Error("fair play", "err", err)
-		}
-		if n > 0 {
-			s.problems.add("fair play: a day's ten played after several throwaway guests from the same network (/admin)")
-		}
-	})
-	go safe.Every(ctx, "measures: the weeks over", 15*time.Minute, func() {
-		if err := s.freezeWeeks(ctx); err != nil && ctx.Err() == nil {
-			slog.Error("measures", "err", err)
 		}
 	})
 	go safe.Every(ctx, "after the runs", time.Minute, func() {

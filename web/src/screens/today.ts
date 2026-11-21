@@ -20,13 +20,13 @@ import { land, reviewed } from "../game/results.ts";
 import { getReady, playRun, shownHere, starting } from "../game/run.ts";
 import { cardFile, cardPath, type SharedDay, shareCard, shareDay, shareText } from "../game/share.ts";
 import type { Board, Mark, Reviewed, Score, State } from "../game/types.ts";
-import { api, errorText, serverNow, tally } from "../lib/api.ts";
+import { api, errorText, serverNow } from "../lib/api.ts";
 import { boot } from "../lib/boot.ts";
 import { dayInBulgaria, hourInBulgaria } from "../lib/day.ts";
 import { type Child, h, onCleanup, signal, slot } from "../lib/dom.ts";
 import { handToken } from "../lib/embedded.ts";
 import { reportProblem } from "../lib/errors.ts";
-import { type RemindAsks, remindAnswered, remindAsks, remindShown } from "../lib/keep.ts";
+import { type RemindAsks, remindAnswered, remindAsks } from "../lib/keep.ts";
 import { pushable, pushOn, turnOn } from "../lib/push.ts";
 import { go, goBack, hold, release, title } from "../lib/router.ts";
 import { dateWords, issueOf, onDay, stakeHour, weekday } from "../lib/words.ts";
@@ -1230,18 +1230,7 @@ function remindAsk(
   const showing = () => state() === "ask" || state() === "on";
   const deciding = () => state() === "deciding";
   if (asked.n >= 3 || asked.day === day || !by.peek()) return { view: null, mailing, showing, deciding };
-  // Each way of asking counted once a day on a device (play/measure.go), however often Начало is drawn.
-  const shown = () => {
-    const how = by.peek() ?? "mail";
-    const next = remindShown(asked, how, day);
-    if (!next) return;
-    tally(how === "push" ? "pushask:shown" : "mailask:shown");
-    save(next);
-  };
-  const ask = () => {
-    state.set("ask");
-    shown();
-  };
+  const ask = () => state.set("ask");
   const gone = () => state.set("gone");
   if (by.peek() === "push") {
     state.set("deciding");
@@ -1258,12 +1247,10 @@ function remindAsk(
       if (!why) {
         save(remindAnswered(asked, "push", day, true));
         state.set("on");
-        tally("pushask:yes");
       } else if (refused() && !app) {
         // Told no just now: the mail, then, an ask of its own.
         error.set(why);
         by.set("mail");
-        shown();
       } else error.set(why);
     } catch (err) {
       reportProblem(`reminder ask: ${(err as Error).name}: ${(err as Error).message}`);
@@ -1275,7 +1262,6 @@ function remindAsk(
     save(remindAnswered(asked, how, day, false));
     mailNo.set(how === "mail");
     state.set("gone");
-    tally(how === "push" ? "pushask:no" : "mailask:no");
   };
   const view = () => {
     if (!showing()) return null;
@@ -1292,10 +1278,7 @@ function remindAsk(
           stake,
           no,
           primary,
-          yes: () => {
-            save(remindAnswered(asked, "mail", day, true));
-            tally("mailask:yes");
-          },
+          yes: () => save(remindAnswered(asked, "mail", day, true)),
         }),
       ];
     return [

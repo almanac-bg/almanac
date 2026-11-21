@@ -111,7 +111,7 @@ func TestDevicesBounded(t *testing.T) {
 }
 
 // A reminder that reached nobody counts neither as one left unplayed nor as the last: three evenings of a push
-// service refusing don't stop the reminders, and the failure is counted.
+// service refusing don't stop the reminders.
 func TestFailedRemindersDontCount(t *testing.T) {
 	s, g, fake, subscribe := pushWorld(t)
 	ana, anaID := g.guest()
@@ -128,8 +128,8 @@ func TestFailedRemindersDontCount(t *testing.T) {
 			t.Fatalf("day %d: reminded %d", d, n)
 		}
 	}
-	if fake.count("/ana") != 0 || g.counted("push:failed:day") != 4 || g.counted("push:sent:day") != 0 {
-		t.Fatalf("pushes %d, failed %d", fake.count("/ana"), g.counted("push:failed:day"))
+	if fake.count("/ana") != 0 {
+		t.Fatalf("pushes %d", fake.count("/ana"))
 	}
 	var fails int
 	_ = g.db.Read.QueryRow(`SELECT fails FROM push_subs WHERE user_id = ?`, anaID).Scan(&fails)
@@ -158,9 +158,11 @@ func TestFailedRemindersDontCount(t *testing.T) {
 		clock = start.AddDate(0, 0, d).Add(20 * time.Hour)
 		s.remindSent(t.Context(), clock)
 	}
-	if fake.count("/ana") != 4 || g.counted("push:failed:stop") != 1 || g.counted("push:sent:stop") != 1 {
-		t.Fatalf("the last word: %d pushes, failed %d, sent %d", fake.count("/ana"), g.counted("push:failed:stop"),
-			g.counted("push:sent:stop"))
+	var lasts, reached int
+	_ = g.db.Read.QueryRow(`SELECT count(*), count(*) FILTER (WHERE delivered > 0) FROM push_reminded
+		WHERE user_id = ? AND last`, anaID).Scan(&lasts, &reached)
+	if fake.count("/ana") != 4 || lasts != 2 || reached != 1 {
+		t.Fatalf("the last word: %d pushes, %d claimed, %d reached", fake.count("/ana"), lasts, reached)
 	}
 }
 
@@ -214,7 +216,7 @@ func TestBusyTriedAgain(t *testing.T) {
 		t.Fatalf("tried again: %d pushes, %d left, topic %q", fake.count("/ana"), left, fake.topic("/ana"))
 	}
 
-	// Busy at every try: given up on after pushTries, and counted.
+	// Busy at every try: given up on after pushTries.
 	fake.answering("/ana", http.StatusTooManyRequests)
 	s.notifySent(t.Context(), pushFriends, m, anaID)
 	for range pushTries {
@@ -222,8 +224,8 @@ func TestBusyTriedAgain(t *testing.T) {
 		s.sendQueued(t.Context())
 	}
 	_ = g.db.Read.QueryRow(`SELECT count(*) FROM push_queue`).Scan(&left)
-	if left != 0 || g.counted("push:failed:friends") != 1 {
-		t.Fatalf("given up: %d left, %d failed", left, g.counted("push:failed:friends"))
+	if left != 0 {
+		t.Fatalf("given up: %d left", left)
 	}
 }
 

@@ -76,8 +76,8 @@ func TestDayMail(t *testing.T) {
 		t.Fatalf("after a restart: %d", n)
 	}
 	g.outbox.Flush(t.Context())
-	if len(g.inbox.got) != 2 || g.counted("mail:day:sent") != 2 {
-		t.Fatalf("sent %+v, counted %d", g.inbox.got, g.counted("mail:day:sent"))
+	if len(g.inbox.got) != 2 {
+		t.Fatalf("sent %+v", g.inbox.got)
 	}
 	for _, m := range g.inbox.got {
 		if m.To != "ana@example.bg" && m.To != "fe@example.bg" {
@@ -132,45 +132,8 @@ func TestDayMailPrefs(t *testing.T) {
 	}
 }
 
-// A mail left on a weekday the player never plays on doesn't count as ignored: one who plays Monday to Friday still
-// gets the mail after a weekend of them; mails left on their weekdays do stop it.
-func TestDayMailOnTheirWeekdays(t *testing.T) {
-	g := start(t)
-	s := g.srv
-	_, id := g.guest()
-	if _, err := g.db.Write.Exec(`UPDATE users SET email = 'ana@example.bg' WHERE id = ?`, id); err != nil {
-		t.Fatal(err)
-	}
-	if err := s.setMailPref(t.Context(), id, mailDay, true); err != nil {
-		t.Fatal(err)
-	}
-	// Played Monday 4 to Friday 8 March 2030; mails on Saturday 9, Sunday 10 and Monday 11, unplayed.
-	for d := 4; d <= 8; d++ {
-		g.finishedDay(id, time.Date(2030, 3, d, 0, 0, 0, 0, bulgaria()), 10*time.Hour)
-	}
-	if _, err := g.db.Write.Exec(`INSERT INTO day_mails (user_id, day, at) VALUES (?1, '2030-03-09', 0),
-		(?1, '2030-03-10', 0), (?1, '2030-03-11', 0)`, id); err != nil {
-		t.Fatal(err)
-	}
-	if n, left, err := s.mailsIgnored(t.Context(), id, "2030-03-08", "2030-03-12"); err != nil || n != 1 || left != 3 {
-		t.Fatalf("ignored: %d of %d %v, want only Monday's of three", n, left, err)
-	}
-	s.game.Now = func() time.Time { return time.Date(2030, 3, 12, 12, 0, 0, 0, bulgaria()) }
-	if n := s.dayMails(t.Context(), s.game.Now()); n != 1 {
-		t.Fatalf("Tuesday: %d mails, want 1", n)
-	}
-	// Wednesday's left too: three on their weekdays, none more.
-	if _, err := g.db.Write.Exec(`INSERT INTO day_mails (user_id, day, at) VALUES (?, '2030-03-13', 0)`, id); err != nil {
-		t.Fatal(err)
-	}
-	s.game.Now = func() time.Time { return time.Date(2030, 3, 14, 12, 0, 0, 0, bulgaria()) }
-	if n := s.dayMails(t.Context(), s.game.Now()); n != 0 {
-		t.Fatalf("Thursday, after three on their weekdays: %d mails", n)
-	}
-}
-
-// A player who played one day has a rhythm of one weekday: the mails on the others stop all the same, after
-// RemindQuietAfter left in all (review 2026-11-20: 21 reminders to a one-day player).
+// A player who played one day gets three mails, whatever the weekdays, and no more (review 2026-11-20: 21 reminders
+// to a one-day player).
 func TestDayMailOneDayPlayer(t *testing.T) {
 	g := start(t)
 	s := g.srv
@@ -187,8 +150,8 @@ func TestDayMailOneDayPlayer(t *testing.T) {
 		s.game.Now = func() time.Time { return time.Date(2030, 3, d, 12, 0, 0, 0, bulgaria()) }
 		sent += s.dayMails(t.Context(), s.game.Now())
 	}
-	if sent != RemindQuietAfter {
-		t.Fatalf("a one-day player got %d mails in a month, want %d", sent, RemindQuietAfter)
+	if sent != RemindIgnored {
+		t.Fatalf("a one-day player got %d mails in a month, want %d", sent, RemindIgnored)
 	}
 }
 

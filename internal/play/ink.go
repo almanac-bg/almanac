@@ -17,7 +17,7 @@ import (
 // before. Grey is never counted and never turns to ink: nothing is ink twice, and nothing played before is ink at
 // all. A game played at a script's speed (ShadowScript, fair.go) writes nothing. The other shadows are a person's own
 // game (fair.go: their own numbers are theirs): a guest's day brought to an account (ShadowGuest) is written by the
-// same rule, and a throwaway guest's day (ShadowThrowaway) is the guest's own book. A question that counts for nobody
+// same rule. A question that counts for nobody
 // in its day (Pick.Void, day.go) writes nothing, and what it wrote goes when it's voided. The issue played a second
 // time in one browser (runs.pencil: SecondPlay, the day's answers in sight there) writes grey. A fact is written once.
 //

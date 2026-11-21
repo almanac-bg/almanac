@@ -139,8 +139,6 @@ function dayBoard(): { view: Child; load: () => void } {
     api<Day>("GET", "/api/day").then(
       (d) => {
         failed.set(null);
-        // The board seen, with its names (the day played): „класация“, counted once a week (play.Used).
-        if (d.run?.done && !day.peek()) api("POST", "/api/me/used", { noun: "board" }).catch(() => {});
         day.set(d);
         // Among friends once there are any (a first one just accepted too), unless the player chose.
         if (!chosen) among.set(d.friends?.length || d.befriended ? "friends" : "all");

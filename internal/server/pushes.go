@@ -33,9 +33,7 @@ import (
 // service asked or pushBackoff, while it's still of use (until). Each device's failures are kept: one gone (404/410, a
 // subscription its service no longer knows) is forgotten at once; one refused or unreached at every try for
 // pushForgetAfter, pushForgetTries tries at least, is forgotten then (a week, so that an outage of the service's, or a
-// mistake of the game's own that refuses everyone, forgets nobody before it's seen and mended). Counted by the
-// message's kind (play/measure.go): push:sent, a device reached; push:gone, a device found gone; push:failed, a
-// notification that reached none of the player's devices, though they had some.
+// mistake of the game's own that refuses everyone, forgets nobody before it's seen and mended).
 
 const (
 	// pushWorkers is how many players' notifications are sent at once: enough that a few slow devices, or a slow
@@ -62,12 +60,10 @@ const (
 // pushBackoff are the waits before a busy row's second and third tries, when the service didn't ask for longer.
 var pushBackoff = []time.Duration{30 * time.Second, 2 * time.Minute}
 
-// pushQueue is the queue's state in memory: a nudge to look at it now, and the counts not yet written.
+// pushQueue is the queue's state in memory: a nudge to look at it now.
 type pushQueue struct {
-	once    sync.Once
-	wake    chan struct{}
-	mu      sync.Mutex
-	tallies map[string]int
+	once sync.Once
+	wake chan struct{}
 }
 
 // morning is when the night `at` falls in ends (quietTo in Bulgaria); zero if `at` isn't in the night.
@@ -100,31 +96,6 @@ func (q *pushQueue) poke() {
 	select {
 	case q.woken() <- struct{}{}:
 	default:
-	}
-}
-
-func (q *pushQueue) count(key string, n int) {
-	if n == 0 {
-		return
-	}
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	if q.tallies == nil {
-		q.tallies = map[string]int{}
-	}
-	q.tallies[key] += n
-}
-
-// flushTallies writes the counts kept so far (play/measure.go): written as they come, they would be a write a send.
-func (s *Server) flushTallies(ctx context.Context) {
-	s.pushq.mu.Lock()
-	t := s.pushq.tallies
-	s.pushq.tallies = nil
-	s.pushq.mu.Unlock()
-	for key, n := range t {
-		if err := s.game.Tally(ctx, key, n); err != nil {
-			slog.Error("push: counting", "err", err)
-		}
 	}
 }
 
@@ -230,12 +201,10 @@ func (s *Server) pushes(ctx context.Context, untilIdle bool) {
 	busy := 0
 	tick := time.NewTicker(pushTick)
 	defer tick.Stop()
-	flushed := time.Now()
 	defer func() {
 		for ; busy > 0; busy-- {
 			<-done
 		}
-		s.flushTallies(work)
 	}()
 	for ctx.Err() == nil {
 		if busy < pushWorkers {
@@ -261,10 +230,6 @@ func (s *Server) pushes(ctx context.Context, untilIdle bool) {
 			busy--
 		case <-s.pushq.woken():
 		case <-tick.C:
-			if time.Since(flushed) >= time.Second {
-				s.flushTallies(work)
-				flushed = time.Now()
-			}
 		}
 	}
 }
@@ -416,8 +381,6 @@ func (s *Server) deliver(ctx context.Context, j queued) {
 			s.Problem("push: the game's own send failed: " + plainKind(err.Error(), "", 160))
 		}
 	}
-	s.pushq.count("push:sent:"+m.Kind, reached)
-	s.pushq.count("push:gone:"+m.Kind, gone)
 	switch {
 	case reached > 0:
 	case busy && j.tries < pushTries: // tried and busy: again after a while, a try spent
@@ -426,9 +389,6 @@ func (s *Server) deliver(ctx context.Context, j queued) {
 			s.pushDone(ctx, j, devices, errs, again, next)
 			return
 		}
-	}
-	if reached == 0 && gone < len(devices) {
-		s.pushq.count("push:failed:"+m.Kind, 1)
 	}
 	s.pushDone(ctx, j, devices, errs, reached, now)
 }

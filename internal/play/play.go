@@ -15,8 +15,7 @@
 // goes through the database, so a refresh, a second tab or a restart of the server changes nothing. A run left
 // half-way goes on where it stopped: the day's when the player comes back to it that day (a run of the day's
 // questions ends with its day, DayGrace after: dayOver), a topic's when they start the same topic again that day
-// (StartTopic). A game played quicker than a person plays counts for its player alone, and so does the day of a
-// throwaway guest who played it before a player on the same network; a game keeps that network for a week (fair.go).
+// (StartTopic). A game played quicker than a person plays counts for its player alone (fair.go).
 //
 // No game deals a player again what they've played, in any game, while the bank has questions they haven't: a topic's,
 // a duel's are drawn for all their players, those none of them has seen first,
@@ -114,9 +113,6 @@ type Game struct {
 	// CrowdMin, if set, is how many answers a question needs before how players answered it shows, the day's
 	// players' and everyone's (CrowdFrom, DayCrowdFrom when 0; the browser tests make it 1).
 	CrowdMin int
-	// Version is the game's version as released (the server's; "" in tests and a developer's build): the version a
-	// player met is kept with them on their first day played (users.first_version, retention.go).
-	Version string
 	// DuelNews, if set, tells a player a duel's news another player caused (duels.go: sent to them, or played back).
 	DuelNews func(context.Context, DuelNews)
 
@@ -414,11 +410,6 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, number bool, ms int64)
 	if err := g.markActive(tx, r.userID); err != nil {
 		return false, err
 	}
-	if r.kind == "day" {
-		if err := g.tallyDayAnswer(tx, r); err != nil {
-			return false, err
-		}
-	}
 	if err := g.judgeAnswer(tx, r, gr, ms); err != nil {
 		return false, err
 	}
@@ -682,11 +673,6 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 		number := d.Question().Base().Type == "number"
 		if res.Ink, err = g.record(tx, r, gr, number, min(took, limit).Milliseconds()); err != nil {
 			return err
-		}
-		if late > Grace && !res.TimedOut {
-			if err := keepLate(tx, r.id, n, late, at); err != nil {
-				return err
-			}
 		}
 		res.Score, res.Right, res.Exact, res.Given = gr.Score, gr.Right, gr.Exact, gr.Shown
 		res.State, err = g.state(tx, r)

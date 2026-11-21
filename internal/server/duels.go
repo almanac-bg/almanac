@@ -165,12 +165,5 @@ func (s *Server) almanac(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	noun := "almanac" // the book; a chapter's page, „глави“ (play.Used)
-	if q.Get("topic") != "" {
-		noun = "chapters"
-	}
-	if err := s.game.Used(r.Context(), u.ID, noun); err != nil {
-		return err
-	}
 	return ok(w, a)
 }

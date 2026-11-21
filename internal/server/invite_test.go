@@ -55,7 +55,7 @@ func TestInviteOverHTTP(t *testing.T) {
 
 	// A guest who hasn't finished a game plays first; then one tap, and both are friends.
 	bo := stranger
-	bo.call("POST", "/api/guest", map[string]any{"from": path})
+	bo.call("POST", "/api/guest", map[string]any{})
 	if status, out := bo.call("POST", "/api/invites/"+code, nil); status != http.StatusForbidden || out["error"] != "play_first" {
 		t.Fatalf("a guest before a game: %d %v", status, out)
 	}
@@ -80,11 +80,6 @@ func TestInviteOverHTTP(t *testing.T) {
 	}
 	if _, out := bo.call("GET", "/api/invites/"+code, nil); out["friends"] != true || out["name"] != anaName {
 		t.Fatalf("opened by a friend: %v", out)
-	}
-	var from string
-	if err := g.db.Read.QueryRow(`SELECT came_from FROM users WHERE tag = ?`, tagOf(bo)).Scan(&from); err != nil ||
-		from != "invite" {
-		t.Fatalf("Bo came from %q (%v)", from, err)
 	}
 
 	// A new link ends the old one.

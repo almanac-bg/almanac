@@ -30,9 +30,6 @@ type player struct {
 
 	profile int // the day they give an email (-1: a guest throughout)
 	named   bool
-	from    string // where they first came in (play.Landings)
-	device  string
-	net     []byte
 	circle  int // the group of people they know
 
 	played map[int]bool // the days they played the day's ten
@@ -59,14 +56,6 @@ func (w *world) cast(n int) {
 	last := w.today()
 	add := func(p *player) {
 		p.played = map[int]bool{}
-		w.nets++
-		p.net = []byte(fmt.Sprintf("seed-net-%04d", w.nets))
-		if p.device == "" {
-			p.device = w.pickDevice()
-		}
-		if p.from == "" {
-			p.from = w.pickLanding()
-		}
 		if p.pace == 0 { // the stronger the quicker, mostly
 			p.pace = time.Duration(float64(12*time.Second)*(1.1-p.skill)) + w.between(0, 3*time.Second)
 		}
@@ -78,7 +67,7 @@ func (w *world) cast(n int) {
 	}
 	// The personas played in the history (the new guest comes at the end: personas).
 	add(&player{kind: keyDay2, persona: keyDay2, joined: last - 1, until: -1, rate: 1, skill: 0.6, topics: 0.6,
-		profile: -1, from: "home", hour: 19})
+		profile: -1, hour: 19})
 	add(&player{kind: keyRegular, persona: keyRegular, joined: last - 29, until: -1, rate: 1, skill: 0.78, topics: 1.2,
 		duels: 1.6, social: 1, profile: last - 26, named: true, hour: 8, pace: 6 * time.Second})
 	add(&player{kind: keyLegend, persona: keyLegend, joined: 0, until: -1, rate: 1, skill: 0.95, topics: 1.5,
@@ -132,26 +121,6 @@ func (w *world) cast(n int) {
 	}
 }
 
-func (w *world) pickDevice() string {
-	switch x := w.r.Float64(); {
-	case x < 0.72:
-		return "phone"
-	case x < 0.95:
-		return "desktop"
-	}
-	return "tablet"
-}
-
-func (w *world) pickLanding() string {
-	switch x := w.r.Float64(); {
-	case x < 0.85:
-		return "home"
-	case x < 0.93:
-		return "player"
-	}
-	return "other"
-}
-
 // arrive makes a player, as the game makes a guest the moment they first come (account.Accounts.Guest), on the clock's
 // day; then the name they choose, if they do.
 func (w *world) arrive(p *player) error {
@@ -169,11 +138,7 @@ func (w *world) arrive(p *player) error {
 		now, now, store.Ms(w.clock().AddDate(0, 0, account.SessionDays)), p.id); err != nil {
 		return err
 	}
-	if err := w.exec(`UPDATE users SET created_at = ?, seen_at = ?, came_from = ? WHERE id = ?`,
-		now, now, p.from, p.id); err != nil {
-		return err
-	}
-	if err := w.g.Tally(w.ctx, "guest:"+p.from, 1); err != nil {
+	if err := w.exec(`UPDATE users SET created_at = ?, seen_at = ? WHERE id = ?`, now, now, p.id); err != nil {
 		return err
 	}
 	if p.named {

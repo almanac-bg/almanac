@@ -67,8 +67,8 @@ func TestStreakMail(t *testing.T) {
 		t.Fatalf("after a restart: %d", n)
 	}
 	g.outbox.Flush(t.Context())
-	if len(g.inbox.got) != 1 || g.counted("mail:streak:sent") != 1 {
-		t.Fatalf("sent %+v, counted %d", g.inbox.got, g.counted("mail:streak:sent"))
+	if len(g.inbox.got) != 1 {
+		t.Fatalf("sent %+v", g.inbox.got)
 	}
 	byTo := map[string]string{}
 	for _, m := range g.inbox.got {

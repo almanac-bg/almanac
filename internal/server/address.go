@@ -1,19 +1,12 @@
 package server
 
 import (
-	"context"
-	"crypto/hmac"
-	"crypto/sha256"
 	"net/http"
 	"net/netip"
-	"strings"
 	"time"
-
-	"github.com/almanac-bg/almanac/internal/play"
 )
 
-// Where a request comes from, for the limits, the log, and fair play (netMark: the network a game is started from,
-// as the game keeps it).
+// Where a request comes from, for the limits and the log.
 //
 // Behind Cloudflare (Config.TrustCloudflare) the connection is Cloudflare's, and the player's address is in
 // CF-Connecting-IP. That header is taken only from a connection that comes from Cloudflare's own addresses: anyone who
@@ -29,9 +22,6 @@ import (
 // block one owner of many addresses rents (review 2026-11-18, S3, S11). Its budget is a few networks', so a school or
 // a company fits under it. Behind a carrier's NAT (thousands of phones behind a few addresses of a /24), each address
 // has a school's budget, never one player's, and the /24 a few schools' (S9).
-//
-// The keys of what many may do at no cost and that is only counted (a page visited) are kept by home (clientHome):
-// the /48 of an IPv6 address, so that one site can't make thousands of them (S8); an IPv4 address as it is.
 
 // cloudflare are the addresses Cloudflare connects from: https://www.cloudflare.com/ips/ (the same since 2021; checked
 // November 2026). The firewalls let only these reach the game: the server's (deploy/nftables.conf) and Hetzner's
@@ -107,45 +97,6 @@ func (s *Server) clientNet(r *http.Request) string { return network(s.clientAddr
 
 // clientSite is the wider network a limit counts by as well: the /48 of an IPv6 address, the /24 of an IPv4 one.
 func (s *Server) clientSite(r *http.Request) string { return site(s.clientAddr(r)) }
-
-// clientHome is what the keys only counted are kept by: the /48 of an IPv6 address, an IPv4 address as it is.
-func (s *Server) clientHome(r *http.Request) string { return network(s.clientAddr(r), 48) }
-
-// netMark is the request's network (clientNet) as a game keeps it (play.FromNet, play/fair.go): a hash keyed with the
-// server's secret, so that the database and its copies hold no address, and two games from one network have one mark.
-// None for an address that is no player's network: unknown, or the machine's own (a test, the developer's).
-func (s *Server) netMark(r *http.Request) []byte {
-	a := s.clientAddr(r)
-	if !a.IsValid() || a.IsLoopback() || a.IsUnspecified() {
-		return nil
-	}
-	h := hmac.New(sha256.New, s.accounts.Secret)
-	h.Write([]byte("net:" + network(a, 64)))
-	return h.Sum(nil)[:12]
-}
-
-// fromClient is the request's context with the network the player plays from (netMark) and the device
-// (clientDevice), for the games it starts.
-func (s *Server) fromClient(r *http.Request, userID int64) context.Context {
-	return play.FromDevice(play.FromNet(r.Context(), userID, s.netMark(r)), userID, clientDevice(r))
-}
-
-// clientDevice is what a request comes from, as a game keeps it (play.Devices, runs.device): a tablet, a phone or a
-// desktop, by the browser's own word (Sec-CH-UA-Mobile, where it gives one) or its user agent. An iPad that asks as a
-// Mac counts as a desktop: nothing in the request tells the two apart.
-func clientDevice(r *http.Request) string {
-	ua := r.UserAgent()
-	switch {
-	case ua == "":
-		return ""
-	case strings.Contains(ua, "iPad") || strings.Contains(ua, "Tablet") ||
-		strings.Contains(ua, "Android") && !strings.Contains(ua, "Mobile"):
-		return "tablet"
-	case r.Header.Get("Sec-CH-UA-Mobile") == "?1" || strings.Contains(ua, "Mobi") || strings.Contains(ua, "iPhone"):
-		return "phone"
-	}
-	return "desktop"
-}
 
 // network is the prefix of bits around an IPv6 address, or an IPv4 address as it is.
 func network(a netip.Addr, bits int) string {

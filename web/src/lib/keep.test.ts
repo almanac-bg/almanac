@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { askToKeep, keptWords, remindAnswered, remindAsks, remindShown } from "./keep.ts";
+import { askToKeep, keptWords, remindAnswered, remindAsks } from "./keep.ts";
 
 test("a guest is asked to keep their game from the second day, and at once in an app's own browser", () => {
   const guest = { days: 1, embedded: false };
@@ -22,22 +22,10 @@ test("the code put in says what came of it: a guest's game kept, or the profile 
   assert.equal(keptWords(null, ana), "Влезе като Ана.");
 });
 
-test("the reminder's asks: each way counted once a day, a refused notification's ask turned to mail counted too", () => {
-  const day = "2026-11-18";
-  let a = remindAsks(null);
-  const push = remindShown(a, "push", day);
-  assert.ok(push, "the notification's ask, counted");
-  a = push;
-  assert.equal(remindShown(a, "push", day), null, "once a day");
-  const mail = remindShown(a, "mail", day);
-  assert.ok(mail, "refused there and then: the ask by mail is counted as shown too");
-  a = mail;
-  assert.equal(remindShown(a, "mail", day), null);
-  assert.ok(remindShown(a, "push", "2026-11-19"), "and again the next day");
-  // As kept before each way counted apart: today's counted already, whichever it was.
-  const old = remindAsks(JSON.stringify({ n: 1, day: "2026-11-17", shown: day }));
-  assert.equal(remindShown(old, "mail", day), null);
+test("the reminder's asks as kept: anything unreadable is none yet", () => {
+  const old = remindAsks(JSON.stringify({ n: 1, day: "2026-11-17", shown: "2026-11-18" }));
   assert.equal(old.n, 1);
+  assert.equal(old.day, "2026-11-17");
   assert.deepEqual(remindAsks("not json"), remindAsks(null));
 });
 

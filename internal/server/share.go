@@ -3,14 +3,11 @@ package server
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"regexp"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -96,24 +93,6 @@ func (s *Server) sharedOf(r *http.Request) (play.Share, bool) {
 
 // cardOf is where a shared day's card is.
 func cardOf(sh play.Share) string { return fmt.Sprintf("/card/%d-%s.png", sh.Issue, sh.Shape) }
-
-// countOpen counts a shared day's link opened by a person (share:open), whoever they are: once a visitEvery for each
-// link from each browser at each home, and visitsHome at most a home, as countVisit counts visits; not a preview's
-// fetch, nor a browser's guess at the next page.
-func (s *Server) countOpen(r *http.Request) {
-	ua := r.UserAgent()
-	if r.Method != http.MethodGet || r.Header.Get("Sec-Purpose") != "" || !strings.HasPrefix(ua, "Mozilla/") ||
-		robot.MatchString(ua) {
-		return
-	}
-	home := s.clientHome(r)
-	seen := sha256.Sum256([]byte(ua + " " + r.URL.Path))
-	if !s.limits.allow("open:"+home+":"+hex.EncodeToString(seen[:6]), 1, visitEvery) ||
-		!s.limits.allow("opens:"+home, visitsHome, visitEvery) {
-		return
-	}
-	_ = s.game.Tally(r.Context(), "share:open", 1)
-}
 
 // cards are the cards drawn, kept by their file's name, and the turns to draw one.
 type cards struct {

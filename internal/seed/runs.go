@@ -11,10 +11,8 @@ import (
 	"github.com/almanac-bg/almanac/internal/play"
 )
 
-// as is the context a player's requests come in: the device and network they play from, as the server says them.
-func (w *world) as(p *player) context.Context {
-	return play.FromNet(play.FromDevice(w.ctx, p.id, p.device), p.id, p.net)
-}
+// as is the context a player's requests come in.
+func (w *world) as(*player) context.Context { return w.ctx }
 
 // picks are a run's questions, as it holds them.
 func (w *world) picks(runID int64) ([]play.Pick, error) {
