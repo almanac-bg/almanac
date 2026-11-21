@@ -296,11 +296,45 @@ export function standing(s: Standing, named = true): HTMLElement {
 /** A chapter's rank as Профил and a player's page have it (play.ChapterRank). */
 export type ChapterRank = Standing;
 
+/** A player's head, one look on Профил and on a player's page: the avatar with the seal worn on its corner (`face`:
+ * on Профил a button with „Смени“ under it), the name, the @username, and a quiet line under them (`line`: on Профил
+ * the way to change the name, on another's page since when they play). */
+export function profileHead(
+  face: Child,
+  name: Child,
+  tag: string | (() => string | undefined),
+  line: Child,
+): HTMLElement {
+  const at = (t: string | undefined) => (t ? h("span", { class: "me-tag" }, `@${t}`) : null);
+  return h(
+    "div",
+    { class: "me-head" },
+    face,
+    h(
+      "div",
+      { class: "me-who" },
+      h("h1", null, name),
+      typeof tag === "function" ? () => at(tag()) : at(tag),
+      h("p", { class: "me-line" }, line),
+    ),
+  );
+}
+
+/** „Печати“, one section on Профил and on a player's page: the seals' list (sealList), or `none` before a first seal. */
+export function sealsSection(ranks: ChapterRank[], none: Child): HTMLElement {
+  return h(
+    "section",
+    { class: "sect me-seals" },
+    h("div", { class: "sect-head" }, h("h2", null, "Печати")),
+    sealList(ranks) ?? none,
+  );
+}
+
 /** A player's seals, one list, a row a chapter with a rank, in the bank's order: the seal (its glyph in it); the
  * chapter's name with its ink at the row's end; under them where it stands (standing: „Страница · още 8 до
  * „Тетрадка““ over its bar). A view, never a choice: the one worn is the best (play.sealOf). Nothing before a first
  * seal: the page says what brings one. */
-export function sealList(ranks: ChapterRank[]): Child {
+function sealList(ranks: ChapterRank[]): Child {
   const had = categories
     .map((c) => ranks.find((r) => r.chapter === c.id))
     .filter((r): r is ChapterRank => !!r && r.level > 0);

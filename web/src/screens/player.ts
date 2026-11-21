@@ -1,6 +1,8 @@
-// Another player's profile, by their tag (/players/tag): how they look, the seal they wear and their ranks by chapter
-// (play/profile.go: no streak, no lifetime totals); and how you stand with them — ask to be friends, or answer their
-// asking.
+// Another player's profile, by their tag (/players/tag), laid out as Профил is (screens/me.ts: one column, on a big
+// screen too): the same head (their avatar with the seal they wear on its corner, their name and tag, and since when
+// they play), how you stand with them where Профил has the streak (friends and a duel a tap away, ask to be friends,
+// or answer their asking), and the same „Печати“ (ui.ts: profileHead, sealsSection). Nothing that's only theirs
+// (play/profile.go: no streak, no lifetime totals), and nothing that's only one's own (Смени, Настройки).
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -8,7 +10,23 @@ import type { ChapterRank } from "../ui.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
-let { api, errorText, h, nameWords, signal, title, checkNews, user, avatar, record, sealList } = {} as Kit;
+let {
+  api,
+  errorText,
+  h,
+  nameWords,
+  signal,
+  title,
+  checkNews,
+  user,
+  avatar,
+  record,
+  go,
+  startDuel,
+  withWord,
+  profileHead,
+  sealsSection,
+} = {} as Kit;
 
 interface Profile {
   name: string;
@@ -21,14 +39,32 @@ interface Profile {
   friend?: "yes" | "asked" | "asks";
   request?: number;
   record?: { won: number; lost: number; drawn: number };
+  // Theirs, to call them to a duel: told only to a friend.
+  id?: number;
 }
 
 // „г.“ kept with its year, never alone on a line.
 const month = (ms: number) =>
-  new Intl.DateTimeFormat("bg", { month: "long", year: "numeric" }).format(new Date(ms)).replace(/\s(?=г\.)/, " ");
+  new Intl.DateTimeFormat("bg", { month: "long", year: "numeric" }).format(new Date(ms)).replace(/\s(?=г\.)/, " ");
 
 export function playerProfile(kit: Kit, [tag]: string[]): Child {
-  ({ api, errorText, h, nameWords, signal, title, checkNews, user, avatar, record, sealList } = kit);
+  ({
+    api,
+    errorText,
+    h,
+    nameWords,
+    signal,
+    title,
+    checkNews,
+    user,
+    avatar,
+    record,
+    go,
+    startDuel,
+    withWord,
+    profileHead,
+    sealsSection,
+  } = kit);
   title(`@${tag}`);
   const profile = signal<Profile | null>(null);
   const error = signal("");
@@ -41,7 +77,7 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
       (err) => error.set(errorText(err)),
     );
   load();
-  return h("section", { class: "screen player" }, (): Child => {
+  return h("section", { class: "screen me" }, (): Child => {
     const p = profile();
     if (error() && !p) {
       return [
@@ -51,35 +87,25 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
       ];
     }
     if (!p) return h("p", { class: "muted" }, "…");
-    return [
-      head(p),
-      p.me
-        ? h("p", { class: "muted" }, "Така те виждат другите. ", h("a", { href: "/me" }, "Към твоя профил"))
-        : actions(p, load),
-      ranks(p),
-    ];
+    return h(
+      "div",
+      { class: "me-intro" },
+      profileHead(
+        h("span", { class: "me-avatar" }, avatar(p.avatar, { size: "l", name: p.name, seal: p.seal })),
+        nameWords(p.name),
+        p.tag,
+        h("span", { class: "muted" }, `Играе от ${month(p.since)}`),
+      ),
+      relation(p, load),
+      sealsSection(p.ranks, h("p", { class: "seal-worn" }, "Още няма печат.")),
+    );
   });
 }
 
-/** Their avatar with the seal they wear on its corner, their name and tag, and since when they play. */
-function head(p: Profile): Child {
-  return h(
-    "div",
-    { class: "me-head" },
-    h("span", { class: "me-avatar" }, avatar(p.avatar, { size: "l", name: p.name, seal: p.seal })),
-    h(
-      "div",
-      { class: "me-who" },
-      h("h1", null, nameWords(p.name)),
-      h("span", { class: "me-tag" }, `@${p.tag}`),
-      h("span", { class: "muted small" }, `Играе от ${month(p.since)}`),
-    ),
-  );
-}
-
-/** How the viewer stands with them: as friends, the duels between the two so far; else ask to be friends, or answer
- * their asking: outlined buttons, beside the page's one action. */
-function actions(p: Profile, reload: () => Promise<unknown>): Child {
+/** How the viewer stands with them, where Профил has the streak: as friends, the duels between the two so far and a
+ * duel a tap away; else ask to be friends, or answer their asking. One's own page, as others see it: the way back to
+ * Профил. */
+function relation(p: Profile, reload: () => Promise<unknown>): Child {
   const busy = signal(false);
   const note = signal<{ text: string; bad?: boolean } | null>(null);
   const act = async (fn: () => Promise<unknown>) => {
@@ -93,13 +119,25 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
       busy.set(false);
     }
   };
-  const button = (label: string, cls: string, fn: () => Promise<unknown>) =>
-    h("button", { class: `btn inline ${cls}`, type: "button", disabled: busy, onclick: () => act(fn) }, label);
+  const button = (label: string, cls: string, fn: () => Promise<unknown>, aria?: string) =>
+    h(
+      "button",
+      { class: `btn inline ${cls}`, type: "button", disabled: busy, "aria-label": aria, onclick: () => act(fn) },
+      label,
+    );
 
   let body: Child;
-  if (p.friend === "yes") {
+  if (p.me) {
+    body = h(
+      "p",
+      { class: "player-relation muted" },
+      "Така те виждат другите. ",
+      h("a", { href: "/me" }, "Към твоя профил"),
+    );
+  } else if (p.friend === "yes") {
     const r = p.record ?? { won: 0, lost: 0, drawn: 0 };
     const played = r.won + r.lost + r.drawn;
+    const id = p.id;
     body = [
       h(
         "p",
@@ -107,6 +145,17 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
         "Приятели сте.",
         played ? h("span", { class: "muted" }, ` Дуели помежду ви: ${record(r.won, r.lost, r.drawn)}.`) : null,
       ),
+      id
+        ? button(
+            "Дуел",
+            "primary",
+            async () => {
+              const d = await startDuel({ friend: id });
+              if (d) go(`/duel/${d.id}`);
+            },
+            `Дуел ${withWord(p.name)}`,
+          )
+        : null,
     ];
   } else if (p.friend === "asks") {
     body = [
@@ -148,19 +197,8 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
       }),
     ];
   }
-  return h("section", { class: "card player-actions" }, body, () => {
+  return h("section", { class: "player-actions" }, body, () => {
     const n = note();
     return n && h("p", { class: n.bad ? "bad" : "muted", role: n.bad ? "alert" : "status" }, n.text);
   });
-}
-
-/** Their seals, as Профил has the player's own (ui.ts, sealList): a row a chapter with a rank, in the bank's order;
- * before any, „Още няма печат.“ */
-function ranks(p: Profile): Child {
-  return h(
-    "section",
-    { class: "sect me-seals" },
-    h("div", { class: "sect-head" }, h("h2", null, "Печати")),
-    sealList(p.ranks) ?? h("p", { class: "seal-worn" }, "Още няма печат."),
-  );
 }

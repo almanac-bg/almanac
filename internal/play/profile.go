@@ -35,6 +35,9 @@ type Profile struct {
 	Request int64  `json:"request,omitempty"`
 	// Record is the duels between the two, from the viewer's side: while they're friends.
 	Record *Record `json:"record,omitempty"`
+	// ID is theirs, for calling them to a duel from their page: told only to a friend (who has it in the friends list
+	// already).
+	ID int64 `json:"id,omitempty"`
 }
 
 // dayOnly is the day of a moment (ms), as noon of it in Bulgaria: the same date wherever a screen shows it, within
@@ -88,7 +91,7 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 func (g *Game) relation(ctx context.Context, p *Profile, viewer, id int64) error {
 	if _, err := g.Friend(ctx, viewer, id); err == nil {
 		r, err := g.recordAgainst(ctx, viewer, id)
-		p.Friend, p.Record = "yes", &r
+		p.Friend, p.ID, p.Record = "yes", id, &r
 		return err
 	} else if !errors.Is(err, ErrNotFriends) {
 		return err

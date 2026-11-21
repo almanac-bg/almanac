@@ -176,8 +176,10 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   animals and nothing else (an avatar is a face: a seal is worn on it, never chosen as it), are a choice made rarely,
   so never on the page: a sheet (`screens/avatar.ts`) opened by the avatar with „Смени“ under it (one button), the one
   worn ringed; a tap wears one and, once it's kept, puts the sheet away. Another player's page (`/players/<tag>`) is
-  the same head without a way to change it, the seals (no streak: none of it is another's to see), with the way to be
-  friends. Where no email may be asked for (an app's browser that reads what's typed: `noEmail`), Профил and
+  laid out the same, one column (`profileHead`, `sealsSection`): the same head without a way to change it („Играе от
+  …“ in the line under the @username), in the streak's place a card of how you stand (ask to be friends, answer their
+  asking, or friends and „Дуел“), the same seals (no streak: none of it is another's to see); nothing of one's own
+  (Смени, Настройки). Where no email may be asked for (an app's browser that reads what's typed: `noEmail`), Профил and
   Настройки offer none, only the line that says so.
 
 ## Colour
