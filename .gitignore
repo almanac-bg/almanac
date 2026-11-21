@@ -17,3 +17,6 @@ node_modules/
 
 # Claude Code settings for this checkout only (e.g. permission to deploy): personal, never in the public repo.
 .claude/settings.local.json
+
+# A session's local scratch (mockups, notes): never in the public repo.
+/work/
