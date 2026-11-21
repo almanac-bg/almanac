@@ -107,7 +107,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   row over the bars, clear of „ти“ over the player's; the question fewest knew named by its number, „най-малко от
   десетте“, never „най-трудният“, which is the issue's tenth), and each question with its fact (its verdict never a
   true-or-not's answer: „Точно“, „Грешно“).
-- **Алманах:** its head (Микс and България as two ways to play, no lifetime totals), then the chapters, each a folded
+- **Алманах:** its head (Микс and България as two ways to play, words only, no glyph: theirs would sit apart from the chapters'; no lifetime totals), then the chapters, each a folded
   card in its colour with its seal as the badge (40px), its ink („180 с мастило“) and its rank, what's left to the
   next under it („Тетрадка“, „още 15 до „Книга““: a line each, no dot to hang at a line's end); a counter at zero is hidden, and the head says once how ink is written; a
   chapter's card with no ink yet is its glyph over its name, no taller, never stretched to the inked ones beside it.

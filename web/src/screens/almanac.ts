@@ -218,7 +218,6 @@ function way(id: string, name: string, note: string): Child {
   return h(
     "a",
     { class: `way t-${id}`, href: `/play/${id}` },
-    glyph(id, 36),
     h("span", { class: "way-words" }, h("b", null, name), h("small", null, note)),
   );
 }
