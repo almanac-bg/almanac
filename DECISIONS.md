@@ -26,6 +26,8 @@ packages' doc comments; this file holds only what must not drift.
   builders at once gets an independent review before or right after it merges.
 - **No open-source ritual** (contributing guides, templates, changelogs by hand): the repo serves the game and the
   sessions that build it.
+- **No mechanism for a risk already covered, and no experiment or metric whose answer can't be read:** a review's
+  finding gets the smallest fix, not a system (the owner's delegation, 2026-11-21).
 
 ## The game
 
@@ -69,12 +71,10 @@ packages' doc comments; this file holds only what must not drift.
     call. `/admin` shows each one's weekly use; a session proposes removing one nobody uses.
   - **The rule for later.** A change is made only if it makes the issue better or names the measure it moves and what
     it removes; adds no noun; keeps every place's budget; is good at zero (first player, first day, 0 right, no
-    friends); pays one deed once; is measured by a randomised hold-out where it can be (changes to the shared day are
-    judged before and after, the owner's call), and while effects are too small to detect, removes at least as much as
-    it adds (the default while numbers are small); and answers „Built to hold“ (CLAUDE.md). "Makes the issue better"
-    means it changes only the questions, the clock or the play screen and adds nothing outside it. A fix restores
-    stated behaviour; polish adds no data, count, block or notification. A hold-out states its measure and window in
-    advance; if it shows nothing by then, the direction's choice stays.
+    friends); pays one deed once; removes at least as much as it adds while effects are too small to detect (judged
+    before and after, by the players who come back: `/admin`); and answers „Built to hold“ (CLAUDE.md). "Makes the
+    issue better" means it changes only the questions, the clock or the play screen and adds nothing outside it. A
+    fix restores stated behaviour; polish adds no data, count, block or notification.
   - **The bets,** each with its measure in `/admin`: that ink from the issue alone is enough progress (D30 of players
     who play only the day); that the seals are wanted (players who open or change theirs); that the share brings
     players (plays per shared link).
@@ -104,12 +104,6 @@ packages' doc comments; this file holds only what must not drift.
   mockups, chosen 20 Nov), never one list of them all. Friends are added by username or email, or by an invite link (above).
   Don't bring any of them back, or something in their place, without the owner's call.
 - **Gamification only from what the game really counts:** no invented currencies, no random boxes, never real money.
-- **A tenth of players get no reminders, to tell what reminders do.** 10 % of players, drawn once by a hash of their
-  id (`play/experiment.go`), are held out of the day's notification and the streak's mail; what they would have had
-  is kept as if sent, by the same rules and hours, and `/admin` compares the two groups with intervals, counted by
-  player. Without it the reminders' rows only show the habit they're timed to (owner, 2026-11-18, review D4). The
-  reminder by mail is never held out: a player asked for it, and gets it (owner, 2026-11-18). The privacy page says
-  so.
 
 ## Questions
 

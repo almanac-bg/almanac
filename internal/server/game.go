@@ -45,7 +45,7 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 		if err != nil {
 			return nil, err
 		}
-		out["streak"], out["spare"], out["perWeek"] = streak.Days, streak.Spare, streak.PerWeek
+		out["streak"], out["spare"] = streak.Days, streak.Spare
 		// What came of the days just missed, told on Начало once (play.TellStreak: the client says when it has): the
 		// week forgave one; or it had forgiven what it does already and the streak ended, and a new one begins.
 		recent := s.game.Now().In(play.Bulgaria).AddDate(0, 0, -3).Format(time.DateOnly)

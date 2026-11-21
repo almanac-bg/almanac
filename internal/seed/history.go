@@ -87,7 +87,7 @@ func (w *world) plan() ([]session, error) {
 			ends, left := w.day, s.Left
 			for {
 				if ends != w.day && w.dayAt(ends, 0, 0).Weekday() == time.Monday {
-					left = s.PerWeek
+					left = play.Forgives
 				}
 				if left == 0 {
 					break

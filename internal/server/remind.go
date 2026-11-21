@@ -30,10 +30,6 @@ import (
 // from their first week, not learned over months. From their third week (RhythmFrom days after their first day
 // played) a reminder goes only on those weekdays at all (rhythm.sends). A reminder that reached none of their devices
 // (a service down, the game's keys wrong) counts for neither. Word from friends goes as before.
-//
-// A player held out (play.HeldReminders, a tenth of them: the owner's call, so that /admin can tell what the
-// reminders do) is claimed the same, at the same hour, by the same rules, marked held, and never sent: what they would
-// have had. A held claim counts as one that reached them, so the held stop as the reminded do.
 
 const (
 	// RemindDefault is the hour of a player who hasn't finished a day yet (minutes into the day, in Bulgaria): 19:00.
@@ -174,8 +170,8 @@ func (s *Server) remind(ctx context.Context, at time.Time) int {
 				return err
 			}
 			defer q.close()
-			stmt, err := tx.PrepareContext(ctx, `INSERT INTO push_reminded (user_id, day, at, last, delivered, held)
-				SELECT ?1, ?2, ?3, ?4, 0, ?5 WHERE NOT EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'day'
+			stmt, err := tx.PrepareContext(ctx, `INSERT INTO push_reminded (user_id, day, at, last, delivered)
+				SELECT ?1, ?2, ?3, ?4, 0 WHERE NOT EXISTS (SELECT 1 FROM runs WHERE user_id = ?1 AND kind = 'day'
 					AND day = ?2 AND finished_at IS NOT NULL)
 				ON CONFLICT DO NOTHING`)
 			if err != nil {
@@ -183,13 +179,11 @@ func (s *Server) remind(ctx context.Context, at time.Time) int {
 			}
 			defer stmt.Close()
 			for _, c := range chunk {
-				// One held out (play.HeldReminders) is claimed as any other, never sent.
-				held := s.heldOut(c.user)
-				res, err := stmt.ExecContext(ctx, c.user, today, at.UnixMilli(), c.last, held)
+				res, err := stmt.ExecContext(ctx, c.user, today, at.UnixMilli(), c.last)
 				if err != nil {
 					return err
 				}
-				if a, _ := res.RowsAffected(); a == 0 || held {
+				if a, _ := res.RowsAffected(); a == 0 {
 					continue
 				}
 				m := push.Message{} // written as it's sent
@@ -250,7 +244,7 @@ func (s *Server) dayReminder(ctx context.Context, today string, userID int64) (l
 		return false, false, err
 	}
 	rows, err := s.db.Read.QueryContext(ctx, `SELECT day, last FROM push_reminded WHERE user_id = ? AND day > ?
-		AND day < ? AND (delivered > 0 OR held) ORDER BY day`, userID, played.String, today)
+		AND day < ? AND delivered > 0 ORDER BY day`, userID, played.String, today)
 	if err != nil {
 		return false, false, err
 	}

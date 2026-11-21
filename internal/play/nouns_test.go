@@ -28,15 +28,14 @@ func TestNounUse(t *testing.T) {
 	s, _ := w.g.StartDay(ctx, ana)
 	w.play(ana, s.ID, repeat(w.right, Length)...)
 	today := w.g.Today()
-	// Reminded by a notification: one that reached a device counts; one held out (experiment.go), or never
-	// delivered, doesn't.
-	cy, dee := w.user(), w.user()
+	// Reminded by a notification: one that reached a device counts; one never delivered doesn't.
+	dee := w.user()
 	for _, r := range []struct {
-		user            int64
-		held, delivered bool
-	}{{ana, false, true}, {cy, true, true}, {dee, false, false}} {
-		if _, err := w.db.Write.Exec(`INSERT INTO push_reminded (user_id, day, at, held, delivered) VALUES (?, ?, 0, ?, ?)`,
-			r.user, today, r.held, r.delivered); err != nil {
+		user      int64
+		delivered bool
+	}{{ana, true}, {dee, false}} {
+		if _, err := w.db.Write.Exec(`INSERT INTO push_reminded (user_id, day, at, delivered) VALUES (?, ?, 0, ?)`,
+			r.user, today, r.delivered); err != nil {
 			t.Fatal(err)
 		}
 	}

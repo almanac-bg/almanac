@@ -651,7 +651,7 @@ func TestStreakForgives(t *testing.T) {
 	streak("Friday, the second day", 2, []string{}, true)
 	w.wait(48 * time.Hour) // Saturday missed: one of this week's two forgiven
 	s := streak("Sunday, before playing", 2, []string{"2026-11-14"}, true)
-	if s.PerWeek != Forgives || s.Left != 1 {
+	if s.Left != 1 {
 		t.Fatalf("Sunday, the week's forgiving: %+v", s)
 	}
 	if week := w.g.InWeek([]string{"2026-11-14"}); week != [7]bool{5: true} {
@@ -682,63 +682,6 @@ func TestStreakForgives(t *testing.T) {
 	if out, _ := json.Marshal(StreakNow{Ended: &Ended{Days: 3, On: "2026-11-18"}}); !strings.Contains(string(out),
 		`"ended":{"on":"2026-11-18"}`) {
 		t.Fatalf("an ended streak's number said: %s", out)
-	}
-}
-
-// A tenth of the players who come in during the hold-out's window (StreakHoldout) get one forgiven day a week while
-// it lasts, by a bucket of their own; from its end, two, as everyone.
-func TestStreakHoldout(t *testing.T) {
-	w := setup(t) // Thursday, 12 November
-	ctx := t.Context()
-	for _, q := range []string{
-		`INSERT OR REPLACE INTO kv (key, value) VALUES ('streak_forgives_from', '2026-11-01')`,
-		`INSERT OR REPLACE INTO kv (key, value) VALUES ('streak_forgives_until', '2026-11-20')`,
-	} {
-		if _, err := w.db.Write.Exec(q); err != nil {
-			t.Fatal(err)
-		}
-	}
-	var held, free int64
-	for held == 0 || free == 0 {
-		id := w.user()
-		if _, err := w.db.Write.Exec(`UPDATE users SET created_at = ? WHERE id = ?`,
-			time.Date(2026, 11, 10, 12, 0, 0, 0, Bulgaria).UnixMilli(), id); err != nil {
-			t.Fatal(err)
-		}
-		switch {
-		case HeldOut(StreakHoldout, id) && held == 0:
-			held = id
-		case !HeldOut(StreakHoldout, id) && free == 0:
-			free = id
-		}
-	}
-	if Bucket(StreakHoldout, held) == Bucket(HeldReminders, held) && Bucket(StreakHoldout, free) == Bucket(HeldReminders, free) {
-		t.Fatal("the streak's buckets are the reminders'")
-	}
-	// Tuesday and Wednesday played; Thursday's today. Saturday and Sunday missed by both.
-	w.daysPlayed(held, 2, 1)
-	w.daysPlayed(free, 2, 1)
-	w.playDay(held)
-	w.playDay(free)
-	w.wait(72 * time.Hour) // Sunday: Friday and Saturday missed
-	if s, _ := w.g.StreakOf(ctx, held); s.Days != 0 || s.PerWeek != HeldForgives || s.Ended == nil {
-		t.Fatalf("held out, two missed: %+v", s)
-	}
-	if s, _ := w.g.StreakOf(ctx, free); s.Days != 3 || s.PerWeek != Forgives || len(s.Forgiven) != 2 {
-		t.Fatalf("not held out, two missed: %+v", s)
-	}
-	// Past the window: two for everyone.
-	w.wait(7 * 24 * time.Hour)
-	if s, _ := w.g.StreakOf(ctx, held); s.PerWeek != Forgives {
-		t.Fatalf("held out, after the window: %+v", s)
-	}
-	// One who came in before the window is never held.
-	old := w.user()
-	for HeldOut(StreakHoldout, old) == false {
-		old = w.user()
-	}
-	if until, _ := w.g.heldUntil(ctx, old); until != "" {
-		t.Fatalf("a player from before the window held: %q", until)
 	}
 }
 

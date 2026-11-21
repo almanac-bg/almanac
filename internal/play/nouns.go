@@ -87,10 +87,9 @@ var kept = map[string]string{
 	// споделяне: a day shared.
 	"share": `SELECT count(DISTINCT r.user_id) FROM shares s JOIN runs r ON r.id = s.run_id
 		WHERE s.created_at >= ?3 AND s.created_at < ?4`,
-	// напомняне: reminded of the day, by a notification that reached a device (not one held out: experiment.go, nor
-	// one never delivered) or by mail.
+	// напомняне: reminded of the day, by a notification that reached a device (not one never delivered) or by mail.
 	"reminder": `SELECT count(*) FROM (SELECT user_id FROM push_reminded WHERE day BETWEEN ?1 AND ?2
-			AND NOT held AND delivered
+			AND delivered
 		UNION SELECT user_id FROM day_mails WHERE day BETWEEN ?1 AND ?2)`,
 }
 
