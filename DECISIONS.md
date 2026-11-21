@@ -52,9 +52,11 @@ packages' doc comments; this file holds only what must not drift.
     counted, never promised to turn into ink. A chapter shows one number, its ink.
   - **Each chapter's seal (печат) is its rank,** from ink, never falling, named for the book, not the person
     (Бележка 1, Страница 5, Тетрадка 15, Книга 40, Том 100, Летопис 250, then „Летопис · 2“ for each further 100):
-    a badge of its own (not the logo), filling in quarters between ranks; beside a name only the seal shows, the name
-    only in the Алманах and on a rank-up. No check against guessing: the names claim nothing a count doesn't hold. The
-    chapter's art becomes a choosable avatar at Страница. The animals stay free. Mastery is hidden: it steers chapter games and recordings.
+    a badge of its own (not the logo), filling in quarters between ranks; with a player only the seal shows, on their
+    avatar's corner (2026-11-21: one place, everywhere, never after the name), the name only in the Алманах and on a
+    rank-up. No check against guessing: the names claim nothing a count doesn't hold. Avatars are the animals only, all
+    free (2026-11-21): a seal's reward is the seal itself, worn as the badge; an avatar is a face, so animals only, and
+    the profile gets simpler. Mastery is hidden: it steers chapter games and recordings.
     The badge is the player's best seal, never chosen (the highest rank, then the most ink, then the rank that came
     first: a choice nobody playing saw the point of, and the best says the most).
     These are the only levels, titles and unlocks; nothing else adds up across games (no XP, currencies, goals,
@@ -85,8 +87,7 @@ packages' doc comments; this file holds only what must not drift.
     fix restores stated behaviour; polish adds no data, count, block or notification.
   - **The bets,** each read from what the game keeps anyway (runs, facts, duels, shares), by a query when it's asked,
     never by new tracking: that ink from the issue alone is enough progress (D30 of the players whose games are only
-    the day's); that the seals are wanted (players who chose a chapter's art as their avatar);
-    that the share brings players (new players beside the days shared, day by day).
+    the day's); that the share brings players (new players beside the days shared, day by day).
   The decisions below that this replaces are gone from this file.
 - **The day's ten questions are the heart;** everything else serves them or stays out of the way. A new system replaces
   one or proves it's needed (CLAUDE.md, Direction).

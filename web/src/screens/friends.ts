@@ -40,7 +40,6 @@ let {
   segmented,
   withWord,
   mini,
-  worn,
   who,
   inSight,
 } = {} as Kit;
@@ -50,7 +49,7 @@ interface Friend {
   name: string;
   tag: string;
   avatar?: string;
-  /** The seal they wear beside their name (play.Seal). */
+  /** The seal they wear on their avatar (play.Seal). */
   seal?: { chapter: string; level: number };
   today?: { rights: number; of: number };
   won: number;
@@ -63,7 +62,7 @@ interface Request {
   id: number;
   name?: string;
   tag?: string;
-  /** Who asks, as they show to others: their seal beside their name (play.Look). */
+  /** Who asks, as they show to others: their seal on their avatar (play.Look). */
   look?: Look;
   email?: string;
 }
@@ -116,7 +115,6 @@ export function friends(kit: Kit): Child {
     segmented,
     withWord,
     mini,
-    worn,
     who,
     inSight,
   } = kit);
@@ -591,14 +589,14 @@ function row(f: Friend, remove: () => void, challenge: () => void, editing: () =
   return h(
     "li",
     { class: "friend" },
-    avatar(f.avatar, { name: f.name }),
+    avatar(f.avatar, { name: f.name, seal: f.seal }),
     h(
       "div",
       { class: "friend-text" },
       h(
         "a",
         { class: "friend-name", href: profileHref(f.tag) },
-        nameWords(f.name, worn(f.seal)),
+        nameWords(f.name),
         h("span", { class: same ? "friend-tag same" : "friend-tag" }, ` @${f.tag}`),
       ),
     ),

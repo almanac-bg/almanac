@@ -113,13 +113,20 @@ func alpha(c color.RGBA, a float64) color.RGBA {
 	return color.RGBA{m(c.R), m(c.G), m(c.B), m(0xff)}
 }
 
-// glyph paints a chapter's glyph size across at (x, y), at opacity a (the whole glyph at once, not each shape apart).
+// glyph paints a chapter's glyph size across at (x, y), at opacity a (the whole glyph at once, not each shape apart),
+// without its round ground (kt): on a tile, as the client has it (app.css, .tile-pic), the tile is its ground.
 func glyph(dst draw.Image, topic string, tone color.RGBA, x, y, size, a float64) error {
 	all, err := glyphs()
 	if err != nil {
 		return err
 	}
-	paint(dst, all[topic], tone, x, y, size, a)
+	var drawn []layer
+	for _, l := range all[topic] {
+		if l.ink != "kt" {
+			drawn = append(drawn, l)
+		}
+	}
+	paint(dst, drawn, tone, x, y, size, a)
 	return nil
 }
 

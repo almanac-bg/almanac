@@ -55,7 +55,7 @@ import { nameFirst } from "./screens/name.ts";
 import type { Steps } from "./screens/outcome.ts";
 import { noEmail, noEmailLine, signIn } from "./screens/signin.ts";
 import { loadStats } from "./screens/stats.ts";
-import { artFrom, rankName, rankNames } from "./seal.ts";
+import { rankName, rankNames } from "./seal.ts";
 import {
   bulgaria,
   categories,
@@ -82,7 +82,6 @@ import {
   formatNumber,
   glyph,
   inSight,
-  ladder,
   leaf,
   meter,
   mini,
@@ -96,6 +95,7 @@ import {
   rightsOf,
   schemeSwitch,
   seal,
+  sealList,
   segmented,
   shapeNames,
   textWords,
@@ -104,11 +104,9 @@ import {
   topicMark,
   verdict,
   who,
-  worn,
 } from "./ui.ts";
 
 export const kit = {
-  artFrom,
   acceptedLine,
   inSight,
   answered,
@@ -153,7 +151,6 @@ export const kit = {
   issueWords,
   keepGame,
   landing,
-  ladder,
   leaf,
   lifetime,
   listen,
@@ -207,6 +204,7 @@ export const kit = {
   schemeSwitch,
   scoreCard,
   seal,
+  sealList,
   segmented,
   setTextSize,
   setCalm,
@@ -243,7 +241,6 @@ export const kit = {
   when,
   withWord,
   who,
-  worn,
 };
 
 export type Kit = typeof kit;

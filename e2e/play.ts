@@ -415,7 +415,7 @@ export async function cutOrOverlapping(page: Page): Promise<string[]> {
     // has no box of its own to be cut in: its row's box is the one measured (and an inline box's own widths are
     // nothing to go by: Chromium has none, Firefox its words' run against a clientWidth of 0).
     for (const el of document.querySelectorAll(
-      ".friend-name, .duel-name, .duel-row .who-label, .me-who h1, .rk-words b",
+      ".friend-name, .duel-name, .duel-row .who-label, .me-who h1, .seal-row-words b",
     )) {
       let box: Element = el;
       while (box.parentElement && getComputedStyle(box).display === "inline") box = box.parentElement;
@@ -427,7 +427,9 @@ export async function cutOrOverlapping(page: Page): Promise<string[]> {
     for (const el of document.querySelectorAll(".friend-tag:not(.same)"))
       if ((el as HTMLElement).offsetParent !== null) out.push(`a tag shown ${say(el)}`);
     // Inside its card: a seal's name, a friend's day, a chapter's words.
-    for (const card of document.querySelectorAll(".rk, .friend, .duel-row, .ch-stand, .entry, .way, .card-leaf")) {
+    for (const card of document.querySelectorAll(
+      ".seal-row, .friend, .duel-row, .ch-stand, .entry, .way, .card-leaf",
+    )) {
       const box = card.getBoundingClientRect();
       for (const el of card.querySelectorAll("*")) {
         const r = el.getBoundingClientRect();

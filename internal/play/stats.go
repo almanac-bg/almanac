@@ -10,13 +10,13 @@ import (
 type Stats struct {
 	Avatar string `json:"avatar"` // a shape (Look)
 	Seal   *Seal  `json:"seal,omitempty"`
-	// Ink is the worn seal's chapter's ink as the book has it now, the number its Алманах card shows (InkOf: an issue
-	// still being played in it too, which the seal counts as it finishes).
-	Ink      int     `json:"ink,omitempty"`
-	Streak   int     `json:"streak"`
-	Week     [7]bool `json:"week"`     // this week's days played, Monday first
-	Forgiven [7]bool `json:"forgiven"` // this week's day missed that the streak forgave
-	Spare    bool    `json:"spare"`    // whether this week has a day to forgive still
+	// Ink is each chapter's ink as the book has it now, the number its Алманах card shows (InkOf: an issue still being
+	// played in it too, which the ranks count as it finishes): Профил's seals say it beside each rank.
+	Ink      map[string]int `json:"ink,omitempty"`
+	Streak   int            `json:"streak"`
+	Week     [7]bool        `json:"week"`     // this week's days played, Monday first
+	Forgiven [7]bool        `json:"forgiven"` // this week's day missed that the streak forgave
+	Spare    bool           `json:"spare"`    // whether this week has a day to forgive still
 }
 
 // StatsOf reads a player's stats.
@@ -38,7 +38,6 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 	if s.Seal, err = g.SealOf(ctx, userID); err != nil || s.Seal == nil {
 		return s, err
 	}
-	ink, err := g.InkOf(ctx, userID)
-	s.Ink = ink[s.Seal.Chapter]
+	s.Ink, err = g.InkOf(ctx, userID)
 	return s, err
 }

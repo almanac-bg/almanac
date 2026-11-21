@@ -78,8 +78,8 @@ const catEyes = (dx: number, y: number): Layer[] => [
   ["k0", both((x) => E(x(dx), y, 1.6, 3))],
   ["kw", glints(dx, y, 2.4)],
 ];
-const shoulders = "M7 66C8 54 19 48 32 48C45 48 56 54 57 66Z";
-const chest = "M25 66C25.5 57 28.5 52.5 32 52.5C35.5 52.5 38.5 57 39 66Z";
+const shoulders = "M7 66C8 54 19 48 32 48C45 48 56 54 57 66V72H7Z";
+const chest = "M25 66C25.5 57 28.5 52.5 32 52.5C35.5 52.5 38.5 57 39 66V72H25Z";
 /** The head's shadow on the chest. */
 const chinShadow = E(33, 51.5, 13.5, 4.4);
 const chin: Layer = ["ks", chinShadow];
@@ -225,8 +225,8 @@ const avatars: Record<string, Layer[]> = {
   ],
   // In profile, as a beak is: the breast where the others' shoulders are, the black of the wing behind it.
   stork: [
-    ["k5", "M4 66C5 55 13 46.5 26 46.5C39 46.5 47 55 48 66Z"],
-    ["k0", "M0 66C1 57 6 50.5 14.5 48.5C13 55 15.5 61.5 21 66Z"],
+    ["k5", "M4 66C5 55 13 46.5 26 46.5C39 46.5 47 55 48 66V72H4Z"],
+    ["k0", "M0 66C1 57 6 50.5 14.5 48.5C13 55 15.5 61.5 21 66V72H0Z"],
     ["k5", "M20.5 26C19.5 34 20.5 40 17 50H37C32.5 43 30 34 30.5 26Z"],
     ["ks", "M30.5 26C30 34 32.5 43 37 50H34C30.4 43 28.4 34 28.6 27Z"],
     ["ka", "M32 14.8L60.6 24.4Q61.8 25.4 60.2 25.8L33.5 24.8Z"],
@@ -330,9 +330,9 @@ const avatars: Record<string, Layer[]> = {
   ],
   // Its shell where the others' shoulders are, its head on its neck before it.
   turtle: [
-    ["ka", "M1 66C1 50 14 39.5 32 39.5C50 39.5 63 50 63 66Z"],
-    ["kb", both((x) => `M${x(24)} 58L${x(19)} 49L${x(11.5)} 47L${x(8.5)} 55.5L${x(12)} 66H${x(22)}Z`)],
-    ["kb", "M26.5 59.5H37.5L40.5 66H23.5Z"],
+    ["ka", "M1 66C1 50 14 39.5 32 39.5C50 39.5 63 50 63 66V72H1Z"],
+    ["kb", both((x) => `M${x(24)} 58L${x(19)} 49L${x(11.5)} 47L${x(8.5)} 55.5L${x(14)} 72H${x(20.5)}Z`)],
+    ["kb", "M26.5 59.5H37.5L43.3 72H20.7Z"],
     ["k2", "M25 42H39V55Q32 58.5 25 55Z"],
     ["ks", E(32.8, 50, 7, 3.2)],
     ["k2", "M32 18.5C42 18.5 49.5 25 49.5 33.5C49.5 42 42 48 32 48C22 48 14.5 42 14.5 33.5C14.5 25 22 18.5 32 18.5Z"],

@@ -24,7 +24,7 @@ const day: SharedDay = {
     { right: true },
   ],
 };
-const text = "Брой 9 · 7/10 · серия 23 дни\n■■◧■□■■□■■\nhttps://almanac.bg/d/9-k4f2m7qa";
+const text = "Брой 9 · 7/10 · серия 23 дни\n■■◩■□■■□■■\nhttps://almanac.bg/d/9-k4f2m7qa";
 
 /** The server, giving the link; what was asked of it. */
 function serve(): string[] {
@@ -54,6 +54,8 @@ test("the text: the issue, the score, the streak from three days, the tiles, the
   assert.equal(shareWords(day, "https://almanac.bg/d/9-k4f2m7qa"), text);
   assert.equal(shareWords({ ...day, streak: 2 }, "https://almanac.bg/d/9-x").split("\n")[0], "Брой 9 · 7/10");
   assert.equal(squares([{ right: true }, { right: false, void: true }, { right: false }]), "■□");
+  // Близо is the upper left half (U+25E9), as the tiles draw it: apart from ■ at a glance, unlike the left half ◧.
+  assert.equal(squares([{ right: false, close: true }]), "◩");
 });
 
 test("shared with the sheet where there is one, the link asked for once", async () => {

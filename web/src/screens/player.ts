@@ -4,33 +4,11 @@
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
+import type { ChapterRank } from "../ui.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
-let {
-  api,
-  errorText,
-  h,
-  nameWords,
-  signal,
-  title,
-  checkNews,
-  user,
-  avatar,
-  record,
-  chapterName,
-  seal,
-  worn,
-  categories,
-} = {} as Kit;
-
-/** A chapter's rank (play.ChapterRank): level 0 is none. */
-interface Rank {
-  chapter: string;
-  level: number;
-  name: string;
-  quarter: number;
-}
+let { api, errorText, h, nameWords, signal, title, checkNews, user, avatar, record, sealList } = {} as Kit;
 
 interface Profile {
   name: string;
@@ -38,8 +16,8 @@ interface Profile {
   me?: boolean;
   avatar: string;
   since: number;
-  seal?: Rank;
-  ranks: Rank[];
+  seal?: { chapter: string; level: number };
+  ranks: ChapterRank[];
   friend?: "yes" | "asked" | "asks";
   request?: number;
   record?: { won: number; lost: number; drawn: number };
@@ -50,22 +28,7 @@ const month = (ms: number) =>
   new Intl.DateTimeFormat("bg", { month: "long", year: "numeric" }).format(new Date(ms)).replace(/\s(?=г\.)/, " ");
 
 export function playerProfile(kit: Kit, [tag]: string[]): Child {
-  ({
-    api,
-    errorText,
-    h,
-    nameWords,
-    signal,
-    title,
-    checkNews,
-    user,
-    avatar,
-    record,
-    chapterName,
-    seal,
-    worn,
-    categories,
-  } = kit);
+  ({ api, errorText, h, nameWords, signal, title, checkNews, user, avatar, record, sealList } = kit);
   title(`@${tag}`);
   const profile = signal<Profile | null>(null);
   const error = signal("");
@@ -103,7 +66,7 @@ function head(p: Profile): Child {
   return h(
     "div",
     { class: "me-head" },
-    h("span", { class: "me-avatar" }, avatar(p.avatar, { size: "l", name: p.name }), worn(p.seal, 48)),
+    h("span", { class: "me-avatar" }, avatar(p.avatar, { size: "l", name: p.name, seal: p.seal })),
     h(
       "div",
       { class: "me-who" },
@@ -191,32 +154,13 @@ function actions(p: Profile, reload: () => Promise<unknown>): Child {
   });
 }
 
-/** Their seals, a chapter's each in the bank's order, the one worn ringed; before any, „Още няма печат.“ */
+/** Their seals, as Профил has the player's own (ui.ts, sealList): a row a chapter with a rank, in the bank's order;
+ * before any, „Още няма печат.“ */
 function ranks(p: Profile): Child {
-  const had = categories
-    .map((c) => p.ranks.find((r) => r.chapter === c.id))
-    .filter((r): r is Rank => !!r && r.level > 0);
   return h(
     "section",
     { class: "sect me-seals" },
     h("div", { class: "sect-head" }, h("h2", null, "Печати")),
-    had.length
-      ? h(
-          "ul",
-          { class: "seal-list" },
-          had.map((r) =>
-            h(
-              "li",
-              null,
-              h(
-                "span",
-                { class: "rk" },
-                seal(r.chapter, r.level, 40),
-                h("span", { class: "rk-words" }, h("b", null, chapterName(r.chapter)), h("span", null, r.name)),
-              ),
-            ),
-          ),
-        )
-      : h("p", { class: "seal-worn" }, "Още няма печат."),
+    sealList(p.ranks) ?? h("p", { class: "seal-worn" }, "Още няма печат."),
   );
 }

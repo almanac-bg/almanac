@@ -9,7 +9,7 @@ import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
 import { calm, type Scheme, scheme, setScheme } from "./lib/prefs.ts";
 import { formatNumber, formatValue, found, hyphenate, keepNumbers, stakeWords } from "./lib/words.ts";
 import { glyphBox, rankName, rankNames, sealParts } from "./seal.ts";
-import { topics } from "./state.ts";
+import { categories, topics } from "./state.ts";
 
 export { formatNumber, formatValue };
 
@@ -248,6 +248,54 @@ export function pips(quarters: number): HTMLElement {
   );
 }
 
+/** A chapter's rank as Профил and a player's page have it (play.ChapterRank). */
+export interface ChapterRank {
+  chapter: string;
+  level: number;
+  /** The quarters of the way to the next rank (0–3). */
+  quarter: number;
+  /** The chapter's ink, as the rank was counted from. */
+  ink: number;
+}
+
+/** A player's seals, one list, a row a chapter with a rank, in the bank's order: the seal (its glyph in it), the
+ * chapter's name, the rank's name with the pips towards the next, and the ink. A view, never a choice: the one worn is
+ * the best (play.sealOf). Nothing before a first seal: the page says what brings one. */
+export function sealList(ranks: ChapterRank[]): Child {
+  const had = categories
+    .map((c) => ranks.find((r) => r.chapter === c.id))
+    .filter((r): r is ChapterRank => !!r && r.level > 0);
+  if (!had.length) return null;
+  return h(
+    "ul",
+    { class: "seal-list" },
+    had.map((r) => {
+      // The seal for the eye: the words beside it say it.
+      const s = seal(r.chapter, r.level, 40);
+      s.removeAttribute("role");
+      s.removeAttribute("aria-label");
+      s.setAttribute("aria-hidden", "true");
+      return h(
+        "li",
+        { class: `seal-row t-${r.chapter}` },
+        s,
+        h(
+          "span",
+          { class: "seal-row-words" },
+          h("b", null, chapterName(r.chapter)),
+          h("span", { class: "seal-row-rank" }, rankName(r.level), " ", pips(r.quarter)),
+        ),
+        h(
+          "span",
+          { class: "seal-row-ink" },
+          h("b", { class: "num" }, formatNumber(r.ink)),
+          h("span", null, " с мастило"),
+        ),
+      );
+    }),
+  );
+}
+
 /** The ladder of a chapter's ranks, Бележка to Летопис, each its seal and its name: the one reached (`rank`; Летопис
  * for „Летопис · 2“ and on, named so) ringed in ink and its name heavy, those below as they are, those to come faded.
  * On a rank-up and Профил. A narrow ladder names only the reached one, by its own width (app.css, a container
@@ -269,15 +317,16 @@ export function ladder(chapter: string, rank: number, size = 24): HTMLElement {
   );
 }
 
-/** A player's worn seal, as it shows beside their name: none for a player without one. */
+/** A player's worn seal, as it shows on their avatar's corner: none for a player without one. */
 export interface Worn {
   chapter: string;
   level: number;
 }
 
-/** The seal a player wears, beside their name or on their avatar's corner, 24px (or `size`); nothing without one. Only
- * the seal: its rank's word is the Алманах's, never beside a name, nor read out there („Печат: История“). */
-export function worn(w: Worn | null | undefined, size = 24): Child {
+/** The seal a player wears, on their avatar's corner (avatar), sized by the avatar's own size (app.css,
+ * `.avatar > .seal`; `size` only says whether Летопис's number fits on it); nothing without one. Only the seal: its
+ * rank's word is the Алманах's, never with a name, nor read out there („Печат: История“). */
+function worn(w: Worn | null | undefined, size: number): Child {
   if (!w?.chapter || w.level < 1) return null;
   const s = seal(w.chapter, w.level, size);
   s.setAttribute("aria-label", `Печат: ${chapterName(w.chapter)}`);
@@ -443,7 +492,7 @@ export const record = (won: number, lost: number, drawn: number) =>
 /** How a player shows to others: their avatar (a shape). */
 export interface Look {
   avatar?: string;
-  /** The seal they wear beside their name (play.Seal), if any. */
+  /** The seal they wear on their avatar's corner (play.Seal), if any. */
   seal?: Worn | null;
 }
 
@@ -476,25 +525,19 @@ function fromName(name: string): string {
   return freeShapes[n % freeShapes.length] ?? "fox";
 }
 
-/** An avatar: the drawn animal in its own colours, in a round medallion of its scene (DECISIONS.md: no tones). `id` is
- * its shape, as the server sends a look. For the eye: the name is said in words nearby. */
-export function avatar(id: string | undefined, opts: { size?: "s" | "l"; name?: string } = {}) {
-  const shape = id || fromName(opts.name ?? "");
-  // A chapter's art, the player's from the chapter's Страница: its glyph on a disc of its colour.
-  if (topics.some((t) => t.id === shape))
-    return h(
-      "span",
-      { class: ["avatar", "chart", opts.size, `t-${shape}`].filter(Boolean).join(" "), "aria-hidden": "true" },
-      h("span", { class: "chart-disc" }, picture(`topic-${shape}`, "avatar-pic")),
-    );
+/** An avatar: the drawn animal in its own colours, on a rounded tile of its scene (DECISIONS.md: an avatar is a face,
+ * so an animal, in its own colours), with the seal the player wears (`seal`) on the tile's lower right corner: the one
+ * place a seal goes with a player, wherever they show (the bar, a row, a card, a profile). `id` is the shape, as the
+ * server sends a look; what isn't an animal is the one their name gives. The picture is for the eye (the name is said
+ * in words nearby); the seal is read out („Печат: История“). */
+export function avatar(id: string | undefined, opts: { size?: "s" | "l"; name?: string; seal?: Worn | null } = {}) {
+  const shape = id && Object.hasOwn(shapeNames, id) ? id : fromName(opts.name ?? "");
   return h(
     "span",
-    {
-      // The shape's class gives it its colours and its scene's (app.css, .tone-natural).
-      class: ["avatar", opts.size, "tone-natural", `sh-${shape}`].filter(Boolean).join(" "),
-      "aria-hidden": "true",
-    },
-    picture(shape, "avatar-pic"),
+    // The shape's class gives it its colours and its scene's (app.css, .tone-natural); the size, its seal's too.
+    { class: ["avatar", opts.size, "tone-natural", `sh-${shape}`].filter(Boolean).join(" ") },
+    h("span", { class: "avatar-tile", "aria-hidden": "true" }, picture(shape, "avatar-pic")),
+    worn(opts.seal, opts.size === "l" ? 48 : 24),
   );
 }
 
@@ -529,14 +572,14 @@ export function rankRow(
     "li",
     { class: ["rank-row", opts.me && "me", opts.gap && "gap"].filter(Boolean).join(" ") },
     opts.place ? h("span", { class: "rank-place" }, String(opts.place)) : null,
-    avatar(opts.look?.avatar, { name }),
+    avatar(opts.look?.avatar, { name, seal: opts.look?.seal }),
     h(
       "span",
       { class: "rank-name" },
-      // The seal and „ти“ after the name's last word (in its link): never alone on a line.
+      // „ти“ after the name's last word (in its link): never alone on a line.
       opts.tag
-        ? h("a", { href: profileHref(opts.tag) }, nameWords(name, worn(opts.look?.seal), opts.me ? rankYou() : null))
-        : nameWords(name, worn(opts.look?.seal), opts.me ? rankYou() : null),
+        ? h("a", { href: profileHref(opts.tag) }, nameWords(name, opts.me ? rankYou() : null))
+        : nameWords(name, opts.me ? rankYou() : null),
     ),
     opts.score || opts.aside
       ? h(
@@ -634,22 +677,20 @@ export function pictureCredit(c: Credit): Child {
 
 /** A player's name as a line holds it (DESIGN.md, Names): it breaks between its words first, each word held whole,
  * going to the next line whole where it fits there; only a word wider than its line breaks, at its syllables, with a
- * hyphen (a surname too), in either alphabet („Maximi-lian“). What follows the name (`tail`: the seal worn, „ти“)
- * stays with its last word, never alone on a line (`.name-end`). CSS keeps `overflow-wrap: break-word` for a word no
- * syllable can save (figures). */
-export function nameWords(name: string, ...tail: Child[]): Child {
+ * hyphen (a surname too), in either alphabet („Maximi-lian“). A word that follows the name (`after`: „ти“, an
+ * @username) stays with its last syllable, never alone on a line (`.name-end`); the seal is on the avatar, never here.
+ * CSS keeps `overflow-wrap: break-word` for a word no syllable can save (figures). */
+export function nameWords(name: string, after: Child = null): Child {
   const words = name.trim().split(/\s+/);
   const lastWord = words.pop() ?? "";
-  const after = tail.filter((t) => t != null && t !== false && t !== "");
   // What follows goes with the last word's last syllable: the word still breaks at its other syllables where it must,
   // and never runs past its line.
   const w = syllables(lastWord);
   const cut = w.lastIndexOf("­") + 1;
-  const last = !after.length
-    ? wholeWord(lastWord)
-    : cut
-      ? h("span", { class: "whole-word" }, w.slice(0, cut), h("span", { class: "name-end" }, w.slice(cut), ...after))
-      : h("span", { class: "name-end" }, lastWord, ...after);
+  const last =
+    after == null || after === false || after === ""
+      ? wholeWord(lastWord)
+      : h("span", { class: "whole-word" }, w.slice(0, cut), h("span", { class: "name-end" }, w.slice(cut), after));
   // One span for the whole name: a link around it takes one rule, whatever its words (app.css, .name-words).
   return h("span", { class: "name-words" }, ...words.flatMap((x) => [wholeWord(x), " "]), last);
 }
@@ -659,22 +700,23 @@ export function emailWords(email: string): Child[] {
   return email.split(/(?<=@)|(?=\.)/).flatMap((part, i) => (i ? [h("wbr"), part] : [part]));
 }
 
-/** A player on a board or a list: their avatar and name; with their tag, a link to their profile. */
+/** A player on a board or a list: their avatar with their seal on its corner, and their name; with their tag, a link
+ * to their profile. */
 export function who(name: Child, look: Look = {}, extra: Child = null, plainName = "", tag = ""): Child {
   return h(
     tag ? "a" : "span",
     tag ? { class: "who", href: profileHref(tag) } : { class: "who" },
-    avatar(look.avatar, { size: "s", name: plainName }),
+    avatar(look.avatar, { size: "s", name: plainName, seal: look.seal }),
     h(
       "span",
       { class: "who-text" },
-      // The name whole, never cut: the seal (and what's beside it, „ти“) after its last word.
+      // The name whole, never cut: what's beside it („ти“) after its last word.
       h(
         "span",
         { class: "who-name" },
         typeof name === "string"
-          ? h("span", { class: "who-label" }, nameWords(name, worn(look.seal), extra))
-          : [h("span", { class: "who-label" }, name), worn(look.seal), extra],
+          ? h("span", { class: "who-label" }, nameWords(name, extra))
+          : [h("span", { class: "who-label" }, name), extra],
       ),
     ),
   );

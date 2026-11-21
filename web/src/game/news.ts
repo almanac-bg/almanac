@@ -2,7 +2,7 @@
 // in the issue that stayed grey because the book had its fact already, and the chapter nearest its next rank (its
 // seal, how much ink is still to come, and the quarters as pips); or the ranks it raised (play/rank.go): several as
 // one line (one chapter's with its ladder of ranks), and a rise of the player's best rank as the result's one big
-// moment, the seal set large on its ladder, with the art Страница brings. A game that ended without its result on screen has
+// moment, the seal set large on its ladder. A game that ended without its result on screen has
 // its news told on Днес later (play/told.go): under its result, if it's the day's; else under a line that says whose it
 // is. A bad game is never celebrated: what's said is what's true of it.
 
@@ -18,9 +18,8 @@ interface News {
   ink?: number;
   /** Right answers in the issue to questions the book had already: their facts stay grey (play: „вече срещан“). */
   metBefore?: number;
-  /** The ranks risen since last told, as one (play.Rose): Бележка never; Страница brings the chapter's art; `best`, the
-   * player's best rank rose. */
-  rose?: { ranks: { chapter: string; name: string; to?: number; ink?: number; art?: boolean }[]; best?: boolean };
+  /** The ranks risen since last told, as one (play.Rose): Бележка never; `best`, the player's best rank rose. */
+  rose?: { ranks: { chapter: string; name: string; to?: number; ink?: number }[]; best?: boolean };
   /** After a day's issue, the chapter nearest its next rank (play.Step), when none rose: its rank now (0: none yet) and
    * the quarters of the way to the next. */
   step?: { chapter: string; left: number; next: string; level: number; quarter: number };
@@ -105,7 +104,7 @@ function stepLine(s: NonNullable<News["step"]>): Child {
 
 /** Ranks risen, the best not among them (or beside a ten of ten): the seals risen, drawn, and one line for them all,
  * each chapter's name a tap from its page: „Нов печат: „Страница“ в История.“, „Нови печати: „Страница“ в География и
- * в Технологии и игри.“; and the art they bring, once: „Картината на тази глава вече може да е твой аватар.“ */
+ * в Технологии и игри.“ */
 function roseLine(r: NonNullable<News["rose"]>): Child {
   const one = r.ranks.length === 1 ? r.ranks[0] : undefined;
   return h(
@@ -116,7 +115,7 @@ function roseLine(r: NonNullable<News["rose"]>): Child {
       { class: "rose-seals" },
       r.ranks.map((x) => seal(x.chapter, x.to ?? rankNames.indexOf(x.name) + 1, 40)),
     ),
-    h("p", null, r.ranks.length === 1 ? "Нов печат: " : "Нови печати: ", risen(r.ranks), ".", artLine(r.ranks)),
+    h("p", null, r.ranks.length === 1 ? "Нов печат: " : "Нови печати: ", risen(r.ranks), "."),
     // One chapter risen: where it stands among the ranks.
     one ? ladder(one.chapter, one.to ?? rankNames.indexOf(one.name) + 1) : null,
   );
@@ -138,24 +137,9 @@ function risen(ranks: Risen): Child[] {
 
 const chapterLink = (chapter: string) => h("a", { href: `/almanac/${chapter}` }, chapterName(chapter));
 
-/** The art the ranks risen bring (Страница reached), said once: „Картините на тези глави вече могат да са твой
- * аватар.“; named, where not every chapter risen brings it. */
-function artLine(ranks: Risen): string {
-  const art = ranks.filter((x) => x.art);
-  if (!art.length) return "";
-  if (art.length === ranks.length)
-    return art.length === 1
-      ? " Картината на тази глава вече може да е твой аватар."
-      : " Картините на тези глави вече могат да са твой аватар.";
-  const names = art.map((x) => chapterName(x.chapter));
-  return art.length === 1
-    ? ` Картината на ${names[0]} вече може да е твой аватар.`
-    : ` Картините на ${names.slice(0, -1).join(", ")} и ${names.at(-1)} вече могат да са твой аватар.`;
-}
-
 /** The player's best rank risen: the result's one big moment, on its chapter's sheet: „Нов печат“, the seal set
- * large, its rank's name, what made it („40 факта от История са с мастило в твоя Алманах.“), its ladder, and the art
- * it brings; other ranks risen with it in a line under them. */
+ * large, its rank's name, what made it („40 факта от История са с мастило в твоя Алманах.“) and its ladder; other
+ * ranks risen with it in a line under them. */
 function rankUp(r: NonNullable<News["rose"]>): Child {
   const top = r.ranks[0];
   if (!top) return null;
@@ -175,7 +159,6 @@ function rankUp(r: NonNullable<News["rose"]>): Child {
         )
       : null,
     level > 0 ? ladder(top.chapter, level, 28) : null,
-    top.art ? h("p", { class: "rankup-art" }, "Картината на тази глава вече може да е твой аватар.") : null,
-    others.length ? h("p", { class: "rankup-more" }, "И още: ", risen(others), ".", artLine(others)) : null,
+    others.length ? h("p", { class: "rankup-more" }, "И още: ", risen(others), ".") : null,
   );
 }

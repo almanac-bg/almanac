@@ -19,7 +19,7 @@ async function standIn(page: Page, sheet: boolean): Promise<void> {
   }, sheet);
 }
 
-const shape = /^Брой \d+ · (\d+)\/10( · \d+ дни)?\n[■◧□]{10}\nhttps?:\/\/\S+(\/d\/\d+-[a-z2-9]{8})$/;
+const shape = /^Брой \d+ · (\d+)\/10( · \d+ дни)?\n[■◩□]{10}\nhttps?:\/\/\S+(\/d\/\d+-[a-z2-9]{8})$/;
 
 test("the day shared: its score and shape and a link, which brings another to the same ten", async ({
   page,

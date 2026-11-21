@@ -19,8 +19,8 @@ import (
 // What a game brings is told once, at its end (NewsOf): what it wrote in the book, the ranks it raised, or the
 // chapter nearest its next. A bad game brings no praise: what it's told is what's true of it.
 //
-// Every animal is every player's from the first day (Shapes); a chapter's art is theirs too from its Страница
-// (rank.go).
+// Every animal is every player's from the first day (Shapes), and nothing else is an avatar: a chapter's seal is worn
+// on the avatar's corner (rank.go), never chosen as one.
 
 // ErrNoAvatar is an avatar there's no such thing as.
 var ErrNoAvatar = errors.New("no such avatar")
@@ -39,7 +39,7 @@ var (
 // it (account.AnimalOf: the animal of their drawn name).
 func DefaultAvatar(userID int64) string { return Starters[max(userID, 0)%int64(len(Starters))] }
 
-// Look is how a player shows to others: their avatar (a shape), and the seal they wear beside their name (rank.go:
+// Look is how a player shows to others: their avatar (a shape), and the seal they wear on its corner (rank.go:
 // none before a rank).
 type Look struct {
 	Avatar string `json:"avatar"`
@@ -87,18 +87,10 @@ func (g *Game) LookOf(ctx context.Context, userID int64) (Look, error) {
 	return g.lookOf(userID, read), err
 }
 
-// SetAvatar changes a player's avatar: a shape of Shapes ("fox"), or a chapter's art the player has (rank.go).
+// SetAvatar changes a player's avatar: an animal of Shapes ("fox"). An avatar is a face, so an animal only: a seal is
+// worn on it, never as it (DECISIONS.md).
 func (g *Game) SetAvatar(ctx context.Context, userID int64, shape string) error {
-	if chapter, ok := chapterOfArt(g.Bank(), shape); ok {
-		// A chapter's art, the player's from its Страница (rank.go).
-		has, err := g.HasArt(ctx, userID, chapter)
-		if err != nil {
-			return err
-		}
-		if !has {
-			return ErrNoAvatar
-		}
-	} else if !slices.Contains(Shapes, shape) {
+	if !slices.Contains(Shapes, shape) {
 		return ErrNoAvatar
 	}
 	_, err := g.DB.Write.ExecContext(ctx, `UPDATE users SET avatar = ? WHERE id = ?`, shape, userID)

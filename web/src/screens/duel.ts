@@ -261,7 +261,7 @@ interface Friend {
   name: string;
   tag: string;
   avatar?: string;
-  /** The seal they wear beside their name (play.Seal). */
+  /** The seal they wear on their avatar's corner (play.Seal). */
   seal?: { chapter: string; level: number };
 }
 

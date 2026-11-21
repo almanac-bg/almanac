@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
+	"maps"
 	"strings"
 	"testing"
 )
@@ -194,7 +194,7 @@ func TestRanksToldOnce(t *testing.T) {
 			t.Fatalf("the step %+v, its chapter %+v", n.Step, r)
 		}
 	}
-	// Five facts of geography in ink, and seven of history: two chapters at Страница, told as one, both with art.
+	// Five facts of geography in ink, and seven of history: two chapters at Страница, told as one.
 	var all []answered
 	for _, topic := range []string{"geography", "history"} {
 		k := 0
@@ -207,7 +207,7 @@ func TestRanksToldOnce(t *testing.T) {
 	w.dayHistory(ana, all)
 	w.countRanks(ana)
 	n, _ = w.g.NewsOf(ctx, ana, 0)
-	if n.Rose == nil || len(n.Rose.Ranks) != 2 || !n.Rose.Best || !n.Rose.Ranks[0].Art || n.Rose.Ranks[0].Name != "Страница" {
+	if n.Rose == nil || len(n.Rose.Ranks) != 2 || !n.Rose.Best || n.Rose.Ranks[0].Name != "Страница" {
 		t.Fatalf("two chapters risen: %+v", n.Rose)
 	}
 	for _, r := range n.Rose.Ranks {
@@ -230,17 +230,14 @@ func TestRanksToldOnce(t *testing.T) {
 	}
 }
 
-// The seal worn is the best, never chosen (the more ink on a tie). A chapter's art is an avatar from its Страница; the
-// animals are everyone's.
-func TestSealAndArt(t *testing.T) {
+// The seal worn is the best, never chosen (the more ink on a tie). An avatar is an animal, everyone's; a chapter's art
+// is never one, whatever its rank: a seal is worn on the avatar, never as it.
+func TestSealAndAvatar(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
 	if s, err := w.g.SealOf(ctx, ana); s != nil || err != nil {
 		t.Fatalf("a seal of nothing: %+v %v", s, err)
-	}
-	if err := w.g.SetAvatar(ctx, ana, "geography"); !errors.Is(err, ErrNoAvatar) {
-		t.Fatalf("a chapter's art without its rank: %v", err)
 	}
 	var all []answered
 	for topic, n := range map[string]int{"geography": 6, "history": 7, "music": 1} {
@@ -256,27 +253,13 @@ func TestSealAndArt(t *testing.T) {
 	if s, _ := w.g.SealOf(ctx, ana); s == nil || s.Chapter != "history" || s.Name != "Страница" {
 		t.Fatalf("the best seal, on a tie the more ink: %+v", s)
 	}
-	if err := w.g.SetAvatar(ctx, ana, "geography"); err != nil {
-		t.Fatalf("a chapter's art at its Страница: %v", err)
-	}
-	if err := w.g.SetAvatar(ctx, ana, "music"); !errors.Is(err, ErrNoAvatar) {
-		t.Fatalf("a chapter's art at Бележка: %v", err)
+	for _, art := range []string{"history", "geography", "music"} {
+		if err := w.g.SetAvatar(ctx, ana, art); !errors.Is(err, ErrNoAvatar) {
+			t.Fatalf("a chapter's art as an avatar (%s): %v", art, err)
+		}
 	}
 	if err := w.g.SetAvatar(ctx, ana, "lynx"); err != nil {
 		t.Fatalf("an animal: %v", err)
-	}
-}
-
-// Профил says under a chapter's art how much ink is left to its Страница (web/src/screens/avatar.ts) by the client's
-// artFrom: the rank's ink as the server has it.
-func TestArtFromTheClient(t *testing.T) {
-	src, err := os.ReadFile("../../web/src/seal.ts")
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := fmt.Sprintf("export const artFrom = %d;", RankFrom(RankArt))
-	if !strings.Contains(string(src), want) {
-		t.Fatalf("web/src/seal.ts: want %q", want)
 	}
 }
 
@@ -457,10 +440,10 @@ func TestIssueLeftUnfinishedCountsOnceItsDayIsOver(t *testing.T) {
 	if r := w.rankIn(ana, s.Chapter); s.Left != max(1, r.NextAt-r.Ink) || s.Level != r.Level {
 		t.Fatalf("the step %+v against its rank %+v", s, r)
 	}
-	// Профил says the worn chapter's ink as its Алманах card does: the book's.
+	// Профил says each chapter's ink as its Алманах card does: the book's.
 	st, err := w.g.StatsOf(ctx, ana)
-	if err != nil || st.Seal == nil || st.Ink != ink[st.Seal.Chapter] {
-		t.Fatalf("Профил's ink %d of %+v, the book's %v (%v)", st.Ink, st.Seal, ink, err)
+	if err != nil || st.Seal == nil || !maps.Equal(st.Ink, ink) {
+		t.Fatalf("Профил's ink %v of %+v, the book's %v (%v)", st.Ink, st.Seal, ink, err)
 	}
 }
 

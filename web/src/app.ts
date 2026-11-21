@@ -17,7 +17,7 @@ import { missing } from "./screens/missing.ts";
 import { topic } from "./screens/play.ts";
 import { sharedDay, today } from "./screens/today.ts";
 import { cover, friendsNews, look, playing, user, watchNews, wornSeal } from "./state.ts";
-import { avatar, rosette, worn } from "./ui.ts";
+import { avatar, rosette } from "./ui.ts";
 
 /** The three places (DECISIONS.md, „The redesign“): where each goes, its name, and which paths are part of it. A game
  * of the day is played on Днес, a topic's from its chapter in the Алманах; a duel is the friends'. */
@@ -68,11 +68,8 @@ if (root) {
           const u = user();
           if (!u || (cover() && !u.email)) return h("a", { class: "bar-in", href: "/me#signin" }, "Вход");
           if (path() === "/me") return null;
-          return h(
-            "a",
-            { class: "bar-me", href: "/me", "aria-label": "Профил" },
-            () => avatar(look()),
-            () => worn(wornSeal(), 24),
+          return h("a", { class: "bar-me", href: "/me", "aria-label": "Профил" }, () =>
+            avatar(look(), { seal: wornSeal() }),
           );
         },
       ),

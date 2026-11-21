@@ -1,6 +1,6 @@
 // Sharing the day's result (server/share.go, play/share.go): its issue, the score and its tiles, never an answer, and
 // the link that brings whoever opens it to the same ten: „Брой 42 · 8/10 · серия 23 дни“, the tiles as squares (■ right,
-// ◧ близо, □ not), the link. The link is made as the day is first shared (the server's), and kept for the page's life,
+// ◩ близо, □ not), the link. The link is made as the day is first shared (the server's), and kept for the page's life,
 // so a second tap shares at once; where there's no sheet, the text is copied. The card is the server's, the picture
 // the link's preview shows (internal/card, /card/<issue>-<shape>.png), fetched as the sheet opens; it goes on its own,
 // where the device's share sheet takes a picture: never with the text, which an app given both may drop, link and all.
@@ -23,11 +23,11 @@ export interface SharedDay {
   marks: Mark[];
 }
 
-/** The day's tiles as text: ■ right, ◧ близо, □ not; a question that counts for nobody has no place. */
+/** The day's tiles as text: ■ right, ◩ близо, □ not; a question that counts for nobody has no place. */
 export function squares(marks: Mark[]): string {
   return marks
     .filter((m) => !m.void)
-    .map((m) => (m.right ? "■" : m.close ? "◧" : "□"))
+    .map((m) => (m.right ? "■" : m.close ? "◩" : "□"))
     .join("");
 }
 
