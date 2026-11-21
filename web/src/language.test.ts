@@ -87,8 +87,8 @@ test("a thing is called by its one name", () => {
  */
 test("a chapter's name is quoted after „глава“ and only there", () => {
   const name = String.raw`\$\{(?:chapterName|nameOf|topicName)\(`;
-  const alone = new RegExp(String.raw`(?<!глава )„${name}`, "u");
-  const bare = new RegExp(String.raw`глава ${name}`, "u");
+  const alone = new RegExp(`(?<!глава )„${name}`, "u");
+  const bare = new RegExp(`глава ${name}`, "u");
   const found: string[] = [];
   for (const path of files("web/src")) {
     if (path.endsWith(".test.ts")) continue;

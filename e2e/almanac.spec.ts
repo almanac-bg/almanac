@@ -117,9 +117,6 @@ test("„Микс“ and „България“ are ways to play, not chapters: 
   await expect(page.locator(".way").first()).toHaveAttribute("href", "/play/mix");
 });
 
-/** A text as the page holds it, without the soft hyphens that let its long words break (ui.ts, textWords). */
-const read = (text: string | null) => (text ?? "").replaceAll("­", "");
-
 test("a chapter's entries: the latest first, each with its dateline; a statement is its own headword", async ({
   page,
 }) => {

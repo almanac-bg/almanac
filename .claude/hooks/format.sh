@@ -3,7 +3,8 @@
 #
 #   format.sh edit    after an Edit or Write: formats that file (the hook's JSON on stdin names it)
 #   format.sh commit  before a git commit: refuses a message that skips CI; formats every changed file, and if any
-#                     changed, stops the commit to add them
+#                     changed, stops the commit to add them; stops it too while Biome finds anything to warn of in the
+#                     client (CI fails on a warning: package.json's check)
 #
 # Sessions write files with tools and scripts, never through an editor that formats on save: this is that editor.
 set -u
@@ -46,6 +47,11 @@ commit)
 	if [ -n "$changed" ]; then
 		echo "Formatted as CI wants it, so the commit was stopped: git add these and commit again:" >&2
 		echo "$changed" >&2
+		exit 2
+	fi
+	if [ -n "$biome" ] && ! out=$("$biome" ci --error-on-warnings --colors=off . 2>&1); then
+		echo "Biome found something to fix, so the commit was stopped (CI would fail on it too):" >&2
+		echo "$out" | grep -vE '^\s*$' | head -60 >&2
 		exit 2
 	fi
 	exit 0
