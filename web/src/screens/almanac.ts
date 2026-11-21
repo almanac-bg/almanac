@@ -1,6 +1,6 @@
 // Алманах, one of the three places: the player's book (DESIGN.md, Places). Its head — whose book it is, what ink and
 // grey mean, and Микс and България as two ways to play — then its chapters, each a card in its colour with its seal as
-// the badge and its ink („22 с мастило“), the one nearest its next rank first. A chapter (/almanac/<topic>) is its head
+// the badge and its ink („22 с мастило“), in their numbers' order. A chapter (/almanac/<topic>) is its head
 // on its sheet (the seal, its ink, the rank and the way to the next), „Игра на главата“, and its facts, ink and grey, the
 // latest first, a page at a time, found by their words. How well a player knows a chapter (mastery) is the game's own,
 // never shown.
@@ -154,20 +154,13 @@ export function almanac(kit: Kit): Child {
 }
 
 /** The book as a page: its head (with a game left half-way today, the way to go on), and its chapters, the one
- * nearest its next rank first. */
+ * in their numbers' order. */
 function book(p: Page, left: () => Left[] = () => []): Child {
   const name = user.peek()?.name;
   const rankOf = (id: string) => p.ranks?.find((r) => r.chapter === id);
-  // The chapter nearest its next rank: the least ink still to come, of those begun.
-  const begun = categories.map((c) => rankOf(c.id)).filter((r): r is Rank => !!r && r.level > 0);
-  const nearest = begun.sort((a, b) => a.nextAt - a.ink - (b.nextAt - b.ink))[0]?.chapter;
-  // The inked chapters first (the one nearest its next rank leading), then those with no ink yet, from a row of
-  // their own: a short card never beside a tall one, which would leave a hole under it.
-  const inked = (id: string) => (p.ink[id] ?? 0) > 0;
-  const order = categories
-    .map((c) => c.id)
-    .sort((a, b) => Number(inked(b)) - Number(inked(a)) || (a === nearest ? -1 : b === nearest ? 1 : 0));
-  const firstBlank = order.find((id) => !inked(id));
+  // The chapters in their numbers' order (Глава 1, 2, …), always the same: a book's contents, never resorted. A row's
+  // cards are as tall as its tallest, so a card with no ink yet leaves no hole beside an inked one.
+  const order = categories.map((c) => c.id);
   return h(
     "section",
     { class: "screen book" },
@@ -208,13 +201,7 @@ function book(p: Page, left: () => Left[] = () => []): Child {
     h(
       "ol",
       { class: "chapters", "aria-label": "Главите" },
-      order.map((id) =>
-        h(
-          "li",
-          { class: id === firstBlank && firstBlank !== order[0] ? "row-start" : undefined },
-          card(id, p.ink[id] ?? 0, rankOf(id)),
-        ),
-      ),
+      order.map((id) => h("li", null, card(id, p.ink[id] ?? 0, rankOf(id)))),
     ),
   );
 }

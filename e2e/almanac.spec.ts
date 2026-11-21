@@ -31,9 +31,9 @@ test("the book's contents: a chapter a row with its ink, and no count of it all"
   // A counter at zero is hidden: the book's head says how ink is written.
   await expect(cards.filter({ hasText: "География" })).not.toContainText("с мастило");
   await expect(page.locator(".way")).toHaveText([/Микс/, /България/]);
-  // The chapters with ink first, then those without: no short card beside a tall one.
-  await expect(cards.first()).toContainText("Кино и телевизия");
-  await expect(cards.nth(1)).not.toContainText("с мастило");
+  // The chapters in their numbers' order, whatever their ink: a book's contents.
+  await expect(cards.first()).toContainText("Обща култура");
+  await expect(cards.nth(4)).toContainText("Кино и телевизия");
   await movies.click();
   await expect(page).toHaveURL(/\/almanac\/movies$/);
   await expect(page.getByRole("heading", { level: 1, name: "Кино и телевизия" })).toBeVisible();
