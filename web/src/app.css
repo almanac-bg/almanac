@@ -6338,36 +6338,44 @@
 
   /* ---- Rows of players: a board, the friends; Приятели ---- */
 
-  /* A board's row: the place, the avatar, and the name with the row's width (on two lines rather than cut, the seal and
-     „ти“ after its last word); the score and the day's small squares on a line under the name. */
+  /* A player's row, a friend's or a board's (friends.ts, playerRow), one build: the avatar with its seal on its
+     corner; the name across the row (on two lines rather than cut); their day on a line under it; and what comes
+     before the avatar (a board's place) or at the row's end (a friend's duel). */
+  .friend,
   .rank-row {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
     align-items: center;
-    gap: 4px 10px;
+    gap: 2px var(--space-3);
     min-height: 3.625rem;
     padding: var(--space-2) 0;
   }
 
+  .friend {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "pic name act"
+      "pic day act";
+  }
+
+  /* A board's: its place before the avatar; under the name the score, the day's small squares after it (under it only
+     where the line is too narrow). */
+  .rank-row {
+    grid-template-columns: 1.5rem auto minmax(0, 1fr);
+    grid-template-areas:
+      "place pic name"
+      "place pic day";
+  }
+
+  :is(.friend, .rank-row) > .avatar {
+    grid-area: pic;
+  }
+
   .rank-place {
-    flex: none;
-    width: 1.5rem;
+    grid-area: place;
     color: var(--ink-3);
     font: 900 1.25rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
     text-align: center;
-  }
-
-  .rank-name {
-    flex: 1 1 0;
-    min-width: 0;
-    font: 800 1rem / 1.25 var(--font-sans);
-    overflow-wrap: break-word;
-  }
-
-  .rank-name a {
-    color: inherit;
-    text-decoration: none;
   }
 
   .rank-you {
@@ -6377,48 +6385,24 @@
     white-space: nowrap;
   }
 
-  .rank-end {
-    display: flex;
-    flex-basis: 100%;
-    align-items: center;
-    gap: 12px;
-    padding-left: calc(1.5rem + 60px); /* under the name: past the place, the avatar (40px) and their gaps */
-  }
-
-  .rank-row:not(:has(> .rank-place)) .rank-end {
-    padding-left: 50px;
-  }
-
   .rank-score {
-    flex: none;
     white-space: nowrap;
   }
 
+  .rank-row .mini {
+    align-self: center;
+  }
+
   .rank-n {
-    font: 900 1.5rem / 1 var(--font-numeral);
+    color: var(--ink);
+    font: 900 1.125rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
   }
 
-  :is(.rank-score, .friend-day) small {
+  .friend-day small {
     margin-left: 2px;
     color: var(--ink-3);
     font: 700 0.8125rem / 1 var(--font-sans);
-  }
-
-  .rank-aside {
-    display: flex;
-  }
-
-  /* On the narrowest phones the score and the small squares don't fit one line under the name: the squares go on a
-     line of their own under the score. */
-  @media (max-width: 339.98px) {
-    .friends-page .rank-end {
-      flex-wrap: wrap;
-    }
-
-    .friends-page .rank-aside {
-      flex-basis: 100%;
-    }
   }
 
   /* The player's own row: on a well. */
@@ -6513,29 +6497,14 @@
     font-weight: 900;
   }
 
-  /* A friend: the avatar; the name and the seal worn across the row, their day and the pair's duels on a line under
-     it; and the way to a duel (or „Премахни“) at the end. */
-  .friend {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 2px var(--space-3);
-    min-height: 3.625rem;
-    padding: var(--space-2) 0;
-  }
-
-  .friend > .avatar {
-    grid-row: 1 / span 2;
-  }
-
+  /* A friend's way to a duel (or „Премахни“), at the row's end. */
   .friend-act {
-    grid-column: 3;
-    grid-row: 1 / span 2;
+    grid-area: act;
     justify-self: end;
   }
 
-  /* The name, and its seal right after its last word however it wraps. */
   .friend-text {
+    grid-area: name;
     min-width: 0;
   }
 
@@ -6570,16 +6539,10 @@
   .friend-day {
     display: flex;
     flex-wrap: wrap;
-    grid-column: 2;
-    grid-row: 2;
+    grid-area: day;
     gap: 2px var(--space-3);
     color: var(--ink-3);
     font: 700 0.875rem / 1.2 var(--font-sans);
-  }
-
-  .friend-day .rank-n {
-    color: var(--ink);
-    font-size: 1.125rem;
   }
 
   .record {
@@ -7825,42 +7788,22 @@
     --gutter: 16px;
   }
 
-  /* A friend's row: the avatar over nothing but itself, the name and its seal across the row, their day and the way
-     to a duel under it. */
-  .tight .friend > .avatar {
-    grid-row: 1;
+  /* A player's row: the avatar over nothing but itself, the name across the row, their day under it all (a board's
+     under its place too) and a friend's way to a duel beside it. */
+  .tight .friend {
+    grid-template-areas:
+      "pic name name"
+      "day day act";
   }
 
-  .tight .friend-text {
-    grid-column: 2 / -1;
-  }
-
-  .tight .friend-day {
-    grid-column: 1 / 3;
-  }
-
-  .tight .friend-act {
-    grid-row: 2;
-  }
-
-  /* Приятели's board row: the score and the small squares under the place and the avatar too, the squares on a line
-     of their own, wrapping if even that is too narrow. */
-  .tight .friends-page .rank-end {
-    flex-wrap: wrap;
-    padding-left: 0;
-  }
-
-  .tight .friends-page .rank-aside {
-    flex-basis: 100%;
-  }
-
-  .tight .friends-page .mini {
-    display: flex;
-    flex-wrap: wrap;
+  .tight .rank-row {
+    grid-template-areas:
+      "place pic name"
+      "day day day";
   }
 
   /* A friend's day: their score and the duels between you, one under the other. */
-  .tight .friend-day {
+  .tight .friend > .friend-day {
     flex-direction: column;
   }
 

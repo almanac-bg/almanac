@@ -131,10 +131,11 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name.
 - **Приятели:** the board (friends by default, or all of България: its spread and the player's place first, then the
   top rows: the place (shared by those as many right and as close on the number, never told apart by time: 1, 2, 2,
-  4; the player first among their equals), the avatar with its seal, the name with the row's width and „ти“ after it, the score and the
-  small squares on a line under it, on a line of their own under the score below 340 px or in large text; the
-  squares once the player has played the day, on both boards); the friends (a row each: avatar with its seal, the name
-  across the row, never cut, today's score and the duels between you „дуели 3 : 1“ under it; the column a third of a
+  4; the player first among their equals), then the row built as a friend's: the avatar with its seal, the name with
+  the row's width and „ти“ after it, and on one line under the name the score (a heavy numeral as a friend's, never
+  display-sized) and the small squares after it, under the score only where the line is too narrow (under 360 px; in
+  large text, as a friend's day, the line runs under the place and the avatar too); the squares once the player has
+  played the day, on both boards); the friends (a row each: avatar with its seal, the name across the row, never cut, today's score and the duels between you „дуели 3 : 1“ under it; the column a third of a
   big screen; a friend removed only after a sheet asks „Премахваш ли Иво от приятелите си?“, „Премахни“ in red and
   „Отказ“, then at once, the duels open between them ending as if their time were up); the duels (shown once there
   are friends or duels, or the day is played: „Нов дуел“ against a recording needs no friend; „Твой ред“ the page's
@@ -314,9 +315,9 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   at rest (its row or place says whose it is), and under a pointer underlined whole.
 - **What a tap brings up** under it (an ask, an answer: „Нова връзка“, „Добави“, „Изтрий профила“) is scrolled into
   sight whole, clear of a phone's places at the foot (`inSight()`).
-- **Rows of players:** `who()` (the avatar with its seal, and the name), `rankRow()`, `.fd-row`, `.friend`,
-  `.duel-row`. **Avatars** (`avatar()`): the drawn animal on a rounded tile of its scene, the seal worn on its corner.
-  Only the fifteen animals: an avatar is a face.
+- **Rows of players:** `who()` (the avatar with its seal, and the name), `playerRow()` in Приятели (a friend's
+  `.friend` and a board's `.rank-row`, one build), `.fd-row`, `.duel-row`. **Avatars** (`avatar()`): the drawn animal
+  on a rounded tile of its scene, the seal worn on its corner. Only the fifteen animals: an avatar is a face.
 - **What went wrong** is never a dead end: `failure()` says what happened, offers „Опитай пак“ where it can help, and
   always a way on.
 
@@ -502,7 +503,7 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
 
 ## In code
 
-- `ui.ts`: `leaf`, `glyph`, `chip`, `tiles`, `mini`, `seal`, `pips`, `sealList`, `ladder`, `avatar`, `who`, `rankRow`, `verdict`,
+- `ui.ts`: `leaf`, `glyph`, `chip`, `tiles`, `mini`, `seal`, `pips`, `sealList`, `ladder`, `avatar`, `who`, `verdict`,
   `fact`, `filed`, `segmented`, `failure`, `rosette`, `back`, `nameWords`, `textWords`, `emailWords`, `inSight`.
 - `game/run.ts`: `trail`, `questionHead`, `timer`, `settle`; `game/questions.ts` each kind; `game/news.ts` what a game
   wrote; `game/share.ts` the share.

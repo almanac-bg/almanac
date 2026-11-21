@@ -561,41 +561,8 @@ export function rosette(): SVGSVGElement {
 /** Where a player's profile is: by their tag. */
 export const profileHref = (tag: string) => `/players/${tag}`;
 
-/** A player's row on a board or a list, between hairlines (`.rows`): their place (if it has one), their avatar, their
- * name (a way to their profile, with their tag; „ти“ after the player's own, whose row is washed), and what's said of
- * them at its end: a score („8 от 10“), and a figure beside it (`aside`). */
-export function rankRow(
-  name: string,
-  opts: { place?: number; me?: boolean; look?: Look; tag?: string; score?: Child; aside?: Child; gap?: boolean } = {},
-): HTMLElement {
-  return h(
-    "li",
-    { class: ["rank-row", opts.me && "me", opts.gap && "gap"].filter(Boolean).join(" ") },
-    opts.place ? h("span", { class: "rank-place" }, String(opts.place)) : null,
-    avatar(opts.look?.avatar, { name, seal: opts.look?.seal }),
-    h(
-      "span",
-      { class: "rank-name" },
-      // „ти“ after the name's last word (in its link): never alone on a line.
-      opts.tag
-        ? h("a", { href: profileHref(opts.tag) }, nameWords(name, opts.me ? rankYou() : null))
-        : nameWords(name, opts.me ? rankYou() : null),
-    ),
-    opts.score || opts.aside
-      ? h(
-          "span",
-          { class: "rank-end" },
-          opts.score ? h("span", { class: "rank-score" }, opts.score) : null,
-          opts.aside ? h("span", { class: "rank-aside" }, opts.aside) : null,
-        )
-      : null,
-  );
-}
-
-/** „ти“ after the player's own name on a board. */
-const rankYou = () => h("span", { class: "rank-you" }, " ти");
-
-/** A day's score as a row says it: the right answers big, „от 10“ small beside them, never parted from them. */
+/** A day's score as a row says it (a friend's, a board's): the right answers in a heavy numeral, „от 10“ small beside
+ * them, never parted from them. */
 export const rightsOf = (rights: number, of: number): Child => [
   h("b", { class: "rank-n" }, String(rights)),
   h("small", null, ` от ${of}`),
