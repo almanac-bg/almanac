@@ -43,7 +43,7 @@ import {
 } from "./lib/dom.ts";
 import { reportProblem } from "./lib/errors.ts";
 import { ordinal } from "./lib/ordinal.ts";
-import { calm, setCalm, setTextSize, setTick, textSize, tickOn } from "./lib/prefs.ts";
+import { calm, setTick, tickOn } from "./lib/prefs.ts";
 import { needsHomeScreen, pushable, pushOn, pushPrefs, setPushPref, turnOff, turnOn } from "./lib/push.ts";
 import { byTap, go, goBack, rename, title } from "./lib/router.ts";
 import { feelKit, loadFeel, play, playAnswer, playCount, quietWhenSilent, setSound, soundOn } from "./lib/sound.ts";
@@ -116,7 +116,6 @@ export const kit = {
   api,
   avatar,
   back,
-  textSize,
   board,
   boardRow,
   bulgaria,
@@ -205,8 +204,6 @@ export const kit = {
   seal,
   sealsSection,
   segmented,
-  setTextSize,
-  setCalm,
   setPushPref,
   setSound,
   setTick,
