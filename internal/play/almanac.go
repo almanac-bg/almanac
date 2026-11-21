@@ -13,8 +13,9 @@ import (
 	"github.com/almanac-bg/almanac/internal/bank"
 )
 
-// The Алманах is a player's book: a chapter per topic, and „Микс“ (every topic) and „България“ (the questions about
-// Bulgaria from every topic) as pages of their own. A chapter holds the fact behind every question the player has
+// The Алманах is a player's book: a chapter per topic. „Микс“ (every topic) and „България“ (the questions about
+// Bulgaria from every topic) are ways to play at its head, not chapters: their facts are in their own topics'
+// chapters, never one list of them all (DECISIONS.md). A chapter holds the fact behind every question the player has
 // met, in ink where it was a right answer in the issue the first time they met it, else in grey (ink.go), and says one
 // number, its ink.
 
@@ -72,15 +73,10 @@ type AlmanacQuery struct {
 	Page, Limit         int
 }
 
-// inChapter says whether a question's fact belongs to a chapter.
+// inChapter says whether a question's fact belongs to a chapter (its topic; "", the book as a whole: what its head
+// counts).
 func inChapter(q bank.Question, topic string) bool {
-	switch topic {
-	case "", MixTopic:
-		return true
-	case BulgariaTopic:
-		return q.Extra().BG
-	}
-	return q.Base().Category == topic
+	return topic == "" || q.Base().Category == topic
 }
 
 // learnedAt is where and when a fact was written: the right answer that wrote it (ink.go).

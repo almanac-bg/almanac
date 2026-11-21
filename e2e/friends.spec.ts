@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { befriend, playedBefore, playedFair, playRun, startDay } from "./play.ts";
+import { befriend, playedBefore, playedFair, playRun, readText, startDay } from "./play.ts";
 
 test("friends on the day: who has played it, and how each went", async ({ browser }) => {
   test.setTimeout(240_000);
@@ -34,7 +34,9 @@ test("friends on the day: who has played it, and how each went", async ({ browse
   const friends = b.locator(".day-board");
   await expect(friends.locator(".rank-row")).toHaveCount(2);
   await expect(friends.locator(".rank-row.me .rank-you")).toHaveText(" ти");
-  await expect(friends.locator(".rank-row").filter({ hasText: ana }).locator(".rank-score")).toHaveText(/^\d+ от 10$/);
+  await expect(friends.locator(".rank-row").filter({ hasText: ana }).locator(".rank-score")).toHaveText(
+    /^\d+\sот\s10$/,
+  );
   // Beside each name, the seal its player wears, as the server says it (none before a rank: her ink is her right
   // answers'), in her chapter's colour.
   const seal = await b.evaluate(
@@ -109,7 +111,7 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await expect(a.locator(".friend")).toHaveCount(1);
   await b.reload();
   // One friend of that name: the name alone, the @username left to her profile.
-  await expect(b.locator(".friend .friend-name")).toHaveText(/^Ана Петрова/);
+  await expect.poll(() => readText(b.locator(".friend .friend-name"))).toMatch(/^Ана Петрова/);
   await expect(b.locator(".friend .friend-tag")).toBeHidden();
 
   // Bo hears of her yes in Приятели, once, over his friends; nothing over the day (Днес is the issue and the streak).

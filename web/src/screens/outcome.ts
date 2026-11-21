@@ -81,8 +81,8 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
       ? reviewParts(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${d.runId}/review`)).questions)
       : null;
   const head = d.state === "expired" ? plain(d) : hero(d);
-  // Two sides on a big screen (DESIGN.md, a spread): the result on the left; what it meant, what to do next and what
-  // the game earned on the right. One column on a phone, in that order.
+  // Two sides on a big screen (DESIGN.md, a spread): the result on the left; what to do next, what it meant and what
+  // the game earned on the right. One column on a phone, in that order: the next duel in sight under the result.
   return h(
     "section",
     { class: "screen duel-result spread" },
@@ -90,13 +90,13 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
     h(
       "div",
       { class: "duel-side page-2" },
-      d.state === "expired" ? null : meant(d),
       // The gold button is another duel where there's one, else the way back to Приятели; the rest are plain, side by
       // side.
       nextSteps(
         next ?? toDuels(true),
         steps ? [questions?.button, ...(steps.also ?? [])] : [questions?.button, next ? toDuels(false) : null],
       ),
+      d.state === "expired" ? null : meant(d),
       more,
     ),
     questions?.list,

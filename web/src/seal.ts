@@ -72,7 +72,7 @@ export function sealParts(rank: number): SealPart[] {
   if (r === 5) parts.push({ d: tail(1), fill: "vivid" });
   if (r === 1) {
     silhouette = circle(19.6);
-    parts.push({ d: silhouette, fill: "none", stroke: "vivid", width: 3.4 });
+    parts.push({ d: silhouette, fill: "none", stroke: "vivid", width: 2.6 });
   } else if (r === 2) {
     silhouette = circle(20.6);
     parts.push({ d: silhouette, fill: "vivid" });

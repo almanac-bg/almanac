@@ -39,7 +39,7 @@ test("a duel with a friend: played first and sent, played back when they can, th
   await a.goto("/friends");
   await expect(a.locator(".duels")).toContainText("Чакаш");
   // Her row says her score and how long he has: „Ти: 7 · още 7 дни“ (his name over it).
-  await expect(a.locator(".duels .duel-row.s-theirs")).toContainText(/Ти: \d+ · още 7\sдни/);
+  await expect(a.locator(".duels .duel-row.s-theirs")).toContainText(/Ти: \d+ ·\sоще 7\sдни/);
 
   // Bo: a dot on Приятели (nothing over the day: Днес is the issue and the streak), the duel his to play there, a tap
   // away.

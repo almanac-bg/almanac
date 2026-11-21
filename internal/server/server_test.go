@@ -356,6 +356,8 @@ func TestPages(t *testing.T) {
 		"/privacy": 200, "/.well-known/security.txt": 200,
 		// An app's page with a slash after it is that page; the slash after anything else isn't.
 		"/almanac/": 200, "/almanac/history/": 200, "/almanac/nosuch/": 404, "/nowhere/": 404,
+		// „Микс“ and „България“ are ways to play, not chapters of the book: no page of their own.
+		"/almanac/mix": 404, "/almanac/bulgaria": 404,
 	} {
 		res, err := http.Get(g.url + path)
 		if err != nil {
@@ -669,7 +671,7 @@ func TestReportsAndTheAdminPage(t *testing.T) {
 		return i >= 0 && j >= 0 && i < j
 	}
 	if !first(hardest, "geo-002", "gen-001") || !first(easiest, "gen-001", "geo-002") ||
-		!strings.Contains(hardest, "<td class=\"num\">10</td><td class=\"num\">0%</td>") || strings.Contains(body, "geo-001 ·") {
+		!strings.Contains(hardest, "<td class=\"num\">10</td><td class=\"num\">0&nbsp;%</td>") || strings.Contains(body, "geo-001 ·") {
 		t.Fatalf("the hardest and the easiest: %s", body)
 	}
 }

@@ -101,22 +101,22 @@ test("a word breaks by its syllables, as Bulgarian hyphenates", () => {
   // Words under seven letters, numbers, Latin and what's around a word stay as they are; a hyphen of its own is kept.
   assert.equal(breaks("„Хамлет“ — Копола, U2, 1885 г."), "„Хамлет“ — Копола, U2, 1885 г.");
   assert.equal(breaks("Сент-екзюпери"), "Сент-ек-зю-пе-ри");
-  // A name after the first word goes to the next line whole, unless it's too long for a line of its own; a first word
-  // (after a quote too) breaks as any.
-  assert.equal(breaks("Майкъл Фарадей, Сент-Екзюпери"), "Майкъл Фарадей, Сент-Екзюпери");
+  // A name breaks as any word (its caller holds it whole where it fits: wholeWords, nameWords), after a quote too.
+  assert.equal(breaks("Майкъл Фарадей, Сент-Екзюпери"), "Майкъл Фа-ра-дей, Сент-Ек-зю-пе-ри");
   assert.equal(breaks("Куентин Тарантино"), "Куен-тин Та-ран-ти-но");
-  assert.equal(breaks("„Списъкът на Шиндлер“"), "„Спи-съ-кът на Шиндлер“");
+  assert.equal(breaks("„Списъкът на Шиндлер“"), "„Спи-съ-кът на Шин-длер“");
+  assert.equal(breaks("Долф Лундгрен"), "Долф Лунд-грен");
   // The text reads the same without them.
   assert.equal(hyphenate("Независимостта").replaceAll("\u00ad", ""), "Независимостта");
 });
 
 test("a streak at stake says what the day's ten make of it, and from 18:00 that it ends at midnight", () => {
   assert.equal(stakeWords(0, false, 20), ""); // nothing to lose
-  assert.equal(stakeWords(1, false, 9), "С днешния брой серията ти става 2.");
-  assert.equal(stakeWords(5, false, 17), "С днешния брой серията ти става 6.");
+  assert.equal(stakeWords(1, false, 9), "С днешния брой серията ти става\u00a02.");
+  assert.equal(stakeWords(5, false, 17), "С днешния брой серията ти става\u00a06.");
   assert.equal(stakeWords(5, false, 18), "Без днешния брой серията прекъсва в полунощ.");
   // The week would forgive the day: nothing ends at midnight.
-  assert.equal(stakeWords(5, true, 23), "С днешния брой серията ти става 6.");
+  assert.equal(stakeWords(5, true, 23), "С днешния брой серията ти става\u00a06.");
 });
 
 test("a number the Bulgarian way: a space between thousands from 10 000, a decimal comma, a minus sign, not a hyphen", () => {

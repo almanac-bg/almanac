@@ -60,7 +60,6 @@ export function keepLine(stake: () => string | null, quiet: () => boolean): Chil
                 form: "keep-line",
                 primary: false,
                 note: keepNote,
-                enter: "Потвърди",
                 done: (s) => said.set(s),
               }),
             ),
@@ -156,7 +155,6 @@ export function mailAsk({
               primary,
               send: "Напомняй ми по имейл",
               note: keepNote,
-              enter: "Потвърди",
               done: turnOn,
             }),
             no ? h("div", { class: "remind-actions" }, nope()) : null,
@@ -207,7 +205,7 @@ export function keepGame(signedIn: () => void, signingIn = false, more: Child = 
         "section",
         { class: "card keep-card" },
         h("h2", { class: "card-title" }, "Запази играта си"),
-        signIn({ form: "keep-game", primary: false, note: keepNote, enter: "Потвърди", done: told(signedIn) }),
+        signIn({ form: "keep-game", primary: false, note: keepNote, done: told(signedIn) }),
       );
     if (o === "in") return inCard(signedIn, false);
     return h(
@@ -330,10 +328,7 @@ export function exitWay(stake: () => string | null): Child {
           h("button", { class: "link tap", type: "button", onclick: () => keeping.set(true) }, "Или я запази с имейл"),
         )
       : null,
-    () =>
-      keeping()
-        ? signIn({ form: "exit-keep", primary: false, note: keepNote, enter: "Потвърди", done: (s) => said.set(s) })
-        : null,
+    () => (keeping() ? signIn({ form: "exit-keep", primary: false, note: keepNote, done: (s) => said.set(s) }) : null),
     () => said() && h("p", { class: "muted keep-said", role: "status" }, said()),
   );
 }
@@ -417,6 +412,6 @@ function confirmTake(game: Handing, take: () => Promise<void>, finish: (words: s
     h("div", { class: "intro" }, h("h1", null, "Продължи играта тук")),
     h("p", { class: "lead" }, "Тази връзка пренася тук играта на ", h("strong", null, game.name), "."),
     h("button", { class: "btn primary", disabled: busy }, "Продължи тук"),
-    h("button", { class: "link tap", type: "button", onclick: () => finish("") }, "Откажи"),
+    h("button", { class: "link tap", type: "button", onclick: () => finish("") }, "Отказ"),
   );
 }

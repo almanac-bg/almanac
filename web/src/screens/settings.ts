@@ -12,6 +12,7 @@ import type { MailPrefs } from "./keep.ts";
 // only types.
 let {
   api,
+  emailWords,
   errorText,
   computed,
   effect,
@@ -57,6 +58,7 @@ let signedIn: Signal<string>;
 export function settings(kit: Kit) {
   ({
     api,
+    emailWords,
     errorText,
     computed,
     effect,
@@ -296,7 +298,7 @@ function account(): Child {
           "p",
           null,
           "Влизаш с ",
-          h("strong", null, () => user()?.email ?? ""),
+          h("strong", null, () => emailWords(user()?.email ?? "")),
           ".",
         ),
         h("button", { class: "link", onclick: signOut }, "Излез"),
@@ -312,7 +314,7 @@ function account(): Child {
             ? "Засега играта ти е само на това устройство."
             : "Засега играта ти е само на това устройство. Добави имейл и ще я имаш навсякъде, където влезеш с него. Вече имаш профил? Влез с имейла му и играта оттук ще се добави към него.",
         ),
-        signIn({ form: "settings-keep", enter: "Потвърди", done: (said) => signedIn.set(said) }),
+        signIn({ form: "settings-keep", done: (said) => signedIn.set(said) }),
       ],
     ),
   );
@@ -350,13 +352,8 @@ function sounds(): Child {
     "section",
     null,
     h("h2", null, "Звук"),
-    h(
-      "p",
-      { class: "muted" },
-      quietWhenSilent()
-        ? "Важи за това устройство. Когато телефонът е в безшумен режим, звуци няма."
-        : "Важи за това устройство.",
-    ),
+    // That it holds for this device is said once, over Изглед, the first of the three.
+    quietWhenSilent() ? h("p", { class: "muted" }, "Когато телефонът е в безшумен режим, звуци няма.") : null,
     switchRow("Звуци", "Часовникът, отговорите, серията.", soundOn, setSound),
     switchRow("Тиктакане", "Последните секунди на въпроса.", tickOn, setTick),
   );
@@ -368,7 +365,7 @@ function looks(): Child {
     "section",
     null,
     h("h2", null, "Изглед"),
-    h("p", { class: "muted" }, "Важи за това устройство."),
+    h("p", { class: "muted" }, "Изгледът, звукът и достъпността важат за това устройство."),
     schemeSwitch(),
   );
 }
@@ -379,7 +376,6 @@ function access(): Child {
     "section",
     null,
     h("h2", null, "Достъпност"),
-    h("p", { class: "muted" }, "Важи за това устройство."),
     switchRow("По-малко движение", "Без анимации. Часовникът върви както винаги.", calm, setCalm),
     h(
       "div",
@@ -621,7 +617,7 @@ function deleteAccount(): Child {
             },
             "Изтрий профила",
           ),
-          h("button", { class: "link tap", onclick: () => asking.set(false) }, "Откажи"),
+          h("button", { class: "link tap", onclick: () => asking.set(false) }, "Отказ"),
           error() && h("p", { class: "bad", role: "alert" }, error()),
         )
       : h("button", { class: "link tap", onclick: () => asking.set(true) }, "Изтрий профила");

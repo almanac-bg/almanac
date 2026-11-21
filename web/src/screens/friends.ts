@@ -19,6 +19,7 @@ let {
   h,
   onCleanup,
   nameWords,
+  emailWords,
   signal,
   when,
   title,
@@ -95,6 +96,7 @@ export function friends(kit: Kit): Child {
     h,
     onCleanup,
     nameWords,
+    emailWords,
     signal,
     when,
     title,
@@ -156,7 +158,7 @@ function dayBoard(): { view: Child; load: () => void; played: () => boolean } {
       { class: "sect-head" },
       h("h2", null, () => {
         const d = day();
-        return d?.issue ? `Класация\u00a0· Брой\u00a0${d.issue}` : "Класация";
+        return d?.issue ? `Класация ·\u00a0Брой\u00a0${d.issue}` : "Класация";
       }),
     ),
     () =>
@@ -429,9 +431,8 @@ function friendsCard(reloadBoard: () => void, played: () => boolean): Child {
               "p",
               null,
               r.tag
-                ? h("a", { href: profileHref(r.tag) }, h("strong", null, nameWords(r.name ?? "")))
-                : h("strong", null, nameWords(r.name ?? "")),
-              worn(r.look?.seal),
+                ? h("a", { href: profileHref(r.tag) }, h("strong", null, nameWords(r.name ?? "", worn(r.look?.seal))))
+                : h("strong", null, nameWords(r.name ?? "", worn(r.look?.seal))),
               h("span", { class: "muted" }, ` @${r.tag}`),
               " иска да сте приятели.",
             ),
@@ -616,7 +617,7 @@ function inviteFriend(had: () => boolean): { view: Child; forget: () => void; ha
             { class: "invite-renew", role: "group", "aria-label": "Нова връзка" },
             h("p", { class: "small" }, "Старата връзка ще спре да работи."),
             h("button", { class: "btn inline", type: "button", disabled: busy, onclick: renew }, "Направи нова"),
-            h("button", { class: "link", type: "button", onclick: () => confirming.set(false) }, "Откажи"),
+            h("button", { class: "link", type: "button", onclick: () => confirming.set(false) }, "Отказ"),
           )
         : null,
     () => {
@@ -713,10 +714,9 @@ function row(f: Friend, remove: () => void, challenge: () => void, editing: () =
       h(
         "a",
         { class: "friend-name", href: profileHref(f.tag) },
-        nameWords(f.name),
+        nameWords(f.name, worn(f.seal)),
         h("span", { class: same ? "friend-tag same" : "friend-tag" }, ` @${f.tag}`),
       ),
-      worn(f.seal),
     ),
     h(
       "span",
@@ -749,9 +749,4 @@ function row(f: Friend, remove: () => void, challenge: () => void, editing: () =
             "Дуел",
           ),
   );
-}
-
-/** An email address as a narrow line holds it: broken after its @ or before a dot, never inside a word. */
-function emailWords(email: string): Child[] {
-  return email.split(/(?<=@)|(?=\.)/).flatMap((part, i) => (i ? [h("wbr"), part] : [part]));
 }

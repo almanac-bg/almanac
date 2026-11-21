@@ -9,6 +9,7 @@ import { embedded } from "../lib/embedded.ts";
 import { keptWords } from "../lib/keep.ts";
 import { pushable, pushOn } from "../lib/push.ts";
 import { type User, user } from "../state.ts";
+import { emailWords } from "../ui.ts";
 
 export interface SignInOptions {
   /** Which form it is, of the game's („settings“, „remind-mail“…): a code it sent is kept by it, for a reload to come
@@ -20,8 +21,6 @@ export interface SignInOptions {
   send?: string;
   /** The line under the first step: what the code is for. */
   note?: string;
-  /** The button that takes the code: „Влез“ unless said („Потвърди“ where a guest keeps their game). */
-  enter?: string;
   /** The code taken: what came of it in words (keptWords), and the player now, told before the player is set, so that
    * what draws the screen anew as they are can say it. */
   done?: (said: string, now: User) => void;
@@ -41,7 +40,6 @@ export function signIn({
   primary = true,
   send: sendWords = "Прати ми код",
   note = "Без пароли: всеки път ти пращаме код за вход.",
-  enter = "Влез",
   done,
 }: SignInOptions): Child {
   if (noEmail) return h("p", { class: "muted" }, noEmailLine);
@@ -117,7 +115,7 @@ export function signIn({
       h(
         "form",
         {
-          class: "stack",
+          class: "stack code-step",
           onsubmit: (e: SubmitEvent) => {
             e.preventDefault();
             if (code.peek().length !== digits.peek()) return missing(`Кодът е от ${digits.peek()} цифри.`, codeField);
@@ -135,7 +133,7 @@ export function signIn({
             });
           },
         },
-        h("p", null, "Пратихме код на ", h("strong", null, email.peek()), ". Въведи го тук:"),
+        h("p", null, "Пратихме код на ", h("strong", null, emailWords(email.peek())), ". Въведи го тук:"),
         h(
           "label",
           { class: "field" },
@@ -154,7 +152,11 @@ export function signIn({
             },
             ref: (el) => {
               codeField = el as HTMLInputElement;
-              queueMicrotask(() => el.focus());
+              queueMicrotask(() => {
+                el.focus({ preventScroll: true });
+                // The whole step in sight, „Потвърди“ clear of the places at a phone's foot (app.css, .code-step).
+                el.closest("form")?.scrollIntoView({ block: "nearest" });
+              });
             },
           }),
         ),
@@ -162,7 +164,7 @@ export function signIn({
         () =>
           dead()
             ? h("button", { type: "button", class: "btn primary", onclick: send, disabled: busy }, "Прати нов код")
-            : h("button", { class: "btn primary", disabled: busy }, enter),
+            : h("button", { class: "btn primary", disabled: busy }, "Потвърди"),
         errorLine,
         h(
           "p",

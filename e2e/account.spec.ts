@@ -77,18 +77,18 @@ test("a code tried too often is dead, and a new one goes at once", async ({ page
   const wrong = first === "000000" ? "111111" : "000000";
   for (const said of [/^Грешен код\.$/, /^Грешен код\.$/, /Остават ти още 2 опита/, /Остава ти още 1 опит/]) {
     await page.getByLabel("Код").fill(wrong);
-    await page.getByRole("button", { name: "Влез" }).click();
+    await page.getByRole("button", { name: "Потвърди" }).click();
     await expect(page.getByRole("alert")).toHaveText(said);
   }
   await page.getByLabel("Код").fill(wrong);
-  await page.getByRole("button", { name: "Влез" }).click();
+  await page.getByRole("button", { name: "Потвърди" }).click();
   await expect(page.getByRole("alert")).toHaveText("Твърде много опити. Поискай нов код.");
   // The way on is a new code, not a minute's wait.
   await page.getByRole("button", { name: "Прати нов код" }).click();
-  await expect(page.getByRole("button", { name: "Влез" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Потвърди" })).toBeVisible();
   await expect.poll(() => mailedCode(email)).not.toBe(first);
   await page.getByLabel("Код").fill(mailedCode(email));
-  await page.getByRole("button", { name: "Влез" }).click();
+  await page.getByRole("button", { name: "Потвърди" }).click();
   await expect(page.getByText(`Влизаш с ${email}`)).toBeVisible();
 });
 
@@ -113,18 +113,18 @@ test("past ten wrong codes for an address its code is longer, and still signs in
     last = mailedCode(email);
     for (let i = 0; i < 5; i++) {
       await page.getByLabel("Код").fill(last === "000000" ? "111111" : "000000");
-      await page.getByRole("button", { name: "Влез" }).click();
+      await page.getByRole("button", { name: "Потвърди" }).click();
       await expect(page.getByRole("alert")).toHaveText(/Грешен код|Твърде много опити/);
     }
     await expect(page.getByRole("alert")).toHaveText("Твърде много опити. Поискай нов код.");
     await page.getByRole("button", { name: "Прати нов код" }).click();
-    await expect(page.getByRole("button", { name: "Влез" })).toBeVisible(); // sent: the field is cleared for it
+    await expect(page.getByRole("button", { name: "Потвърди" })).toBeVisible(); // sent: the field is cleared for it
   }
   // The next is twelve digits, in fours in the mail: pasted as it is, it signs in.
   await expect.poll(() => longCode(email)).not.toBe("");
   await page.getByLabel("Код").fill(longCode(email));
   await expect(page.getByLabel("Код")).toHaveValue(longCode(email).replaceAll(" ", ""));
-  await page.getByRole("button", { name: "Влез" }).click();
+  await page.getByRole("button", { name: "Потвърди" }).click();
   await expect(page.getByText(`Влизаш с ${email}`)).toBeVisible();
 });
 

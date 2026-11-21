@@ -73,7 +73,7 @@ function inkLine(ink: number): Child {
     { class: "news-facts ink-row", href: "/almanac" },
     h("span", { class: "i i-nib", "aria-hidden": "true" }),
     h("b", { class: "num" }, `+${ink}`),
-    "\u00a0с\u00a0мастило",
+    h("span", null, " с\u00a0мастило"),
   );
 }
 
@@ -84,7 +84,7 @@ function metLine(n: number): Child {
     { class: "news-met" },
     n === 1
       ? "Един от въпросите вече беше в твоя Алманах и остава в сиво."
-      : `${n} от въпросите вече бяха в твоя Алманах и остават в сиво.`,
+      : `${n}\u00a0от въпросите вече бяха в твоя Алманах и остават в сиво.`,
   );
 }
 
@@ -97,7 +97,7 @@ function stepLine(s: NonNullable<News["step"]>): Child {
     h(
       "span",
       { class: "step-words" },
-      h("span", null, h("b", null, `${chapterName(s.chapter)}:`), ` още ${s.left}\u00a0с мастило до „${s.next}“`),
+      h("span", null, h("b", null, `${chapterName(s.chapter)}:`), ` още\u00a0${s.left} с\u00a0мастило до „${s.next}“`),
       s.level > 0 ? pips(s.quarter) : null,
     ),
   );

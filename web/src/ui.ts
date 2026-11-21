@@ -6,7 +6,7 @@ import { errorText, passing } from "./lib/api.ts";
 import { hourInBulgaria } from "./lib/day.ts";
 import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
 import { type Scheme, scheme, setScheme } from "./lib/prefs.ts";
-import { formatNumber, formatValue, nameWords, stakeWords } from "./lib/words.ts";
+import { formatNumber, formatValue, hyphenate, stakeWords } from "./lib/words.ts";
 import { glyphBox, rankName, rankNames, sealParts } from "./seal.ts";
 import { topics } from "./state.ts";
 
@@ -90,7 +90,7 @@ export function fact(text?: string, day?: string): Child {
       "aria-label": text ? "Знаеше ли?" : "На този ден",
     },
     day ? h("div", { class: "fact-day" }, h("h2", null, "На този ден"), h("p", null, day)) : null,
-    text ? [h("h2", null, "Знаеше ли?"), h("p", null, text)] : null,
+    text ? [h("h2", null, "Знаеше ли?"), h("p", null, textWords(text))] : null,
   );
 }
 
@@ -558,9 +558,10 @@ export function rankRow(
     h(
       "span",
       { class: "rank-name" },
-      opts.tag ? h("a", { href: profileHref(opts.tag) }, nameWords(name)) : nameWords(name),
-      worn(opts.look?.seal),
-      opts.me ? h("span", { class: "rank-you" }, " ти") : null,
+      // The seal and „ти“ after the name's last word (in its link): never alone on a line.
+      opts.tag
+        ? h("a", { href: profileHref(opts.tag) }, nameWords(name, worn(opts.look?.seal), opts.me ? rankYou() : null))
+        : nameWords(name, worn(opts.look?.seal), opts.me ? rankYou() : null),
     ),
     opts.score || opts.aside
       ? h(
@@ -573,11 +574,54 @@ export function rankRow(
   );
 }
 
-/** A day's score as a row says it: the right answers big, „от 10“ small beside them. */
+/** „ти“ after the player's own name on a board. */
+const rankYou = () => h("span", { class: "rank-you" }, " ти");
+
+/** A day's score as a row says it: the right answers big, „от 10“ small beside them, never parted from them. */
 export const rightsOf = (rights: number, of: number): Child => [
   h("b", { class: "rank-n" }, String(rights)),
-  h("small", null, ` от ${of}`),
+  h("small", null, ` от ${of}`),
 ];
+
+/** A word that may break (hyphenate: seven letters and more) held whole (`.whole-word`): it goes to the next line
+ * whole where it fits there, and breaks at its syllables, with a hyphen, only where it's wider than its line. */
+const wholeWord = (word: string): Child => {
+  const w = hyphenate(word);
+  return w === word ? word : h("span", { class: "whole-word" }, w);
+};
+
+/** A text as a narrow line holds it (a fact, an entry, outside the play screen; questions.ts, wholeWords, holds a
+ * question's): it breaks between its words, a word only where it's wider than its line, at its syllables, with a
+ * hyphen, never at any letter (large text at 320 px). */
+export function textWords(text: string): Child {
+  return text.split(/(\s+)/).map((part, i) => (i % 2 ? part : wholeWord(part)));
+}
+
+/** A player's name as a line holds it (DESIGN.md, Names): it breaks between its words first, each word held whole,
+ * going to the next line whole where it fits there; only a word wider than its line breaks, at its syllables, with a
+ * hyphen (a surname too). What follows the name (`tail`: the seal worn, „ти“) stays with its last word, never alone
+ * on a line (`.name-end`). CSS keeps `overflow-wrap: break-word` for a word no syllable can save (Latin letters,
+ * figures). */
+export function nameWords(name: string, ...tail: Child[]): Child {
+  const words = name.trim().split(/\s+/);
+  const lastWord = words.pop() ?? "";
+  const after = tail.filter((t) => t != null && t !== false && t !== "");
+  // What follows goes with the last word's last syllable: the word still breaks at its other syllables where it must,
+  // and never runs past its line.
+  const w = hyphenate(lastWord);
+  const cut = w.lastIndexOf("­") + 1;
+  const last = !after.length
+    ? wholeWord(lastWord)
+    : cut
+      ? h("span", { class: "whole-word" }, w.slice(0, cut), h("span", { class: "name-end" }, w.slice(cut), ...after))
+      : h("span", { class: "name-end" }, lastWord, ...after);
+  return [...words.flatMap((x) => [wholeWord(x), " "]), last];
+}
+
+/** An email address as a narrow line holds it: broken after its @ or before a dot, never inside a word. */
+export function emailWords(email: string): Child[] {
+  return email.split(/(?<=@)|(?=\.)/).flatMap((part, i) => (i ? [h("wbr"), part] : [part]));
+}
 
 /** A player on a board or a list: their avatar and name; with their tag, a link to their profile. */
 export function who(name: Child, look: Look = {}, extra: Child = null, plainName = "", tag = ""): Child {
@@ -588,13 +632,13 @@ export function who(name: Child, look: Look = {}, extra: Child = null, plainName
     h(
       "span",
       { class: "who-text" },
-      // The name gives way (an ellipsis) so that what's beside it (the seal, „ти“) always shows whole.
+      // The name whole, never cut: the seal (and what's beside it, „ти“) after its last word.
       h(
         "span",
         { class: "who-name" },
-        h("span", { class: "who-label" }, typeof name === "string" ? nameWords(name) : name),
-        worn(look.seal),
-        extra,
+        typeof name === "string"
+          ? h("span", { class: "who-label" }, nameWords(name, worn(look.seal), extra))
+          : [h("span", { class: "who-label" }, name), worn(look.seal), extra],
       ),
     ),
   );

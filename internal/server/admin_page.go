@@ -55,22 +55,22 @@ func (s *Server) adminPage(w http.ResponseWriter, title string, body template.HT
 	_, _ = w.Write(out.Bytes())
 }
 
-var adminBody = template.Must(template.New("admin").Parse(`
-<p>{{.Players}} {{if eq .Players 1}}играч{{else}}играча{{end}} ({{.WithEmail}} с имейл). Днес броя на деня са изиграли {{.DayToday}}.{{if .DayScripted}}
-По-бързо, отколкото играе човек: {{.DayScripted}} (другите не ги виждат).{{end}}
-В банката: {{.Questions}} въпроса, {{.Live}} в игра.</p>
+var adminBody = template.Must(template.New("admin").Funcs(template.FuncMap{"n": sayInt}).Parse(`
+<p>{{n .Players}} {{if eq .Players 1}}играч{{else}}играча{{end}} ({{n .WithEmail}} с имейл). Днес броя на деня са изиграли {{n .DayToday}}.{{if .DayScripted}}
+По-бързо, отколкото играе човек: {{n .DayScripted}} (другите не ги виждат).{{end}}
+В банката: {{n .Questions}} въпроса, {{n .Live}} в игра.</p>
 
 <section class="admin-section" id="days">
 <h2>По дни</h2>
 <p class="muted">Играч тук е човек: отговорил на въпрос с човешка скорост, без тези, които водят играта. Нови: играли
 за първи път този ден. След 1, 7 и 30 дни: колко от новите са играли пак точно тогава.</p>
 <div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th><th class="num">Играли</th><th class="num">Нови</th><th class="num">След 1 ден</th><th class="num">След 7 дни</th><th class="num">След 30 дни</th></tr></thead><tbody>
-{{range .Days}}<tr><td>{{.Day}}</td><td class="num">{{.Played}}</td><td class="num">{{.New}}</td>{{range .Back}}<td class="num">{{.}}</td>{{end}}</tr>{{end}}
+{{range .Days}}<tr><td>{{.Day}}</td><td class="num">{{n .Played}}</td><td class="num">{{n .New}}</td>{{range .Back}}<td class="num">{{.}}</td>{{end}}</tr>{{end}}
 </tbody></table></div>
 </section>
 `))
 
-var adminQuestionsBody = template.Must(template.New("admin-questions").Funcs(template.FuncMap{"withWord": withWord}).Parse(`
+var adminQuestionsBody = template.Must(template.New("admin-questions").Funcs(template.FuncMap{"withWord": withWord, "n": sayInt}).Parse(`
 <section class="admin-section" id="reports">
 <h2>Доклади ({{.ReportsOpen}} за {{.QuestionsReported}} {{if eq .QuestionsReported 1}}въпрос{{else}}въпроса{{end}})</h2>
 {{if gt .QuestionsReported (len .Reported)}}<p class="muted">Тук са последно докладваните {{len .Reported}}. Другите се
@@ -96,7 +96,7 @@ action="/admin/players/{{.Player}}/reports/resolve"><button class="link">Вси�
 <p class="muted">Въпроси с поне 10 отговора, по дела на верните.</p>
 <div class="table-scroll"><table class="admin-table"><thead><tr><th>Въпрос</th><th class="num">Отговори</th><th class="num">Верни</th></tr></thead><tbody>
 {{range .Hardest}}<tr><td>{{.ID}} · {{.Text}}<br><span class="muted">{{.Answer}}{{if .Lure}} · грешат най-често {{withWord .Lure}}{{end}}</span></td>
-<td class="num">{{.Answers}}</td><td class="num">{{.Share}}%</td></tr>{{else}}<tr><td colspan="3" class="muted">Още няма достатъчно отговори.</td></tr>{{end}}
+<td class="num">{{n .Answers}}</td><td class="num">{{.Share}}&nbsp;%</td></tr>{{else}}<tr><td colspan="3" class="muted">Още няма достатъчно отговори.</td></tr>{{end}}
 </tbody></table></div>
 </section>
 
@@ -104,7 +104,7 @@ action="/admin/players/{{.Player}}/reports/resolve"><button class="link">Вси�
 <h2>Най-лесните</h2>
 <p class="muted">Въпроси с поне 10 отговора, по дела на верните.</p>
 <div class="table-scroll"><table class="admin-table"><thead><tr><th>Въпрос</th><th class="num">Отговори</th><th class="num">Верни</th></tr></thead><tbody>
-{{range .Easiest}}<tr><td>{{.ID}} · {{.Text}}<br><span class="muted">{{.Answer}}</span></td><td class="num">{{.Answers}}</td><td class="num">{{.Share}}%</td></tr>
+{{range .Easiest}}<tr><td>{{.ID}} · {{.Text}}<br><span class="muted">{{.Answer}}</span></td><td class="num">{{n .Answers}}</td><td class="num">{{.Share}}&nbsp;%</td></tr>
 {{else}}<tr><td colspan="3" class="muted">Още няма достатъчно отговори.</td></tr>{{end}}
 </tbody></table></div>
 </section>

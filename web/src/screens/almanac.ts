@@ -21,14 +21,15 @@ let {
   h,
   leaf,
   missing,
+  nameWords,
   onCleanup,
+  textWords,
   pips,
   rankName,
   rename,
   seal,
   signal,
   title,
-  topics,
   categories,
   user,
 } = {} as Kit;
@@ -94,14 +95,15 @@ function setKit(kit: Kit) {
     h,
     leaf,
     missing,
+    nameWords,
     onCleanup,
+    textWords,
     pips,
     rankName,
     rename,
     seal,
     signal,
     title,
-    topics,
     categories,
     user,
   } = kit);
@@ -114,9 +116,9 @@ interface Left {
   total: number;
 }
 
-/** The book's chapters, in its order: the bank's topics, then „Микс“ and „България“ (a chapter's page each, played
- * from the book's head). */
-const chapters = () => topics.map((t) => t.id);
+/** The book's chapters, in its order: the bank's topics. „Микс“ and „България“ are two ways to play at its head, not
+ * chapters: no page of their own, where every fact would be one list (DECISIONS.md). */
+const chapters = () => categories.map((t) => t.id);
 const nameOf = (id: string) => chapterName(id) || id;
 
 /** Алманах: the book's head, then its chapters. */
@@ -153,14 +155,20 @@ function book(p: Page, left: () => Left[] = () => []): Child {
   // The chapter nearest its next rank: the least ink still to come, of those begun.
   const begun = categories.map((c) => rankOf(c.id)).filter((r): r is Rank => !!r && r.level > 0);
   const nearest = begun.sort((a, b) => a.nextAt - a.ink - (b.nextAt - b.ink))[0]?.chapter;
-  const order = categories.map((c) => c.id).sort((a, b) => (a === nearest ? -1 : b === nearest ? 1 : 0));
+  // The inked chapters first (the one nearest its next rank leading), then those with no ink yet, from a row of
+  // their own: a short card never beside a tall one, which would leave a hole under it.
+  const inked = (id: string) => (p.ink[id] ?? 0) > 0;
+  const order = categories
+    .map((c) => c.id)
+    .sort((a, b) => Number(inked(b)) - Number(inked(a)) || (a === nearest ? -1 : b === nearest ? 1 : 0));
+  const firstBlank = order.find((id) => !inked(id));
   return h(
     "section",
     { class: "screen book" },
     h(
       "header",
       { class: "book-head" },
-      h("h1", null, name ? `Алманахът на ${name}` : "Алманахът ти"),
+      h("h1", null, name ? ["Алманахът на ", nameWords(name)] : "Алманахът ти"),
       h(
         "p",
         { class: "deck" },
@@ -185,7 +193,7 @@ function book(p: Page, left: () => Left[] = () => []): Child {
               "span",
               { class: "book-left-words" },
               h("b", null, nameOf(l.category)),
-              ` Следва въпрос ${l.at + 1}\u00a0от\u00a0${l.total}.`,
+              `Следва въпрос ${l.at + 1}\u00a0от\u00a0${l.total}.`,
             ),
             h("a", { class: "btn inline", href: `/play/${l.category}` }, "Продължи"),
           ),
@@ -194,7 +202,13 @@ function book(p: Page, left: () => Left[] = () => []): Child {
     h(
       "ol",
       { class: "chapters", "aria-label": "Главите" },
-      order.map((id) => h("li", null, card(id, p.ink[id] ?? 0, rankOf(id)))),
+      order.map((id) =>
+        h(
+          "li",
+          { class: id === firstBlank && firstBlank !== order[0] ? "row-start" : undefined },
+          card(id, p.ink[id] ?? 0, rankOf(id)),
+        ),
+      ),
     ),
   );
 }
@@ -379,7 +393,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
             h(
               "div",
               { class: "chapter-title" },
-              index < categories.length ? h("p", { class: "kicker" }, `Глава ${index + 1}`) : null,
+              h("p", { class: "kicker" }, `Глава ${index + 1}`),
               h("h1", null, name),
             ),
           ),
@@ -392,19 +406,15 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
         ],
         "chapter-leaf",
       ),
-      id !== "bulgaria" || bulgaria.open
-        ? h(
-            "div",
-            { class: "chapter-play" },
-            h("a", { class: "btn primary", href: `/play/${id}` }, () =>
-              left() ? "Продължи играта" : "Игра на главата",
-            ),
-            () => {
-              const l = left();
-              return l ? h("p", { class: "small" }, `Следва въпрос ${l.at + 1}\u00a0от\u00a0${l.total}.`) : null;
-            },
-          )
-        : null,
+      h(
+        "div",
+        { class: "chapter-play" },
+        h("a", { class: "btn primary", href: `/play/${id}` }, () => (left() ? "Продължи играта" : "Игра на главата")),
+        () => {
+          const l = left();
+          return l ? h("p", { class: "small" }, `Следва въпрос ${l.at + 1}\u00a0от\u00a0${l.total}.`) : null;
+        },
+      ),
     ),
     h(
       "section",
@@ -489,7 +499,7 @@ function whence(f: Learned): string {
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" }).format(new Date(f.at));
   const from =
     f.kind === "day" && f.issue ? `Брой ${f.issue}` : f.kind === "duel" ? "Дуел" : f.kind ? "Игра на главата" : "";
-  return from ? `${shortDate(day)} · ${from}` : shortDate(day);
+  return from ? `${shortDate(day)} ·\u00a0${from}` : shortDate(day);
 }
 
 /** A fact as an entry of the book: ink (a card with an ink edge and „с мастило“), or grey („в сиво“, outlined thin,
@@ -511,11 +521,16 @@ function entry(f: Learned): Child {
       ? h(
           "ul",
           { class: "entry-lines" },
-          f.lines.map((l) => h("li", null, l)),
+          f.lines.map((l) => h("li", null, textWords(l))),
         )
-      : h("p", { class: "entry-word" }, f.untrue ? h("span", { class: "entry-untrue" }, "Невярно: ") : null, f.answer),
-    f.question ? h("p", { class: "entry-q" }, f.question) : null,
-    h("p", { class: "entry-fact" }, f.fact),
+      : h(
+          "p",
+          { class: "entry-word" },
+          f.untrue ? h("span", { class: "entry-untrue" }, "Невярно: ") : null,
+          textWords(f.answer),
+        ),
+    f.question ? h("p", { class: "entry-q" }, textWords(f.question)) : null,
+    h("p", { class: "entry-fact" }, textWords(f.fact)),
   );
 }
 

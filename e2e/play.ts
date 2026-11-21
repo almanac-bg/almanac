@@ -2,8 +2,13 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { type Browser, expect, type Page } from "@playwright/test";
+import { type Browser, expect, type Locator, type Page } from "@playwright/test";
 import { bankQuestions, type Q } from "./bank.ts";
+
+/** A text as a player reads it: without the soft hyphens that let its long words break at their syllables (a name, a
+ * fact: web/src/ui.ts, nameWords, textWords), its spaces (no-break ones too) as one. For `expect.poll`. */
+export const readText = (l: Locator): Promise<string> =>
+  l.evaluate((e) => (e.textContent ?? "").replaceAll("\u00ad", "").replace(/\s+/g, " ").trim());
 
 /** Answers the question showing: the first option; a true-or-not rightly (the one answer a test plays knowing it:
  * every day's ten has one, so a day played is never none right, whatever ten a fresh database drew and in whatever

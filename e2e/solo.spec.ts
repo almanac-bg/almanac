@@ -29,7 +29,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await page.goto("/friends");
   await expect(page.getByRole("tab")).toHaveText(["Приятели", "България"]);
   await page.getByRole("tab", { name: "България" }).click();
-  await expect(page.locator(".day-board .rank-row.me")).toContainText(/\d от 10$/);
+  await expect(page.locator(".day-board .rank-row.me")).toContainText(/\d\sот\s10$/);
   // A row is the place, the name and the score: no level, no title.
   await expect(page.locator(".day-board .lv, .day-board .who-title")).toHaveCount(0);
   await page.goto("/me");

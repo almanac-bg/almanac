@@ -787,6 +787,25 @@
     gap: var(--space-3);
   }
 
+  /* A page's picture beside its heading, small, not over it: the page opens on what it's for (its lead under both on
+     a phone, beside the picture on a big screen). */
+  .intro:has(> .page-art) {
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: var(--space-4);
+  }
+
+  .intro:has(> .page-art) > :not(.page-art, h1) {
+    grid-column: 1 / -1;
+  }
+
+  .intro > .page-art {
+    grid-column: 1;
+    align-self: center;
+    width: 72px;
+    height: 72px;
+    margin: 0;
+  }
+
   /* ---- Cards and sections ---- */
 
   /* A card: a white surface with soft corners on the page. */
@@ -1420,11 +1439,18 @@
     vector-effect: non-scaling-stroke;
   }
 
-  /* On a sheet of a chapter's colour (its own, most often), the seal keeps its edge with a rim of ink. */
+  /* On a sheet of a chapter's colour (its own, most often), the seal keeps its edge with a rim of ink, and a filled
+     one is a lighter disc of its colour: so Бележка, an open ring, shows the sheet through it, and Страница, a disc,
+     doesn't (on its own sheet the two would otherwise be the same ink circle). */
   .leaf .seal .s-outline,
   .seal.rimmed .s-outline {
     stroke: #16132b;
     stroke-width: 2;
+  }
+
+  .leaf .seal .f-vivid,
+  .seal.rimmed .f-vivid {
+    fill: color-mix(in srgb, var(--tv) 40%, #fff);
   }
 
   .seal-tab {
@@ -3467,24 +3493,6 @@
     flex: 1 0 40%;
   }
 
-  /* A duel's other player whole, on a second line rather than cut, the seal after the last word. */
-  :is(.duel-row, .duel-turn) .who-name {
-    display: block;
-    white-space: normal;
-  }
-
-  :is(.duel-row, .duel-turn) .who-label {
-    overflow: visible;
-    overflow-wrap: break-word;
-    text-overflow: clip;
-  }
-
-  :is(.duel-row, .duel-turn) .who-name > .seal {
-    display: inline-block;
-    margin-left: 6px;
-    vertical-align: -6px;
-  }
-
   .duel-row-end {
     display: grid;
     flex: 0 1 auto;
@@ -3512,13 +3520,22 @@
     color: var(--ink-3);
   }
 
-  /* What broke a tie, under a played duel's row: the row's whole width, from the left. */
-  .duel-row:has(> .duel-tie) {
+  /* A played duel's score at the row's end, a heavy numeral under its word („Победа“). */
+  .duel-row-score {
+    color: var(--ink);
+    font: 900 1.75rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* What more a played duel's row says (why it ran out, a recording, what broke a tie), under the row: the row's
+     whole width, from the left. */
+  .duel-row:has(> .duel-note) {
     flex-wrap: wrap;
     row-gap: 4px;
   }
 
-  .duel-tie {
+  .duel-note {
     flex-basis: 100%;
     font: 600 0.8125rem / 1.35 var(--font-sans);
     text-align: left;
@@ -3615,21 +3632,13 @@
     margin: 0;
   }
 
-  /* The name and what's beside it („ти“): the name gives way with an ellipsis, the badge always shows whole. */
+  /* The name whole, never cut: on a second line rather than an ellipsis, the seal and „ти“ after its last word. */
   .who-name {
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    display: block;
     min-width: 0;
     font-size: 1rem;
     line-height: 1.375rem;
     font-weight: 600;
-    white-space: nowrap;
-  }
-
-  /* Large text on a phone (at the end): a name on two lines rather than cut to its first letters. */
-  .tight .who-name {
-    white-space: normal;
   }
 
   /* A name keeps its own figures: only the numbers of a row line up in columns. */
@@ -3638,9 +3647,27 @@
   }
 
   .who-label {
-    overflow: hidden;
     min-width: 0;
-    text-overflow: ellipsis;
+    overflow-wrap: break-word;
+  }
+
+  /* A word held whole (ui.ts, textWords and nameWords): to the next line whole where it fits there, broken at its
+     syllables only where it's wider than its line. What follows a name (the seal, „ти“) stays on its last word's line. */
+  .whole-word {
+    display: inline-block;
+    max-width: 100%;
+    white-space: normal;
+    hyphens: manual;
+  }
+
+  .name-end {
+    white-space: nowrap;
+  }
+
+  .name-end > .seal {
+    display: inline-block;
+    margin-left: 6px;
+    vertical-align: -6px;
   }
 
   .you {
@@ -3688,7 +3715,8 @@
 
   @media (hover: hover) and (pointer: fine) {
     a.who:hover .who-name,
-    a.friend-name:hover {
+    a.friend-name:hover,
+    :is(a.who, a.friend-name, .duel-row):hover .whole-word {
       text-decoration: underline;
     }
   }
@@ -4310,6 +4338,11 @@
     font: 700 0.9375rem / 1.4 var(--font-sans);
   }
 
+  /* „· избери друг“ on one line: the dot never at a line's end. */
+  .seal-choose {
+    white-space: nowrap;
+  }
+
   .rk-words {
     display: grid;
     gap: 2px;
@@ -4581,9 +4614,9 @@
     box-shadow: inset 0 0 0 3px var(--line-2);
   }
 
+  /* The art faded on its white disc, which by night keeps it in sight on the dark page. */
   .pick.locked .chart-disc {
-    background: transparent;
-    opacity: 0.45;
+    opacity: 0.55;
     filter: grayscale(1);
   }
 
@@ -4640,6 +4673,7 @@
   }
 
   .book-left-words b {
+    display: block;
     color: var(--ink);
     font-weight: 900;
   }
@@ -4691,6 +4725,11 @@
      beside it; one with ink has room for it, as tall as its row. */
   .chapters > li:not(:has(.card-ink)) {
     align-self: start;
+  }
+
+  /* The chapters with no ink yet start a row of their own, after the inked ones (almanac.ts, book). */
+  .chapters > .row-start {
+    grid-column-start: 1;
   }
 
   .card-leaf {
@@ -5567,8 +5606,10 @@
     background: var(--surface);
   }
 
+  /* „+6 с мастило“: its words go under the figure where they don't fit beside it (large text at 320 px). */
   .ink-row {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     color: var(--ink);
@@ -5711,7 +5752,7 @@
   .ladder-name {
     max-width: 100%;
     color: var(--ink-3);
-    font: 700 0.6875rem / 1.15 var(--font-sans);
+    font: 700 0.75rem / 1.15 var(--font-sans);
     letter-spacing: -0.01em;
     white-space: nowrap;
   }
@@ -5728,7 +5769,7 @@
   }
 
   .ladder > .later .seal {
-    opacity: 0.35;
+    opacity: 0.55;
     filter: grayscale(1);
   }
 
@@ -5751,10 +5792,6 @@
     .ladder {
       gap: 2px;
       padding-inline: 4px;
-    }
-
-    .ladder-name {
-      font-size: 0.625rem;
     }
   }
 
@@ -5989,12 +6026,16 @@
     background: var(--ink);
   }
 
+  /* „ти“ over the player's bar, on the page's ground over the average's line: the line stops at it, never through it. */
   .spread-bars i.me::after {
     content: "ти";
     position: absolute;
     bottom: 100%;
     left: 50%;
-    margin-bottom: 4px;
+    z-index: 1;
+    margin-bottom: 2px;
+    padding: 2px 3px;
+    background: var(--bg);
     font: 800 0.8125rem / 1 var(--font-sans);
     transform: translateX(-50%);
   }
@@ -6023,6 +6064,12 @@
     color: var(--ink-3);
     font: 700 0.9375rem / 1 var(--font-numeral);
     text-align: center;
+  }
+
+  .spread-ticks > span {
+    display: flex;
+    justify-content: center;
+    white-space: nowrap;
   }
 
   .spread-ticks .me {
@@ -6068,6 +6115,8 @@
     border-radius: var(--r-2);
     background: var(--surface-2);
     font: 600 1rem / 1.5 var(--font-sans);
+    /* The squares (■ ◧ □), which our faces don't have, from one face that has all three, so they're one size. */
+    font-family: "Sofia Sans", "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols 2", sans-serif;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
@@ -6077,17 +6126,12 @@
     gap: var(--space-2);
   }
 
-  /* A short phone (320 × 568): the card smaller and the rows closer, so that the sheet's last line shows whole. */
+  /* A short phone (320 × 568): the rows closer, so that the sheet's last line shows whole; the card keeps the
+     sheet's width. */
   @media (max-height: 37.5rem) {
     .share-sheet .sheet-panel {
       gap: var(--space-2);
       padding-top: var(--space-4);
-    }
-
-    .share-card {
-      width: auto;
-      max-width: 100%;
-      max-height: 6.5rem;
     }
 
     .share-text {
@@ -6227,12 +6271,6 @@
     text-decoration: none;
   }
 
-  .rank-name > .seal {
-    display: inline-block;
-    margin-left: 6px;
-    vertical-align: -6px;
-  }
-
   .rank-you {
     color: var(--ink-3);
     font-size: 0.75rem;
@@ -6364,6 +6402,13 @@
     text-align: center;
   }
 
+  /* A label never wraps („10“ is one): wider than its column (large text at 320 px), it spills evenly into the gaps. */
+  .board-ticks > span {
+    display: flex;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
   .board-ticks .me {
     color: var(--ink);
     font-weight: 900;
@@ -6393,12 +6438,6 @@
   /* The name, and its seal right after its last word however it wraps. */
   .friend-text {
     min-width: 0;
-  }
-
-  .friend-text > .seal {
-    display: inline-block;
-    margin-left: 6px;
-    vertical-align: -6px;
   }
 
   /* The name whole, on a second line rather than cut. */
@@ -6682,10 +6721,24 @@
     gap: var(--space-4);
   }
 
+  /* The sign-in's code step, scrolled into sight as it comes (signin.ts): clear of the bar over it and of the places
+     at a phone's foot under it. */
+  .code-step {
+    scroll-margin: 72px 0 calc(88px + env(safe-area-inset-bottom));
+  }
+
   /* ---- The server's own pages (privacy) ---- */
 
   .prose {
     gap: var(--space-4);
+  }
+
+  /* One reading column (45rem), its headings, paragraphs and lists on one left edge. */
+  .prose > * {
+    width: 100%;
+    max-width: 45rem;
+    margin-inline: auto;
+    text-align: start;
   }
 
   .prose h2 {
@@ -6694,7 +6747,7 @@
   }
 
   .prose ul {
-    margin: 0;
+    margin-block: 0;
     padding-left: 1.25rem;
   }
 
@@ -7097,25 +7150,15 @@
       max-width: 48rem;
     }
 
-    /* A page's picture beside its heading and lead, not over them: the page opens on what it's for. */
-    .intro:has(> .page-art) {
-      grid-template-columns: auto minmax(0, 1fr);
-      column-gap: var(--space-5);
-    }
-
-    .intro:has(> .page-art) > :not(.page-art) {
+    /* The page's picture beside its heading and its lead. */
+    .intro:has(> .page-art) > :not(.page-art, .back) {
       grid-column: 2;
     }
 
-    .intro:has(> .page-art) > .back {
-      grid-column: 1 / -1;
-    }
-
     .intro > .page-art {
-      grid-column: 1;
       grid-row: span 2;
-      align-self: center;
-      margin: 0;
+      width: 112px;
+      height: 112px;
     }
 
     .intro:has(> .page-art) > h1 {
@@ -8017,10 +8060,28 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .tight .fig + .fig {
-    padding-left: 0;
-    border-top: 1px solid var(--line);
-    border-left: 0;
+  /* The issue's cover with large text: its display type held near its usual size (the date by the screen's height,
+     the month and „Десет въпроса за днес“ a little over the text's), and no „Около три минути“, so that the cover
+     stays the top of the screen and „Започни“ is in sight under it. */
+  .tight .issue-day {
+    font-size: min(5.5rem, 15dvh, 96px);
+  }
+
+  .tight .issue-month {
+    font-size: calc(12px + 0.5rem);
+  }
+
+  .tight .issue-title {
+    font-size: calc(8px + 0.625rem);
+  }
+
+  .tight .issue-time {
+    display: none;
+  }
+
+  /* With no line under them, the ten glyphs keep clear of the turned corner. */
+  .tight .issue-body:has(> .issue-time) {
+    padding-bottom: 36px;
   }
 
   /* The places at a phone's foot: a name no bigger than its third of the screen holds whole (a phone that enlarges
@@ -8099,11 +8160,6 @@
   .tight .row > :nth-child(n + 3) {
     grid-column: 2;
     justify-self: end;
-  }
-
-  /* A name on two lines rather than cut to its first letters (its words wrap: .who-name, above). */
-  .tight .who-label {
-    overflow-wrap: anywhere;
   }
 
   /* Choices in a switch go on to a second line rather than out of the screen. */

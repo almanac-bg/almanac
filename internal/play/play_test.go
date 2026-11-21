@@ -1175,10 +1175,14 @@ func TestAlmanacPages(t *testing.T) {
 		a.Found != len(ids)+1 || a.Facts[0].Ink || a.Facts[0].Kind != "topic" {
 		t.Fatalf("the latest fact first: %+v", a)
 	}
-	// Found by its words, as they're written or not: a word of its answer finds it, in its chapter and in all.
+	// Found by its words, as they're written or not: a word of its answer finds it, in its chapter and in all; „Микс“ is
+	// no chapter of the book, and finds nothing.
 	f := mustQuestion(t, w, ids[0])
 	word := strings.ToUpper(strings.Fields(bank.AnswerText(f))[0])
-	for _, topic := range []string{"", f.Base().Category, MixTopic} {
+	if a, _ := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Topic: MixTopic, Search: word, Limit: AlmanacPage}); a.Found != 0 {
+		t.Fatalf("„Микс“ as a chapter: %+v", a)
+	}
+	for _, topic := range []string{"", f.Base().Category} {
 		a, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Topic: topic, Search: word, Limit: AlmanacPage})
 		if err != nil || !slices.ContainsFunc(a.Facts, func(l Learned) bool { return l.ID == ids[0] }) {
 			t.Fatalf("searched %q in %q: %+v %v", word, topic, a.Facts, err)

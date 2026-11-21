@@ -12,7 +12,7 @@ test("a topic's game never tells how well the topic is known, and the avatar is 
   // How well the topic is known is the game's own (play/mastery.go): never told. Nothing about XP, levels or
   // achievements: the game has none (DECISIONS.md, „The direction“).
   await expect(page.locator(".summary")).toBeVisible();
-  await expect(page.locator(".screen")).not.toContainText(/XP|[Нн]иво \d|[Пп]остижени|оценка|Познавач|Новак/);
+  await expect(page.locator(".summary")).not.toContainText(/XP|[Нн]иво \d|[Пп]остижени|оценка|Познавач|Новак/);
 
   // The avatar, on Профил: every animal, none locked; each chapter's art, the player's from its Страница.
   await page.goto("/me");

@@ -100,18 +100,14 @@ const onset = /^[бвгдзкпстфхжшчц][рл]$/;
 /** Where a word may break at a line's end, as soft hyphens, by the Bulgarian rules: by syllables; one consonant
  * between two vowels goes to the next line („ма-ма“); of two or more, the last does, or the last two where they begin
  * a syllable together („сес-тра“), so two of the same part („мост-та“); „ь“ never starts a line, „дж“ and „дз“ stay
- * together, and no line keeps or takes a single letter; a word under seven letters fits any column whole. A name
- * after the first word (a capital: „Майкъл Фарадей“) goes to the next line whole rather than „Фара-дей“, unless it's
- * too long for a line of its own in the narrowest column (nine letters or more: „Куентин Таран-тино“); a first word
- * starts its line, so it breaks only where it's wider than the line, capital or not. The browser breaks a word there,
- * with a hyphen, instead of at any letter: no browser knows Bulgarian hyphenation itself. It fills a line as far as a
- * soft hyphen lets it, so a cell holds each such word whole (questions.ts, wholeWords): broken only where it's wider
- * than the cell (a narrow column at 320 px), never where it would fit on the next line. */
+ * together, and no line keeps or takes a single letter; a word under seven letters fits any column whole. The browser
+ * breaks a word there, with a hyphen, instead of at any letter: no browser knows Bulgarian hyphenation itself. It
+ * fills a line as far as a soft hyphen lets it, so every caller holds each such word whole (questions.ts, wholeWords;
+ * ui.ts, nameWords): it goes to the next line whole where it fits there („Майкъл / Фарадей“, not „Фара-дей“), and
+ * breaks only where it's wider than its line (a long name in large text at 320 px). */
 export function hyphenate(text: string): string {
-  return text.replace(/[а-яѝ]{7,}/gi, (word, at: number) => {
+  return text.replace(/[а-яѝ]{7,}/gi, (word) => {
     const w = word.toLowerCase();
-    const first = !/[\p{L}\p{N}]/u.test(text.slice(0, at));
-    if (!first && word.charAt(0) !== w.charAt(0) && word.length < 9) return word;
     let out = "";
     let from = 0;
     let prev = -1;
@@ -131,13 +127,6 @@ export function hyphenate(text: string): string {
   });
 }
 
-/** A player's name as a narrow cell holds it: between its words, and a word wider than its line (a long surname in
- * large text at 320 px) at its syllables, with a hyphen, as hyphenate breaks words (CSS keeps `overflow-wrap:
- * break-word` for a word no syllable can save: Latin letters, figures). */
-export function nameWords(name: string): string {
-  return hyphenate(name);
-}
-
 /** The hour (in Bulgaria) from which a streak at stake says it ends at midnight. */
 export const stakeHour = 18;
 
@@ -148,7 +137,7 @@ export function stakeWords(days: number, spare: boolean, hour: number): string {
   if (days < 1) return "";
   return hour >= stakeHour && !spare
     ? "Без днешния брой серията прекъсва в полунощ."
-    : `С днешния брой серията ти става ${days + 1}.`;
+    : `С днешния брой серията ти става\u00a0${days + 1}.`;
 }
 
 /** How long an open duel has left, in words, rounded up (a duel just sent has „още 7 дни“, not six and some hours):

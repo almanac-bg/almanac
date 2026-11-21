@@ -205,7 +205,7 @@ test.describe("in Messenger's own browser", () => {
     await expect(late.locator(".notice")).toContainText("Тази връзка вече не работи");
     await late.context().close();
 
-    // Another link, made as the page comes back: opened elsewhere, it names the game, and „Откажи“ takes nothing.
+    // Another link, made as the page comes back: opened elsewhere, it names the game, and „Отказ“ takes nothing.
     await page.reload();
     await expect(page).toHaveURL(/\/#hand=[A-Za-z0-9_-]{43}$/);
     const other = page.url();
@@ -217,7 +217,7 @@ test.describe("in Messenger's own browser", () => {
     const desk = await laptop.newPage();
     await desk.goto(other);
     await expect(desk.locator(".hand-take")).toContainText(`Тази връзка пренася тук играта на ${name}.`);
-    await desk.getByRole("button", { name: "Откажи" }).click();
+    await desk.getByRole("button", { name: "Отказ" }).click();
     await expect(desk.locator(".hand-take")).toHaveCount(0);
     expect(
       await desk.evaluate(async () => ((await (await fetch("/api/me")).json()) as { user: unknown }).user ?? null),
