@@ -70,7 +70,8 @@ type Board struct {
 	// before): what tells a player whether their eight is good today.
 	Average float64 `json:"average,omitempty"`
 	// Spread is how many played the day to each count of right answers, 0 to Of, once DayCrowdFrom have finished it:
-	// the day's result draws it as „България днес“. People only: a game played at a script's speed is in no count.
+	// the day's board draws it on the result's България tab. People only: a game played at a script's speed is in no
+	// count.
 	Spread []int `json:"spread,omitempty"`
 }
 

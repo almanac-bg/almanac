@@ -1328,7 +1328,7 @@
      boards, a duel's marks; the share's ◩ and its card say it the same): the upper left half filled, cut on the
      diagonal, the lower right empty, so that it parts from a full one at a glance. Filled in --half: a tile's chapter
      colour, else ink. */
-  :is(.tile.near, .mini li.partial, .duel-pip.partial) {
+  :is(.tile.near, .mini > i.partial, .duel-pip.partial) {
     background-image: linear-gradient(to bottom right, var(--half, var(--ink)) 50%, transparent 50%);
   }
 
@@ -1385,23 +1385,20 @@
     flex: none;
     grid-template-columns: repeat(10, 10px);
     gap: 3px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
   }
 
-  .mini li {
+  .mini > i {
     width: 10px;
     height: 10px;
     border-radius: 2.5px;
     box-shadow: inset 0 0 0 1.8px var(--ink);
   }
 
-  .mini li.right {
+  .mini > i.right {
     background: var(--ink);
   }
 
-  .mini li.void {
+  .mini > i.void {
     box-shadow: inset 0 0 0 1.5px var(--line-2);
   }
 
@@ -5259,42 +5256,6 @@
     visibility: hidden;
   }
 
-  /* Numbers in a row (the profile's, the day's Bulgaria): each big, its words under it. */
-  .figures-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-    gap: var(--space-2);
-  }
-
-  /* On a phone, two across, an odd one out the row's width (the fewest knew's long words, not six lines of them). */
-  @media (max-width: 30rem) {
-    .figures-row {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .figures-row > .fig:last-child:nth-child(odd) {
-      grid-column: 1 / -1;
-    }
-  }
-
-  .fig {
-    display: grid;
-    align-content: start;
-    gap: 4px;
-    padding: 14px;
-    border-radius: var(--r-2);
-    background: var(--surface);
-  }
-
-  .fig-n {
-    font: 900 2.25rem / 0.9 var(--font-numeral);
-  }
-
-  .fig-label {
-    color: var(--ink-3);
-    font: 700 0.8125rem / 1.25 var(--font-sans);
-  }
-
   @media (min-width: 56.25rem) {
     .ways {
       max-width: 36rem;
@@ -6128,8 +6089,8 @@
     padding-top: var(--space-5);
   }
 
-  /* How all of България did, under „Въпросите и фактите“: eleven bars, 0 to 10, the player's in ink, the average a
-     thin line. */
+  /* How all of България did, on the day's board's България tab: eleven bars, 0 to 10, the player's in ink, the
+     average a thin line. */
   /* Over the bars, a row of its own for the average's label: „ти“ over the player's bar (as high as the tallest) never
      meets it, whatever the two counts. */
   .spread-chart {
@@ -6188,13 +6149,15 @@
     white-space: nowrap;
   }
 
+  /* Eleven labels across the phone's width: with large text no bigger than their columns hold („10“ beside „9“ at
+     320 px, never over it); the chart says its numbers to a screen reader in its own words. */
   .spread-ticks {
     display: grid;
     grid-template-columns: repeat(11, minmax(0, 1fr));
     gap: 4px;
     margin-top: 6px;
     color: var(--ink-3);
-    font: 700 0.9375rem / 1 var(--font-numeral);
+    font: 700 min(0.9375rem, 4.2vw) / 1 var(--font-numeral);
     text-align: center;
   }
 
@@ -6313,7 +6276,7 @@
       display: grid;
     }
 
-    /* The result: the score and the day's entry on the left page, the friends, the action and tomorrow on the right;
+    /* The result: the score and the day's entry on the left page, the action, tomorrow and the day's board on the right;
        what's under „Въпросите и фактите“ across both. */
     .result.spread > .result-main {
       grid-column: 1 / span 7;
@@ -6482,55 +6445,6 @@
     padding: var(--space-2) 0;
     color: var(--ink-2);
     font: 600 1rem / 1.45 var(--font-sans);
-  }
-
-  /* All of България: how many got each count, the player's bar in ink. */
-  .board-spread {
-    display: grid;
-    gap: 6px;
-    padding: 14px 16px 12px;
-    border-radius: var(--r-3);
-    background: var(--surface);
-  }
-
-  .board-bars {
-    display: grid;
-    grid-template-columns: repeat(11, minmax(0, 1fr));
-    align-items: end;
-    gap: 4px;
-    height: 72px;
-    border-bottom: 1px solid var(--ink);
-  }
-
-  .board-bars i {
-    display: block;
-    border-radius: 3px 3px 0 0;
-    background: var(--line);
-  }
-
-  .board-bars i.me {
-    background: var(--ink);
-  }
-
-  .board-ticks {
-    display: grid;
-    grid-template-columns: repeat(11, minmax(0, 1fr));
-    gap: 4px;
-    color: var(--ink-3);
-    font: 800 0.875rem / 1 var(--font-numeral);
-    text-align: center;
-  }
-
-  /* A label never wraps („10“ is one): wider than its column (large text at 320 px), it spills evenly into the gaps. */
-  .board-ticks > span {
-    display: flex;
-    justify-content: center;
-    white-space: nowrap;
-  }
-
-  .board-ticks .me {
-    color: var(--ink);
-    font-weight: 900;
   }
 
   /* The friends' head: its heading for a screen reader only (the page's own says it), „Премахни приятел“ at the right. */
@@ -7865,20 +7779,6 @@
 
   .tight .tomorrow-head > .tomorrow-sep {
     display: none;
-  }
-
-  /* Figures in a row: one under another. */
-  .tight .figures-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  /* The day's board's heading: „Брой 31“ a line of its own, no dot hung at the line's end. */
-  .tight .board-dot {
-    display: none;
-  }
-
-  .tight .board-issue {
-    display: block;
   }
 
   /* The issue's cover with large text: its display type held near its usual size (the date by the screen's height,

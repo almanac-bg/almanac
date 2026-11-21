@@ -6,47 +6,38 @@ test("friends on the day: who has played it, and how each went", async ({ browse
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
 
-  // Ana plays the day with no friends yet: the day's board says so among friends, with the way to Приятели to add
-  // someone.
+  // Ana plays the day with no friends yet: the day's board on her result opens on all България; among friends it says
+  // she has none, with the way to Приятели to add some.
   await a.goto("/");
   await startDay(a);
   await playRun(a);
   await playedFair(a);
-  await a.goto("/board");
-  await a.getByRole("tab", { name: "Приятели" }).click();
-  await expect(a.locator(".day-board")).toContainText("Още нямаш приятели тук.");
-  await expect(a.locator(".day-board").getByRole("link", { name: "Добави ги в Приятели" })).toHaveAttribute(
-    "href",
-    "/friends",
-  );
+  await a.reload();
+  const hersBoard = a.locator(".day-board");
+  await expect(hersBoard.getByRole("tab", { name: "България" })).toHaveAttribute("aria-selected", "true");
+  await hersBoard.getByRole("tab", { name: "Приятели" }).click();
+  await expect(hersBoard).toContainText("Още нямаш приятели.");
+  await expect(hersBoard.getByRole("link", { name: "Добави приятели" })).toHaveAttribute("href", "/friends");
   // Her own day is on the board all the same.
-  await expect(a.locator(".day-board .rank-row.me")).toHaveCount(1);
+  await expect(hersBoard.locator(".rank-row.me")).toHaveCount(1);
   const ana = await a.evaluate(async () => (await (await fetch("/api/me")).json()).user.name as string);
 
-  // Bo asks her by her username, and she says yes. Днес is the day alone: friends' days come with his result.
+  // Bo asks her by her username, and she says yes. Днес is the day alone: the day's board comes with his result.
   await befriend(a, b);
   await b.goto("/");
-  await expect(b.locator(".friends-day")).toHaveCount(0);
+  await expect(b.locator(".day-board")).toHaveCount(0);
 
-  // He plays the day: her tiles and score under his result, one gold action, and both on the day's board among
-  // friends, the page of Днес's its „Класация“ opens, his own row marked; back from it is Днес.
+  // He plays the day: one gold action, and under his result the day's board, open among friends: both of them, in
+  // places, each with their score and squares, his own row marked.
   await startDay(b);
   await playRun(b);
-  const hers = b.locator(".friends-day .rank-row").filter({ hasText: ana });
-  await expect(hers.locator(".rank-score")).toHaveText(/^\d+\sот\s10$/);
-  // No place on Днес: the list leaves the player out, so places would skip (1, 3, 4).
-  await expect(hers.locator(".rank-place")).toHaveCount(0);
-  await expect(hers.locator(".mini")).toHaveCount(1);
-  await expect(b.locator(".friends-day .rank-row.me")).toHaveCount(0);
   await expect(b.locator(".tomorrow")).toBeVisible();
   await expect(b.locator(".summary .btn.primary")).toHaveCount(1);
-  await b.locator(".friends-day").getByRole("link", { name: "Класация" }).click();
-  await expect(b).toHaveURL(/\/board$/);
-  await expect(b.getByRole("heading", { level: 1 })).toHaveText(/^Класация ·\sБрой\s\d+$/);
-  await expect(b.locator("nav.places-foot a[aria-current='page']")).toContainText("Днес");
   const friends = b.locator(".day-board");
+  await expect(friends.getByRole("heading", { name: "Класация" })).toBeVisible();
   await expect(friends.getByRole("tab", { name: "Приятели" })).toHaveAttribute("aria-selected", "true");
   await expect(friends.locator(".rank-row")).toHaveCount(2);
+  await expect(friends.locator(".rank-row .rank-place")).toHaveCount(2);
   await expect(friends.locator(".rank-row .mini")).toHaveCount(2);
   await expect(friends.locator(".rank-row.me .rank-you")).toHaveText(" ти");
   await expect(friends.locator(".rank-row").filter({ hasText: ana }).locator(".rank-score")).toHaveText(
@@ -70,9 +61,10 @@ test("friends on the day: who has played it, and how each went", async ({ browse
     // Read out as a seal and its chapter: never the rank's word, which is the Алманах's.
     await expect(worn).toHaveAttribute("aria-label", /^Печат: [^:]+$/);
   }
-  await b.locator("a.back").filter({ hasText: "Днес" }).click();
-  await expect(b).toHaveURL(/\/$/);
-  await expect(b.locator(".friends-day")).toBeVisible();
+  // All България a tap away, on the same card, the two of them on it.
+  await friends.getByRole("tab", { name: "България" }).click();
+  await expect(friends.locator(".rank-row").filter({ hasText: ana })).toHaveCount(1);
+  await expect(friends.locator(".rank-row.me")).toHaveCount(1);
   // Приятели is the people and the duels: the day's board isn't there.
   await b.goto("/friends");
   await expect(b.locator(".friend")).toHaveCount(1);
@@ -224,18 +216,18 @@ test("a friend just accepted is on the day's board at once", async ({ browser })
     await playedFair(p);
   }
   const bo = await b.evaluate(async () => (await (await fetch("/api/me")).json()).user.name as string);
-  // Ana says yes in Приятели (befriend), and the day's board is among the two of them, Bo on it.
+  // Ana says yes in Приятели (befriend), and the day's board on her result is among the two of them, Bo on it.
   await befriend(a, b);
-  await a.goto("/board");
+  await a.goto("/");
   const board = a.locator(".day-board");
   await expect(board.getByRole("tab", { name: "Приятели" })).toHaveAttribute("aria-selected", "true");
   await expect(board.locator(".rank-row").filter({ hasText: bo })).toHaveCount(1);
   await expect(board.locator(".rank-row")).toHaveCount(2);
 });
 
-// On the narrowest phone, at the usual text and at twice it, the day played: each board's rows hold their score and
-// small squares (both boards have them), nothing goes sideways, and in Приятели „Дуели“ with „Нов дуел“ is there
-// without a friend.
+// On the narrowest phone, at the usual text and at twice it, the day played: the day's board's rows hold their score
+// and small squares on both its tabs, nothing goes sideways, and in Приятели „Дуели“ with „Нов дуел“ is there without
+// a friend.
 test("the day's board at 320 px, the day played: the rows hold their squares, and a duel is a tap away", async ({
   browser,
 }) => {
@@ -261,9 +253,9 @@ test("the day's board at 320 px, the day played: the rows hold their squares, an
       await expect(page.locator("html")).toHaveClass(/\btight\b/);
     }
     await expect(page.locator(".duels").getByRole("link", { name: "Нов дуел" })).toBeVisible();
-    await page.goto("/board");
+    await page.goto("/");
     for (const tab of ["Приятели", "България"]) {
-      await page.getByRole("tab", { name: tab }).click();
+      await page.locator(".day-board").getByRole("tab", { name: tab }).click();
       const rows = page.locator(".day-board .rank-row");
       await expect(rows.first().locator(".mini")).toBeVisible();
       const flaws = await page.evaluate(() => {
@@ -285,28 +277,34 @@ test("the day's board at 320 px, the day played: the rows hold their squares, an
 test("a day of none right isn't rubbed in: no place on the board of all България, only how many played", async ({
   page,
 }) => {
-  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" }).format(new Date());
+  test.setTimeout(120_000);
+  await page.goto("/");
+  await startDay(page);
+  await playRun(page);
+  // The day as the server says it, its board as 53 played it, the player's own row with 3 right or none; Днес opened
+  // again from another place, so that it asks for the day.
   const row = (name: string, rights: number, me = false) => ({ name, rights, of: 10, me });
-  const board = (rights: number) => ({
-    day,
-    issue: 10,
-    run: { done: true },
-    friends: [],
-    befriended: false,
-    board: {
-      players: 53,
-      place: rights ? 20 : 53,
-      top: [row("Ана", 9), row("Бо", 8)],
-      mine: row("Аз", rights, true),
-    },
-  });
   for (const rights of [3, 0]) {
-    await page.route("**/api/day", (route) => route.fulfill({ json: board(rights) }));
-    // „България днес“'s „Класация“: the board opens on all България.
-    await page.goto("/board?tab=bulgaria");
-    await expect(page.getByRole("tab", { name: "България" })).toHaveAttribute("aria-selected", "true");
-    await expect(page.locator(".day-board .board-note")).toHaveText(
-      rights ? /^В България си на 20\S* място от 53\.$/ : "Днес играха 53 души.",
+    await page.route("**/api/day", async (route) => {
+      const day = await (await route.fetch()).json();
+      day.friends = [];
+      day.befriended = false;
+      day.board = {
+        ...day.board,
+        players: 53,
+        place: rights ? 20 : 53,
+        top: [row("Ана", 9), row("Бо", 8)],
+        mine: row("Аз", rights, true),
+      };
+      await route.fulfill({ json: day });
+    });
+    await page.locator("nav.places-foot").getByRole("link", { name: "Алманах" }).click();
+    await page.locator("nav.places-foot").getByRole("link", { name: "Днес" }).click();
+    // No friends: the board opens on all България.
+    const board = page.locator(".day-board");
+    await expect(board.getByRole("tab", { name: "България" })).toHaveAttribute("aria-selected", "true");
+    await expect(board.locator(".board-note")).toHaveText(
+      rights ? /^В България си на 20\S* място от 53\.$/ : "Днес играха 53 души.",
     );
     await page.unroute("**/api/day");
   }
