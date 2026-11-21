@@ -15,7 +15,7 @@ import (
 // adminSections are /admin's parts, as its menu names them: on /admin, but the questions, on a page of their own.
 var adminSections = []struct{ ID, Name string }{
 	{"back", "Връщане"}, {"path", "Път"}, {"habit", "Навик"}, {"streaks", "Серии"},
-	{"fair", "Честна игра"}, {"notices", "Известия"}, {"games", "Игри"}, {"players", "Играчи"},
+	{"notices", "Известия"}, {"games", "Игри"}, {"players", "Играчи"},
 }
 
 var adminFrame = template.Must(template.New("admin-page").Parse(`<!doctype html>
@@ -156,24 +156,6 @@ var adminBody = template.Must(template.New("admin").Parse(`
 </section>
 {{end}}
 
-<section class="admin-section" id="fair">
-<h2>Честна игра</h2>
-<p class="muted">Броеве на деня, изиграни след поне двама гости от същата мрежа, създадени същия ден и изиграли само
-деня: може да са пробвали отговорите. Дните на гостите вече не се виждат на другите (докато не се върнат); денят на
-играча остава, щом не е скрит.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th><th>Играч</th><th class="num">Верни</th><th class="num">Гости</th><th class="num">Най-добрият гост</th><th>Скрит</th></tr></thead><tbody>
-{{range .Fair}}<tr><td class="num">{{.Day}}</td><td><a href="/admin?player={{.Tag}}#players">{{.Name}}</a></td><td class="num">{{.Rights}}</td><td class="num">{{.Guests}}</td><td class="num">{{.Best}}</td><td>{{if .Shadow}}да{{else}}не{{end}}</td></tr>
-{{else}}<tr><td colspan="6" class="muted">Няма.</td></tr>{{end}}
-</tbody></table></div>
-<h3>Късни отговори</h3>
-<p class="muted">Отговори, стигнали до сървъра след времето на въпроса, но до 15 секунди и отбелязани от екрана на
-играча като дадени навреме: приети. Последните 30 дни. Много такива често значат бавна връзка или екран, който казва
-каквото не бива.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th>Играч</th><th class="num">Късни</th><th class="num">От отговори</th><th class="num">Най-късно, мс</th></tr></thead><tbody>
-{{range .Late}}<tr><td><a href="/admin?player={{.Tag}}#players">{{.Name}}</a></td><td class="num">{{.Late}}</td><td class="num">{{.Answers}}</td><td class="num">{{.MostMs}}</td></tr>
-{{else}}<tr><td colspan="4" class="muted">Няма.</td></tr>{{end}}
-</tbody></table></div>
-</section>
 </div>
 
 {{with .M}}

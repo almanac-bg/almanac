@@ -113,8 +113,7 @@ func SecondPlay(ctx context.Context, userID int64) context.Context {
 	return context.WithValue(ctx, secondKey{}, second)
 }
 
-// insertRun starts a game for a player, with the network they play from if ctx has it (FromNet, fair.go), the device
-// (FromDevice), and, of a day's issue, whether it's a second play in this browser (SecondPlay).
+// insertRun starts a game for a player, with the device (FromDevice), and, of a day's issue, whether it's a second play in this browser (SecondPlay).
 func (g *Game) insertRun(ctx context.Context, tx *sql.Tx, userID int64, kind string, day, category any, picks []Pick) (*run, error) {
 	data, _ := json.Marshal(picks)
 	second, _ := ctx.Value(secondKey{}).(map[int64]bool)
@@ -125,9 +124,6 @@ func (g *Game) insertRun(ctx context.Context, tx *sql.Tx, userID int64, kind str
 		return nil, err
 	}
 	id, _ := res.LastInsertId()
-	if err := g.keepNet(ctx, tx, userID, id); err != nil {
-		return nil, err
-	}
 	return load(tx, userID, id)
 }
 

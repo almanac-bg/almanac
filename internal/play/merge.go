@@ -25,10 +25,8 @@ var mergeSteps = []mergeStep{
 	// ever an account's. A day's run the guest played while the account was there already comes as a shadow
 	// (ShadowGuest, fair.go): the player's own, for their streak and their numbers, never on the others' boards, so
 	// that the day played as several guests, and signed in from the best of them, races nobody.
-	// (A throwaway guest's day, ShadowThrowaway, is one too: brought to the account, it would be let out of the shadow
-	// as a guest's who came back.)
 	{sql: `UPDATE runs SET shadow = ` + strconv.Itoa(ShadowGuest) + ` WHERE user_id = ?2 AND kind = 'day'
-		AND shadow IN (0, ` + strconv.Itoa(ShadowThrowaway) + `) AND started_at >= (SELECT created_at FROM users WHERE id = ?1)`},
+		AND shadow = 0 AND started_at >= (SELECT created_at FROM users WHERE id = ?1)`},
 	{carries: []string{"runs.user_id"}, sql: `UPDATE runs SET user_id = ?1 WHERE user_id = ?2
 		AND NOT (kind = 'day' AND day IN (SELECT day FROM runs WHERE user_id = ?1 AND kind = 'day'))`},
 	// The guest's friends become the account's (the two aren't friends with themselves), as many as the account has

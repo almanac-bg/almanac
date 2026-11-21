@@ -13,7 +13,7 @@ import (
 
 // as is the context a player's requests come in: the device and network they play from, as the server says them.
 func (w *world) as(p *player) context.Context {
-	return play.FromNet(play.FromDevice(w.ctx, p.id, p.device), p.id, p.net)
+	return play.FromDevice(w.ctx, p.id, p.device)
 }
 
 // picks are a run's questions, as it holds them.

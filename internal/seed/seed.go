@@ -155,7 +155,6 @@ type world struct {
 	friends map[[2]int64]bool // who has asked whom, either way (the lower id first)
 	swept   time.Time         // the last time the server's sweeps ran (sweep)
 	day     int               // the day being played, from 0
-	nets    int
 }
 
 func (w *world) clock() time.Time {
@@ -223,7 +222,7 @@ func (w *world) count(mean float64) int {
 	return n
 }
 
-// sweep does what the server does every few minutes in the background, as the clock passes: duels whose time is up, what follows runs, the days drawn ahead, the throwaway guests.
+// sweep does what the server does every few minutes in the background, as the clock passes: duels whose time is up, what follows runs, the days drawn ahead.
 func (w *world) sweep() error {
 	if w.clock().Sub(w.swept) < 10*time.Minute {
 		return nil
@@ -238,9 +237,6 @@ func (w *world) sweep() error {
 	}
 	if err := w.g.AfterDue(w.ctx); err != nil {
 		return fmt.Errorf("after runs: %w", err)
-	}
-	if _, err := w.g.JudgeNets(w.ctx); err != nil {
-		return fmt.Errorf("networks: %w", err)
 	}
 	return nil
 }

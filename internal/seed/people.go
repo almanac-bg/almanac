@@ -32,7 +32,6 @@ type player struct {
 	named   bool
 	from    string // where they first came in (play.Landings)
 	device  string
-	net     []byte
 	circle  int // the group of people they know
 
 	played map[int]bool // the days they played the day's ten
@@ -59,8 +58,6 @@ func (w *world) cast(n int) {
 	last := w.today()
 	add := func(p *player) {
 		p.played = map[int]bool{}
-		w.nets++
-		p.net = []byte(fmt.Sprintf("seed-net-%04d", w.nets))
 		if p.device == "" {
 			p.device = w.pickDevice()
 		}

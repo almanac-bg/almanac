@@ -629,7 +629,7 @@ func TestReportsAndTheAdminPage(t *testing.T) {
 	}
 	_, main := at("/admin")
 	for _, part := range []string{"Връщане", "Посещения без профил", "Кои се връщат", "Навик",
-		"Серии", "Части на играта", "Устройства", "Честна игра", "Играчи", `href="/admin/questions"`} {
+		"Серии", "Части на играта", "Устройства", "Играчи", `href="/admin/questions"`} {
 		if !strings.Contains(main, part) {
 			t.Fatalf("the admin page has no %q", part)
 		}
