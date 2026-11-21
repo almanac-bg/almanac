@@ -61,6 +61,8 @@ var playerErrors = map[error]*apiError{
 		"Три твои дуела с този приятел вече чакат. Изчакай да бъде изигран някой от тях."},
 	play.ErrDuelsADay:      {http.StatusTooManyRequests, "duels_a_day", "Днес започна твърде много дуели. Утре можеш да започнеш нови."},
 	play.ErrNoRequest:      {http.StatusNotFound, "no_request", "Поканата вече я няма."},
+	play.ErrNoInvite:       {http.StatusNotFound, "no_invite", "Тази покана вече не важи. Поискай нова връзка."},
+	play.ErrInviteSpent:    {http.StatusTooManyRequests, "invite_spent", "С тази покана днес вече се добавиха много приятели. Опитай утре."},
 	play.ErrManyRequests:   {http.StatusConflict, "many_requests", "Твърде много покани чакат отговор. Изчакай да отговорят на някоя от тях."},
 	account.ErrBadEmail:    {http.StatusBadRequest, "bad_email", "Това не прилича на имейл."},
 	account.ErrTooSoon:     {http.StatusTooManyRequests, "too_soon", "Току-що ти пратихме код. Провери пощата си."},

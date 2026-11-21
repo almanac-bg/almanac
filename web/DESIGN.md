@@ -57,7 +57,14 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/fi
   - On a big screen, under them, „В броя“: the ten chapters in their order.
   - A new visitor: the cover, „Започни“, and under it „Едни и същи за цяла България.“ In an app's own browser, one
     line under „Започни“: „Имаш игра в браузъра? Отвори там“ (`coverExit`).
-  - Nothing over the issue but what came of the player's own step (a profile signed in to, a game brought here).
+  - Come by an invite link (`/f/<code>`, the address then Днес's): over the issue, the invite (`.invite-card`, on
+    the cover too): the inviter's avatar, name and worn seal, „те кани да сте приятели в АЛМАНАХ.“ and „Добави като
+    приятел“ (an outlined `.btn`: „Започни“ stays the action). The tap says what came of it in the card's line:
+    „Вече сте приятели с Ана.“ and „Към Приятели“; before any game, „Първо изиграй днешния брой. След него ще сте
+    приятели с Ана.“, and as that game ends „Вече сте приятели с Ана.“ is the result's notice. The player's own link:
+    „Това е твоята покана…“, no button; a link gone: „Тази покана вече не важи. Поискай нова връзка.“
+  - Nothing over the issue but what came of the player's own step (a profile signed in to, a game brought here, an
+    invite opened).
     Others' news is Приятели's: its dot for a friend's duel or request, its line for a friend's yes.
 - **The day's result** (Днес once the day is played):
   1. The score on a sheet of the issue's first chapter: „Брой 9 · 20 ноември“, the score as the hero numeral „7 от
@@ -104,7 +111,10 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/fi
   duels between you „дуели 3 : 1“ under it; the column a third of a big screen); the
   duels („Твой ред“ the page's action, „Чакаш“, „Изиграни“: an open one how it stands under the name, „Изиграй същите
   десет въпроса · още 6 дни“, „Ти: 8 · Иво има още 6 дни“; a played one its score and, on even right answers, what broke the
-  tie; the record between two is the friend's row's alone). Friends are added in one field, „име или имейл“; a
+  tie; the record between two is the friend's row's alone). Friends are added by the player's invite link, „Покани приятел“
+  (`.invite-friend`, an outlined `.btn`: a phone's share sheet with „Добави ме в АЛМАНАХ: <link>“, a big screen's copy,
+  „Връзката е копирана. Изпрати я на приятел.“; one quiet line under it, and „Нова връзка“ beside it, which asks once,
+  „Старата връзка ще спре да работи.“), and in one field, „име или имейл“; a
   friend's yes to a request is one line over the friends, told once; requests sent wait under „Изпратени покани“.
   Only two friends of one name show their @username. A duel's result, as the day's: a white card, the kicker, the
   verdict („Победа“, „Загуба“, „Равенство“) as its h1, the two face to face with their scores as the heroes and „от 10“
@@ -379,7 +389,7 @@ flat shapes with depth, lit from the top left, no outlines, painted from one ton
   `.verdict`, `.right-said`, `.after`, `.up-next-go`; `.issue`, `.issue-go`, `.today-side`, `.result`, `.result-main`, `.score-n`,
   `.tiles .tile`, `.tomorrow`, `.result-share`, `.share-sheet`, `.streak-chip`, `.streak-notice`, `.day-entry`, `.friends-day`, `.missed-day`;
   `.summary`, `.reviewed`, `.news-facts`; `.toc-row`, `.entry`; `.day-board`, `.rank-row`, `.friend`, `.invitation`,
-  `.accepted-notice`, `.duels`, `.duel-turn`, `.duel-row`, `.their-line`; `.me-ladder`, `.ladder`.
+  `.accepted-notice`, `.invite-card`, `.invite-friend`, `.duels`, `.duel-turn`, `.duel-row`, `.their-line`; `.me-ladder`, `.ladder`.
 
 ## Before a UI change ships
 
