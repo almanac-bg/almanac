@@ -33,10 +33,12 @@ test("the day shared: its score and shape and a link, which brings another to th
   await page.reload();
   await startDay(page);
   await playRun(page);
-  // The sheet: the card drawn for it, the text, and the ways to send it.
+  // The sheet: the server's card (the link's preview), the text, and the ways to send it.
   await page.getByRole("button", { name: "Сподели", exact: true }).click();
   const sheet = page.getByRole("dialog", { name: "Сподели резултата" });
-  await expect(sheet.locator(".share-card")).toHaveAttribute("src", /^data:image\/png;base64,/);
+  const card = sheet.locator(".share-card");
+  await expect(card).toHaveAttribute("src", /^\/card\/\d+-[0-3]{10}\.png$/);
+  await expect.poll(() => card.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBe(1200);
   await expect(sheet.locator(".share-text")).toContainText("/10");
   await sheet.getByRole("button", { name: "Сподели", exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { sent: string[] }).sent.length)).toBe(1);

@@ -1,7 +1,7 @@
 // Every avatar the server knows (internal/play: Shapes) is drawn, named and has its natural colours in the client,
 // and the client offers no other.
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 import { pictures } from "./pictures.ts";
@@ -47,4 +47,21 @@ test("every avatar is drawn and named, and the choice offers no other", () => {
   const tones = ui.slice(ui.indexOf("export const toneNames"), ui.indexOf("const freeShapes"));
   const toned = [...tones.matchAll(/\n {2}([a-z]+): "/g)].map((m) => m[1] ?? "");
   assert.deepEqual(toned, goList(go, "Tones"), "toneNames are the server's tones, in its order");
+});
+
+// The server draws a shared day's card (internal/card) in Go, from the chapters' glyphs as pictures.ts draws them:
+// kept in internal/card/glyphs.json, written again by WRITE_GLYPHS=1 npm test, and held equal here. The chapters are
+// app.css's, each with its colour by day (--t-<id>).
+test("the server's card has the chapters' glyphs as pictures.ts draws them", () => {
+  const css = read("web/src/app.css");
+  const day = css.slice(css.indexOf(":root {"), css.indexOf("@media (prefers-color-scheme: dark)"));
+  const ids = [...day.matchAll(/--t-(\w+): #/g)].map((m) => m[1] ?? "");
+  assert.ok(ids.length >= 10, "app.css has the chapters' colours");
+  const glyphs = Object.fromEntries(
+    ids.map((id) => [id, pictures[`topic-${id}`] ?? assert.fail(`no picture for ${id}`)]),
+  );
+  const want = `${JSON.stringify(glyphs, null, 2)}\n`;
+  const file = join(root, "internal/card/glyphs.json");
+  if (process.env.WRITE_GLYPHS) writeFileSync(file, want);
+  assert.equal(read("internal/card/glyphs.json"), want, "internal/card/glyphs.json is old: WRITE_GLYPHS=1 npm test");
 });

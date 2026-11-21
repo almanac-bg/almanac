@@ -19,7 +19,7 @@ import (
 // The chapters' glyphs, as the client draws them (web/src/art/pictures.ts): each a list of SVG paths on a 64 × 64
 // grid, its ink a class (k0–k5 and kw, ks, kh, kt filled; l0–l5 the same inks as strokes), now and then a transform
 // and a stroke's width. glyphs.json is pictures.ts's, written by the client's tests and held equal there
-// (web/src/game/card.test.ts), so the art is drawn in one place. Here they're read once into polygons, and painted
+// (web/src/art/pictures.test.ts), so the art is drawn in one place. Here they're read once into polygons, and painted
 // with x/image/vector: curves and arcs flattened to lines, a stroke as a band of quads with round ends and joins.
 
 //go:embed glyphs.json
@@ -79,7 +79,7 @@ var (
 	attr    = regexp.MustCompile(`([a-z-]+)="([^"]*)"`)
 )
 
-// inks are a glyph's colours from its chapter's tone, as card.ts sets them (app.css's .pic by day).
+// inks are a glyph's colours from its chapter's tone, as app.css's .pic sets them by day.
 func inks(tone color.RGBA) map[string]color.Color {
 	night := color.RGBA{0x14, 0x0f, 0x26, 0xff}
 	white := color.RGBA{0xff, 0xff, 0xff, 0xff}
@@ -101,7 +101,7 @@ func inks(tone color.RGBA) map[string]color.Color {
 	return k
 }
 
-// mix is p of a and the rest of b, as card.ts mixes them.
+// mix is p of a and the rest of b, as color-mix in srgb mixes them.
 func mix(a, b color.RGBA, p float64) color.RGBA {
 	m := func(x, y uint8) uint8 { return uint8(math.Round(float64(x)*p + float64(y)*(1-p))) }
 	return color.RGBA{m(a.R, b.R), m(a.G, b.G), m(a.B, b.B), 0xff}

@@ -110,26 +110,28 @@ func TestTilesPartInGrey(t *testing.T) {
 	}
 }
 
-// The chapters' colours are card.ts's (which card.test.ts holds equal to app.css's), and every chapter has its glyph.
+// The chapters' colours are app.css's by day (its first :root, before the dark theme), every one of them, and every
+// chapter has its glyph.
 func TestChaptersAreTheClients(t *testing.T) {
-	src, err := os.ReadFile("../../web/src/game/card.ts")
+	src, err := os.ReadFile("../../web/src/app.css")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for name, colours := range map[string]map[string]color.RGBA{"vivid": vivid, "deep": deep} {
-		block := regexp.MustCompile(`(?s)export const ` + name + `: Record<string, string> = \{(.*?)\};`).
-			FindSubmatch(src)
-		if block == nil {
-			t.Fatalf("card.ts has no %s", name)
-		}
-		pairs := regexp.MustCompile(`(\w+): "#([0-9a-f]{6})"`).FindAllSubmatch(block[1], -1)
+	css := string(src)
+	start := strings.Index(css, ":root {")
+	end := strings.Index(css, "@media (prefers-color-scheme: dark)")
+	if start < 0 || end < start {
+		t.Fatal("app.css has no day's :root before its dark theme")
+	}
+	for name, colours := range map[string]map[string]color.RGBA{"t": vivid, "d": deep} {
+		pairs := regexp.MustCompile(`--`+name+`-(\w+): #([0-9a-f]{6});`).FindAllStringSubmatch(css[start:end], -1)
 		if len(pairs) != len(colours) {
-			t.Errorf("%s: card.ts has %d, here %d", name, len(pairs), len(colours))
+			t.Errorf("--%s-: app.css has %d, here %d", name, len(pairs), len(colours))
 		}
 		for _, p := range pairs {
-			c := colours[string(p[1])]
-			if got := fmt.Sprintf("%02x%02x%02x", c.R, c.G, c.B); got != string(p[2]) {
-				t.Errorf("%s %s: %s, card.ts %s", name, p[1], got, p[2])
+			c, ok := colours[p[1]]
+			if got := fmt.Sprintf("%02x%02x%02x", c.R, c.G, c.B); !ok || got != p[2] {
+				t.Errorf("--%s-%s: %s here, app.css %s", name, p[1], got, p[2])
 			}
 		}
 	}
