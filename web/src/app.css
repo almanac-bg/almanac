@@ -5174,11 +5174,55 @@
   }
 
   .entry-pic {
+    display: block;
     width: 88px;
     height: auto;
     max-height: 132px;
     object-fit: contain;
     border-radius: 8px;
+  }
+
+  /* The picture a button: a tap shows it large (.picture-sheet), a pointer's cursor a magnifier. */
+  .entry-zoom {
+    display: block;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .entry-zoom {
+      cursor: zoom-in;
+    }
+  }
+
+  /* An entry's picture large, whole (never cut): as wide as the screen allows, or as tall as it holds under the title
+     and over the credit, whichever comes first, by the picture's own shape (--ratio: its width over its height). On a
+     phone the sheet is the screen's width from the foot; on a big screen it's as wide as the picture. */
+  .picture-sheet .sheet-panel {
+    display: grid;
+    gap: var(--space-3);
+    width: 100%;
+  }
+
+  .picture-large {
+    display: block;
+    justify-self: center;
+    width: min(100%, (100dvh - 10rem) * var(--ratio));
+    height: auto;
+    object-fit: contain;
+  }
+
+  @media (min-width: 56.25rem) {
+    .picture-sheet .sheet-panel {
+      width: auto;
+      min-width: 24rem;
+    }
+
+    .picture-large {
+      width: min(100vw - 4 * var(--space-6), (100dvh - 14rem) * var(--ratio));
+    }
   }
 
   /* What a search found: a soft tone of the chapter's colour under the full ink (4.5:1 on both themes' surfaces:

@@ -136,7 +136,9 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   the dateline, the question small and muted (a kicker), the answer as the headword (big, bold) between it and the
   fact, then the fact in body text; a statement has no question, its headword right under the dateline; an answer of
   parts a line each. A picture question shows its picture (a choice of pictures, its answer's) beside the question and
-  headword, its whole shape (88px wide on a phone, 112px on a big screen), credited in the entry's small text. One
+  headword, its whole shape (88px wide on a phone, 112px on a big screen), credited in the entry's small text; a tap
+  („Виж снимката голяма“, a magnifier for a pointer) shows it on a sheet as large as the screen holds it, whole, its
+  biggest file, the headword its title and its credit under it (no zoom, no gallery). One
   column on a big screen too, 44rem at most, the head at the left: a book reads top to bottom, the latest first
   exactly, and one column leaves no hole beside a tall entry (two across did; columns or masonry would read down then
   across, and reshuffle as a page comes in). From ten facts, a search over them („Търси факт“); fewer are read at a
@@ -334,7 +336,8 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   or a setting's few choices on a well, the chosen one a raised surface, of one width unless a word needs more (never broken inside one). A switch is a 52 × 30 track. Never a native
   select, radio or checkbox.
 - **Sheets over the page** (`.sheet`, a `<dialog>`): a surface with round top corners over a scrim, from the foot on a
-  phone, centred on a big screen (a name asked for, the share, a way out of a game, the avatars); its title's words whole,
+  phone, centred on a big screen (a name asked for, the share, a way out of a game, the avatars, an entry's picture);
+  its title's words whole,
   „Затвори“ under it where they don't fit beside it.
 - **Names** (`nameWords()`): a name breaks between its words first; a single word wider than its line, and only
   then, at its syllables with a hyphen. „ти“ stays on its last word's line, never alone. Never cut

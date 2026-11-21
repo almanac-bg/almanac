@@ -197,6 +197,34 @@ test("a picture question's entry shows its picture, credited; a choice of pictur
   await expect(page.locator(".entry img, .entry .credit")).toHaveCount(0);
 });
 
+test("an entry's picture opens large, whole and credited, its headword the title, and goes again", async ({ page }) => {
+  await page.goto("/");
+  await knows(page, ["geo-901"]);
+  await page.goto("/almanac/geography");
+  const word = await readText(page.locator(".entry-word"));
+  const thumb = page.getByRole("button", { name: "Виж снимката голяма" });
+  const sheet = page.locator("dialog.picture-sheet");
+  // Opened by the thumbnail: the largest file, drawn whole, wider than the thumbnail; the headword and the credit.
+  await thumb.click();
+  await expect(sheet).toBeVisible();
+  expect(await readText(sheet.getByRole("heading", { level: 2 }))).toBe(word);
+  const big = sheet.locator("img.picture-large");
+  await expect(big).toHaveAttribute("src", /^\/qimg\/[0-9a-f]{16}\.webp$/);
+  await expect.poll(() => big.evaluate((im: HTMLImageElement) => im.complete && im.naturalWidth > 0)).toBe(true);
+  await expect(big).toHaveCSS("object-fit", "contain");
+  expect((await big.boundingBox())?.width ?? 0).toBeGreaterThan(200);
+  await expect(sheet.locator(".credit")).toContainText("Снимка:");
+  // Put away by „Затвори“, by Esc, and by a tap beside it.
+  await sheet.getByRole("button", { name: "Затвори" }).click();
+  await expect(sheet).toHaveCount(0);
+  await thumb.click();
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await thumb.click();
+  await page.mouse.click(5, 5);
+  await expect(sheet).toHaveCount(0);
+});
+
 test("on a big screen a chapter's entries are one column, the latest first, top to bottom", async ({ page }) => {
   await page.setViewportSize({ width: 1366, height: 900 });
   await page.goto("/");
