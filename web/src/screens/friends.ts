@@ -34,7 +34,6 @@ let {
   formatNumber,
   ordinal,
   profileHref,
-  rankRow,
   record,
   rightsOf,
   segmented,
@@ -109,7 +108,6 @@ export function friends(kit: Kit): Child {
     formatNumber,
     ordinal,
     profileHref,
-    rankRow,
     record,
     rightsOf,
     segmented,
@@ -132,7 +130,7 @@ export function friends(kit: Kit): Child {
 }
 
 /** The day's board: among the player and their friends (first, once they have any), or all of България. A row says
- * what places it: the right answers big („8 от 10“; a tie between them broken as play/board.go says, never by time:
+ * what places it: the right answers („8 от 10“; a tie between them broken as play/board.go says, never by time:
  * those still equal share a place, the server's); the player's own row washed, „ти“ after the name, and under the best twenty if further down. */
 function dayBoard(): { view: Child; load: () => void; played: () => boolean } {
   const day = signal<Day | null>(null);
@@ -274,16 +272,44 @@ function spreadOf(b: Board): Child {
   );
 }
 
+/** A board's row, built as a friend's (`playerRow`): its place before the avatar, „ти“ after the player's own name
+ * (their row washed), and under the name the score, the day's small squares after it. */
 const scoreRow = (s: Score, place: number, gap = false) =>
-  rankRow(s.name, {
-    place,
-    me: s.me,
-    gap,
-    look: s,
-    tag: s.tag,
-    score: rightsOf(s.rights, s.of),
-    aside: s.trail?.length ? mini(s.trail) : null,
-  });
+  playerRow(
+    ["rank-row", s.me && "me", gap && "gap"].filter(Boolean).join(" "),
+    s,
+    s.tag,
+    nameWords(s.name, s.me ? h("span", { class: "rank-you" }, " ти") : null),
+    [h("span", { class: "rank-score" }, rightsOf(s.rights, s.of)), s.trail?.length ? mini(s.trail) : null],
+    h("span", { class: "rank-place" }, String(place)),
+  );
+
+/** A player's row, a friend's or a board's: what comes before the avatar (a board's place), the avatar with its seal,
+ * the name across the row (a way to their profile; on a second line rather than cut), their day on a line under it,
+ * and what comes after (a friend's duel). */
+function playerRow(
+  cls: string,
+  look: { name: string; avatar?: string; seal?: Score["seal"] },
+  tag: string | undefined,
+  name: Child,
+  day: Child,
+  before: Child = null,
+  after: Child = null,
+): HTMLElement {
+  return h(
+    "li",
+    { class: cls },
+    before,
+    avatar(look.avatar, { name: look.name, seal: look.seal }),
+    h(
+      "div",
+      { class: "friend-text" },
+      tag ? h("a", { class: "friend-name", href: profileHref(tag) }, name) : h("span", { class: "friend-name" }, name),
+    ),
+    h("span", { class: "friend-day" }, day),
+    after,
+  );
+}
 
 /** The friends: who asks to be friends, each friend with their day and the duels between you (and, while changing
  * the list, removing them), the one field to add more, and the requests that wait for an answer. */
@@ -586,23 +612,12 @@ function addFriend(reload: () => Promise<void>): Child {
  * duels between you under it, and a duel a tap away (while changing the list, removing them instead). */
 function row(f: Friend, remove: () => void, challenge: () => void, editing: () => boolean, same = false): Child {
   const played = f.won + f.lost + f.drawn;
-  return h(
-    "li",
-    { class: "friend" },
-    avatar(f.avatar, { name: f.name, seal: f.seal }),
-    h(
-      "div",
-      { class: "friend-text" },
-      h(
-        "a",
-        { class: "friend-name", href: profileHref(f.tag) },
-        nameWords(f.name),
-        h("span", { class: same ? "friend-tag same" : "friend-tag" }, ` @${f.tag}`),
-      ),
-    ),
-    h(
-      "span",
-      { class: "friend-day" },
+  return playerRow(
+    "friend",
+    f,
+    f.tag,
+    [nameWords(f.name), h("span", { class: same ? "friend-tag same" : "friend-tag" }, ` @${f.tag}`)],
+    [
       h(
         "span",
         null,
@@ -616,7 +631,8 @@ function row(f: Friend, remove: () => void, challenge: () => void, editing: () =
             `дуели\u00a0${f.won}:${f.lost}`,
           )
         : null,
-    ),
+    ],
+    null,
     () =>
       editing()
         ? h("button", { class: "link muted friend-act", type: "button", onclick: remove }, "Премахни")

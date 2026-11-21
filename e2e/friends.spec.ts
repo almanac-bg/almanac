@@ -49,7 +49,7 @@ test("friends on the day: who has played it, and how each went", async ({ browse
   const row = friends.locator(".rank-row").filter({ hasText: ana });
   const worn = row.locator(".avatar > .seal");
   await expect(worn).toHaveCount(seal ? 1 : 0);
-  await expect(row.locator(".rank-name .seal")).toHaveCount(0);
+  await expect(row.locator(".friend-name .seal")).toHaveCount(0);
   if (seal) {
     await expect(worn).toHaveClass(new RegExp(`t-${seal.chapter}`));
     // Read out as a seal and its chapter: never the rank's word, which is the Алманах's.
