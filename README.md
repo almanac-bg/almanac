@@ -1,8 +1,8 @@
 # АЛМАНАХ — almanac.bg
 
-Въпроси, от които научаваш нещо. Десет на ден, едни и същи за всички; игра по теми, която следва колко знаеш;
-дуели с приятели, всеки по свое време. Играй на
-**[almanac.bg](https://almanac.bg)**.
+Десет въпроса на ден, едни и същи за цяла България. Всеки верен отговор в броя пише факт с мастило в твоя
+Алманах, а печатът на всяка глава казва колко от нея държиш. Приятели, класация на деня и дуели, всеки по свое време.
+Играй на **[almanac.bg](https://almanac.bg)**.
 
 Свободен софтуер под [AGPL-3.0](LICENSE).
 
@@ -12,9 +12,9 @@
 
 - **Сървърът** (`cmd/almanac`, `internal/`) е един статичен файл: HTTP, HTTPS, базата данни (SQLite), пощата и
   клиентът са вътре. Зависи само от драйвера за SQLite и от age, с който се шифроват резервните копия.
-- **Клиентът** (`web/`) е около 23 kB скрипт и 10 kB стилове (gzip) и се строи с esbuild през `go run ./cmd/build`.
-  Бюджетите му (40 kB и 14 kB) са в CI, както и играта, изиграна в Chromium, WebKit и Firefox (`e2e/`). Шрифтовете
-  (Sofia Sans) са наши файлове: браузърът не пита никой друг за нищо.
+- **Клиентът** (`web/`) се строи с esbuild през `go run ./cmd/build`. Първият екран е около 95 kB заедно с
+  шрифтовете (бюджет 110 kB, пазен в CI), а играта се изпитва в Chromium, WebKit и Firefox (`e2e/`). Шрифтовете
+  (Sofia Sans, с българските форми на буквите) са наши файлове: браузърът не пита никой друг за нищо.
 - **Въпросите** (`internal/bank`) са сърцето на играта: всеки вид въпрос (с избор, с число, за подреждане) сам се
   проверява, раздава и оценява. Нов вид е нов файл тук и неговият изглед в клиента.
 
@@ -25,8 +25,9 @@ internal/bank    въпросите: видовете, банката на ди�
 internal/store   SQLite и миграциите (internal/store/migrations)
 internal/account гости, вход с код по имейл, сесии, имена
 internal/mail    пощата: опашка в базата, SMTP
-internal/play    играта: денят, темите, дуелите, приятелите, класацията, серията, статистиката
+internal/play    играта: броят, мастилото и печатите, главите, серията, приятелите, дуелите, класацията
 internal/push    известията (Web Push)
+internal/card    картинката на споделен ден и на сайта (PNG)
 internal/backup  копията на базата в R2
 internal/server  HTTP: API, страницата на приложението, файловете
 deploy           услугата и скриптовете на сървъра
@@ -63,8 +64,8 @@ go run ./cmd/almanac bank check -sample bank/sample   # извадката
 Един сървър (Hetzner), зад Cloudflare. Програмата работи като systemd услуга (`deploy/almanac.service`) и сама
 говори HTTPS със сертификата на Cloudflare за сървъра. На всеки 15 минути копира базата си в Cloudflare R2.
 
-- Всяко сливане в `main` с feat, fix, perf или revert е ново издание: GitHub избира версията, строи програмата и
-  я слага на сървъра (`.github/workflows/deploy.yml`).
+- Всяко сливане в `main`, което променя програмата, е ново издание: GitHub строи програмата, вдига версията (второто
+  число, ако носи миграция, иначе третото) и я слага на сървъра (`.github/workflows/deploy.yml`).
 - На сървъра `almanac-deploy vX.Y.Z` слага версията веднага: всяка игра е в базата, отговор по отговор, и рестартът
   не прекъсва игра. Щом `deploy/release-signers` назове ключ, приема
   програмата само с подписа на издаването. Версия, която носи промени в базата (миграции), първо я копира (`before-vX.Y.Z.db`);
@@ -94,9 +95,9 @@ go run ./cmd/almanac bank check -sample bank/sample   # извадката
 
 Всяко копие сравнява редовете на всяка таблица с тези в предишното и в първото за деня: таблица, която е загубила
 половината си редове или ги е удвоила, е проблем, докато копията отпреди това още са тук. Веднъж на ден се проверява
-и че никой ред не сочи към ред, който го няма (`foreign_key_check`). Каквото не е наред (неуспешно копие, липсващ или
-непроверен ключ, стари копия, които R2 не е изтрил, или копия, изтрити твърде рано, рязка промяна в редовете) идва в
-на `ALERT_EMAIL` веднъж на ден.
+и че никой ред не сочи към ред, който го няма (`foreign_key_check`). Каквото не е наред (неуспешно копие, липсващ ключ,
+стари копия, които R2 не е изтрил, или копия, изтрити твърде рано, рязка промяна в редовете) идва на `ALERT_EMAIL`
+веднъж на ден.
 
 **Ключът, веднъж.** На своя компютър, не на сървъра: `go run ./cmd/almanac backup keys` (или `age-keygen -pq`).
 
@@ -166,7 +167,8 @@ Stack):
 ## In English
 
 ALMANAC (АЛМАНАХ) is a Bulgarian quiz game at [almanac.bg](https://almanac.bg): ten questions a day, the same for
-everyone; topic play that follows what you know; duels in each one's own time; friends who call each
-other to a duel. One Go program (stdlib + SQLite) serves a plain TypeScript client of about 23 kB. Run it with `go run
+everyone in Bulgaria; each right answer writes its fact in ink in your book, and each chapter's seal says how much of it
+you hold; friends, the day's board and duels in each one's own time. One Go program (stdlib + SQLite) serves a plain
+TypeScript client with no framework. Run it with `go run
 ./cmd/build && DEV=1 go run ./cmd/almanac serve`. Free software under the AGPL-3.0; issues and pull requests in
 English are welcome.
