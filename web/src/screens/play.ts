@@ -41,11 +41,13 @@ export function topic([category = ""]: string[]) {
   return run({
     name,
     chapter: category,
-    home: `/almanac/${category}`,
+    home: isChapter(category) ? `/almanac/${category}` : "/almanac",
     lead:
       category === mix.id
         ? "Десет въпроса от всички глави, от лесен към труден."
-        : "Десет въпроса от главата, от лесен към труден.",
+        : category === bulgaria.id
+          ? "Десет въпроса за България от всички глави, от лесен към труден."
+          : "Десет въпроса от главата, от лесен към труден.",
     begin: async () => {
       const s = await api<State>("POST", "/api/topic", { category });
       ask();

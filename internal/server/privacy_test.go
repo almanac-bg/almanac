@@ -122,3 +122,16 @@ func TestProfileMisses(t *testing.T) {
 		t.Fatalf("another network: %d", status)
 	}
 }
+
+// An email address on the page breaks after its @ or before a dot, never inside a word.
+func TestEmailParts(t *testing.T) {
+	for email, want := range map[string]string{
+		"privacy@almanac.bg": "privacy@|almanac|.bg",
+		"a.b@c.d.e":          "a|.b@|c|.d|.e",
+		"nobody":             "nobody",
+	} {
+		if got := strings.Join(emailParts(email), "|"); got != want {
+			t.Errorf("%s: %s, want %s", email, got, want)
+		}
+	}
+}

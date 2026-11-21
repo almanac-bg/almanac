@@ -36,7 +36,7 @@ func (s *Server) dayRows(ctx context.Context) ([]dayRow, error) {
 		for k := range play.Backs {
 			r.Back[k] = "—"
 			if c.Due[k] && c.New > 0 {
-				r.Back[k] = fmt.Sprintf("%d%% (%d)", int(math.Round(100*float64(c.Back[k])/float64(c.New))), c.Back[k])
+				r.Back[k] = fmt.Sprintf("%d\u00a0%% (%s)", int(math.Round(100*float64(c.Back[k])/float64(c.New))), sayInt(c.Back[k]))
 			}
 		}
 		rows = append(rows, r)

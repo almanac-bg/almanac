@@ -261,4 +261,15 @@
       font-size: calc(64px + 3rem);
     }
   }
+
+  /* A phone of the usual height (390 × 664 and under): the card closer, so that the next duel shows under it. */
+  @media (max-height: 45rem) and (max-width: 56.25rem) {
+    .duel-end.card.hero {
+      gap: var(--space-4);
+    }
+
+    .duel-score {
+      margin-top: var(--space-1);
+    }
+  }
 }

@@ -29,9 +29,21 @@ import { reportProblem } from "../lib/errors.ts";
 import { type RemindAsks, remindAnswered, remindAsks } from "../lib/keep.ts";
 import { pushable, pushOn, turnOn } from "../lib/push.ts";
 import { go, goBack, hold, release, title } from "../lib/router.ts";
-import { dateWords, hyphenate, issueOf, onDay, stakeHour, weekday } from "../lib/words.ts";
+import { dateWords, issueOf, onDay, stakeHour, weekday } from "../lib/words.ts";
 import { cover, notice, player, playing, user } from "../state.ts";
-import { chapterName, chip, failure, formatNumber, glyph, leaf, mini, stakeLine, tiles, who } from "../ui.ts";
+import {
+  chapterName,
+  chip,
+  failure,
+  formatNumber,
+  glyph,
+  leaf,
+  mini,
+  stakeLine,
+  textWords,
+  tiles,
+  who,
+} from "../ui.ts";
 import { inviteCard, takeWaiting, takeWaitingOnce } from "./invite.ts";
 import { app, coverExit, exitWay, handedIn, haveProfile, keepLine, keepStake, mailAsk, takeHand } from "./keep.ts";
 import { loadStats, type Stats } from "./stats.ts";
@@ -385,11 +397,11 @@ function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): 
             t.late
               ? "Десет въпроса от вчера"
               : lead
-                ? `Някой позна ${sharedMarks.filter((m) => m.right).length} от ${sharedMarks.filter((m) => !m.void).length}. А ти?`
+                ? `Някой позна ${sharedMarks.filter((m) => m.right).length}\u00a0от\u00a0${sharedMarks.filter((m) => !m.void).length}. А ти?`
                 : "Десет въпроса за днес",
           ),
           at
-            ? [h("p", { class: "issue-deck" }, `Следва въпрос ${at + 1} от 10.`), tiles(marks, order)]
+            ? [h("p", { class: "issue-deck" }, `Следва въпрос ${at + 1}\u00a0от\u00a010.`), tiles(marks, order)]
             : lead
               ? h("div", { class: "shared-score" }, tiles(sharedMarks, order, sharedMarks.length))
               : order.length
@@ -401,7 +413,7 @@ function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): 
                 : null,
           h(
             "p",
-            { class: "issue-meta" },
+            { class: t.late || at || players >= crowdFrom ? "issue-meta" : "issue-meta issue-time" },
             // Yesterday's, begun or not: until when it can be finished.
             t.late
               ? `Вчерашният брой. Довърши го до ${clockAt(t.late.until)}.`
@@ -409,7 +421,11 @@ function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): 
                 ? "Довърши броя до полунощ."
                 : // Who has played today, once enough have for it to say something.
                   players >= crowdFrom
-                  ? `Около три минути · Днес играха ${formatNumber(players)}\u00a0души`
+                  ? [
+                      // With large text, how long it takes gives way to the cover (app.css, .issue-time).
+                      h("span", { class: "issue-time" }, "Около три минути ·\u00a0"),
+                      `Днес играха ${formatNumber(players)}\u00a0души`,
+                    ]
                   : "Около три минути",
           ),
         ),
@@ -582,7 +598,11 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
     order[0] ?? "general",
     [
       perfect ? h("div", { class: "perfect-head" }, perfectMark(), h("p", { class: "kicker" }, "Всички верни")) : null,
-      h("p", { class: "kicker score-kicker" }, `Брой ${t.issue ?? issueOf(t.day)} · ${dateWords(t.day)}`),
+      h(
+        "p",
+        { class: "kicker score-kicker" },
+        `Брой\u00a0${t.issue ?? issueOf(t.day)} ·\u00a0${dateWords(t.day).replace(" ", "\u00a0")}`,
+      ),
       h(
         "h1",
         { class: "score" },
@@ -595,7 +615,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       tenthLine(review),
       () => {
         const avg = fresh().board.average;
-        return avg ? h("p", { class: "score-bg" }, `България днес: средно ${formatNumber(avg, 0.1)}`) : null;
+        return avg ? h("p", { class: "score-bg" }, `България днес: средно ${averageWords(avg)}`) : null;
       },
     ],
     "result-score score-leaf",
@@ -615,7 +635,11 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
         : null,
     first ? null : shareButton(run, t, streak, known),
   );
-  return h(
+  // The first results' action: right under the score on a phone; on a big screen at the top of the right page, so the
+  // two pages are of a height (the left one has the score and the questions). Moved, never drawn twice.
+  const underScore = document.createTextNode("");
+  const sideTop = document.createTextNode("");
+  const page = h(
     "section",
     { class: "screen result summary spread" },
     h("div", { class: "notices" }, notices),
@@ -625,7 +649,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       hero,
       best,
       zero ? missed(missedList, () => bulgariaToday(fresh(), run, reviewOf(run.id))) : null,
-      first ? action : null,
+      first ? underScore : null,
       // 2. The day's entry in the book, and what the day wrote.
       () => entryOfDay(fresh().entry),
       // Asked on every visit: the ink and the nearest step are counted again; a rank risen is told once (play.NewsOf).
@@ -634,6 +658,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
     h(
       "div",
       { class: "result-side page-2" },
+      first ? sideTop : null,
       // 3. The friends who played it.
       () => friendsDay(fresh()),
       // 4. The action, once the first results are past.
@@ -664,6 +689,14 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       );
     },
   );
+  if (first) {
+    const wide = matchMedia("(min-width: 56.25rem)");
+    const place = () => (wide.matches ? sideTop : underScore).after(action);
+    place();
+    wide.addEventListener("change", place);
+    onCleanup(() => wide.removeEventListener("change", place));
+  }
+  return page;
 }
 
 /** How many of the questions missed a result with none right shows at once. */
@@ -739,11 +772,15 @@ function rightAnswer(q: Reviewed): Child {
     return h(
       "ul",
       { class: "miss-a miss-lines" },
-      lines.map((l) => h("li", null, hyphenate(l))),
+      lines.map((l) => h("li", null, textWords(l))),
     );
   const answer = answerWords(v, r);
-  return answer ? h("p", { class: "miss-a" }, hyphenate(answer)) : null;
+  return answer ? h("p", { class: "miss-a" }, textWords(answer)) : null;
 }
+
+/** The day's average right answers, always to one decimal, wherever it's said: „6,0“, „6,2“ (never „6“ on one result
+ * and „6,1“ on another). */
+const averageWords = (avg: number) => avg.toLocaleString("bg", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 /** A question of the ten by its place, as the result's line names it („Десетият“). */
 const lastWords = [
@@ -866,7 +903,7 @@ function bulgariaToday(t: Today, run: State, review: Promise<Reviewed[]>): Child
           ? h(
               "span",
               { class: "spread-avg", style: { left: `${((avg + 0.5) / spread.length) * 100}%` } },
-              h("span", null, `средно ${formatNumber(avg, 0.1)}`),
+              h("span", null, `средно ${averageWords(avg)}`),
             )
           : null,
       ),
@@ -882,15 +919,18 @@ function bulgariaToday(t: Today, run: State, review: Promise<Reviewed[]>): Child
       h(
         "div",
         { class: "fig" },
-        h("b", { class: "fig-n" }, formatNumber(avg, 0.1)),
+        h("b", { class: "fig-n" }, averageWords(avg)),
         h("span", { class: "fig-label" }, `средно от ${t.board.of}`),
       ),
-      h(
-        "div",
-        { class: "fig" },
-        h("b", { class: "fig-n" }, formatNumber(spread.at(-1) ?? 0)),
-        h("span", { class: "fig-label" }, "с всички верни"),
-      ),
+      // A counter at zero is hidden (DESIGN.md, Copy): nobody with all ten isn't a figure.
+      spread.at(-1)
+        ? h(
+            "div",
+            { class: "fig" },
+            h("b", { class: "fig-n" }, formatNumber(spread.at(-1) ?? 0)),
+            h("span", { class: "fig-label" }, "с всички верни"),
+          )
+        : null,
       () => {
         const x = hardest();
         return x
@@ -928,16 +968,16 @@ function entryOfDay(r?: DayEntry | null): Child {
           ? h(
               "ul",
               { class: "entry-lines" },
-              f.lines.map((l) => h("li", null, l)),
+              f.lines.map((l) => h("li", null, textWords(l))),
             )
           : h(
               "p",
               { class: "entry-word" },
               f.untrue ? h("span", { class: "entry-untrue" }, "Невярно: ") : null,
-              f.answer,
+              textWords(f.answer),
             ),
-        f.question ? h("p", { class: "entry-q" }, f.question) : null,
-        h("p", { class: "entry-fact" }, f.fact),
+        f.question ? h("p", { class: "entry-q" }, textWords(f.question)) : null,
+        h("p", { class: "entry-fact" }, textWords(f.fact)),
       ],
       "entry-leaf",
     ),
@@ -1129,7 +1169,7 @@ function tomorrow(
           : null,
         () => {
           const n = streak();
-          return n > 0 ? h("span", { class: "tomorrow-streak" }, `С него серията ти става ${n + 1}.`) : null;
+          return n > 0 ? h("span", { class: "tomorrow-streak" }, `С него серията ти става\u00a0${n + 1}.`) : null;
         },
       ),
     ),

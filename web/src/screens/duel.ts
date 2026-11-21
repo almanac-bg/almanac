@@ -122,11 +122,11 @@ export async function startDuel(to: To): Promise<DuelView | null> {
 export function tieWords(d: DuelView): string {
   if (d.state === "draw") return "равен брой верни и под секунда разлика";
   if (d.state !== "won" && d.state !== "lost") return "";
-  if (d.tieBy === "number") return "равен брой верни · реши по-близкото число";
+  if (d.tieBy === "number") return "равен брой верни ·\u00a0реши по-близкото число";
   if (d.tieBy === "time" && d.you && d.opponent)
     return d.state === "won"
-      ? `равен брой верни · по-бързо отговаряш ти: ${seconds(d.you.ms)} срещу ${seconds(d.opponent.ms)} на ${d.opponent.name}`
-      : `равен брой верни · по-бързо отговаря ${d.opponent.name}: ${seconds(d.opponent.ms)} срещу твоите ${seconds(d.you.ms)}`;
+      ? `равен брой верни ·\u00a0по-бързо отговаряш ти: ${seconds(d.you.ms)} срещу ${seconds(d.opponent.ms)} на ${d.opponent.name}`
+      : `равен брой верни ·\u00a0по-бързо отговаря ${d.opponent.name}: ${seconds(d.opponent.ms)} срещу твоите ${seconds(d.you.ms)}`;
   return "";
 }
 
@@ -143,37 +143,42 @@ const ends: Record<DuelView["state"], string> = {
   expired: "Изтече",
 };
 
-/** What a row says under a duel's end: where an open one stands (begun: a question shown, its time run out or not); a
- * finished one's score (what broke a tie on even right answers goes on a line of its own: duelRow). The pair's record
- * is said once, on the friend (Приятели), not on each duel. */
+/** What a row says of an open duel, under the name: where it stands (begun: a question shown, its time run out or
+ * not), and how long is left. The pair's record is said once, on the friend (Приятели), not on each duel. */
 function rowLine(d: DuelView): string {
+  if (d.state === "theirs")
+    // The player's ten are in: their score, and how long the other (named over it) has for the same ten.
+    return `Ти: ${formatNumber(d.you?.rights ?? 0)} ·\u00a0${leftWords(d.until ?? 0)}`;
+  if (d.first && !d.you?.started) return `Още не е започнат ·\u00a0${leftWords(d.until ?? 0)}`;
+  return d.first
+    ? `Довърши своята игра ·\u00a0${leftWords(d.until ?? 0)}`
+    : `Изиграй същите десет въпроса ·\u00a0${leftWords(d.until ?? 0)}`;
+}
+
+/** What a played duel's row says on a line of its own under it, the row's whole width: why one that ran out has no
+ * score, that a player is gone (their game went with them), that it was against a recording, and what broke a tie on
+ * even right answers; "" for nothing to say. */
+function noteLine(d: DuelView): string {
   const them = d.opponent;
-  const versus = d.recorded ? " · срещу запис" : "";
-  switch (d.state) {
-    case "yours":
-      if (d.first && !d.you?.started) return `Още не е започнат · ${leftWords(d.until ?? 0)}`;
-      return d.first
-        ? `Довърши своята игра · ${leftWords(d.until ?? 0)}`
-        : `Изиграй същите десет въпроса · ${leftWords(d.until ?? 0)}`;
-    case "theirs":
-      // The player's ten are in: their score, and how long the other (named over it) has for the same ten.
-      return `Ти: ${formatNumber(d.you?.rights ?? 0)} · ${leftWords(d.until ?? 0)}`;
-    case "expired":
-      if (d.lapsed === "they") return `${them?.name ?? "Приятелят"} не го изигра навреме`;
-      if (d.lapsed === "you") return "Не го изигра навреме";
-      return "Без резултат";
+  if (d.state === "expired") {
+    if (d.lapsed === "they") return `${them?.name ?? "Приятелят"} не го изигра навреме.`;
+    if (d.lapsed === "you") return "Не го изигра навреме.";
+    return "Без резултат.";
   }
-  if (them?.gone) return "Играчът вече го няма"; // their game went with them: no score of theirs to set beside the player's
-  return `${formatNumber(d.you?.rights ?? 0)}:${formatNumber(them?.rights ?? 0)}${versus}`;
+  if (them?.gone) return "Играчът вече го няма.";
+  const said = [d.recorded ? "срещу запис" : "", tieWords(d)].filter(Boolean).join(" ·\u00a0");
+  return said && `${said.charAt(0).toUpperCase()}${said.slice(1)}`;
 }
 
 /** A duel as a row: the other player, where it stands, and a word on it. An open one's list says whose turn it is
- * („Твой ред“, „Чакаш“): its row only how it stands („Ти: 8 · още 6 дни“). A played one won or lost on even right
- * answers says what broke the tie on a line of its own under the row, the score staying at the right. */
+ * („Твой ред“, „Чакаш“): its row only how it stands, under the name („Ти: 8 · още 6 дни“). A played one has its end
+ * at the right („Победа“ over its score, set big: „8:6“; „Изтече“ alone), and what more there is to say of it on a line
+ * of its own under the row (noteLine). */
 export function duelRow(d: DuelView): Child {
   const them = d.opponent;
   const open = d.state === "yours" || d.state === "theirs";
-  const tie = them?.gone ? "" : tieWords(d);
+  const scored = !open && d.state !== "expired" && !them?.gone;
+  const note = open ? "" : noteLine(d);
   return h(
     "li",
     null,
@@ -181,13 +186,21 @@ export function duelRow(d: DuelView): Child {
       "a",
       { class: open ? `duel-row open s-${d.state}` : `duel-row s-${d.state}`, href: `/duel/${d.id}` },
       them ? who(them.name, them.look ?? {}, null, them.name) : h("span", { class: "who-name" }, "Съперник"),
-      h(
-        "span",
-        { class: "duel-row-end" },
-        open ? null : h("strong", { class: "duel-state" }, ends[d.state]),
-        h("span", { class: "muted" }, rowLine(d)),
-      ),
-      tie ? h("span", { class: "duel-tie muted" }, tie.charAt(0).toUpperCase() + tie.slice(1)) : null,
+      open
+        ? h("span", { class: "duel-row-end" }, h("span", { class: "muted" }, rowLine(d)))
+        : h(
+            "span",
+            { class: "duel-row-end" },
+            h("strong", { class: "duel-state" }, ends[d.state]),
+            scored
+              ? h(
+                  "b",
+                  { class: "duel-row-score" },
+                  `${formatNumber(d.you?.rights ?? 0)}:${formatNumber(them?.rights ?? 0)}`,
+                )
+              : null,
+          ),
+      note ? h("span", { class: "duel-note muted" }, note) : null,
     ),
   );
 }

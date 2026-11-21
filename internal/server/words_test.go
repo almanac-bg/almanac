@@ -26,3 +26,12 @@ func TestWithWord(t *testing.T) {
 		}
 	}
 }
+
+// A whole number the Bulgarian way: a space between thousands from 10 000, the minus sign.
+func TestSayInt(t *testing.T) {
+	for n, want := range map[int]string{0: "0", 1380: "1380", 15448: "15 448", 1234567: "1 234 567", -12000: "−12 000"} {
+		if got := sayInt(n); got != want {
+			t.Errorf("sayInt(%d) = %q, want %q", n, got, want)
+		}
+	}
+}

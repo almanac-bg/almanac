@@ -15,6 +15,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -293,10 +294,10 @@ func (s *Server) there(r *http.Request) bool {
 	case strings.HasPrefix(p, "/play/"):
 		return s.game.IsTopic(strings.TrimPrefix(p, "/play/"))
 	case strings.HasPrefix(p, "/almanac/"):
-		// A chapter of the book: every topic's, „Микс“, and „България“ even while its game is closed (its facts are
-		// the player's all the same).
+		// A chapter of the book: one of the bank's topics. „Микс“ and „България“ are ways to play, not chapters: no page
+		// of their own, which would list every fact as one (DECISIONS.md).
 		t := strings.TrimPrefix(p, "/almanac/")
-		return t == play.BulgariaTopic || s.game.IsTopic(t)
+		return slices.ContainsFunc(s.game.Bank().Categories, func(c bank.Category) bool { return c.ID == t })
 	case strings.HasPrefix(p, "/duel/") && p != "/duel/new":
 		id, _ := strconv.ParseInt(strings.TrimPrefix(p, "/duel/"), 10, 64)
 		yes, err = s.game.DuelExists(ctx, id)

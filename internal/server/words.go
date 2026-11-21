@@ -31,6 +31,27 @@ func withWord(text string) string {
 	return "с " + text
 }
 
+// sayInt is a whole number as the game writes it (the client's formatNumber, web/src/lib/words.ts): a no-break space
+// between thousands from 10 000 up, the minus sign „−“ below zero: „15 448“, „1380“.
+func sayInt(n int) string {
+	s := strconv.Itoa(n)
+	sign := ""
+	if n < 0 {
+		sign, s = "−", s[1:]
+	}
+	if len(s) <= 4 {
+		return sign + s
+	}
+	var b strings.Builder
+	for i, c := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			b.WriteRune(' ')
+		}
+		b.WriteRune(c)
+	}
+	return sign + b.String()
+}
+
 // readsWithS is whether a whole number (its digits) is read in Bulgarian starting with an „с“: седем (7),
 // седемнадесет (17), седемдесет… (70–79), сто… (100–199), седемстотин… (700–799); past a thousand, as its leading
 // group is read, except a lone one („хиляда“, „милион“).

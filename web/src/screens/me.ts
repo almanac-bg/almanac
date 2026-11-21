@@ -13,6 +13,7 @@ import type { Stats } from "./stats.ts";
 let {
   api,
   h,
+  nameWords,
   signal,
   when,
   go,
@@ -49,6 +50,7 @@ export function me(kit: Kit) {
   ({
     api,
     h,
+    nameWords,
     signal,
     when,
     go,
@@ -145,7 +147,7 @@ export function me(kit: Kit) {
         h(
           "p",
           { class: "lead" },
-          "Имаш профил? Влез с имейла си. Ако нямаш, профилът се създава сам с първата ти игра.",
+          "Имаш профил? Влез с имейла си. Ако нямаш, играта ти се пази на това устройство от първата ти игра. С имейл я имаш навсякъде.",
         ),
         haveProfile(() => go("/me", true), undefined, true, true),
       ],
@@ -173,7 +175,7 @@ function head(data: () => Stats | null): Child {
     h(
       "div",
       { class: "me-who" },
-      h("h1", null, () => user()?.name ?? "Профил"),
+      h("h1", null, () => nameWords(user()?.name ?? "Профил")),
       () => (user()?.tag ? h("span", { class: "me-tag" }, `@${user()?.tag}`) : null),
       () =>
         user()?.drawn
@@ -277,12 +279,18 @@ function seals(ranks: Rank[] | null, s: Stats | null, told: (s: Stats) => void):
                   h("button", { class: "link", type: "button", onclick: choose }, "Готово"),
                 ]
               : [
-                  wearing() ? `Носиш печата на глава „${chapterName(wearing())}“ · ` : "",
+                  wearing() ? `Носиш печата на глава „${chapterName(wearing())}“ ` : "",
+                  // The dot goes with what follows it, never at a line's end.
                   had.length > 1 || !wearing()
                     ? h(
-                        "button",
-                        { class: "link", type: "button", onclick: choose },
-                        wearing() ? "избери друг" : "избери",
+                        "span",
+                        { class: "seal-choose" },
+                        wearing() ? "· " : "",
+                        h(
+                          "button",
+                          { class: "link", type: "button", onclick: choose },
+                          wearing() ? "избери друг" : "избери",
+                        ),
                       )
                     : null,
                 ],

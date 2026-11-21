@@ -170,9 +170,9 @@ func (s *Server) adminQuestions(w http.ResponseWriter, r *http.Request) {
 	// The clock: answers run out of time by kind, over 28 days (play.Limit's floors are set so each stays under 2%).
 	if timed, err := s.game.TimedOutSince(ctx, play.DayShift(s.game.Today(), -27)); err == nil {
 		for _, t := range timed {
-			share := strings.Replace(fmt.Sprintf("%.1f%%", 100*float64(t.N)/float64(max(t.Of, 1))), ".", ",", 1)
+			share := strings.Replace(fmt.Sprintf("%.1f\u00a0%%", 100*float64(t.N)/float64(max(t.Of, 1))), ".", ",", 1)
 			data.TimedOut = append(data.TimedOut, timedOutRow{cmp.Or(questionKinds[t.Kind], t.Kind),
-				fmt.Sprintf("%s (%d от %d)", share, t.N, t.Of)})
+				fmt.Sprintf("%s (%s от %s)", share, sayInt(t.N), sayInt(t.Of))})
 		}
 	}
 

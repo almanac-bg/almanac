@@ -37,7 +37,7 @@ var privacyBody = template.Must(template.New("privacy").Parse(`
 реклами, няма проследяване, няма чужди скриптове.</p>
 
 <h2>Кой стои зад играта</h2>
-<p>Играта се поддържа от {{.Operator}}. За всичко, което засяга данните ти, пиши на <a href="mailto:{{.Contact}}">{{.Contact}}</a>.</p>
+<p>Играта се поддържа от {{.Operator}}. За всичко, което засяга данните ти, пиши на <a href="mailto:{{.Contact}}">{{range $i, $p := .ContactParts}}{{if $i}}<wbr>{{end}}{{$p}}{{end}}</a>.</p>
 
 <h2>Какво пазим и защо</h2>
 <ul>
@@ -131,12 +131,12 @@ var privacyBody = template.Must(template.New("privacy").Parse(`
 животно, докато не си избере друго. Името, което си избереш, се вижда в класациите и в профила ти: по-добре да е
 малкото ти име или прякор.
 Ако си под 14 години, добави имейл само със съгласието на родител. Родител, който иска да изтрием профила на детето
-си, може да ни пише на <a href="mailto:{{.Contact}}">{{.Contact}}</a>.</p>
+си, може да ни пише на <a href="mailto:{{.Contact}}">{{range $i, $p := .ContactParts}}{{if $i}}<wbr>{{end}}{{$p}}{{end}}</a>.</p>
 
 <h2 id="delete">Изтриване на профила</h2>
 <p>На сайта: <a href="/settings">Профил → Настройки → Изтрий профила</a>, после
 потвърди. Изчезват веднага името, имейлът, игрите, записите им, Алманахът, приятелствата и известията ти; от
-резервните копия — до месец. В бройките ни по дни остава само, че в тези дни е играл някой, без връзка с теб. Ако не можеш да влезеш, пиши на <a href="mailto:{{.Contact}}">{{.Contact}}</a> от имейла на профила и ще го
+резервните копия — до месец. В бройките ни по дни остава само, че в тези дни е играл някой, без връзка с теб. Ако не можеш да влезеш, пиши на <a href="mailto:{{.Contact}}">{{range $i, $p := .ContactParts}}{{if $i}}<wbr>{{end}}{{$p}}{{end}}</a> от имейла на профила и ще го
 изтрием ние.</p>
 
 <h2>Правата ти</h2>
@@ -147,11 +147,24 @@ var privacyBody = template.Must(template.New("privacy").Parse(`
 <p class="muted">Последна промяна: 21 ноември 2026 г.</p>
 `))
 
+// emailParts is an email address cut where a narrow line may break it, after its @ and before a dot, never inside a
+// word (the page puts a <wbr> between them, as the client's emailWords does: web/src/ui.ts).
+func emailParts(email string) []string {
+	var parts []string
+	from := 0
+	for i, r := range email {
+		if r == '.' && i > from || i > 0 && email[i-1] == '@' {
+			parts, from = append(parts, email[from:i]), i
+		}
+	}
+	return append(parts, email[from:])
+}
+
 // privacy is the privacy notice. It says what the code does (a test holds parts of it to the code).
 func (s *Server) privacy(w http.ResponseWriter, r *http.Request) {
 	var body bytes.Buffer
 	_ = privacyBody.Execute(&body, map[string]any{
-		"Operator": s.cfg.Operator, "Contact": s.cfg.Contact,
+		"Operator": s.cfg.Operator, "Contact": s.cfg.Contact, "ContactParts": emailParts(s.cfg.Contact),
 	})
 	s.plain(w, "Какво пазим и защо", template.HTML(body.String()))
 }
