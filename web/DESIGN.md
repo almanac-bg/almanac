@@ -418,6 +418,30 @@ Drawn by hand as paths (`art/pictures.ts`), placed with `picture(id)`, loaded as
 flat shapes with depth, lit from the top left, no outlines, painted from one tone in its inks (`k0`–`k5`, `kw`, `ks`,
 `kh`, `kt`). Art never changes the rules. A new picture is checked at its smallest (24px) in both themes.
 
+Every picture is drawn to one sheet, so that none stands out as another hand's:
+
+- **An avatar is a bust, front on**, on a round tile of its scene (the tile's edge is a circle of radius 36.4 about
+  the grid's middle). Its skull, without ears, wool or quills, is 34–38 wide about x = 32, its eyes at y 32–36 and 7–9
+  from the middle; ears, antlers and tufts start inside the skull, so nothing floats. Its body is the same shoulders
+  for all, in its darkest fur; what stands in for them keeps their place (the turtle's shell, the sheep's wool, the
+  stork's breast). Only what the animal is changes this: the stork is in profile, the frog's eyes are on top.
+- **One eye:** a night-ink circle (radius 2.3–2.8) with a white glint up and to its left, on both eyes alike; the cat
+  and the lynx have it on an iris. No lids, brows or whites.
+- **One light**, from the top left: a crescent of light inside the head's upper left edge, the head's shadow on the
+  chest under the chin, the glint. A white animal takes a crescent of shade down its right instead.
+- **Filled shapes, never outlines.** A stroke is only what is a line in life (a whisker, a mouth, an antler, a seam),
+  round-ended, 1.2 wide or more. Symmetric parts are drawn once and mirrored; only the light is one-sided.
+- **Colours by name:** an animal's furs and pale parts are its inks (`k1`, `k2`, `k4`, `k5`), its own accents `ka` and
+  `kb` (an iris, a beak), all set under `.tone-natural.sh-<shape>`; never by a part's place among the layers
+  (`pictures.test.ts`).
+- **At 32px** (a friend's row; a grid unit is under half a pixel) an avatar is its silhouette (ears, antlers, a tail,
+  a beak, each 6 or more wide where it starts), two eyes and one pale muzzle or mask. Finer detail may fade there, but
+  not break into specks; fur and tile differ in hue and in lightness.
+- **A glyph** is one object, upright, within the ground (30 from the middle), in the chapter's tone with its dark and
+  white, never pale on pale; a highlight up left, a shade down right.
+
+Look at all of them together after changing one: 200, 64, 40 and 32px, by day and by night.
+
 ## The share
 
 - **The text:** „Брой 42 · 8/10 · серия 23 дни“ (the streak from three days), the squares ■ right, ◧ близо, □ not, and the

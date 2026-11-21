@@ -3979,6 +3979,20 @@
     stroke: var(--k5);
   }
 
+  /* An avatar's own accents (an iris, a beak, antlers), each set with its other inks (.tone-natural.sh-<shape>). */
+  .ka {
+    fill: var(--ka, var(--k3));
+  }
+  .kb {
+    fill: var(--kb, var(--k4));
+  }
+  .la {
+    fill: none;
+    stroke: var(--ka, var(--k3));
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
   /* ---- Avatars: the drawn animal in its own colours, in a round medallion of its scene ---- */
 
   .avatar {
@@ -4008,9 +4022,9 @@
 
   /* The natural tone: no tone over the picture, every part in its own colour, as the thing looks (a fox orange with a
      white chest, a stork white with a black wing and a red beak), on a tile of its own scene (a meadow, the sky, the
-     night). Each shape sets its inks; a part that shares an ink with another but differs in life (the cat's eyes, the
-     stork's wing lines) is picked by its place among the picture's layers (art/pictures.ts: keep them in order, or
-     move its number here). pictures.test.ts holds every avatar coloured. */
+     sand). Each shape sets its inks: its furs and pale parts (k1, k2, k4, k5) and its own accents (ka, kb: an iris, a
+     beak, a nose, a shell), which art/pictures.ts paints its parts with by name, never by a part's place among the
+     picture's layers. pictures.test.ts holds every avatar coloured. */
   .tone-natural {
     --tone: #9fd0f2;
   }
@@ -4044,14 +4058,8 @@
     --k2: #f29a45;
     --k4: #f6c1a6;
     --k5: #fff7ec;
-  }
-
-  .tone-natural.sh-cat > .avatar-pic > :nth-child(7) {
-    fill: #b9d03c;
-  }
-
-  .tone-natural.sh-cat > .avatar-pic > :nth-child(10) {
-    fill: #e5808f;
+    --ka: #b9d03c;
+    --kb: #e5808f;
   }
 
   .tone-natural.sh-hare {
@@ -4063,10 +4071,7 @@
     --k2: #b08d6e;
     --k4: #f2c2c2;
     --k5: #f6efe6;
-  }
-
-  .tone-natural.sh-hare > .avatar-pic > :nth-child(7) {
-    fill: #e5808f;
+    --ka: #e5808f;
   }
 
   .tone-natural.sh-hedgehog {
@@ -4087,8 +4092,8 @@
   .tone-natural.sh-dog > .avatar-pic {
     --k1: #7a4a26;
     --k2: #d99b5c;
-    --k4: #ee7c8b;
     --k5: #fff6ea;
+    --ka: #ee7c8b;
   }
 
   .tone-natural.sh-deer {
@@ -4099,10 +4104,7 @@
     --k1: #7a4f2e;
     --k2: #b8784a;
     --k4: #f4e7d4;
-  }
-
-  .tone-natural.sh-deer > .avatar-pic > :nth-child(3) {
-    stroke: #d9c09a;
+    --ka: #a67c4e;
   }
 
   .tone-natural.sh-stork {
@@ -4110,12 +4112,8 @@
   }
 
   .tone-natural.sh-stork > .avatar-pic {
-    --k1: #e14a2c;
     --k5: #fbfbfd;
-  }
-
-  .tone-natural.sh-stork > .avatar-pic > :nth-child(3) {
-    stroke: #4a4a5e;
+    --ka: #e14a2c;
   }
 
   .tone-natural.sh-frog {
@@ -4123,14 +4121,10 @@
   }
 
   .tone-natural.sh-frog > .avatar-pic {
-    --k1: #2e8a3d;
+    --k1: #2a7a36;
     --k2: #55b84f;
     --k4: #f1a3a0;
     --k5: #eaf6c6;
-  }
-
-  .tone-natural.sh-frog > .avatar-pic > :nth-child(10) {
-    stroke: #2a6a30;
   }
 
   .tone-natural.sh-mouse {
@@ -4160,8 +4154,8 @@
   }
 
   .tone-natural.sh-sheep > .avatar-pic {
-    --k1: #3b3330;
-    --k2: #8a6f63;
+    --k1: #4a3d38;
+    --k2: #a38a7d;
     --k5: #f7f3ea;
   }
 
@@ -4170,17 +4164,11 @@
   }
 
   .tone-natural.sh-turtle > .avatar-pic {
-    --k1: #6b4a24;
+    --k1: #5f7a3c;
     --k2: #8fa65a;
     --k4: #c3d48a;
-  }
-
-  .tone-natural.sh-turtle > .avatar-pic > :nth-child(9) {
-    fill: #b8893f;
-  }
-
-  .tone-natural.sh-turtle > .avatar-pic > :nth-child(10) {
-    stroke: #d9b56a;
+    --ka: #6b4a24;
+    --kb: #b8893f;
   }
 
   .tone-natural.sh-badger {
@@ -4188,12 +4176,13 @@
   }
 
   .tone-natural.sh-badger > .avatar-pic {
-    --k1: #7d7f86;
+    --k1: #3f3d4a;
+    --k2: #7d7f86;
     --k5: #f5f3ee;
   }
 
   .tone-natural.sh-lynx {
-    --tone: #d6e4f0;
+    --tone: #c3d0ee;
   }
 
   .tone-natural.sh-lynx > .avatar-pic {
@@ -4201,10 +4190,8 @@
     --k2: #c99a5e;
     --k4: #f0dcbc;
     --k5: #fbf3e6;
-  }
-
-  .tone-natural.sh-lynx > .avatar-pic > :nth-child(9) {
-    fill: #b9c43c;
+    --ka: #b9c43c;
+    --kb: #a8563f;
   }
 
   .avatar.s {

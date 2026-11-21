@@ -9,7 +9,10 @@
 //
 //   k0 night ink · k1 deep · k2 shade · k3 the tone itself · k4 light · k5 pale · kw white
 //   ks a shadow over what's below · kh a light over it · kt a tint of the tone (a ground behind a picture)
-//   l0–l5 the same inks as strokes (round ends, no fill)
+//   l0–l5 the same inks as strokes (round ends, no fill): only for what is a line in life (a whisker, an antler)
+//   ka kb an avatar's own accents (an iris, a beak), la the first as a stroke: named, never picked by a layer's place
+//
+// The rules a picture is drawn to (an avatar's head and eyes, the light, how it reads at 32 px) are in DESIGN.md.
 //
 // This module is loaded on its own after the game starts (art/picture.ts), so its weight never holds up the first
 // screen. It imports nothing, so that it stays one file of its own.
@@ -19,7 +22,7 @@ type Layer = [ink: string, d: string, attrs?: string];
 const n = (v: number) => Math.round(v * 100) / 100;
 /** A circle as a path. */
 const C = (x: number, y: number, r: number) =>
-  `M${n(x - r)} ${n(y)}a${r} ${r} 0 1 0 ${n(2 * r)} 0a${r} ${r} 0 1 0 ${n(-2 * r)} 0Z`;
+  `M${n(x - r)} ${n(y)}a${n(r)} ${n(r)} 0 1 0 ${n(2 * r)} 0a${n(r)} ${n(r)} 0 1 0 ${n(-2 * r)} 0Z`;
 /** An ellipse as a path. */
 const E = (x: number, y: number, rx: number, ry: number) =>
   `M${n(x - rx)} ${n(y)}a${rx} ${ry} 0 1 0 ${n(2 * rx)} 0a${rx} ${ry} 0 1 0 ${n(-2 * rx)} 0Z`;
@@ -44,13 +47,42 @@ const spikes = (cx: number, cy: number, R: number, r: number, from: number, to: 
 };
 /** A soft shadow under a shape: the same path, set down and right a little. */
 const lift = (d: string, dy = 2.5): Layer => ["ks", d, `transform="translate(1 ${dy})"`];
-/** Eyes: a dark eye on each side with a glint of light. */
-const eyes = (dx: number, y: number, r: number): Layer[] => [
+/** A point on an ellipse, at an angle (0 is right, 270 is up). */
+const on = (cx: number, cy: number, rx: number, ry: number, deg: number) => {
+  const a = (deg * Math.PI) / 180;
+  return `${n(cx + rx * Math.cos(a))} ${n(cy + ry * Math.sin(a))}`;
+};
+/** A crescent inside a round form's edge, between two angles: its light or its shade. */
+const rim = (ink: string, cx: number, cy: number, rx: number, ry: number, from: number, to: number): Layer => {
+  const p = (deg: number, k: number) => on(cx, cy, rx * k, ry * k, deg);
+  return [
+    ink,
+    `M${p(from, 0.84)}A${n(rx * 0.84)} ${n(ry * 0.84)} 0 0 1 ${p(to, 0.84)}Q${p((from + to) / 2, 0.58)} ${p(from, 0.84)}Z`,
+  ];
+};
+/** The light on a head, lit from the top left. */
+const shine = (cx: number, cy: number, rx: number, ry: number) => rim("kh", cx, cy, rx, ry, 194, 258);
+/** The shade on a white form, where the light wouldn't show: inside its lower right edge. */
+const shade = (cx: number, cy: number, rx: number, ry: number) => rim("ks", cx, cy, rx, ry, 8, 82);
+/** The glints of two eyes: up and to the left on both, since the light is one. */
+const glints = (dx: number, y: number, r: number) =>
+  C(32 - dx - r * 0.33, y - r * 0.38, r * 0.36) + C(32 + dx - r * 0.33, y - r * 0.38, r * 0.36);
+/** Eyes, every animal's: a dark eye on each side with a glint of light. */
+const eyes = (dx: number, y: number, r = 2.4): Layer[] => [
   ["k0", both((x) => C(x(dx), y, r))],
-  ["kw", both((x) => C(n(x(dx) + r * 0.35), n(y - r * 0.4), n(r * 0.36)))],
+  ["kw", glints(dx, y, r)],
+];
+/** A cat's eyes: the same on an iris of its own colour (ka), the pupil upright. */
+const catEyes = (dx: number, y: number): Layer[] => [
+  ["ka", both((x) => E(x(dx), y, 3.8, 3.9))],
+  ["k0", both((x) => E(x(dx), y, 1.6, 3))],
+  ["kw", glints(dx, y, 2.4)],
 ];
 const shoulders = "M7 66C8 54 19 48 32 48C45 48 56 54 57 66Z";
-const foxChest = "M25 66C25.5 57 28.5 52.5 32 52.5C35.5 52.5 38.5 57 39 66Z";
+const chest = "M25 66C25.5 57 28.5 52.5 32 52.5C35.5 52.5 38.5 57 39 66Z";
+/** The head's shadow on the chest. */
+const chinShadow = E(33, 51.5, 13.5, 4.4);
+const chin: Layer = ["ks", chinShadow];
 
 /** A sword standing on the middle, turned by `deg` (crossed swords are two). */
 const sword = (deg: number): Layer[] => {
@@ -64,231 +96,266 @@ const sword = (deg: number): Layer[] => {
   ];
 };
 
-// ---- Avatars: fifteen animals, each anyone's from the first day (play.Animals). Each is drawn over a tile in its tone
-// (k3), so it's painted in the ramp's darker and lighter inks: portraits, cut at the tile's bottom edge.
+// ---- Avatars: fifteen animals, each anyone's from the first day (play.Animals). Each is a bust on a tile of its
+// scene, in its own colours (app.css, .tone-natural.sh-<shape>: k1 its darkest fur, k2 its fur, k4 and k5 its pale
+// parts, ka and kb its own accents), drawn to one sheet: a skull 34–38 wide about x = 32, the eyes at y 32–36, the
+// shoulders the same for all, the light on its upper left and its shadow under the chin.
 
 const avatars: Record<string, Layer[]> = {
   fox: [
     ["k1", shoulders],
-    ["k5", foxChest],
+    ["k5", chest],
+    chin,
     ["k1", both((x) => `M${x(5.5)} 24L${x(16.5)} 7.5Q${x(19.5)} 6 ${x(20.5)} 9.5L${x(21.5)} 29Z`)],
     ["k0", both((x) => `M${x(9.5)} 22.5L${x(16)} 12.5Q${x(17.6)} 11.6 ${x(18)} 13.6L${x(18.6)} 25Z`)],
     [
       "k2",
       "M32 53.5C28 53.5 23 49.5 19 44.5L12 37C11 28 19 19.5 32 19.5C45 19.5 53 28 52 37L45 44.5C41 49.5 36 53.5 32 53.5Z",
     ],
-    ["kh", "M23.5 24C27 21.6 37 21.6 40.5 24C37.4 26.4 34.2 30 32 34.5C29.8 30 26.6 26.4 23.5 24Z"],
+    shine(32, 35, 20, 15.5),
     [
       "k5",
       "M12 37C17 35 23 36.5 27 40C29.5 42.3 31 43.6 32 43.6C33 43.6 34.5 42.3 37 40C41 36.5 47 35 52 37L45 44.5C41 49.5 36 53.5 32 53.5C28 53.5 23 49.5 19 44.5Z",
     ],
-    ["k0", both((x) => `M${x(4.6)} 33.6Q${x(8.2)} 29.4 ${x(12.4)} 31.8Q${x(9)} 36.2 ${x(4.6)} 33.6Z`)],
-    ["kw", both((x) => C(x(9.4), 32.2, 0.8))],
+    ...eyes(8.4, 32.6, 2.4),
     ["k0", "M28.8 48.6Q32 46.6 35.2 48.6Q34.2 51.6 32 51.8Q29.8 51.6 28.8 48.6Z"],
   ],
   bear: [
     ["k1", shoulders],
-    ["k2", both((x) => C(x(13.5), 20.5, 6.8))],
-    ["k1", both((x) => C(x(13.5), 21, 3.6))],
-    ["k2", E(32, 34, 17.5, 16)],
-    ["kh", "M20 27C22 22 27 19.5 32 19.5C27.5 21.5 24.5 24.5 23 28.5Z"],
-    ["k4", E(32, 41.5, 8.8, 7.2)],
-    ["k0", "M28.2 38.2Q32 36.3 35.8 38.2Q34.7 41.7 32 41.9Q29.3 41.7 28.2 38.2Z"],
-    ["l0", "M32 42V44.6M29.2 45.2Q32 47.6 34.8 45.2", 'stroke-width="1.5"'],
-    ...eyes(7.6, 31, 2.2),
+    chin,
+    ["k2", both((x) => C(x(13.5), 21.5, 6.8))],
+    ["k1", both((x) => C(x(13.5), 22, 3.6))],
+    ["k2", E(32, 35.5, 17.5, 16)],
+    shine(32, 35.5, 17.5, 16),
+    ["k4", E(32, 43, 8.8, 7.2)],
+    ["k0", "M28.2 39.7Q32 37.8 35.8 39.7Q34.7 43.2 32 43.4Q29.3 43.2 28.2 39.7Z"],
+    ["l0", "M32 43.5V46.1M29.2 46.7Q32 49.1 34.8 46.7", 'stroke-width="1.5"'],
+    ...eyes(7.8, 32.5),
   ],
   cat: [
     ["k1", shoulders],
-    ["k2", both((x) => `M${x(5)} 22.5L${x(15.5)} 8.5Q${x(18.5)} 7 ${x(19)} 10.5L${x(18.5)} 28Z`)],
-    ["k4", both((x) => `M${x(8.6)} 21.8L${x(14.8)} 13.2Q${x(16.3)} 12.6 ${x(16.4)} 14.2L${x(16.2)} 24.5Z`)],
-    [
-      "k2",
-      "M32 52.5C21 52.5 13.5 46.5 13.5 37.5C13.5 27 21.5 20.5 32 20.5C42.5 20.5 50.5 27 50.5 37.5C50.5 46.5 43 52.5 32 52.5Z",
-    ],
-    ["k1", "M32 21.5L30.4 27.6L32 29.4L33.6 27.6ZM26.4 22.2L25.8 26.4L27.6 27ZM37.6 22.2L38.2 26.4L36.4 27Z"],
-    ["k5", C(29, 42.8, 4.7) + C(35, 42.8, 4.7)],
-    ["k4", both((x) => E(x(8), 34, 3.8, 4))],
-    ["k0", both((x) => E(x(8), 34, 1.25, 3.2))],
-    ["kw", both((x) => C(n(x(8) + 1.4), 32.4, 0.8))],
-    ["k1", "M29.6 39.2Q32 38.3 34.4 39.2L32 42Z"],
-    ["l5", both((x) => `M${x(7.5)} 42.6L${x(18)} 41M${x(7.5)} 45L${x(17.5)} 47`), 'stroke-width="1"'],
+    chin,
+    ["k2", both((x) => `M${x(5)} 24L${x(15.5)} 8.5Q${x(18.5)} 7 ${x(19)} 10.5L${x(18.5)} 29Z`)],
+    ["k4", both((x) => `M${x(8.6)} 22.6L${x(14.8)} 13.4Q${x(16.3)} 12.8 ${x(16.4)} 14.4L${x(16.2)} 25.5Z`)],
+    ["k2", E(32, 37, 18.5, 16)],
+    shine(32, 37, 18.5, 16),
+    ["k1", "M32 22L30.4 28.1L32 29.9L33.6 28.1ZM26.4 22.7L25.8 26.9L27.6 27.5ZM37.6 22.7L38.2 26.9L36.4 27.5Z"],
+    ["k5", C(29, 43.6, 4.7) + C(35, 43.6, 4.7)],
+    ...catEyes(8, 35),
+    ["kb", "M29.6 40Q32 39.1 34.4 40L32 42.8Z"],
+    ["l5", both((x) => `M${x(7.5)} 43.4L${x(18)} 42M${x(7.5)} 45.8L${x(17.5)} 47.8`), 'stroke-width="1"'],
   ],
   hare: [
     ["k1", shoulders],
-    ["k2", both((x) => `M${x(3.5)} 27C${x(1.5)} 15 ${x(3)} 3 ${x(9)} 2.5C${x(15)} 2 ${x(15.5)} 14 ${x(11.5)} 27Z`)],
-    ["k4", both((x) => `M${x(6)} 24.5C${x(5)} 15 ${x(6)} 7 ${x(9)} 6.5C${x(12)} 6.5 ${x(12.5)} 15 ${x(10)} 24.5Z`)],
-    ["k2", E(32, 38.5, 15.5, 14.5)],
-    ["kh", "M20 33C21.5 28 26 25 31 24.5C27 27 24 30 23 34Z"],
-    ["k5", E(27.4, 44.5, 5.7, 4.5) + E(36.6, 44.5, 5.7, 4.5)],
-    ["k1", "M29.8 40.6Q32 39.5 34.2 40.6Q33 42.9 32 42.9Q31 42.9 29.8 40.6Z"],
-    ["kw", "M30.6 47H33.4V49.6Q32 50.4 30.6 49.6Z"],
-    ...eyes(7.2, 35, 2.2),
+    chin,
+    ["k2", both((x) => `M${x(4.5)} 30C${x(2)} 18 ${x(5)} 3 ${x(11)} 2.5C${x(17)} 2 ${x(17.5)} 17 ${x(14.5)} 30Z`)],
+    ["k4", both((x) => `M${x(7.6)} 27C${x(6)} 18 ${x(8)} 7.2 ${x(11)} 6.8C${x(14)} 6.6 ${x(14.2)} 17 ${x(12.2)} 27Z`)],
+    [
+      "k2",
+      "M32 23.5C42 23.5 49.5 30 49.5 39.5C49.5 48.5 42 54.5 32 54.5C22 54.5 14.5 48.5 14.5 39.5C14.5 30 22 23.5 32 23.5Z",
+    ],
+    shine(32, 39, 17.5, 15.5),
+    ["kw", "M29.8 48.5H34.2V52Q34.2 53.2 33 53.2H31Q29.8 53.2 29.8 52Z"],
+    ["k5", E(27.2, 45.8, 6, 4.8) + E(36.8, 45.8, 6, 4.8)],
+    ["ka", "M29.4 41Q32 39.7 34.6 41Q33.4 44 32 44Q30.6 44 29.4 41Z"],
+    ...eyes(8.4, 36, 2.5),
   ],
   hedgehog: [
-    ["k1", spikes(32, 40, 28, 19, 160, 380, 13)],
-    ["k2", E(32, 41, 20, 17)],
+    ["k1", spikes(32, 40, 29, 20, 158, 382, 13)],
+    ["k2", spikes(32, 41, 24, 17, 163, 377, 12)],
     ["k1", shoulders],
-    ["k5", "M19 40.5C19 32 25 28 32 28C39 28 45 32 45 40.5C45 46.5 38.5 51.5 32 56C25.5 51.5 19 46.5 19 40.5Z"],
-    ["k4", both((x) => E(x(9.2), 45.5, 2.8, 1.7))],
-    ["k0", C(32, 54.2, 2.7)],
-    ...eyes(6.2, 38.5, 2.1),
+    [
+      "k5",
+      "M18.5 41C18.5 32.5 24.5 28.5 32 28.5C39.5 28.5 45.5 32.5 45.5 41C45.5 47 39 52 32 57C25 52 18.5 47 18.5 41Z",
+    ],
+    ["k4", both((x) => E(x(9.4), 46, 2.8, 1.8))],
+    ["k0", C(32, 54.8, 2.8)],
+    ...eyes(6.6, 39.5),
   ],
   dog: [
     ["k1", shoulders],
-    ["k2", "M32 20C42 20 48 26.5 48 35C48 44.5 41.5 52.5 32 52.5C22.5 52.5 16 44.5 16 35C16 26.5 22 20 32 20Z"],
-    ["kh", "M19 30C20 25 24.5 21.5 30 21C26 23.5 22.5 26.5 21.5 31Z"],
-    ["k1", E(38.6, 31, 6, 5.6)],
+    chin,
+    ["k2", "M32 20.5C42.5 20.5 49 27 49 35.5C49 45 42 53 32 53C22 53 15 45 15 35.5C15 27 21.5 20.5 32 20.5Z"],
+    shine(32, 36, 17, 15.5),
+    ["k1", E(39, 32.5, 6.2, 6)],
     [
       "k1",
       both(
         (x) =>
-          `M${x(9.5)} 21.5C${x(16)} 19 ${x(21.5)} 22 ${x(22)} 28.5C${x(22.5)} 35.5 ${x(20.5)} 42.5 ${x(17)} 44.5C${x(13.5)} 46 ${x(12)} 40.5 ${x(12)} 35C${x(12)} 30 ${x(10.5)} 26 ${x(9.5)} 21.5Z`,
+          `M${x(9.5)} 21.5C${x(16)} 19 ${x(22)} 22 ${x(22.5)} 28.5C${x(23)} 35.5 ${x(21)} 43 ${x(17.5)} 45C${x(14)} 46.5 ${x(12.5)} 41 ${x(12.5)} 35.5C${x(12.5)} 30.5 ${x(10.5)} 26 ${x(9.5)} 21.5Z`,
       ),
     ],
-    ["k5", E(32, 43.2, 9.2, 7.6)],
-    ["k4", "M30.4 46.4H33.6V49.4Q33.6 51.2 32 51.2Q30.4 51.2 30.4 49.4Z"],
-    ["k0", "M28.2 39.2Q32 37.1 35.8 39.2Q34.9 42.7 32 42.9Q29.1 42.7 28.2 39.2Z"],
-    ["l0", "M32 42.9V45.2M28.4 45.4Q30.4 47.8 32 45.4Q33.6 47.8 35.6 45.4", 'stroke-width="1.4"'],
-    ...eyes(6.6, 32, 2.2),
+    ["k5", E(32, 43.7, 9.2, 7.6)],
+    ["ka", "M30.2 46.6H33.8V50Q33.8 52 32 52Q30.2 52 30.2 50Z"],
+    ["k0", "M28.2 39.7Q32 37.6 35.8 39.7Q34.9 43.2 32 43.4Q29.1 43.2 28.2 39.7Z"],
+    ["l0", "M32 43.4V45.7M28.4 45.9Q30.4 48.3 32 45.9Q33.6 48.3 35.6 45.9", 'stroke-width="1.4"'],
+    ...eyes(7, 32.5),
   ],
   deer: [
     ["k1", shoulders],
     ["k4", C(17, 58, 1.7) + C(22.5, 53.5, 1.4) + C(44.5, 55, 1.7) + C(48, 60.5, 1.4) + C(14, 63, 1.3)],
+    chin,
     [
-      "l1",
+      "la",
       both(
         (x) =>
-          `M${x(6)} 21C${x(8)} 15 ${x(10)} 10 ${x(10)} 3M${x(9)} 12.5C${x(13)} 11.5 ${x(16)} 8.5 ${x(17)} 4.5M${x(9.7)} 7.5C${x(7.4)} 6.5 ${x(5.8)} 5 ${x(5.2)} 2.5`,
+          `M${x(6)} 22C${x(8)} 16 ${x(10)} 11 ${x(10)} 4M${x(9)} 13.5C${x(13)} 12.5 ${x(16)} 9.5 ${x(17)} 5.5M${x(9.7)} 8.5C${x(7.4)} 7.5 ${x(5.8)} 6 ${x(5.2)} 3.5`,
       ),
       'stroke-width="2.8"',
     ],
     [
       "k2",
-      both((x) => `M${x(8)} 25.5C${x(13)} 19.5 ${x(20)} 19 ${x(24.5)} 22C${x(21)} 27.5 ${x(14)} 29.5 ${x(8)} 28.5Z`),
+      both((x) => `M${x(9)} 26.5C${x(14)} 20 ${x(21)} 19.5 ${x(25.5)} 22.5C${x(22)} 28.5 ${x(15)} 30.5 ${x(9)} 29.5Z`),
     ],
     [
       "k4",
       both(
         (x) =>
-          `M${x(10.5)} 26.3C${x(14.2)} 22.6 ${x(18.4)} 22 ${x(21.4)} 23C${x(18.4)} 26.2 ${x(14.4)} 27.2 ${x(10.5)} 27.3Z`,
+          `M${x(11.5)} 27.3C${x(15.2)} 23.4 ${x(19.4)} 22.8 ${x(22.4)} 23.8C${x(19.4)} 27 ${x(15.4)} 28.2 ${x(11.5)} 28.3Z`,
       ),
-    ],
-    ["k2", "M32 19C40 19 44.5 25 43.5 33C42.5 41 38 51 32 53C26 51 21.5 41 20.5 33C19.5 25 24 19 32 19Z"],
-    ["kh", E(32, 26.5, 4, 5)],
-    ["k4", E(32, 46, 7, 6.6)],
-    ["k0", E(32, 47.3, 3.7, 2.7)],
-    ...eyes(5.6, 33, 2.1),
-  ],
-  stork: [
-    [
-      "k5",
-      "M14 66C15 54 20 44 24.5 36C27.5 30.5 26.5 24 29.5 18.5C32.5 13 40 12.5 43 17C45.5 21 43 25.5 40.5 29C36.5 35 37 45 44 54C47 58 49 62 50 66Z",
-    ],
-    ["k0", "M7 66C8 58 12 53 18.5 51.5C24 55.5 26.5 60.5 27 66Z"],
-    ["l1", "M12 61L17 56M16 64L21 58.5", 'stroke-width="1.2"'],
-    ["ks", "M40.5 29C36.5 35 37 45 44 54C47 58 49 62 50 66H44C41 58 33 48 34.5 37C35 33 37.5 30.5 40.5 29Z"],
-    ["k1", "M41.5 15.5L61 24.4Q61.6 25.6 60.4 25.7L42 21.8Z"],
-    ["k0", C(36.8, 17.6, 2)],
-    ["kw", C(37.5, 16.9, 0.65)],
-  ],
-  frog: [
-    ["k1", "M9 66C9 60 16 56.5 32 56.5C48 56.5 55 60 55 66Z"],
-    ["k2", both((x) => C(x(12), 27, 9.2))],
-    ["k2", "M7 46C7 35 17 30 32 30C47 30 57 35 57 46C57 56.5 46 62 32 62C18 62 7 56.5 7 46Z"],
-    ["kh", "M13 38C16 33.5 23 31.5 31 31.5C24 33 18 35.5 15.5 40Z"],
-    ["k5", both((x) => C(x(12), 26.5, 6.3))],
-    ["k0", both((x) => C(x(11.3), 27, 3.4))],
-    ["kw", both((x) => C(x(10.2), 25.6, 1.1))],
-    ["k4", both((x) => E(x(19), 47.5, 3.4, 2.2))],
-    ["k1", both((x) => C(x(3), 40.5, 1))],
-    ["l1", "M17 47Q32 55.5 47 47", 'stroke-width="2.2"'],
-  ],
-
-  squirrel: [
-    ["k2", "M40 66C56 62 63 46 59 32C56 21 46 15 40 21C47 24 52 31 51 41C50 50 44 55 37 57Z"],
-    ["k4", "M41 61C53 57 58 46 56 35C55 29 51 24 46 23C50 28 52 35 51 42C50 50 46 55 41 58Z"],
-    ["k1", shoulders],
-    ["k2", both((x) => `M${x(4)} 25L${x(11)} 8.5L${x(16)} 25Z`)],
-    ["k1", both((x) => `M${x(9.4)} 12L${x(11)} 4.5L${x(13.4)} 12Z`)],
-    ["k2", E(32, 36, 14, 13)],
-    ["kh", "M20 32C21 27 25.5 23.5 31 23C27 25.5 24 28.5 23 33Z"],
-    ["k5", E(32, 43, 8.4, 6.6)],
-    ["k0", "M29.6 39.4Q32 38.2 34.4 39.4Q33.4 41.6 32 41.7Q30.6 41.6 29.6 39.4Z"],
-    ["kw", "M30.5 44H33.5V47Q32 47.8 30.5 47Z"],
-    ...eyes(6.6, 33.5, 2.5),
-  ],
-  lynx: [
-    ["k1", shoulders],
-    ["k2", both((x) => `M${x(5)} 23L${x(14.5)} 7.5L${x(18.5)} 27Z`)],
-    ["l0", both((x) => `M${x(14.5)} 7.5L${x(14)} 1.5`), 'stroke-width="1.6"'],
-    ["k4", both((x) => `M${x(8.4)} 22L${x(14)} 12.5L${x(16.4)} 24Z`)],
-    ["k2", both((x) => `M${x(12)} 36L${x(22)} 41L${x(17)} 43L${x(21.5)} 47L${x(15)} 48L${x(17.5)} 51.5L${x(9)} 50Z`)],
-    ["k2", E(32, 37, 17, 15.5)],
-    ["k1", C(25, 25.5, 1.1) + C(29, 23.5, 1.1) + C(35, 23.5, 1.1) + C(39, 25.5, 1.1) + C(32, 22.5, 1.1)],
-    ["k5", "M32 38C36.5 38 41 41 41 45.5C41 49.5 37 52 32 52C27 52 23 49.5 23 45.5C23 41 27.5 38 32 38Z"],
-    ["k4", both((x) => E(x(7.6), 34, 3.6, 3.4))],
-    ["k0", both((x) => C(x(7.6), 34, 1.7))],
-    ["kw", both((x) => C(n(x(7.6) + 0.9), 33, 0.7))],
-    ["k1", "M29.6 41.2Q32 40.2 34.4 41.2L32 43.8Z"],
-    ["l1", "M32 43.8V45.6M29.4 46.6Q32 48.4 34.6 46.6", 'stroke-width="1.3"'],
-  ],
-  badger: [
-    ["k1", shoulders],
-    ["k1", both((x) => C(x(15.5), 24, 4.6))],
-    ["k5", "M32 55C27 55 16 45 14 35C13 26.5 21 20 32 20C43 20 51 26.5 50 35C48 45 37 55 32 55Z"],
-    [
-      "k0",
-      both(
-        (x) =>
-          `M${x(3)} 52C${x(5.5)} 42 ${x(7.5)} 30 ${x(9.5)} 20.6C${x(13)} 21.4 ${x(16)} 23.4 ${x(17.4)} 26.4C${x(15)} 35 ${x(10)} 45 ${x(4.4)} 53.4Z`,
-      ),
-    ],
-    ["kw", both((x) => C(x(10.4), 35, 1.5))],
-    ["k0", both((x) => C(x(10.4), 35.2, 0.8))],
-    ["k0", E(32, 51.2, 3.2, 2.3)],
-    ["kh", "M21 26C24 22.5 28 21.4 31 21.4C28 23 25.5 25 24 27.6Z"],
-  ],
-  sheep: [
-    ["k5", C(10, 63, 8) + C(21, 59, 8.5) + C(32, 58, 8.5) + C(43, 59, 8.5) + C(54, 63, 8)],
-    [
-      "k1",
-      both((x) => `M${x(8.5)} 31C${x(14)} 26.5 ${x(20.5)} 27.5 ${x(23.5)} 31C${x(20.5)} 35 ${x(14)} 35 ${x(8.5)} 33Z`),
     ],
     [
       "k2",
+      "M32 19.5C41.5 19.5 46.5 25.5 45.5 33.5C44.5 41.5 39 51.5 32 53.5C25 51.5 19.5 41.5 18.5 33.5C17.5 25.5 22.5 19.5 32 19.5Z",
+    ],
+    shine(32, 32, 13.5, 12.5),
+    ["k4", E(32, 46.5, 7.2, 6.6)],
+    ["k0", E(32, 47.6, 3.8, 2.8)],
+    ...eyes(6.6, 33.5),
+  ],
+  // In profile, as a beak is: the breast where the others' shoulders are, the black of the wing behind it.
+  stork: [
+    ["k5", "M4 66C5 55 13 46.5 26 46.5C39 46.5 47 55 48 66Z"],
+    ["k0", "M0 66C1 57 6 50.5 14.5 48.5C13 55 15.5 61.5 21 66Z"],
+    ["k5", "M20.5 26C19.5 34 20.5 40 17 50H37C32.5 43 30 34 30.5 26Z"],
+    ["ks", "M30.5 26C30 34 32.5 43 37 50H34C30.4 43 28.4 34 28.6 27Z"],
+    ["ka", "M32 14.8L60.6 24.4Q61.8 25.4 60.2 25.8L33.5 24.8Z"],
+    ["ks", "M33 20L60.9 24.7Q61.4 25.5 60.2 25.8L33.5 24.8Z"],
+    ["k5", C(25, 19.5, 10.2)],
+    shade(25, 19.5, 10.2, 10.2),
+    ["k0", C(28.6, 18, 2.4)],
+    ["kw", C(27.8, 17.1, 0.86)],
+  ],
+  frog: [
+    ["k1", shoulders],
+    ["k2", both((x) => C(x(11.5), 27.5, 8.6))],
+    ["k2", "M10 46C10 36.5 19 32 32 32C45 32 54 36.5 54 46C54 55 44.5 60 32 60C19.5 60 10 55 10 46Z"],
+    shine(32, 46, 22, 14),
+    ["k5", both((x) => C(x(11.5), 27.2, 6))],
+    ...eyes(11.5, 27.6, 2.8),
+    ["k4", both((x) => E(x(17), 48.5, 3.2, 2.1))],
+    ["k1", both((x) => C(x(2.6), 41.5, 0.9))],
+    ["l1", "M19.5 48Q32 55.5 44.5 48", 'stroke-width="2"'],
+  ],
+
+  // Its tail a plume behind its shoulder, as wide as its head is tall.
+  squirrel: [
+    [
+      "k2",
+      "M40 66C42 58 50 51 50.5 38C51 27 50.5 15 57.5 13.5C62.5 12.5 66 17 65 23C64.5 26 62 27.5 60.6 29.6C65 32 66.5 38 66 43C65 54 57 63 47 66Z",
+    ],
+    [
+      "k4",
+      "M49 62C55 56 60.5 49 61 40C61.3 34 58.5 30 56.5 27C55 24 55.5 19 59 17.5C56 17 54.3 20 54.3 25C54.3 30 55 34 54.8 40C54.5 49 52 56 49 62Z",
+    ],
+    ["k1", shoulders],
+    ["k5", chest],
+    chin,
+    ["k2", both((x) => `M${x(5.5)} 28L${x(11.6)} 9.4Q${x(13.5)} 6.4 ${x(15.2)} 9.6L${x(18.5)} 30Z`)],
+    ["k1", both((x) => `M${x(8.8)} 26L${x(12.6)} 14.5Q${x(13.5)} 13.3 ${x(14.2)} 14.7L${x(16)} 27Z`)],
+    ["k2", E(32, 37.5, 17, 15)],
+    shine(32, 37.5, 17, 15),
+    ["k5", "M32 39.5C38 39.5 45 42.5 45 47C45 51 38.5 52.5 32 52.5C25.5 52.5 19 51 19 47C19 42.5 26 39.5 32 39.5Z"],
+    ["k0", "M29.6 42Q32 40.8 34.4 42Q33.4 44.4 32 44.5Q30.6 44.4 29.6 42Z"],
+    ["l1", "M32 44.5V46.2M29.6 47Q32 48.8 34.4 47", 'stroke-width="1.3"'],
+    ...eyes(8.2, 35, 2.6),
+  ],
+  lynx: [
+    ["k1", shoulders],
+    chin,
+    ["k2", both((x) => `M${x(5.5)} 27L${x(15.5)} 9L${x(20)} 30Z`)],
+    ["k4", both((x) => `M${x(9.4)} 25.5L${x(15)} 15L${x(17.6)} 27Z`)],
+    ["k0", both((x) => `M${x(13.2)} 13.2L${x(17.2)} 1.6L${x(17)} 15.6Z`)],
+    [
+      "k2",
+      both((x) => `M${x(12)} 38L${x(22.5)} 43.5Q${x(19)} 45 ${x(18)} 46.8L${x(20.5)} 52.6Q${x(14)} 54.5 ${x(8)} 53Z`),
+    ],
+    ["k2", E(32, 37.5, 17, 15.5)],
+    shine(32, 37.5, 17, 15.5),
+    ["k1", C(25, 26, 1.1) + C(29, 24, 1.1) + C(35, 24, 1.1) + C(39, 26, 1.1) + C(32, 23, 1.1)],
+    ["k5", "M32 38.5C36.5 38.5 41 41.5 41 46C41 50 37 52.5 32 52.5C27 52.5 23 50 23 46C23 41.5 27.5 38.5 32 38.5Z"],
+    ...catEyes(8, 34.5),
+    ["kb", "M29.6 41.7Q32 40.7 34.4 41.7L32 44.3Z"],
+    ["l1", "M32 44.3V46.1M29.4 47.1Q32 48.9 34.6 47.1", 'stroke-width="1.3"'],
+  ],
+  // Its mask: two dark bands from the nose through the eyes to the ears, on a white head.
+  badger: [
+    ["k2", shoulders],
+    chin,
+    ["k1", both((x) => C(x(14.5), 24, 5.2))],
+    ["k5", both((x) => C(x(14.5), 24.4, 2.4))],
+    ["k5", "M32 55.5C26 55.5 14.5 46.5 14.5 36C14.5 27 22 21 32 21C42 21 49.5 27 49.5 36C49.5 46.5 38 55.5 32 55.5Z"],
+    shade(32, 37, 17.5, 16),
+    [
+      "k1",
       both(
-        (x) => `M${x(10)} 31.6C${x(14)} 29 ${x(18.5)} 29.4 ${x(21)} 31.4C${x(18.5)} 33.2 ${x(14)} 33.2 ${x(10)} 32.4Z`,
+        (x) =>
+          `M${x(3)} 50.5C${x(3.6)} 42 ${x(5)} 32 ${x(7.2)} 22C${x(11)} 22.6 ${x(14.6)} 25 ${x(16.4)} 28.6C${x(15.6)} 37.5 ${x(10.6)} 46.5 ${x(4.6)} 52Z`,
       ),
     ],
-    ["k5", C(21, 23, 7) + C(32, 19, 8.5) + C(43, 23, 7) + C(26, 14.5, 6) + C(38, 14.5, 6)],
-    ["k1", "M32 24C38 24 41 29 41 35C41 43 37 51 32 51C27 51 23 43 23 35C23 29 26 24 32 24Z"],
-    ["k5", C(27.6, 25.6, 4.6) + C(32, 23.6, 5.2) + C(36.4, 25.6, 4.6)],
-    ["kw", both((x) => C(x(4.6), 36, 2))],
-    ["k0", both((x) => C(x(4.6), 36.4, 1.1))],
-    ["k0", both((x) => E(x(2.2), 46, 0.9, 0.6))],
-    ["l2", "M29.6 48.4Q32 50.2 34.4 48.4", 'stroke-width="1.2"'],
+    ...eyes(9.6, 35.5),
+    ["k0", E(32, 51.8, 3.5, 2.6)],
   ],
+  // Its head is its face in its wool; its body, wool where the others' shoulders are.
+  sheep: [
+    ["k5", C(10, 63, 8) + C(21, 59, 8.5) + C(32, 58, 8.5) + C(43, 59, 8.5) + C(54, 63, 8)],
+    ["ks", E(32.6, 53.4, 8, 2.4)],
+    [
+      "k2",
+      both((x) => `M${x(8.5)} 34C${x(14)} 28.5 ${x(21)} 29.5 ${x(24.5)} 33.5C${x(21)} 38 ${x(14)} 38 ${x(8.5)} 36Z`),
+    ],
+    [
+      "k1",
+      both(
+        (x) =>
+          `M${x(10.5)} 34.6C${x(14.5)} 31.6 ${x(19)} 32 ${x(21.5)} 34.2C${x(19)} 36.2 ${x(14.5)} 36.2 ${x(10.5)} 35.4Z`,
+      ),
+    ],
+    ["k5", C(19, 27, 8) + C(32, 20.5, 10) + C(45, 27, 8) + C(24.5, 18.5, 7.5) + C(39.5, 18.5, 7.5)],
+    ["k2", "M32 26C39.5 26 43.5 31 43.5 37.5C43.5 46 38 53 32 53C26 53 20.5 46 20.5 37.5C20.5 31 24.5 26 32 26Z"],
+    ["k5", C(26, 28, 5.4) + C(32, 26, 6) + C(38, 28, 5.4)],
+    ...eyes(5.8, 38),
+    ["k1", "M29.4 46.4Q32 45.4 34.6 46.4L32 49Z"],
+    ["l1", "M32 49V50.2", 'stroke-width="1.2"'],
+  ],
+  // Its shell where the others' shoulders are, its head on its neck before it.
   turtle: [
-    ["k2", "M26 34H38V50H26Z"],
-    ["k2", E(32, 28, 11.5, 11)],
-    ["kh", "M22 25C23 20.5 27 18 31.5 17.5C28 20 25.5 22.5 24.5 26Z"],
-    ["k4", both((x) => E(x(7.4), 33.5, 2.4, 1.6))],
-    ...eyes(5.4, 28.5, 2.2),
-    ["l1", "M28.4 33.6Q32 36.4 35.6 33.6", 'stroke-width="1.4"'],
-    ["k1", "M2 66C2 51 15 42 32 42C49 42 62 51 62 66Z"],
-    ["k2", "M25 50.5L32 46.5L39 50.5V58L32 62L25 58ZM9 60L14 52L22 53.5V61L16 66H8ZM55 60L50 52L42 53.5V61L48 66H56Z"],
-    ["l4", "M7 58Q32 41 57 58", 'stroke-width="1.2"'],
+    ["ka", "M1 66C1 50 14 39.5 32 39.5C50 39.5 63 50 63 66Z"],
+    ["kb", both((x) => `M${x(24)} 58L${x(19)} 49L${x(11.5)} 47L${x(8.5)} 55.5L${x(12)} 66H${x(22)}Z`)],
+    ["kb", "M26.5 59.5H37.5L40.5 66H23.5Z"],
+    ["k2", "M25 42H39V55Q32 58.5 25 55Z"],
+    ["ks", E(32.8, 50, 7, 3.2)],
+    ["k2", "M32 18.5C42 18.5 49.5 25 49.5 33.5C49.5 42 42 48 32 48C22 48 14.5 42 14.5 33.5C14.5 25 22 18.5 32 18.5Z"],
+    shine(32, 33, 17.5, 14.7),
+    ["k4", both((x) => E(x(11.6), 39.4, 2.8, 1.8))],
+    ...eyes(7.8, 33),
+    ["k1", both((x) => C(x(1.7), 38, 0.75))],
+    ["l1", "M25.5 41Q32 45.5 38.5 41", 'stroke-width="1.5"'],
   ],
   mouse: [
     ["k1", shoulders],
-    ["k2", both((x) => C(x(14), 22, 10))],
-    ["k4", both((x) => C(x(14), 23, 6.6))],
-    ["k2", "M32 55C27 55 18 47 18 38C18 30 24 25 32 25C40 25 46 30 46 38C46 47 37 55 32 55Z"],
-    ["kh", "M21.5 34C22.5 29.5 26.5 26.5 31 26.2C27.5 28.5 25 31 24 35Z"],
-    ["k5", E(32, 47.5, 6.4, 5.2)],
-    ["k4", C(32, 52.2, 2.2)],
-    ...eyes(6.2, 38, 2.5),
-    ["l5", both((x) => `M${x(6.5)} 47L${x(17)} 45M${x(6.5)} 49L${x(16.5)} 51`), 'stroke-width="0.9"'],
+    chin,
+    ["k2", both((x) => C(x(15), 22.5, 10.5))],
+    ["k4", both((x) => C(x(15), 23, 6.8))],
+    [
+      "k2",
+      "M32 55.5C26.5 55.5 15.5 48 15.5 38.5C15.5 30 23 24.5 32 24.5C41 24.5 48.5 30 48.5 38.5C48.5 48 37.5 55.5 32 55.5Z",
+    ],
+    shine(32, 38.5, 16.5, 14),
+    ["k5", E(32, 47.8, 6.6, 5.2)],
+    ["k4", C(32, 52.4, 2.3)],
+    ...eyes(7.2, 38.2, 2.5),
+    ["l5", both((x) => `M${x(6.8)} 47.4L${x(17.5)} 45.4M${x(6.8)} 49.4L${x(17)} 51.4`), 'stroke-width="0.9"'],
   ],
 };
 
@@ -342,12 +409,13 @@ const topics: Record<string, Layer[]> = {
   science: [
     ground,
     ["k4", C(45, 21, 2.6) + C(50.5, 12.5, 1.9) + C(45.5, 5.5, 1.3)],
-    ["k5", "M27.5 12V24L14 47C12 51 14.5 55.5 19 55.5H45C49.5 55.5 52 51 50 47L36.5 24V12Z"],
+    ["kw", "M27.5 12V24L14 47C12 51 14.5 55.5 19 55.5H45C49.5 55.5 52 51 50 47L36.5 24V12Z"],
     ["k3", "M20.4 36H43.6L50 47C52 51 49.5 55.5 45 55.5H19C14.5 55.5 12 51 14 47Z"],
     ["k2", "M38.5 36H43.6L50 47C52 51 49.5 55.5 45 55.5H39C44.5 52.5 46 48 42.6 42.4Z"],
     ["k4", "M20.4 36H43.6L44.8 38H19.2Z"],
     ["k5", C(25.5, 47.5, 2.3) + C(32.5, 43, 1.5) + C(36.5, 49.5, 1.9)],
     ["kh", "M29.4 13.5H31.6V24.6L22 41H19.6L29.4 24.2Z"],
+    ["ks", "M34 12H36.5V24L43.6 36H40.4L34 25Z"],
     ["k1", "M25 6.5H39Q40.6 6.5 40.6 8.1V10.4Q40.6 12 39 12H25Q23.4 12 23.4 10.4V8.1Q23.4 6.5 25 6.5Z"],
   ],
   history: [
@@ -375,64 +443,96 @@ const topics: Record<string, Layer[]> = {
       "k1",
       "M16.5 25C18.5 18 25.5 14.5 30 16.5C33 18.5 29 21.5 31 25C33 28 28 31 24 30C21 33 23 38.5 20 41C15.5 37.5 14.5 30.5 16.5 25ZM35 34.5C38 31.5 43 32.5 45 35.5C46 40.5 42 45.5 38 47.5C36 44.5 37 40.5 34 38.5ZM36.5 15C39.5 14 43.5 17 44.5 20.5C41.5 21.5 38.5 19.5 36.5 15Z",
     ],
-    ["l4", "M11.6 27Q30 31.5 48.4 27M11.6 38Q30 42.5 48.4 38", 'stroke-width="1"'],
     ["ks", "M42.2 16.9A19 19 0 0 1 15.4 43.7A21.5 21.5 0 0 0 42.2 16.9Z"],
     ["kh", E(23, 21.5, 5, 2.6), 'transform="rotate(-35 23 21.5)"'],
     ["k2", C(32, 8, 2) + C(32, 55, 2)],
     ["k1", "M29.5 55H34.5V58.5H29.5ZM21 58.5H43Q45 58.5 45 60.5V62H19V60.5Q19 58.5 21 58.5Z"],
   ],
-  movies: [
-    ground,
-    ["k1", "M10 27H54V54Q54 57 51 57H13Q10 57 10 54Z"],
-    ["k5", "M14 27H20.5L16.5 34H10V31ZM27 27H33.5L29.5 34H23ZM40 27H46.5L42.5 34H36ZM53 27H54V34H49Z"],
-    ["k1", "M10 16H54V23H10Z", 'transform="rotate(-13 10 24)"'],
-    [
-      "k5",
-      "M13 16H19.5L15.5 23H10V20ZM26 16H32.5L28.5 23H22ZM39 16H45.5L41.5 23H35ZM52 16H54V19.5L51.5 23H48Z",
-      'transform="rotate(-13 10 24)"',
-    ],
-    ["k5", C(11.6, 25.2, 1.7)],
-    ["l3", "M16 41H32M16 47.5H27", 'stroke-width="2.6"'],
-    ["k3", "M38.5 38L48.5 44.5L38.5 51Z"],
-    ["kh", "M10 34H54V36H10Z"],
-  ],
-  music: [
-    ground,
-    ["k0", C(27, 34, 22)],
-    ["l1", C(27, 34, 18) + C(27, 34, 14.5) + C(27, 34, 11), 'stroke-width="0.9"'],
-    ["kh", "M10.5 26A18 18 0 0 1 19.5 17.6L21 20.5A15 15 0 0 0 13.5 27.5Z"],
-    ["k3", C(27, 34, 7.5)],
-    ["k5", C(27, 34, 1.6)],
-    lift("M51 13H54V47.5A6.4 4.8 -20 1 1 51 43.6Z", 2),
-    ["k4", "M51 13H54V47.5A6.4 4.8 -20 1 1 51 43.6Z"],
-    ["k4", "M54 13C55.5 19.5 61.5 21 60.5 28.5C59 24.5 56.5 23 54 23Z"],
-    ["kw", E(45.5, 46.4, 2, 1.2), 'transform="rotate(-20 45.5 46.4)"'],
-  ],
+  movies: (() => {
+    const arm = 'transform="rotate(-12 12 26.5)"';
+    const board = "M12 29H52V52Q52 55 49 55H15Q12 55 12 52Z";
+    return [
+      ground,
+      lift(board, 2),
+      ["k1", board],
+      ["k5", "M15.5 29H21.5L18 35.5H12V32ZM27.5 29H33.5L30 35.5H24ZM39.5 29H45.5L42 35.5H36ZM51.5 29H52V35.5H48Z"],
+      ["k1", "M12 19H52V25.5H12Z", arm],
+      [
+        "k5",
+        "M14.5 19H20.5L17 25.5H12V22ZM26.5 19H32.5L29 25.5H23ZM38.5 19H44.5L41 25.5H35ZM50.5 19H52V21.5L49.8 25.5H47Z",
+        arm,
+      ],
+      ["k5", C(13.8, 27.3, 1.5)],
+      ["l3", "M17.5 42H31M17.5 48H26.5", 'stroke-width="2.4"'],
+      ["k3", "M37.5 39.5L46.5 45L37.5 50.5Z"],
+      ["kh", "M12 35.5H52V37.3H12Z"],
+    ] as Layer[];
+  })(),
+  music: (() => {
+    // A record, and before it two notes on one beam: their heads, then their stems and the beam.
+    const heads = E(39.6, 52, 4.4, 3.3) + E(53.2, 48, 4.4, 3.3);
+    const stems = "M41.7 31H44V52H41.7ZM55.3 27H57.6V48H55.3ZM41.7 30.5L57.6 26.5V31.5L41.7 35.5Z";
+    return [
+      ground,
+      ["k0", C(27, 30, 20.5)],
+      ["l1", C(27, 30, 16.8) + C(27, 30, 13.6) + C(27, 30, 10.4), 'stroke-width="0.9"'],
+      ["kh", "M10.5 22A18 18 0 0 1 19.5 13.6L21 16.5A15 15 0 0 0 13.5 23.5Z"],
+      ["k3", C(27, 30, 7.2)],
+      ["k5", C(27, 30, 1.6)],
+      lift(heads + stems, 1.6),
+      ["k3", heads],
+      ["k3", stems],
+      ["kw", E(38.2, 51, 1.6, 0.9) + E(51.8, 47, 1.6, 0.9)],
+    ] as Layer[];
+  })(),
+  // A football as it is: a ball of twelve five-sided patches (and twenty six-sided ones between them), one of the
+  // twelve turned a little up and left of the middle, seen from far (so what's near the rim is narrow).
   sports: (() => {
     const cx = 32;
     const cy = 31;
     const R = 23;
-    const patches: string[] = [];
-    const seams: string[] = [];
-    for (let i = 0; i < 5; i++) {
-      const t = -90 + 72 * i;
-      patches.push(
-        `M${at(cx, cy, 15.5, t)}L${at(cx, cy, 19.5, t - 15)}L${at(cx, cy, R, t - 11)}A${R} ${R} 0 0 1 ${at(cx, cy, R, t + 11)}L${at(cx, cy, 19.5, t + 15)}Z`,
-      );
-      seams.push(
-        `M${at(cx, cy, 7.4, t)}L${at(cx, cy, 15.5, t)}M${at(cx, cy, 19.5, t + 15)}L${at(cx, cy, 17.5, t + 36)}L${at(cx, cy, 19.5, t + 57)}M${at(cx, cy, 17.5, t + 36)}L${at(cx, cy, R, t + 36)}`,
-      );
+    const g = (1 + Math.sqrt(5)) / 2;
+    type P = [number, number, number];
+    const [ax, ay] = [0.42, -0.2];
+    // The twelve corners of the solid the patches sit on, turned to face us.
+    const corners: P[] = [];
+    for (const a of [-1, 1])
+      for (const b of [-g, g])
+        for (const [x, y, z] of [
+          [0, a, b],
+          [a, b, 0],
+          [b, 0, a],
+        ] as P[]) {
+          const [y1, z1] = [y * Math.cos(ax) - z * Math.sin(ax), y * Math.sin(ax) + z * Math.cos(ax)];
+          corners.push([x * Math.cos(ay) + z1 * Math.sin(ay), y1, z1 * Math.cos(ay) - x * Math.sin(ay)]);
+        }
+    const near = (p: P, q: P) => Math.abs(Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) - 2) < 0.01;
+    /** A third of the way from one corner to its neighbour, on the ball, as a point of the picture: one that's
+     * behind the ball is set on its rim. */
+    const third = (p: P, q: P) => {
+      const v = [0, 1, 2].map((i) => (p[i] ?? 0) + ((q[i] ?? 0) - (p[i] ?? 0)) / 3) as P;
+      const k = v[2] > 0 ? Math.hypot(...v) : Math.hypot(v[0], v[1]);
+      return `${n(cx + (R * v[0]) / k)} ${n(cy + (R * v[1]) / k)}`;
+    };
+    let patches = "";
+    let seams = "";
+    for (const p of corners) {
+      if (p[2] < -0.3) continue;
+      // Its five neighbours, in order around it: each next to the one before.
+      const round = corners.filter((q) => near(p, q)).slice(0, 1);
+      while (round.length < 5)
+        round.push(corners.find((q) => near(p, q) && !round.includes(q) && near(q, round[round.length - 1] ?? p)) ?? p);
+      patches += `M${round.map((q) => third(p, q)).join("L")}Z`;
+      for (const q of round)
+        if (q[2] > 0.3 && corners.indexOf(q) > corners.indexOf(p)) seams += `M${third(p, q)}L${third(q, p)}`;
     }
-    let pentagon = "";
-    for (let i = 0; i < 5; i++) pentagon += `${i ? "L" : "M"}${at(cx, cy, 7.4, -90 + 72 * i)}`;
     return [
       ground,
       ["ks", E(32, 58.5, 15, 2.6)],
-      ["k5", C(cx, cy, R)],
-      ["l2", seams.join(""), 'stroke-width="1.3"'],
-      ["k1", `${pentagon}Z${patches.join("")}`],
+      ["kw", C(cx, cy, R)],
+      ["l3", seams, 'stroke-width="1.2"'],
+      ["k1", patches],
       ["ks", "M49.6 16A23 23 0 0 1 16.1 47.6A25 25 0 0 0 49.6 16Z"],
-      ["kw", E(23.5, 18.5, 5.5, 2.8), 'transform="rotate(-35 23.5 18.5)"'],
     ] as Layer[];
   })(),
   technology: [
@@ -457,10 +557,10 @@ const topics: Record<string, Layer[]> = {
   ],
   literature: [
     ground,
-    ["k5", "M33 35C34 27 38 16 46 9C50 6 54 4.6 57.4 4.6C57.4 9 55 14 51 19C46 26 40 30.6 33 35Z"],
-    ["k4", "M33 35C40 30.6 46 26 51 19C55 14 57.4 9 57.4 4.6C52.4 12 44 22.4 33 35Z"],
-    ["l1", "M30.5 38.5C38 29 47 17 57.4 4.6", 'stroke-width="1.4"'],
-    ["l3", "M41.6 20.4L45.6 21.6M37.6 25.6L41.2 27.2M47 13.6L50.4 14.4", 'stroke-width="1.2"'],
+    ["k3", "M33.6 32.9C27.8 26 37.9 11.8 48 8.5Z"],
+    ["k2", "M33.6 32.9C42.4 34.6 49.9 19 48 8.5Z"],
+    ["l5", "M43.5 27.1L41.5 23.4M46.7 20.9L45 17.4M35.7 18.5L39.9 18.4", 'stroke-width="1.1"'],
+    ["l1", "M30 39L48 8.5", 'stroke-width="1.4"'],
     ["k2", "M26.5 33.5H37.5Q38.5 33.5 38.5 34.5V39H25.5V34.5Q25.5 33.5 26.5 33.5Z"],
     lift(
       "M24.5 38.5H39.5C43 38.5 45 40.5 45.6 43.5L47 52.5C47.5 55.8 45.2 58.5 42 58.5H22C18.8 58.5 16.5 55.8 17 52.5L18.4 43.5C19 40.5 21 38.5 24.5 38.5Z",
@@ -512,7 +612,7 @@ const lighter: Record<string, string> = { k1: "k2", k2: "k3", k4: "k5", l1: "l2"
 const head = (id: string, x: number, y: number, s: number, deg: number, front: boolean): Layer[] => {
   const t = `transform="translate(${x} ${y}) rotate(${deg}) scale(${s}) translate(-32 -32)"`;
   return (avatars[id] ?? [])
-    .filter(([, d]) => d !== shoulders && d !== foxChest)
+    .filter(([, d]) => d !== shoulders && d !== chest && d !== chinShadow)
     .map(([ink, d, attrs]) => [(front && lighter[ink]) || ink, d, attrs ? `${t} ${attrs}` : t]);
 };
 
