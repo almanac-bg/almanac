@@ -1811,7 +1811,9 @@
     gap: 8px;
     min-height: 34px;
     padding: 3px 14px 3px 3px;
-    border-radius: var(--radius-full);
+    /* Its corners follow the glyph's tile inside it (28% of 28px, and the 3px around it): a rounded square in a
+       rounded rectangle, never a square tile in a pill. */
+    border-radius: 11px;
     background: #fff;
     color: #16132b;
     font: 800 0.9375rem / 1.1 var(--font-sans);
