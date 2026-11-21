@@ -1,10 +1,13 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/almanac-bg/almanac/internal/safe"
 )
 
 // However many kinds browsers send, the server's own problems and a failed backup are still told; past their
@@ -186,5 +189,35 @@ func TestProblemsByMail(t *testing.T) {
 	g.outbox.Flush(t.Context())
 	if len(g.inbox.got) != 1 || !strings.Contains(g.inbox.got[0].Text, "backup: upload failed") {
 		t.Fatalf("mailed %+v", g.inbox.got)
+	}
+}
+
+// A panic in the work done in the background is stopped there (package safe) and told as one of the server's
+// problems: in a loop of the server's, the next round comes as ever; in its loops of the program, the loop starts
+// again.
+func TestBackgroundPanicsTold(t *testing.T) {
+	g := start(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	rounds := make(chan int, 10)
+	n := 0
+	go safe.Every(ctx, "a test's round", time.Millisecond, func() {
+		n++
+		rounds <- n
+		if n == 1 {
+			panic("the first round")
+		}
+	})
+	for range 3 {
+		select {
+		case <-rounds:
+		case <-time.After(5 * time.Second):
+			t.Fatal("the rounds stopped after a panic")
+		}
+	}
+	cancel()
+	news, _ := g.srv.problems.take()
+	if news["panic: a test's round: the first round"] == nil {
+		t.Fatalf("the panic wasn't told: %v", news)
 	}
 }
