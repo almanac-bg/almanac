@@ -216,8 +216,20 @@ test("„Вход“ is a page of its own: the form alone, back where it was com
   await expect(page).toHaveURL(/\/signin$/);
   await bare();
   await expect(page.getByRole("heading", { name: "Влез в профила си", level: 1 })).toBeVisible();
+  // The page is for the email alone: its field has the focus.
+  await expect(page.getByLabel("Имейл")).toBeFocused();
+  // Back to the cover, the frame stays bare all the way: the places never flash in while the day loads.
+  await page.evaluate(() => {
+    const w = window as unknown as { flashed: boolean };
+    w.flashed = false;
+    new MutationObserver(() => {
+      if (!document.documentElement.classList.contains("bare")) w.flashed = true;
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  });
   await page.getByRole("link", { name: "Назад" }).click();
   await expect(page).toHaveURL(/\/$/);
+  await expect(page.locator(".issue")).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { flashed: boolean }).flashed)).toBe(false);
   await page.getByRole("link", { name: "Вход", exact: true }).click();
   await page.getByLabel("Имейл").fill(email);
   await page.getByRole("button", { name: "Прати ми код" }).click();
