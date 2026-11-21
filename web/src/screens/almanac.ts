@@ -79,6 +79,9 @@ interface Page {
 /** How many facts a page shows (play.AlmanacPage). */
 const perPage = 30;
 
+/** How many facts a chapter has before it offers to search them: fewer are read at a glance. */
+const searchFrom = 10;
+
 function setKit(kit: Kit) {
   ({
     api,
@@ -191,7 +194,7 @@ function book(p: Page, left: () => Left[] = () => []): Child {
     h(
       "ol",
       { class: "chapters", "aria-label": "Главите" },
-      order.map((id) => h("li", null, card(id, p.ink[id] ?? 0, rankOf(id), id === nearest))),
+      order.map((id) => h("li", null, card(id, p.ink[id] ?? 0, rankOf(id)))),
     ),
   );
 }
@@ -207,16 +210,14 @@ function way(id: string, name: string, note: string): Child {
 }
 
 /** A chapter's card: its colour, its seal as the badge (or its glyph, before a rank) over its name, its ink, and its
- * rank with the ink to the next. The corner turned, as a page of the book. */
-function card(id: string, ink: number, r: Rank | undefined, nearest: boolean): Child {
+ * rank with the ink to the next („Тетрадка · още 15 до „Книга““: the ink is said over it). The corner turned, as a
+ * page of the book. */
+function card(id: string, ink: number, r: Rank | undefined): Child {
   const ranked = r && r.level > 0 ? r : null;
   const left = ranked ? Math.max(1, ranked.nextAt - ranked.ink) : 0;
   return h(
     "a",
-    {
-      class: nearest ? "chapter-card nearest" : "chapter-card",
-      href: `/almanac/${id}`,
-    },
+    { class: "chapter-card", href: `/almanac/${id}` },
     leaf(
       id,
       [
@@ -230,9 +231,7 @@ function card(id: string, ink: number, r: Rank | undefined, nearest: boolean): C
         ink
           ? h("span", { class: "card-ink" }, h("b", { class: "num" }, formatNumber(ink)), h("span", null, "с мастило"))
           : null,
-        ranked
-          ? h("span", { class: "card-rank" }, `${ranked.name} · още ${left}\u00a0с мастило до „${ranked.next}“`)
-          : null,
+        ranked ? h("span", { class: "card-rank" }, `${ranked.name} · още\u00a0${left} до „${ranked.next}“`) : null,
       ],
       "card-leaf",
       { next: "" },
@@ -266,6 +265,8 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
   const data = signal<Page | null>(null);
   const first = signal<Page | null>(null);
   const failed = signal<unknown>(null);
+  // The chapter's facts in all, unsearched: the search shows from `searchFrom` of them.
+  const total = signal(0);
   let asked = "";
   const load = () => {
     const q = new URLSearchParams({ topic: id, page: String(page.peek()) });
@@ -285,6 +286,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
         }
         data.set(p);
         if (p.ranks) first.set(p);
+        if (!ask.includes("q=")) total.set(p.found);
         if (toFacts) requestAnimationFrame(() => document.querySelector(".chapter-facts")?.scrollIntoView());
         toFacts = false;
       },
@@ -301,7 +303,13 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
   if (user.peek()) {
     // The first page has the chapter's rank: asked for once, apart, when the chapter opens on another page.
     if (page.peek() || query.peek())
-      api<Page>("GET", `/api/almanac?${new URLSearchParams({ topic: id })}`).then(first.set, () => {});
+      api<Page>("GET", `/api/almanac?${new URLSearchParams({ topic: id })}`).then(
+        (p) => {
+          first.set(p);
+          total.set(p.found);
+        },
+        () => {},
+      );
     load();
   }
   // The chapter's game left half-way today: it goes on from where it stopped (play.Left).
@@ -329,6 +337,23 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
     return `/almanac/${id}${shown.size ? `?${shown}` : ""}`;
   };
   const index = chapters().indexOf(id);
+  const finder = user.peek()
+    ? h(
+        "label",
+        { class: "search" },
+        h("span", { class: "i i-search", "aria-hidden": "true" }),
+        h("input", {
+          type: "search",
+          "aria-label": "Търси във фактите",
+          placeholder: "Търси факт",
+          maxlength: 60,
+          autocomplete: "off",
+          enterkeyhint: "search",
+          value: query,
+          oninput: (e: Event) => search((e.target as HTMLInputElement).value),
+        }),
+      )
+    : null;
   return h(
     "section",
     { class: `screen chapter spread t-${id}` },
@@ -391,23 +416,8 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
             )
           : null;
       }),
-      user.peek()
-        ? h(
-            "label",
-            { class: "search" },
-            h("span", { class: "i i-search", "aria-hidden": "true" }),
-            h("input", {
-              type: "search",
-              "aria-label": "Търси във фактите",
-              placeholder: "Търси във фактите",
-              maxlength: 60,
-              autocomplete: "off",
-              enterkeyhint: "search",
-              value: query,
-              oninput: (e: Event) => search((e.target as HTMLInputElement).value),
-            }),
-          )
-        : null,
+      // The search, once the chapter has facts enough to look through (or comes searched).
+      () => (finder && (total() >= searchFrom || query.peek().trim()) ? finder : null),
       (): Child => {
         if (!user())
           return h("p", { class: "entries-none" }, "Изиграй първите си въпроси и фактите им ще се записват тук.");
@@ -450,7 +460,7 @@ function stand(id: string, r: Rank | undefined, ink: number): Child {
   return h(
     "div",
     { class: "ch-stand" },
-    ranked ? h("span", { class: "ch-seal" }, seal(id, ranked.level, 64, "rimmed"), pips(ranked.quarter)) : null,
+    ranked ? h("span", { class: "ch-seal" }, seal(id, ranked.level, 64, "rimmed")) : null,
     h(
       "div",
       { class: "ch-words" },
@@ -458,11 +468,8 @@ function stand(id: string, r: Rank | undefined, ink: number): Child {
       ranked
         ? [
             h("p", { class: "ch-rank" }, rankName(ranked.level)),
-            h(
-              "p",
-              { class: "ch-next" },
-              `още ${Math.max(1, ranked.nextAt - ranked.ink)}\u00a0с мастило до „${ranked.next}“`,
-            ),
+            h("p", { class: "ch-next" }, `още\u00a0${Math.max(1, ranked.nextAt - ranked.ink)} до „${ranked.next}“`),
+            pips(ranked.quarter),
           ]
         : h("p", { class: "ch-next" }, "Всеки верен отговор в броя на деня вписва факт с мастило."),
     ),

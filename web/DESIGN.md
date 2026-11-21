@@ -72,7 +72,10 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      „България днес: средно 6,2“. Ten of ten: „Всички верни“ and the mark drawn over it. None right: right under the
      score, „Въпросите и фактите“ open (`.missed-day`): the first four, each its dashed tile, the question, the right
      answer (an order, a match, a split in lines) and its fact, and „Още 6 въпроса“, which shows the rest in place
-     and after them the rest of „Въпросите и фактите“; no word of praise.
+     and after them the rest of „Въпросите и фактите“; no word of praise. A best rank risen, the big moment, right
+     under the score, on its chapter's sheet: „Нов печат“, the seal set large, the rank's name, what made it („40
+     факта от Кино и телевизия са с мастило в твоя Алманах.“), the ladder from Бележка to Летопис (`ladder()`), the
+     art it brings, and other ranks risen with it in a line.
   2. On the first results (a guest's first day, a game just brought here, an app's own browser): the action, right
      under the score — keeping the game and being reminded, or the way out to the phone's browser (a button: on Android
      it opens the phone's browser, elsewhere it copies the link for it; the app's menu named under it, „Или от менюто
@@ -81,8 +84,9 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      chip, the answer as a headword (an order, a match, a split: its parts a line each, at the entry's size), the
      question, the fact. Under it what the day wrote (`game/news.ts`): „+6 с
      мастило“; „Един от въпросите вече беше в твоя Алманах и остава в сиво.“; the chapter nearest its next rank with
-     its seal and pips („История: още 2 до Книга“); ranks risen, their seals and one line (one chapter's: its ladder
-     under it); or a best rank risen, the big moment, with the ladder from Бележка to Летопис (`ladder()`).
+     its seal and pips („История: още 2 до Книга“); or ranks risen, their seals and one line, each rank once with its
+     chapters, their names the links („Нови печати: „Страница“ в География и в Технологии и игри. Картините на тези
+     глави вече могат да са твой аватар.“; one chapter's: its ladder under it).
   4. Friends who played it, up to five (`.friends-day`): avatar, name, worn seal, their small squares, their score.
   5. The action, past the first results: „Сподели“.
   6. Tomorrow: the next issue's date set big, „Утре, неделя · Брой 32“, the chapter of its hard question with its
@@ -94,31 +98,39 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   Everything else is under „Въпросите и фактите“ (`.more`): how others played the player's recordings, how all of
   България spread, and each question with its fact (its verdict never a true-or-not's answer: „Точно“, „Грешно“).
 - **Алманах:** its head (Микс and България as two ways to play, no lifetime totals), then the chapters, each a folded
-  card in its colour with its seal as the badge (40px) and its ink („180 с мастило“); a counter at zero is hidden, and
-  the head says once how ink is written; a chapter's card with no ink yet is its glyph over its name, no taller.
+  card in its colour with its seal as the badge (40px), its ink („180 с мастило“) and its rank with what's left to the
+  next („Тетрадка · още 15 до „Книга““); a counter at zero is hidden, and the head says once how ink is written; a
+  chapter's card with no ink yet is its glyph over its name, no taller, never stretched to the inked ones beside it.
+  Two across on a phone, five on a big screen (the page's whole width, the head a reading width).
   It leads with the chapter nearest its next step. A chapter's game left half-way today shows under the head, where
   it stopped, with „Продължи“ (its cross comes back here).
-- **A chapter:** its head on its sheet (glyph, name, the seal with its pips, its ink, how much to the next rank),
-  „Игра на главата“, then its facts, the latest first: ink black, facts met in grey (a thin solid 1.5px grey outline,
-  lighter text). Where grey first shows: „В сиво са всички останали факти, които срещнеш. С мастило се пише само в броя на деня.“
+- **A chapter:** its head on its sheet (glyph, name, the seal, its ink, the rank, how much to the next „още 16 до
+  „Книга““ and the pips under it), „Игра на главата“, then its facts, the latest first, each as tall as it holds
+  (two across on a big screen): ink black, facts met in grey (a thin solid 1.5px grey outline, lighter text). From
+  ten facts, a search over them („Търси факт“); fewer are read at a glance. Where grey first shows: „В сиво са всички останали факти, които срещнеш. С мастило се пише само в броя на деня.“
   Its game's result: on the chapter's sheet its chip, the score and its tiles; under it, with no number (grey is never
   counted), „Фактите от играта са в книгата ти, в сиво.“ While the day's issue waits, „Към въпросите на деня“ is the
   action, the streak's stake under it; once it's played, „Още десет въпроса“ the action. The other ways on are quiet
   links in a line: „Още десет въпроса“, „Прегледай въпросите“, „Към главата“ (from Микс and България, which aren't
   chapters, „Към Алманаха“). Its start (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name.
 - **Приятели:** the board (friends by default, or all of България: its spread and the player's place first, then the
-  top rows); the friends (a row each: avatar, the name and seal across the row, never cut, today's score and the
-  duels between you „дуели 3 : 1“ under it; the column a third of a big screen); the
+  top rows: the place, the avatar, the name with the row's width and the seal and „ти“ after it, the score and the
+  small squares on a line under it); the friends (a row each: avatar, the name and seal across the row, never cut,
+  today's score and the duels between you „дуели 3 : 1“ under it; the column a third of a big screen; a friend
+  removed is out at once, „Премахна Иво от приятелите си. Върни“ in the list's place for five seconds, and only then
+  removed, the duels open between them ending as if their time were up); the
   duels („Твой ред“ the page's action, „Чакаш“, „Изиграни“: an open one how it stands under the name, „Изиграй същите
   десет въпроса · още 6 дни“, „Ти: 8 · Иво има още 6 дни“; a played one its score and, on even right answers, what broke the
-  tie; the record between two is the friend's row's alone). Friends are added by the player's invite link, „Покани приятел“
+  tie, and who was quicker by name: „по-бързо отговаря Иво: 116,9 с срещу твоите 135,1 с“; the record between two is
+  the friend's row's alone). Friends are added by the player's invite link, „Покани приятел“
   (`.invite-friend`, an outlined `.btn`: a phone's share sheet with „Добави ме в АЛМАНАХ: <link>“, a big screen's copy,
   „Връзката е копирана. Изпрати я на приятел.“; one quiet line under it, and „Нова връзка“ beside it, which asks once,
   „Старата връзка ще спре да работи.“), and in one field, „име или имейл“; a
   friend's yes to a request is one line over the friends, told once; requests sent wait under „Изпратени покани“.
   Only two friends of one name show their @username. A duel's result, as the day's: a white card, the kicker, the
-  verdict („Победа“, „Загуба“, „Равенство“) as its h1, the two face to face with their scores as the heroes and „от 10“
-  in words, the marks, no hairlines; a spread on a big screen, the record and the ways on (one width) on the right; its
+  verdict („Победа“, „Загуба“, „Равенство“) as its h1, the two face to face, each a column (the avatar, the name under
+  it broken only between its words, the score), their scores as the heroes and „от 10“ in words, the marks, no
+  hairlines; a spread on a big screen, the record and the ways on (one width) on the right; its
   marks as the tiles (близо half filled), nothing ringed: speed only breaks a tie.
 - **Профил:** the avatar with the seal worn on its corner, the name; the longest streak and what the week forgives;
   the seal worn on its ladder („Печатът на География“, its ink, Бележка to Летопис, the one reached ringed); the seals
@@ -243,7 +255,8 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   | Летопис  | 250      | the same with two tails                      |
 
   Then „Летопис · N“ for each further 100, its number on a tab from 32px. 24px at the least. How far towards the next
-  rank is four pips under it (`pips()`), from 32px, on a chapter's page and the result's line only. By day a fine
+  rank is four small bars (`pips()`) beside it, under the words that say what's left, on a chapter's page and the
+  result's line only. By day a fine
   outline in the deep colour; on a sheet (its own colour, often) a 2px ink rim (`.rimmed`). Beside a player's name only
   the seal shows, never its rank's word (`worn()`); the word is the Алманах's and a rank-up's.
 - **The ladder** (`ladder()`, `.ladder`): a chapter's six ranks in a row, each its seal and name; the one reached ringed
@@ -254,7 +267,10 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   or a setting's few choices on a well, the chosen one a raised surface, of one width unless a word needs more (never broken inside one). A switch is a 52 × 30 track. Never a native
   select, radio or checkbox.
 - **Sheets over the page** (`.sheet`, a `<dialog>`): a surface with round top corners over a scrim, from the foot on a
-  phone, centred on a big screen (a name asked for, the share).
+  phone, centred on a big screen (a name asked for, the share, a way out of a game); its title's words whole,
+  „Затвори“ under it where they don't fit beside it.
+- **Names** (`nameWords()`): a name of several words breaks only between them; a one-word name, where it's wider
+  than its line, at its syllables with a hyphen. Never cut with an ellipsis.
 - **Rows of players:** `who()` (avatar and name, the worn seal after it), `rankRow()`, `.fd-row`, `.friend`,
   `.duel-row`. **Avatars** (`avatar()`): the drawn animal in a round medallion of its scene; a chapter's art becomes an
   avatar at Страница.
@@ -274,7 +290,10 @@ under it.
   gone once answered. Its sound: silent until ten seconds are left.
 - **The sheet** (`.q-leaf`, no corner): the chip (and on the day's last question „Най-трудният: число“ beside it), then the
   question. Under 620px of height the sheet is the question with the chapter's glyph beside it (on the day's last, the
-  chip's glyph alone beside its tag) and an answer is 52px. A picture over the question takes at most 30% of the
+  chip's glyph alone beside its tag) and an answer is 52px. Under 680px, while an order or pairs are asked, the sheet
+  is the question beside its glyph a size smaller, cut to as many lines as leave every row and „Готово“ in sight (two
+  at the least; a tap on it reads it all: answering.ts, `clamp`), and the rows and cells are 44px; the pairs' right
+  column, a cell more, has five ninths of the width. A picture over the question takes at most 30% of the
   height; on a laptop, once answered, it gives the panel under it the room to show whole. A choice of pictures is two
   by two, the letter and (answered) the ✓ or ✕ in the picture's corners, its name under it across the card.
 - **A cell's words** (`wholeWords()`): a long word breaks only at its syllables (soft hyphens, `lib/words.ts`) and only
@@ -300,8 +319,10 @@ under it.
   row and the right one in sight, and at least the fact's first two lines; a longer fact scrolls in it, fading out
   above „Напред“, which stands on a foot of the panel's colour down to its edge (`.after-foot`): nothing shows under
   it. In it, the verdict, a choice
-  missed its right answer in words („Вярно е: Съединението.“), how many got it, „Записано с мастило · глава История“
-  for ink, „Знаеше ли?“ and the fact, and „Напред“ (the one action).
+  missed its right answer in words („Вярно е: Съединението.“; not a choice of pictures, each named under it, nor
+  where the question names it), how many got it, „Записано с мастило · глава История“
+  for ink, „Знаеше ли?“ and the fact, a picture's credits (a choice of pictures' too, here where nothing covers
+  them), and „Напред“ (the one action).
 - **Verdicts** are a fixed set, never an answer's own word: „Точно!“, „Вярно!“ (a number near enough to count, not
   spot on), „Не е това.“, „Близо, но не се брои.“, „Времето изтече.“ The verdict's sign is ink: a filled disc with ✓, a half-filled disc, a ✕ or a clock in a dashed
   ring.
@@ -310,7 +331,8 @@ under it.
 ## Fit and large text
 
 - **Fit** (`e2e/layout.spec.ts`, at 320 × 568, 375 × 600, 390 × 664 and 1366 × 900, by day and by night; every kind of
-  question at its longest in the sample bank, answered right, wrong and close: `e2e/kinds.ts`): nothing scrolls
+  question at its longest in the sample bank, and the real bank's longest orders and pairs where it's here (`private/`;
+  CI has only the sample), answered right, wrong and close: `e2e/kinds.ts`, `e2e/bank.ts`): nothing scrolls
   sideways; Днес shows „Започни“ whole and high; a question shows every answer or its pad and its action whole,
   nothing under the action; once answered, the player's row, the right one and „Напред“ are in sight, nothing under
   „Напред“; a row's sign never on a line of its own, nor a punctuation mark.
@@ -372,6 +394,8 @@ flat shapes with depth, lit from the top left, no outlines, painted from one ton
   (`language.test.ts`).
 - **Copy promises nothing the game doesn't do:** ink is „вярно отговорени“ in the issue, never „знаеш“; a counter at
   zero is hidden; an ended streak's number is never named.
+- **„със“ before с and з** („със Стефан Баторий“, „със 7“), „с“ before the rest; before a name, a number or anything
+  that comes in, through `withWord()` (the server's `withWord` in words.go): `language.test.ts`.
 - **Numbers the Bulgarian way** (`formatNumber()`): a space between thousands from 10 000; a decimal comma; „38 %“
   with a no-break space; the minus „−“; a unit after a no-break space; months in lower case. A number and the word it
   goes with („7 от 10“, „3 дни“) never part at a line's end.

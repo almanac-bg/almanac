@@ -209,6 +209,11 @@ func TestRanksToldOnce(t *testing.T) {
 	if n.Rose == nil || len(n.Rose.Ranks) != 2 || !n.Rose.Best || !n.Rose.Ranks[0].Art || n.Rose.Ranks[0].Name != "Страница" {
 		t.Fatalf("two chapters risen: %+v", n.Rose)
 	}
+	for _, r := range n.Rose.Ranks {
+		if r.Ink < RankFrom(r.To) || r.Ink >= RankFrom(r.To+1) {
+			t.Fatalf("risen with the ink it was counted from: %+v", r)
+		}
+	}
 	if n, _ = w.g.NewsOf(ctx, ana, 0); n.Rose != nil {
 		t.Fatalf("told twice: %+v", n.Rose)
 	}

@@ -155,6 +155,14 @@ test("a request turned down, a friend removed", async ({ browser }) => {
   await a.getByRole("button", { name: "Премахни приятел" }).click();
   await a.locator(".friend").getByRole("button", { name: "Премахни" }).click();
   await expect(a.locator(".friend")).toHaveCount(0);
+  // „Върни“ for a few seconds brings him back, nothing done.
+  await a.locator(".removed-line").getByRole("button", { name: "Върни" }).click();
+  await expect(a.locator(".friend")).toHaveCount(1);
+  await a.locator(".friend").getByRole("button", { name: "Премахни" }).click();
+  await expect(a.locator(".removed-line")).toBeVisible();
+  // Then it's done.
+  await expect(a.locator(".removed-line")).toHaveCount(0, { timeout: 10_000 });
+  await expect(a.locator(".friend")).toHaveCount(0);
   await b.reload();
   await expect(
     b.getByText("Още нямаш приятели тук. Изпрати им връзката си или ги добави по потребителско име или имейл."),

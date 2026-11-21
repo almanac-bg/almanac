@@ -12,6 +12,7 @@ import type {
   Answer,
   ChoiceView,
   CluesView,
+  Credit,
   Crowd,
   MatchView,
   NumberView,
@@ -345,21 +346,28 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
           if (b !== own) mark(b, i);
         });
         crowd = crowdOnAll(buttons, reveal.crowd, mine);
-        if (reveal.credits?.length) {
+        // Gone over, the pictures' credits under them; in a game, in the answer's panel (run.ts), where nothing
+        // covers them.
+        if (display && reveal.credits?.length) {
           credits.hidden = false;
-          credits.replaceChildren(
-            "Снимки: ",
-            ...reveal.credits.flatMap((c, i) => [
-              i ? " · " : "",
-              h("a", { href: c.source, target: "_blank", rel: "noopener" }, `${letters[i]} ${c.credit}`),
-              ` (${c.license})`,
-            ]),
-          );
+          append(credits, creditsWords(reveal.credits));
         }
       });
       at(beats.crowd, () => crowd());
     },
   };
+}
+
+/** A choice of pictures' credits, in a line: „Снимки: А … (CC BY-SA 4.0) · Б …“. */
+export function creditsWords(credits: Credit[]): Child[] {
+  return [
+    "Снимки: ",
+    ...credits.flatMap((c, i) => [
+      i ? " · " : "",
+      h("a", { href: c.source, target: "_blank", rel: "noopener" }, `${letters[i]} ${c.credit}`),
+      ` (${c.license})`,
+    ]),
+  ];
 }
 
 /** The keys of the number pad, row by row ("" is a gap, "," a decimal comma). */

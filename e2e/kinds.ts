@@ -1,26 +1,10 @@
-// Every kind of question, as the sample bank has it at its longest, answered as a test wants it (right, wrong or
-// close), and what a question's screen must never do whatever its size (layout.spec.ts, answer.spec.ts).
-import { readdirSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+// Every kind of question, as the tests' bank has it at its longest (the sample's, and the real bank's longest orders
+// and pairs where the real bank is here: bank.ts), answered as a test wants it (right, wrong or close), and what a
+// question's screen must never do whatever its size (layout.spec.ts, answer.spec.ts).
 import { expect, type Page } from "@playwright/test";
+import { bankQuestions, type Q, words } from "./bank.ts";
 
-/** A question of the sample bank, as much of it as the tests read. */
-export interface Q {
-  id: string;
-  type: string;
-  text: string;
-  answer?: unknown;
-  wrong?: string[];
-  image?: unknown;
-  pictures?: { alt: string }[];
-  clues?: string[];
-  items?: { text: string; value?: number; group?: number }[];
-  direction?: string;
-  pairs?: { left: string; right: string }[];
-  decoy?: string;
-  groups?: string[];
-  tolerance?: number;
-}
+export type { Q };
 
 /** How a question is answered: right, wrong, or close (a number near, an order, pairs or groups partly right). */
 export type How = "right" | "wrong" | "close";
@@ -28,44 +12,31 @@ export type How = "right" | "wrong" | "close";
 /** Whether a kind of question can be answered close: a number, or a whole made of parts. */
 export const closeable = (q: Q) => ["number", "order", "match", "split"].includes(q.type);
 
-const bank = (): Q[] => {
-  const dir = resolve(import.meta.dirname, "../bank/sample/questions");
-  return readdirSync(dir).flatMap((f) => JSON.parse(readFileSync(resolve(dir, f), "utf8")) as Q[]);
-};
-
-/** All the words a question shows: the longest of each kind is the one a screen has the least room for. */
-const words = (q: Q) =>
-  [
-    q.text,
-    q.answer,
-    q.wrong,
-    q.clues,
-    q.items?.map((i) => i.text),
-    q.pairs?.flatMap((p) => [p.left, p.right]),
-    q.decoy,
-    q.groups,
-  ]
-    .flat()
-    .filter((w) => typeof w === "string")
-    .join(" ").length;
-
-/** One question of each kind, the longest the sample bank has: a choice, a choice of pictures, a choice under a
- * picture, „Вярно или невярно“, an order, pairs, groups, clues and a number; each named. */
+/** One question of each kind, the longest the tests' bank has: a choice, a choice of pictures, a choice under a
+ * picture, „Вярно или невярно“, an order, pairs, groups, clues and a number; and of an order and of pairs, the one
+ * with the longest question too, where that's another (a sheet of five lines over the rows); each named. */
 export function kinds(): { name: string; q: Q }[] {
-  const all = bank();
-  const longest = (f: (q: Q) => boolean) => {
-    const q = all.filter(f).sort((a, b) => words(b) - words(a))[0];
-    if (!q) throw new Error("the sample bank has no such question");
+  const all = bankQuestions().filter((q) => !q.retired);
+  const longest = (f: (q: Q) => boolean, size = words) => {
+    const q = all.filter(f).sort((a, b) => size(b) - size(a))[0];
+    if (!q) throw new Error("the bank has no such question");
     return q;
   };
   const plain = (type: string) => (q: Q) => q.type === type && !q.image && !q.pictures;
+  const asked = (q: Q) => q.text.length;
+  const order = longest(plain("order"));
+  const orderAsk = longest(plain("order"), asked);
+  const match = longest(plain("match"));
+  const matchAsk = longest(plain("match"), asked);
   return [
     { name: "choice", q: longest(plain("choice")) },
     { name: "pictures", q: longest((q) => !!q.pictures) },
     { name: "picture", q: longest((q) => q.type === "choice" && !!q.image) },
     { name: "truefalse", q: longest(plain("truefalse")) },
-    { name: "order", q: longest(plain("order")) },
-    { name: "match", q: longest(plain("match")) },
+    { name: "order", q: order },
+    ...(orderAsk.id === order.id ? [] : [{ name: "order-asked", q: orderAsk }]),
+    { name: "match", q: match },
+    ...(matchAsk.id === match.id ? [] : [{ name: "match-asked", q: matchAsk }]),
     { name: "split", q: longest(plain("split")) },
     { name: "clues", q: longest(plain("clues")) },
     { name: "number", q: longest(plain("number")) },

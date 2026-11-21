@@ -70,7 +70,7 @@ var adminBody = template.Must(template.New("admin").Parse(`
 </section>
 `))
 
-var adminQuestionsBody = template.Must(template.New("admin-questions").Parse(`
+var adminQuestionsBody = template.Must(template.New("admin-questions").Funcs(template.FuncMap{"withWord": withWord}).Parse(`
 <section class="admin-section" id="reports">
 <h2>Доклади ({{.ReportsOpen}} за {{.QuestionsReported}} {{if eq .QuestionsReported 1}}въпрос{{else}}въпроса{{end}})</h2>
 {{if gt .QuestionsReported (len .Reported)}}<p class="muted">Тук са последно докладваните {{len .Reported}}. Другите се
@@ -95,7 +95,7 @@ action="/admin/players/{{.Player}}/reports/resolve"><button class="link">Вси�
 <h2>Най-трудните</h2>
 <p class="muted">Въпроси с поне 10 отговора, по дела на верните.</p>
 <div class="table-scroll"><table class="admin-table"><thead><tr><th>Въпрос</th><th class="num">Отговори</th><th class="num">Верни</th></tr></thead><tbody>
-{{range .Hardest}}<tr><td>{{.ID}} · {{.Text}}<br><span class="muted">{{.Answer}}{{if .Lure}} · грешат най-често с {{.Lure}}{{end}}</span></td>
+{{range .Hardest}}<tr><td>{{.ID}} · {{.Text}}<br><span class="muted">{{.Answer}}{{if .Lure}} · грешат най-често {{withWord .Lure}}{{end}}</span></td>
 <td class="num">{{.Answers}}</td><td class="num">{{.Share}}%</td></tr>{{else}}<tr><td colspan="3" class="muted">Още няма достатъчно отговори.</td></tr>{{end}}
 </tbody></table></div>
 </section>

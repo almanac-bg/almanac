@@ -134,14 +134,16 @@ export async function startDuel(to: To): Promise<DuelView | null> {
 }
 
 /** What broke a tie on even right answers (DuelView.tieBy), as a duel's row and its result say it: „равен брой верни ·
- * реши по-близкото число“, „равен брой верни · по-бързо: 34,5 с срещу 40,1 с“; a draw, „равен брой верни и под секунда разлика“; "" for a
+ * реши по-близкото число“, „равен брой верни · по-бързо отговаря Иво: 34,5 с срещу твоите 40,1 с“ (who was quicker, by name); a draw, „равен брой верни и под секунда разлика“; "" for a
  * duel won on right answers, or none ended. */
 export function tieWords(d: DuelView): string {
   if (d.state === "draw") return "равен брой верни и под секунда разлика";
   if (d.state !== "won" && d.state !== "lost") return "";
   if (d.tieBy === "number") return "равен брой верни · реши по-близкото число";
   if (d.tieBy === "time" && d.you && d.opponent)
-    return `равен брой верни · по-бързо: ${seconds(d.you.ms)} срещу ${seconds(d.opponent.ms)}`;
+    return d.state === "won"
+      ? `равен брой верни · по-бързо отговаряш ти: ${seconds(d.you.ms)} срещу ${seconds(d.opponent.ms)} на ${d.opponent.name}`
+      : `равен брой верни · по-бързо отговаря ${d.opponent.name}: ${seconds(d.opponent.ms)} срещу твоите ${seconds(d.you.ms)}`;
   return "";
 }
 

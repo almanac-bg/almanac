@@ -28,14 +28,26 @@ import {
 import { guardLeaving, questionHead, readyClock, startScreen, timer, trail, upNext } from "./game/run.ts";
 import { ApiError, api, errorText } from "./lib/api.ts";
 import { dayInBulgaria } from "./lib/day.ts";
-import { type Child, computed, effect, h, lifetime, onCleanup, signal, slot, untracked, when } from "./lib/dom.ts";
+import {
+  type Child,
+  computed,
+  effect,
+  h,
+  lifetime,
+  listen,
+  onCleanup,
+  signal,
+  slot,
+  untracked,
+  when,
+} from "./lib/dom.ts";
 import { reportProblem } from "./lib/errors.ts";
 import { ordinal } from "./lib/ordinal.ts";
 import { calm, setCalm, setTextSize, setTick, textSize, tickOn } from "./lib/prefs.ts";
 import { needsHomeScreen, pushable, pushOn, pushPrefs, setPushPref, turnOff, turnOn } from "./lib/push.ts";
 import { byTap, go, goBack, rename, title } from "./lib/router.ts";
 import { feelKit, loadFeel, play, playAnswer, playCount, quietWhenSilent, setSound, soundOn } from "./lib/sound.ts";
-import { dateWords, issueWords, listWords, weekday, withWord } from "./lib/words.ts";
+import { dateWords, issueWords, listWords, nameWords, weekday, withWord } from "./lib/words.ts";
 import { acceptedLine, type DuelView, duelLists, recordingName, startDuel, tieWords } from "./screens/duel.ts";
 import { haveProfile, keepGame, mailAsk } from "./screens/keep.ts";
 import { missing } from "./screens/missing.ts";
@@ -137,7 +149,9 @@ export const kit = {
   ladder,
   leaf,
   lifetime,
+  listen,
   listWords,
+  nameWords,
   loadDuelResult,
   loadStats,
   mailAsk,

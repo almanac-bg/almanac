@@ -279,11 +279,23 @@ func (g *Game) Asked(ctx context.Context, from, to int64) (bool, error) {
 	return asked, err
 }
 
-// Unfriend ends a friendship, for both.
+// Unfriend ends a friendship, for both, and the duels open between them with it: their time is up now, and each ends
+// as one whose time ran out does (SettleDue: a side left half-way counts as it stood, one never started lapses, one
+// never sent goes), so that neither is left a „Твой ред“ that can't be played. The record between them stays.
 func (g *Game) Unfriend(ctx context.Context, userID, friendID int64) error {
-	_, err := g.DB.Write.ExecContext(ctx, `DELETE FROM friends WHERE (user_id = ? AND friend_id = ?)
-		OR (user_id = ? AND friend_id = ?)`, userID, friendID, friendID, userID)
-	return err
+	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.Exec(`DELETE FROM friends WHERE (user_id = ?1 AND friend_id = ?2)
+			OR (user_id = ?2 AND friend_id = ?1)`, userID, friendID); err != nil {
+			return err
+		}
+		_, err := tx.Exec(`UPDATE duels SET expires_at = min(expires_at, ?3) WHERE kind = 'person' AND ended_at IS NULL
+			AND ((a_id = ?1 AND b_id = ?2) OR (a_id = ?2 AND b_id = ?1))`, userID, friendID, store.Ms(g.Now()))
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	return g.SettleDue(ctx)
 }
 
 // Friend returns a friend's name, or ErrNotFriends.

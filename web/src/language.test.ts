@@ -101,3 +101,26 @@ test("a chapter's name is quoted after „глава“ and only there", () => {
   }
   assert.deepEqual(found, []);
 });
+
+/**
+ * „със“ before a word read starting with an с or a з („със Стефан Баторий“, „със звук“), „с“ before the rest: written
+ * so in a fixed text, and through `withWord` (the client's lib/words.ts, the server's words.go) before a name, a number
+ * or anything else that comes in (`${…}`, `{{…}}`, `%s`): DESIGN.md, Copy. A unit after a number („34,5 с срещу“)
+ * isn't the word.
+ */
+test("„със“ before с and з, through withWord before what comes in", () => {
+  const slip = /(?<![\p{L}\p{N}])(?<!\d[ \u00a0])[сС] ([сзСЗ]|\$\{|\{\{|%[sdv])/u;
+  const found: string[] = [];
+  for (const place of ["web/src", "web/public", "internal", "cmd"]) {
+    for (const path of files(place)) {
+      if (path.startsWith("internal/assets/dist") || /(\.test\.ts|_test\.go)$/.test(path)) continue;
+      readFileSync(join(root, path), "utf8")
+        .split("\n")
+        .forEach((line, i) => {
+          const m = line.match(slip);
+          if (m) found.push(`${path}:${i + 1}: „${m[0]}“; say „със“, or withWord(…)`);
+        });
+    }
+  }
+  assert.deepEqual(found, []);
+});
