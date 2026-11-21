@@ -163,6 +163,9 @@
     --i-share: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 15V4M7.5 8.5L12 4l4.5 4.5'/%3E%3Cpath d='M5 13v6h14v-6'/%3E%3C/svg%3E");
     --i-nib: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.5c2.6 3 5 6.2 5 9.3 0 2-1.1 3.4-2.6 4.1V18H9.6v-2.1C8.1 15.2 7 13.8 7 11.8c0-3.1 2.4-6.3 5-9.3zm0 6.3a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM8.6 19.4h6.8v2.1H8.6z'/%3E%3C/svg%3E");
     --i-gear: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='3.2'/%3E%3Cpath d='M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M5.5 18.5l1.9-1.9M16.6 7.4l1.9-1.9'/%3E%3C/svg%3E");
+    --i-today: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='5' width='17' height='15.5' rx='3'/%3E%3Cpath d='M8 3v4M16 3v4M3.5 10h17'/%3E%3Ccircle cx='12' cy='15.25' r='1.75' fill='%23000' stroke='none'/%3E%3C/svg%3E");
+    --i-book: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 18.5V5.5A2.5 2.5 0 0 1 7.5 3H19v14H7.5A2.5 2.5 0 0 0 5 19.5 1.5 1.5 0 0 0 6.5 21H19'/%3E%3Cpath d='M9 7.5h6'/%3E%3C/svg%3E");
+    --i-friends: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='8' r='3.25'/%3E%3Cpath d='M3 19.5c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5'/%3E%3Cpath d='M15.5 4.9a3.25 3.25 0 0 1 0 6.2M17.5 14.3c2 .6 3.5 2.4 3.5 5.2'/%3E%3C/svg%3E");
   }
 
   @media (prefers-color-scheme: dark) {
@@ -340,7 +343,7 @@
     text-size-adjust: 100%;
     -webkit-tap-highlight-color: transparent;
     /* What's brought into view (a field focused, an ask opened) stops above a phone's places, not under them. */
-    scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+    scroll-padding-bottom: calc(6rem + env(safe-area-inset-bottom));
   }
 
   body {
@@ -489,10 +492,22 @@
     --i: var(--i-gear);
   }
 
+  .i-today {
+    --i: var(--i-today);
+  }
+
+  .i-book {
+    --i: var(--i-book);
+  }
+
+  .i-friends {
+    --i: var(--i-friends);
+  }
+
   /* ---- The frame: the bar, the places ---- */
 
   #app {
-    padding-bottom: calc(var(--space-7) + 4.5rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(var(--space-7) + 5.5rem + env(safe-area-inset-bottom));
   }
 
   .frame {
@@ -579,37 +594,46 @@
   }
 
   /* The three places on a phone: words at the foot where a thumb is, the current one on a well. */
+  /* The places on a phone: a pill that floats over the page, clear of every edge, the home bar under it. */
   .places-foot {
     position: fixed;
-    right: 0;
-    bottom: 0;
-    left: 0;
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, calc(env(safe-area-inset-bottom) - 8px));
+    left: max(12px, env(safe-area-inset-left));
     z-index: 10;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
-    /* Under the buttons, only what the phone's home bar needs: its safe area less what the bar's own gesture zone can
-       spare (a tap 22px up from the edge never meets the home bar), never the safe area and a gap on top of it. */
-    padding: 6px max(12px, env(safe-area-inset-right)) max(6px, calc(env(safe-area-inset-bottom) - 12px))
-      max(12px, env(safe-area-inset-left));
-    border-top: 1px solid var(--line);
+    gap: 4px;
+    padding: 5px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-full);
     background: var(--surface);
+    box-shadow:
+      0 10px 28px rgb(20 15 38 / 0.14),
+      0 2px 6px rgb(20 15 38 / 0.08);
   }
 
   .places-foot a {
     position: relative;
     display: grid;
     place-items: center;
+    align-content: center;
+    gap: 2px;
     /* At most a quarter taller with large text: the bar stays a bar, the page over it. */
     min-height: min(3rem, 60px);
-    padding: 0 var(--space-1);
-    border-radius: 14px;
+    padding: 4px var(--space-1);
+    border-radius: var(--radius-full);
     color: var(--ink-3);
     /* Never wider than its third of a phone, nor over a quarter larger: a name holds whole however large the phone
        sets its text. */
-    font: 700 min(0.9375rem, 18.75px, 5.25vw) / 1.1 var(--font-sans);
+    font: 800 min(0.9375rem, 18.75px, 5.25vw) / 1.1 var(--font-sans);
     text-align: center;
     text-decoration: none;
+  }
+
+  /* Each place's icon over its name: the bar reads at a glance, its name says it. */
+  .places-foot a > .i {
+    font-size: min(1.375rem, 27px);
   }
 
   .places-foot a[aria-current="page"] {
@@ -629,6 +653,13 @@
     margin-top: -3.5px;
     border-radius: var(--radius-full);
     background: var(--ink);
+  }
+
+  /* On a phone the dot sits on the icon's shoulder. */
+  .places-foot a.news::after {
+    top: 7px;
+    right: calc(50% - 19px);
+    margin-top: 0;
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -690,14 +721,19 @@
 
     .places a {
       position: relative;
-      display: grid;
-      place-items: center;
+      display: flex;
+      align-items: center;
+      gap: 8px;
       min-height: 44px;
       padding: 0 18px;
       border-radius: 14px;
       color: var(--ink-3);
       font: 800 1rem / 1 var(--font-sans);
       text-decoration: none;
+    }
+
+    .places a > .i {
+      font-size: 1.25rem;
     }
 
     .places a[aria-current="page"] {

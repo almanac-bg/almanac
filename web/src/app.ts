@@ -22,10 +22,10 @@ import { avatar, rosette, worn } from "./ui.ts";
 
 /** The three places (DECISIONS.md, „The redesign“): where each goes, its name, and which paths are part of it. A game
  * of the day is played on Днес, a topic's from its chapter in the Алманах; a duel is the friends'. */
-const places: [href: string, label: string, here: (p: string) => boolean][] = [
-  ["/", "Днес", (p) => p === "/" || invitePath.test(p)],
-  ["/almanac", "Алманах", (p) => /^\/(almanac|play)(\/|$)/.test(p)],
-  ["/friends", "Приятели", (p) => /^\/(friends|duel|players)(\/|$)/.test(p)],
+const places: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
+  ["/", "Днес", "today", (p) => p === "/" || invitePath.test(p)],
+  ["/almanac", "Алманах", "book", (p) => /^\/(almanac|play)(\/|$)/.test(p)],
+  ["/friends", "Приятели", "friends", (p) => /^\/(friends|duel|players)(\/|$)/.test(p)],
 ];
 
 reportErrors();
@@ -36,7 +36,7 @@ loadPictures().catch(() => {}); // the illustrations, in a file of their own: on
 /** The places as links (the bar's on a big screen, the foot's on a phone): the one here marked; a dot on Приятели
  * while something has come there since the player last looked (friendsNews). */
 const placeLinks = () =>
-  places.map(([href, label, here]) =>
+  places.map(([href, label, icon, here]) =>
     h(
       "a",
       {
@@ -45,6 +45,7 @@ const placeLinks = () =>
         // News in Приятели since the player last looked: a dot on it.
         class: () => (href === "/friends" && friendsNews() ? "news" : ""),
       },
+      h("span", { class: `i i-${icon}`, "aria-hidden": "true" }),
       label,
       () => (href === "/friends" && friendsNews() ? h("span", { class: "sr" }, " (има ново)") : null),
     ),
