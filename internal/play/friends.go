@@ -339,13 +339,13 @@ type Friend struct {
 	Drawn int `json:"drawn"`
 }
 
-// FriendsOf lists a player's friends: those who've played today first, best first (as the day's board has them),
-// then the rest by name. A friend's
+// FriendsOf lists a player's friends: those who've played today first, best first (as the day's board has them, and
+// equal ones by name), then the rest by name. A friend's
 // day played at a script's speed is theirs alone to see (fair.go).
 func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	db := g.DB.Read
 	rows, err := db.QueryContext(ctx, `SELECT u.id, u.name, u.tag, f.since, r.rights, r.closeness,
-			`+countedOf("r.questions")+`, r.ms, `+lookColumns+`
+			`+countedOf("r.questions")+`, `+lookColumns+`
 		FROM friends f JOIN users u ON u.id = f.friend_id
 		LEFT JOIN runs r ON r.user_id = u.id AND r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND NOT r.shadow AND NOT r.pencil
 		WHERE f.user_id = ?`, g.Today(), userID)
@@ -356,15 +356,15 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	at := map[int64]int{}
 	for rows.Next() {
 		var f Friend
-		var rights, closeness, of, ms sql.NullInt64
+		var rights, closeness, of sql.NullInt64
 		var avatar string
-		if err := rows.Scan(&f.ID, &f.Name, &f.Tag, &f.Since, &rights, &closeness, &of, &ms, &avatar); err != nil {
+		if err := rows.Scan(&f.ID, &f.Name, &f.Tag, &f.Since, &rights, &closeness, &of, &avatar); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		f.Look = g.lookOf(f.ID, avatar)
 		if rights.Valid {
-			f.Today = &Score{Name: f.Name, Rights: int(rights.Int64), Of: int(of.Int64), Ms: ms.Int64,
+			f.Today = &Score{Name: f.Name, Rights: int(rights.Int64), Of: int(of.Int64),
 				tie: tiebreak{closeness: int(closeness.Int64)}}
 		}
 		at[f.ID] = len(list)
@@ -410,28 +410,27 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 			return b.Today.Rights - a.Today.Rights
 		case a.Today != nil && a.Today.tie != b.Today.tie:
 			return a.Today.tie.cmp(b.Today.tie)
-		case a.Today != nil && a.Today.Ms != b.Today.Ms:
-			return cmpInt(int(a.Today.Ms), int(b.Today.Ms))
 		}
 		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 	})
 	return list, rows.Err()
 }
 
-// FriendsBoard is the day's board among a player and their friends: everyone of them who finished it, best first.
+// FriendsBoard is the day's board among a player and their friends: everyone of them who finished it, best first,
+// placed as the day's board is (placed: equal ones share a place, the player first among their equals).
 // Empty while none of their friends has. A game played at a script's speed is on it for its player alone (fairFor).
 // Once the player has finished the day, the first BoardTop rows and their own carry how each of the ten went (Trail),
 // as Начало shows them beside the result; before that, nothing of how the others' went.
 func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Score, error) {
 	// From the player and their friends to each one's game of the day (runs_one_a_day): CROSS JOIN keeps that order,
 	// so it costs as many as they are, not as many as the day has players.
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT r.id, u.id, u.name, u.tag, r.rights, `+countedOf("r.questions")+`,
-			r.ms, `+lookColumns+`
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT r.id, u.id, u.name, u.tag, r.rights, r.closeness,
+			`+countedOf("r.questions")+`, `+lookColumns+`
 		FROM (SELECT ?2 AS id UNION SELECT friend_id FROM friends WHERE user_id = ?2) f
 		CROSS JOIN runs r ON r.user_id = f.id AND r.kind = 'day' AND r.day = ?1
 		JOIN users u ON u.id = r.user_id
 		WHERE r.finished_at IS NOT NULL AND `+fairFor("r", "?2")+`
-		ORDER BY `+dayOrderOf("r"), day, userID)
+		ORDER BY `+resultOrder("r")+`, r.user_id <> ?2, r.id`, day, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -443,7 +442,7 @@ func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Sc
 		var s Score
 		var run, id int64
 		var avatar string
-		if err := rows.Scan(&run, &id, &s.Name, &s.Tag, &s.Rights, &s.Of, &s.Ms, &avatar); err != nil {
+		if err := rows.Scan(&run, &id, &s.Name, &s.Tag, &s.Rights, &s.tie.closeness, &s.Of, &avatar); err != nil {
 			return nil, err
 		}
 		s.Me, s.Look = id == userID, g.lookOf(id, avatar)
@@ -454,6 +453,7 @@ func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Sc
 		return nil, err
 	}
 	rows.Close()
+	placed(board)
 	if !played {
 		return board, nil
 	}

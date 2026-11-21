@@ -220,7 +220,8 @@ export interface Score {
   rights: number;
   /** How many questions `rights` is out of: the day's that count (ten, but for one that counts for nobody). */
   of: number;
-  ms: number;
+  /** The row's place on its board (play.Score.Place): shared by those as many right and as close on the number. */
+  place?: number;
   me?: boolean;
   avatar?: string;
   /** How each of the ten went: on the friends' board, once the viewer has finished the day. */

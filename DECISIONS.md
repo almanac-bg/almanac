@@ -41,6 +41,8 @@ packages' doc comments; this file holds only what must not drift.
   - **The issue is asked once.** Its score is the number right out of 10; a close answer is „близо“, not right. No
     points and no bonus. No played question is asked again (no Втори шанс, no past issues), and a share link opened
     after its day opens today's issue.
+  - **Time never counts:** not in the score, not in a tie (board places are shared; a duel even in right answers and
+    the hard number's closeness is a draw).
   - **Ink.** A right answer in the issue, the first time a player meets that question, writes its fact in ink. Every
     other fact a player meets (a miss, or any answer in chapter games and duels) is in the book in grey, as met: never
     counted, never promised to turn into ink. A chapter shows one number, its ink.

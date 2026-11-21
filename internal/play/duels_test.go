@@ -468,8 +468,6 @@ func TestDuelTheOtherAsFarAsYouGo(t *testing.T) {
 	}
 }
 
-// The same right answers, and nothing else to break the tie: the quicker wins only by a second or more over the game
-// (TieBand); closer, it's a draw.
 // A friend has a week to play a duel sent to them (DECISIONS.md, „The direction“): open for six days and a half, gone
 // past seven.
 func TestDuelWaitsAWeek(t *testing.T) {
@@ -501,22 +499,25 @@ func TestDuelWaitsAWeek(t *testing.T) {
 	}
 }
 
-func TestTieBand(t *testing.T) {
+// The same right answers and as close on the number: a draw, however much quicker one was (time never counts); a
+// closer number wins.
+func TestDuelEvenIsADraw(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana, bo := w.user(), w.user()
-	duel := func(slower time.Duration) DuelView {
+	w.befriend(ana, bo)
+	duel := func(closer int) DuelView {
 		t.Helper()
-		if _, err := w.g.Friend(ctx, ana, bo); err != nil {
-			w.befriend(ana, bo)
-		}
-		id, _ := w.g.DuelFriend(ctx, ana, bo)
-		// Both as quick, answer for answer (the same score); Ana slower overall by `slower` (her line's).
-		run := w.playSide(ana, id, nil)
-		if _, err := w.db.Write.Exec(`UPDATE runs SET ms = ms + ? WHERE id = ?`, slower.Milliseconds(), run); err != nil {
+		id, err := w.g.DuelFriend(ctx, ana, bo)
+		if err != nil {
 			t.Fatal(err)
 		}
-		w.play(ana, run, repeat(w.right, Length)...)
+		w.playSide(ana, id, repeat(w.right, Length))
+		// Ana's game took ten minutes longer than Bo's will, her number `closer` nearer (in thousandths).
+		if _, err := w.db.Write.Exec(`UPDATE runs SET ms = ms + 600000, closeness = closeness + ?
+			WHERE id = (SELECT a_run FROM duels WHERE id = ?)`, closer, id); err != nil {
+			t.Fatal(err)
+		}
 		w.playSide(bo, id, repeat(w.right, Length))
 		d, err := w.g.DuelOf(ctx, bo, id)
 		if err != nil || d.You.Rights != d.Opponent.Rights {
@@ -524,11 +525,14 @@ func TestTieBand(t *testing.T) {
 		}
 		return d
 	}
-	if d := duel(900 * time.Millisecond); d.State != DuelDraw {
-		t.Fatalf("0,9 s apart: %+v", d)
+	if d := duel(0); d.State != DuelDraw || d.TieBy != "" {
+		t.Fatalf("even, ten minutes apart: %+v", d)
 	}
-	if d := duel(1500 * time.Millisecond); d.State != DuelWon {
-		t.Fatalf("1,5 s apart: %+v", d)
+	if list, _ := w.g.DuelsOf(ctx, ana); len(list.Played) == 0 || list.Played[0].State != DuelDraw {
+		t.Fatalf("Ana's duels: %+v", list)
+	}
+	if d := duel(100); d.State != DuelLost || d.TieBy != TieNumber {
+		t.Fatalf("Ana's number nearer: %+v", d)
 	}
 }
 

@@ -884,12 +884,12 @@ function laidTop(el: HTMLElement): number {
   return y;
 }
 
-/** How a question went for the other side of a duel, as a line under the player's verdict: „Мария: вярно за 4,2 с“.
- * Their mark for it comes with the player's own answer (play.State.Against): none, nothing to say. */
+/** How a question went for the other side of a duel, as a line under the player's verdict: „Мария: вярно“ (never how
+ * long it took: time never counts). Their mark for it comes with the player's own answer (play.State.Against): none,
+ * nothing to say. */
 function theirLine(name: string, m: TheirMark | undefined): Child {
   if (!name || !m) return null;
-  const secs = (m.ms / 1000).toLocaleString("bg", { maximumFractionDigits: 1 });
-  const how = m.right ? `вярно за ${secs}\u00a0с` : m.close ? "близо" : m.missed ? "без отговор" : "грешно";
+  const how = m.right ? "вярно" : m.close ? "близо" : m.missed ? "без отговор" : "грешно";
   return h("p", { class: `their-line${m.right ? " right" : ""}` }, h("b", null, `${name}: `), how);
 }
 

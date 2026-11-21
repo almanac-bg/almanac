@@ -136,7 +136,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   action, the ways on and that line on the right, „Прегледай въпросите“ under both in a reading column. Its start
   (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name.
 - **Приятели:** the board (friends by default, or all of България: its spread and the player's place first, then the
-  top rows: the place, the avatar, the name with the row's width and the seal and „ти“ after it, the score and the
+  top rows: the place (shared by those as many right and as close on the number, never told apart by time: 1, 2, 2,
+  4; the player first among their equals), the avatar, the name with the row's width and the seal and „ти“ after it, the score and the
   small squares on a line under it, on a line of their own under the score below 340 px or in large text; the
   squares once the player has played the day, on both boards); the friends (a row each: avatar, the name and seal
   across the row, never cut, today's score and the duels between you „дуели 3 : 1“ under it; the column a third of a
@@ -146,8 +147,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   action, „Чакаш“, „Изиграни“: an open one how it stands under the name, „Изиграй същите десет въпроса · още 6 дни“,
   „Довърши своята игра“ once its first question was shown, „Ти: 8 · още 6 дни“; a played one at the right its end
   („Победа“) over its score, a heavy numeral („8:6“), and on a line of its own under the row, the row's width, what
-  more there is to say: that it was against a recording, what broke a tie on even right answers and who was quicker by
-  name („Равен брой верни · по-бързо отговаря Иво: 116,9 с срещу твоите 135,1 с“); one that ran out „Изтече“ alone at
+  more there is to say: that it was against a recording, and what broke a tie on even right answers („Равен брой
+  верни · реши по-близкото число“: nothing else does; even in that too, „Равенство“ and nothing more); one that ran out „Изтече“ alone at
   the right, why under the row („Иво не го изигра навреме.“); the record between two is the friend's
   row's alone). Friends are added by the player's invite link, „Покани приятел“
   (`.invite-friend`, an outlined `.btn`: a phone's share sheet with „Добави ме в АЛМАНАХ: <link>“, a big screen's copy,
@@ -159,7 +160,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   it broken only between its words, the score), their scores as the heroes and „от 10“ in words, the marks, no
   hairlines; a spread on a big screen, the ways on (one width) and the record under them on the right (a phone has
   them in that order too: the next duel in sight under the result); its marks as the tiles (близо half filled),
-  nothing ringed: speed only breaks a tie.
+  nothing ringed, no time on any of them: time never counts.
 - **Профил:** the avatar with the seal worn on its corner, the name; a guest's ways in one quiet line under it („Играта
   ти е само на това устройство. Запази я с имейл · Имаш профил? Влез · Как те виждат другите“, each opening its form
   in the line's place); the longest streak and what the week forgives (that it's used up, only while a streak runs);
