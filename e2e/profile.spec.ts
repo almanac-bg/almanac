@@ -7,18 +7,19 @@ test("Профил: one list of seals, the best worn on the avatar, never chosen
   await page.goto("/");
   await ranked(page, 3);
   await page.goto("/me");
-  // One list, a row a chapter: its seal, its name and its ink, and under them its rank and what's left to the next in
-  // words over a bar of the way (at the rank's first ink: empty). Nothing to tap, nothing ringed as worn, no way to
-  // choose; no single chapter's ladder over it.
+  // One list, a row a chapter: its seal, its name and its ink, and under them a bar of its ink out of the next rank's
+  // (15 of 40, even at the rank's first ink), the rank under its left end and what's left under its right. Nothing to
+  // tap, nothing ringed as worn, no way to choose; no single chapter's ladder over it.
   const rows = page.locator(".me-seals .seal-list .seal-row");
   await expect(rows).toHaveCount(10);
   const history = rows.filter({ hasText: "История" });
   await expect(history.locator(".seal")).toHaveClass(/\bt-history\b/);
   await expect(history.locator(".seal-row-name")).toHaveText("История");
   await expect(history.locator(".seal-row-ink")).toHaveText("15 с мастило");
-  await expect(history.locator(".standing-words")).toHaveText(/^·Тетрадка·още\s25\sдо „Книга“$/);
+  await expect(history.locator(".standing-now")).toHaveText("Тетрадка");
+  await expect(history.locator(".standing-next")).toHaveText(/^още\s25\sдо\s„Книга“$/);
   await expect(history.locator(".standing-bar")).toBeVisible();
-  expect(await history.locator(".standing-bar > i").evaluate((i) => (i as HTMLElement).style.width)).toBe("0%");
+  expect(await history.locator(".standing-bar > i").evaluate((i) => (i as HTMLElement).style.width)).toBe("37.5%");
   await expect(page.locator(".me-seals button, .ladder")).toHaveCount(0);
   await expect(page.locator(".screen")).not.toContainText(/избери|Носиш|Печатът на/);
   // The badge is the best (every chapter alike in rank, ink and day: the bank's first), on the avatar's corner.

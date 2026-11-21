@@ -432,7 +432,7 @@ export async function cutOrOverlapping(page: Page): Promise<string[]> {
     )) {
       const box = card.getBoundingClientRect();
       for (const el of card.querySelectorAll("*")) {
-        // What shows of it: a box that clips (.standing-words, its line's first dot out of sight) cuts it to its own.
+        // What shows of it: a box that clips (a bar's fill) cuts it to its own.
         let { left, right, width } = el.getBoundingClientRect();
         for (let up = el.parentElement; up && up !== card; up = up.parentElement)
           if (getComputedStyle(up).overflowX !== "visible") {

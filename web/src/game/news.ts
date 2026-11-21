@@ -87,7 +87,8 @@ function metLine(n: number): Child {
   );
 }
 
-/** The chapter nearest its next rank: its seal, its name, and where it stands (ui.ts, standing),„История: още 2 до Тетрадка“. */
+/** The chapter nearest its next rank: its seal, its name, and where it stands (ui.ts, standing): its bar, „Страница“
+ * under its left end, „още 2 до „Тетрадка““ under its right. */
 function stepLine(s: NonNullable<News["step"]>): Child {
   return h(
     "p",

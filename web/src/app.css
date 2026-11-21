@@ -1487,49 +1487,46 @@
     font: 900 12.5px var(--font-numeral);
   }
 
-  /* Where a chapter stands (ui.ts, standing): what's left to the next rank in words, and under them a slim bar of the
-     way from its rank to the next. On the page, the chapter's deep colour (4.5:1 on it, by day and night) over a track
-     of it; on a chapter's sheet, where its colour is the paper, the sheet's ink. Words too long for a line go on two,
-     with no dot left at a line's end: each part is led by its dot, and a line's first is out of sight to the left. */
+  /* Where a chapter stands (ui.ts, standing): a bar filled for the chapter's ink out of the next rank's, and under it
+     its two ends named, the rank held at the left in ink, what's left to the next at the right. On the page, the
+     chapter's deep colour (4.5:1 on it, by day and night) over a track of it; on a chapter's sheet, where its colour
+     is the paper, the sheet's ink. Where the two don't fit on a line (large text), the right goes under the left, at
+     the left; never cut. */
   .standing {
     display: grid;
-    gap: 6px;
+    gap: 5px;
     min-width: 0;
   }
 
   .standing-words {
-    overflow: hidden;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0 12px;
     color: var(--ink-3);
     font: 700 0.8125rem / 1.3 var(--font-sans);
   }
 
-  .standing-words > span {
-    display: flex;
-    flex-wrap: wrap;
-    margin-left: -1em;
-  }
-
-  /* A part: its dot, and its words beside it, wrapping under themselves, never under the dot (out of sight). */
-  .standing-words > span > span {
-    display: flex;
+  .standing-words > * {
     min-width: 0;
+    overflow-wrap: break-word;
   }
 
-  .standing-words > span > span > span {
-    min-width: 0;
+  .standing-now {
+    color: var(--ink);
+    font-weight: 900;
   }
 
-  .standing-dot {
-    flex: none;
-    width: 1em;
-    font-style: normal;
-    text-align: center;
+  .standing-now.none {
+    color: inherit;
+    font-weight: inherit;
   }
 
   .standing-bar {
     display: block;
-    height: 6px;
-    border-radius: 3px;
+    height: 8px;
+    border-radius: 4px;
     background: color-mix(in srgb, var(--td) 20%, transparent);
     overflow: hidden;
   }
@@ -1541,7 +1538,7 @@
     background: var(--td);
   }
 
-  .leaf .standing-words {
+  .leaf :is(.standing-words, .standing-now) {
     color: inherit;
   }
 
@@ -4439,8 +4436,8 @@
   }
 
   /* The seals (ui.ts, sealList): one list on a card, a row a chapter between hairlines: the seal; the chapter's name,
-     its ink at the row's end; under them where it stands (.standing), the rank and what's left over its bar, as wide
-     as the row beside the seal. */
+     its ink at the row's end; under them where it stands (.standing), its bar with the rank and what's left under it,
+     as wide as the row beside the seal. */
   .seal-list {
     margin: 0;
     padding: 2px 16px;
@@ -4886,12 +4883,12 @@
     line-height: 0.85;
   }
 
-  /* The rank over what's left and its bar (.standing), clear of the turned corner. */
+  /* The rank over its bar, what's left under it (.standing), clear of the turned corner. */
   .card-rank {
     display: grid;
-    gap: 2px;
+    gap: 5px;
     padding-right: 22px;
-    font: 700 0.8125rem / 1.25 var(--font-sans);
+    font: 900 0.8125rem / 1.25 var(--font-sans);
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -4926,7 +4923,7 @@
     }
   }
 
-  /* A chapter: its head on its sheet (its glyph, its name, the seal with its pips, its ink, the next rank), „Игра на
+  /* A chapter: its head on its sheet (its glyph, its name, the seal, its ink, where it stands), „Игра на
      главата“, then its facts. */
   .chapter-side {
     display: grid;
@@ -4963,10 +4960,13 @@
     font-size: min(calc(14px + 1.125rem), 10.5vw);
   }
 
+  /* The seal beside the ink (the ink under it, with too little room beside it), and under them where it stands
+     (.standing), as wide as the box. */
   .ch-stand {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 16px;
+    gap: 14px 16px;
     padding: 14px;
     border-radius: 20px;
     background: rgb(255 255 255 / 0.72);
@@ -4979,13 +4979,21 @@
 
   .ch-words {
     display: grid;
-    flex: 1 1 auto;
+    flex: 1 1 8rem;
     gap: 4px;
     min-width: 0;
   }
 
-  .ch-words .standing-words {
+  .ch-stand > .standing {
+    flex: 1 1 100%;
+  }
+
+  .ch-stand .standing-words {
     font-size: 0.9375rem;
+  }
+
+  .ch-stand .standing-now {
+    font-size: 1.125rem;
   }
 
   .ch-ink {
@@ -4999,10 +5007,6 @@
   .ch-ink .num {
     font-size: calc(28px + 1.75rem);
     line-height: 0.85;
-  }
-
-  .ch-rank {
-    font: 900 1.25rem / 1.1 var(--font-sans);
   }
 
   .ch-next {
@@ -5772,7 +5776,7 @@
   .step-words {
     display: grid;
     flex: 1 1 auto;
-    gap: 2px;
+    gap: 6px;
     min-width: 0;
   }
 
@@ -7923,11 +7927,6 @@
 
   .tight .chapter-title {
     flex-basis: 100%;
-  }
-
-  /* Its seal over what it says. */
-  .tight .ch-stand {
-    flex-wrap: wrap;
   }
 
   /* A title's long word breaks where it must, wherever the title sits. */

@@ -92,7 +92,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      chip, the answer as a headword (an order, a match, a split: its parts a line each, at the entry's size), the
      question, the fact. Under it what the day wrote (`game/news.ts`): „+6 с
      мастило“; „Един от въпросите вече беше в твоя Алманах и остава в сиво.“; the chapter nearest its next rank with
-     its seal, its name and where it stands (`standing()`: „Тетрадка · още 2 до „Книга““ over its bar); or ranks
+     its seal, its name and where it stands (`standing()`: its bar, „Тетрадка“ and „още 2 до „Книга““ under it); or ranks
      risen, their seals and one line, each rank once with its chapters, their names the links („Нови печати: „Страница“ в География и в Технологии и игри.“; one chapter's: its
      ladder under it).
   4. Friends who played it, up to five (`.friends-day`), each a board's row as in Приятели (`scoreRow()`): their
@@ -111,16 +111,16 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   десетте“, never „най-трудният“, which is the issue's tenth), and each question with its fact (its verdict never a
   true-or-not's answer: „Точно“, „Грешно“).
 - **Алманах:** its head (Микс and България as two ways to play, words only, no glyph: theirs would sit apart from the chapters'; no lifetime totals), then the chapters, each a folded
-  card in its colour with its seal as the badge (40px), its ink („180 с мастило“) and its rank, what's left to the
-  next under it („Тетрадка“, „още 15 до „Книга““: a line each, no dot to hang at a line's end); a counter at zero is hidden, and the head says once how ink is written; a
+  card in its colour with its seal as the badge (40px), its ink („180 с мастило“), its rank over its bar and what's left to
+  the next under it („Тетрадка“, the bar, „още 15 до „Книга““: a card has no room for both under the bar); a counter at zero is hidden, and the head says once how ink is written; a
   chapter's card with no ink yet is its glyph over its name, no taller, never stretched to the inked ones beside it.
   Two across on a phone, five on a big screen (the page's whole width, the head a reading width).
   The inked chapters first, led by the one nearest its next step; those with no ink yet after them, from a row of their
   own, so no short card stands beside a tall one. Микс and България are ways to play (`/play/mix`, `/play/bulgaria`),
   never pages of their own: every fact as one list is what the book isn't (DECISIONS.md). A chapter's game left
   half-way today shows under the head, where it stopped, with „Продължи“ (its cross comes back here).
-- **A chapter:** its head on its sheet (glyph, name, the seal, its ink, the rank, how much to the next „още 16 до
-  „Книга““ over its bar: `standing()`), „Игра на главата“, then its facts, the latest first, each as tall as it holds:
+- **A chapter:** its head on its sheet (glyph, name, the seal, its ink, and under them as wide as the head its bar,
+  the rank and „още 16 до „Книга““ under it: `standing()`), „Игра на главата“, then its facts, the latest first, each as tall as it holds:
   ink black, facts met in grey (a thin solid 1.5px grey outline, lighter text). An entry reads in the order it was lived:
   the dateline, the question small and muted (a kicker), the answer as the headword (big, bold) between it and the
   fact, then the fact in body text; a statement has no question, its headword right under the dateline; an answer of
@@ -299,12 +299,14 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
 
   Then „Летопис · N“ for each further 100, its number on a tab from 32px. 24px at the least. How far towards the next
   rank is said and drawn by one component, `standing()`, everywhere (Профил's seals, a chapter's page and card, the
-  result's line): the words („Страница · още 8 до „Тетрадка““; before a first seal „още 1 до „Бележка““; past
-  Летопис „Летопис · 2 · още 37 до „Летопис · 3““; the rank's name left out where a line over it says it), and under
-  them a slim continuous bar filled for the part of the way from the rank's ink to the next one's (play.ChapterRank:
-  `from`, `nextAt`), never full while the next isn't held. On the page the chapter's deep colour over a track of it; on
-  a chapter's sheet the sheet's ink (`standing.test.ts` holds both 3:1, day and night). Words too long for a line go on
-  two, with no dot left at a line's end. The seal itself never shows it. By day a fine
+  result's line): a bar filled for the chapter's ink out of the next rank's (1 of 5 a fifth, 40 of 100 two fifths: its
+  length says how near the next is in the words' own units, and a first ink shows), past Летопис the ink within its
+  hundred (`from`, `nextAt`: play.ChapterRank), never full while the next isn't held; under it its two ends named:
+  at the left the rank held, bold, in ink („Страница“, „Летопис · 2“; before a first seal „Още без печат“), at the
+  right what's left to the next („още 8 до „Тетрадка““, breaking only between „още 8“ and „до „Тетрадка““). On a
+  card, too narrow for both, the rank over the bar and the right one alone under it. With large text the right goes
+  under the left, never cut. On the page the bar is the chapter's deep colour over a track of it; on a chapter's
+  sheet the sheet's ink (`standing.test.ts` holds both 3:1, day and night). The seal itself never shows it. By day a fine
   outline in the deep colour; on a sheet (its own colour, often) a 2px ink rim (`.rimmed`), and a filled seal there a
   lighter disc of its colour, so Бележка, a thin open ring, shows the sheet through it and Страница doesn't. With a
   player only the seal shows, never its rank's word, and only in one place: on their avatar's lower right corner
