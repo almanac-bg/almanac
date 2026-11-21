@@ -96,14 +96,17 @@ export function issueWords(issue: number | undefined, day: string): string {
 const vowel = /[аъоуеиюяѝ]/;
 /** A stop or a hiss with р or л after it: they begin a syllable together. */
 const onset = /^[бвгдзкпстфхжшчц][рл]$/;
+/** Two consonants that begin a syllable together, more widely: a stop or a hiss with р, л or в, and с or ш with a
+ * stop. */
+const starts = /^([бвгдзкпстфхжшчц][рлв]|[сш][тпк])$/;
 
 /** Where a word may break at a line's end, as soft hyphens, by the Bulgarian rules: by syllables; one consonant
  * between two vowels goes to the next line („ма-ма“); of two or more, the last does, or the last two where they begin
  * a syllable together („сес-тра“), so two of the same part („мост-та“); „ь“ never starts a line, „дж“ and „дз“ stay
- * together, and no line keeps or takes a single letter; a word under seven letters fits any column whole. The browser
- * breaks a word there, with a hyphen, instead of at any letter: no browser knows Bulgarian hyphenation itself. It
- * fills a line as far as a soft hyphen lets it, so every caller holds each such word whole (questions.ts, wholeWords;
- * ui.ts, nameWords): it goes to the next line whole where it fits there („Майкъл / Фарадей“, not „Фара-дей“), and
+ * together, no line keeps a single letter and none takes fewer than three (no „Преброяване-то“); a word under seven
+ * letters fits any column whole. The browser breaks a word there, with a hyphen, instead of at any letter: no
+ * browser knows Bulgarian hyphenation itself. It fills a line as far as a soft hyphen lets it, so every caller holds
+ * each such word whole (questions.ts, wholeWords; ui.ts, nameWords): it goes to the next line whole where it fits there („Майкъл / Фарадей“, not „Фара-дей“), and
  * breaks only where it's wider than its line (a long name in large text at 320 px). */
 export function hyphenate(text: string): string {
   return text.replace(/[а-яѝ]{7,}/gi, (word) => {
@@ -115,8 +118,11 @@ export function hyphenate(text: string): string {
       if (!vowel.test(w.charAt(i))) continue;
       if (prev >= 0 && i - prev > 1) {
         const two = w.slice(i - 2, i);
-        const cut = i - prev > 2 && (two[1] === "ь" || onset.test(two) || two === "дж" || two === "дз") ? i - 2 : i - 1;
-        if (cut >= 2 && w.length - cut >= 2) {
+        let cut = i - prev > 2 && (two[1] === "ь" || onset.test(two) || two === "дж" || two === "дз") ? i - 2 : i - 1;
+        // Never fewer than three letters on to the next line: one consonant earlier, where the two begin a syllable
+        // together („кралс-тво“), or not at all („Замръзналото“, „мостта“).
+        if (w.length - cut < 3) cut = cut - 1 > prev && starts.test(w.slice(cut - 1, cut + 1)) ? cut - 1 : -1;
+        if (cut >= 2 && w.length - cut >= 3) {
           out += `${word.slice(from, cut)}\u00ad`;
           from = cut;
         }

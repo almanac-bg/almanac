@@ -106,18 +106,6 @@ export function filed(topic: string): Child {
   );
 }
 
-/** A box that may scroll on its own (the answer's panel docked at a run's foot, with a long fact: app.css): while it
- * does, the keyboard can reach it to scroll it, a stop of its own; while all of it shows, it's none. */
-export function reachable(box: HTMLElement): void {
-  const check = () => {
-    if (box.scrollHeight > box.clientHeight + 1) box.tabIndex = 0;
-    else box.removeAttribute("tabindex");
-  };
-  const sized = new ResizeObserver(check);
-  sized.observe(box);
-  onCleanup(() => sized.disconnect());
-}
-
 /** A topic's colour, the same on every screen: its chapter's (app.css, .t-<topic>). */
 export function toneOf(category: string): string {
   return `t-${category}`;
