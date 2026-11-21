@@ -109,9 +109,16 @@ test("a player's profile: asked to be friends from it, and friends there", async
   await a.getByRole("button", { name: "Приеми" }).click();
   await expect(a.getByText("Приятели сте.")).toBeVisible();
 
-  // Friends now, on his side too.
+  // Friends now, on his side too, with a duel a tap away (its name first, a drawn one: duels.spec); the page laid out
+  // as Профил is: the head, how they stand where the streak would be, the seals.
   await b.reload();
   await expect(b.locator(".player-actions")).toContainText("Приятели сте.");
+  expect(await b.locator(".screen.me > .me-intro > *").evaluateAll((els) => els.map((e) => e.classList[0]))).toEqual([
+    "me-head",
+    "player-actions",
+    "sect",
+  ]);
+  await expect(b.getByRole("button", { name: /^Дуел (с|със) / })).toBeVisible();
 
   // Her own profile, as others see it, says so.
   await a.goto(`/players/${ana.tag}`);

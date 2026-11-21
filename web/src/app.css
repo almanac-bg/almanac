@@ -3743,18 +3743,6 @@
     min-width: 0;
   }
 
-  .player-actions {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2) var(--space-3);
-  }
-
-  .player-actions > p {
-    flex: 1 1 100%;
-    margin: 0;
-  }
-
   /* The name whole, never cut: on a second line rather than an ellipsis, „ти“ after its last word. */
   .who-name {
     display: block;
@@ -4338,7 +4326,8 @@
   }
 
   /* ---- Профил: the avatar with the seal worn, the name; the streak now; the seals; Настройки (the avatars on a
-     sheet: screens/avatar.ts) ---- */
+     sheet: screens/avatar.ts). A player's page is laid out the same (.screen.me): the head, how you stand with them
+     where the streak is, the seals ---- */
 
   .me-intro,
   .me-side {
@@ -4423,13 +4412,28 @@
     font: 700 1rem / 1.2 var(--font-sans);
   }
 
-  .me-rename {
-    justify-self: start;
-    font-size: 0.9375rem;
+  /* The head's quiet line under the tag: on Профил the way to change the name, on a player's page since when they
+     play. */
+  .me-line {
+    color: var(--ink-3);
+    font: 600 0.9375rem / 1.4 var(--font-sans);
   }
 
-  .me-drawn {
-    font-size: 0.875rem;
+  /* How you stand with a player, on their page where Профил has the streak, in the streak's card (.streak-chip): the
+     words on a line, the buttons under them. */
+  .player-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding: 14px 18px;
+    border-radius: var(--r-3);
+    background: var(--surface);
+  }
+
+  .player-actions > p {
+    flex: 1 1 100%;
+    margin: 0;
   }
 
   .me-links {
@@ -7217,8 +7221,8 @@
   }
 
   /* A laptop and up: the page takes the width. Начало in two columns (the day and the topics; beside them the streak
-     and the ways to play with others); Профил's places at 64rem, with Профил's cards in two
-     columns; every other page a centred column of 48rem, so no line of text runs too long. */
+     and the ways to play with others); Профил and a player's page one column of 40rem (.screen.me); every other page a
+     centred column of 48rem, so no line of text runs too long. */
   @media (min-width: 64rem) {
     #main {
       max-width: 76rem;
@@ -7228,12 +7232,6 @@
     main > * {
       max-width: 48rem;
       margin-inline: auto;
-    }
-
-    /* Начало, wherever it's drawn: its own page, or the end of the day's ten played there. */
-
-    main > :has(.me-head) {
-      max-width: 64rem;
     }
 
     /* The book: its chapters five across, the page's width. */
@@ -7261,27 +7259,6 @@
        number big. */
 
     /* A new player: the day and the topics, one centred column. */
-
-    /* Профил: two columns of cards under the name, each read top to bottom. */
-    .screen:has(> .me-head) {
-      display: block;
-      columns: 2;
-      column-gap: var(--space-5);
-    }
-
-    .screen:has(> .me-head) > * {
-      margin: 0 0 var(--space-5);
-      break-inside: avoid;
-    }
-
-    .screen:has(> .me-head) > .me-head {
-      column-span: all;
-    }
-
-    .screen:has(> .me-head) > .link {
-      display: block;
-      width: fit-content;
-    }
 
     /* The avatar's choice: bigger looks to choose from, more to a row. */
     .picker {

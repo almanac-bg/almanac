@@ -29,7 +29,8 @@ let {
   keepGame,
   loadStats,
   formatNumber,
-  sealList,
+  profileHead,
+  sealsSection,
   illustration,
 } = {} as Kit;
 
@@ -51,7 +52,8 @@ export function me(kit: Kit) {
     keepGame,
     loadStats,
     formatNumber,
-    sealList,
+    profileHead,
+    sealsSection,
     illustration,
   } = kit);
   title("Профил");
@@ -131,11 +133,9 @@ function theirView(tag: string | undefined): Child {
 
 /** Who you are: your avatar as you wear it, the seal you wear on its corner, and „Смени“ under it (it, or a tap on the
  * avatar, opens the animals: `pick`); your name and tag; a name still the one drawn says so, with the way to change
- * it. */
+ * it. The same head as another's page (ui.ts, profileHead). */
 function head(data: () => Stats | null, pick: () => void): Child {
-  return h(
-    "div",
-    { class: "me-head" },
+  return profileHead(
     // One button, the avatar and its word: the whole of it a tap.
     h(
       "button",
@@ -143,21 +143,12 @@ function head(data: () => Stats | null, pick: () => void): Child {
       () => avatar(look(), { size: "l", name: user.peek()?.name, seal: data()?.seal }),
       h("span", { class: "me-avatar-change", "aria-hidden": "true" }, "Смени"),
     ),
-    h(
-      "div",
-      { class: "me-who" },
-      h("h1", null, () => nameWords(user()?.name ?? "Профил")),
-      () => (user()?.tag ? h("span", { class: "me-tag" }, `@${user()?.tag}`) : null),
-      () =>
-        user()?.drawn
-          ? h(
-              "p",
-              { class: "me-drawn muted" },
-              "Това име е избрано наслуки. ",
-              h("a", { class: "link", href: "/settings#name" }, "Смени името"),
-            )
-          : h("a", { class: "link me-rename", href: "/settings#name" }, "Смени името"),
-    ),
+    () => nameWords(user()?.name ?? "Профил"),
+    () => user()?.tag,
+    () => [
+      user()?.drawn ? "Това име е избрано наслуки. " : null,
+      h("a", { class: "link", href: "/settings#name" }, "Смени името"),
+    ],
   );
 }
 
@@ -191,17 +182,14 @@ function streakNow(s: Stats | null): Child {
   ];
 }
 
-/** The seals: one list, a row a chapter with a rank (ui.ts, sealList), its ink as the book has it now (the number its
- * Алманах card shows: Stats.ink); a view, no choice (the one worn on the avatar is the best: play.sealOf). Before any:
- * what brings the first. */
+/** The seals, as another's page has them (ui.ts, sealsSection): a row a chapter with a rank, its ink as the book has it
+ * now (the number its Алманах card shows: Stats.ink); a view, no choice (the one worn on the avatar is the best:
+ * play.sealOf). Before any: what brings the first. */
 function seals(ranks: ChapterRank[] | null, s: Stats | null): Child {
   if (!ranks) return null;
-  const list = sealList(ranks.map((r) => ({ ...r, ink: s?.ink?.[r.chapter] ?? r.ink })));
-  return h(
-    "section",
-    { class: "sect me-seals" },
-    h("div", { class: "sect-head" }, h("h2", null, "Печати")),
-    list ?? [
+  return sealsSection(
+    ranks.map((r) => ({ ...r, ink: s?.ink?.[r.chapter] ?? r.ink })),
+    [
       h("p", { class: "seal-worn" }, "Още нямаш печат."),
       h(
         "p",
