@@ -251,44 +251,44 @@ export interface Standing {
 /** The ink still to come to the next rank: never 0 (the next rank, held for a day's count: play.StepOf). */
 const leftOf = (s: Standing) => Math.max(1, s.nextAt - s.ink);
 
-/** How much of the way from its rank to the next a chapter has come, 0 to 1, as its words say it (never the whole:
- * the next rank isn't held yet). */
+/** How full a chapter's bar is, 0 to 1, as its words say it: its ink out of the next rank's (1 of 5 a fifth, 40 of 100
+ * two fifths), so the bar's length is the way to the next in the words' own units. Past Летопис, where each rank is a
+ * further hundred, the ink within its hundred: counted from nothing there, the bar would always look nearly full.
+ * Never the whole: the next rank isn't held yet. */
 export function wayOf(s: Standing): number {
-  const span = s.nextAt - s.from;
-  return span > 0 ? Math.min(1, Math.max(0, (s.nextAt - leftOf(s) - s.from) / span)) : 0;
+  const start = s.level > rankNames.length ? s.from : 0;
+  const span = s.nextAt - start;
+  return span > 0 ? Math.min(1, Math.max(0, (s.nextAt - leftOf(s) - start) / span)) : 0;
 }
 
-/** What's left to the next rank, in words: „още 8 до „Тетрадка““; `named`, after the rank's own name: „Страница · още
- * 8 до „Тетрадка““, „Летопис · 2 · още 37 до „Летопис · 3““ (before a first rank, no name: „още 1 до „Бележка““). */
-export function standingWords(s: Standing, named = true): string[] {
+/** Where a chapter stands, in words: the rank it holds („Страница“, „Летопис · 2“; before a first, „Още без печат“),
+ * and what's left to the next („още 8 до „Тетрадка““). */
+export function standingWords(s: Standing): [now: string, next: string] {
   const next = rankName(s.level + 1).replaceAll(" ", " ");
-  const left = `още ${leftOf(s)} до „${next}“`;
-  return named && s.level > 0 ? [rankName(s.level), left] : [left];
+  // Where it must break, between its halves: „още 8“, „до „Тетрадка““.
+  return [s.level > 0 ? rankName(s.level) : "Още без печат", `още ${leftOf(s)} до „${next}“`];
 }
 
-/** Where a chapter stands, said and drawn, one way everywhere (Профил's seals, a chapter's head and card, the result's
- * line): the words (`named`: the rank's name first, where nothing over them says it), and under them a slim bar in the
- * chapter's colour (in ink on its sheet) filled for the part of the way from its rank to the next. The bar is for the
- * eye: the words say it. Where they don't fit on a line, they go on two, the dot between them gone (app.css). */
+/** Where a chapter stands, one way everywhere (Профил's seals, a chapter's head and card, the result's line): a bar in
+ * the chapter's colour (in ink on its sheet) filled for its ink out of the next rank's (wayOf), and under it its two
+ * ends named: the rank held at the left, in ink, and what's left to the next at the right. Where both don't fit on a
+ * line, the right goes under the left, never cut; `named` false (a narrow card, its rank said over the bar), the right
+ * one alone. The bar is for the eye: the words say it. */
 export function standing(s: Standing, named = true): HTMLElement {
+  const [now, next] = standingWords(s);
   return h(
     "span",
     { class: `standing t-${s.chapter}` },
     h(
       "span",
-      { class: "standing-words" },
-      h(
-        "span",
-        null,
-        standingWords(s, named).map((w) =>
-          h("span", null, h("i", { class: "standing-dot", "aria-hidden": "true" }, "·"), h("span", null, w)),
-        ),
-      ),
+      { class: "standing-bar", "aria-hidden": "true" },
+      h("i", { style: { width: `${Math.round(wayOf(s) * 1000) / 10}%` } }),
     ),
     h(
       "span",
-      { class: "standing-bar", "aria-hidden": "true" },
-      h("i", { style: { width: `${Math.round(wayOf(s) * 1000) / 10}%` } }),
+      { class: "standing-words" },
+      named ? h("b", { class: s.level > 0 ? "standing-now" : "standing-now none" }, now) : null,
+      h("span", { class: "standing-next" }, next),
     ),
   );
 }
@@ -331,8 +331,8 @@ export function sealsSection(ranks: ChapterRank[], none: Child): HTMLElement {
 }
 
 /** A player's seals, one list, a row a chapter with a rank, in the bank's order: the seal (its glyph in it); the
- * chapter's name with its ink at the row's end; under them where it stands (standing: „Страница · още 8 до
- * „Тетрадка““ over its bar). A view, never a choice: the one worn is the best (play.sealOf). Nothing before a first
+ * chapter's name with its ink at the row's end; under them where it stands (standing: its bar, „Страница“ under its
+ * left end and „още 8 до „Тетрадка““ under its right). A view, never a choice: the one worn is the best (play.sealOf). Nothing before a first
  * seal: the page says what brings one. */
 function sealList(ranks: ChapterRank[]): Child {
   const had = categories

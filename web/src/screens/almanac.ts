@@ -27,7 +27,6 @@ let {
   pictureCredit,
   textWords,
   standing,
-  rankName,
   rename,
   seal,
   searchWords,
@@ -42,7 +41,7 @@ interface Rank {
   chapter: string;
   level: number;
   name: string;
-  /** The ink its rank starts at: the bar under it is the way from here to `nextAt` (ui.ts, standing). */
+  /** The ink its rank starts at: past Летопис, its bar is the way from here to `nextAt` (ui.ts, wayOf). */
   from: number;
   ink: number;
   next: string;
@@ -106,7 +105,6 @@ function setKit(kit: Kit) {
     pictureCredit,
     textWords,
     standing,
-    rankName,
     rename,
     seal,
     searchWords,
@@ -231,8 +229,8 @@ function way(id: string, name: string, note: string): Child {
 }
 
 /** A chapter's card: its colour, its seal as the badge (or its glyph, before a rank) over its name, its ink, and its
- * rank and under it the ink to the next over its bar („Тетрадка“, „още 15 до „Книга““: ui.ts, standing). The corner
- * turned, as a page of the book. */
+ * rank over its bar, and under the bar what's left to the next („Тетрадка“, the bar, „още 15 до „Книга““: ui.ts,
+ * standing). The corner turned, as a page of the book. */
 function card(id: string, ink: number, r: Rank | undefined): Child {
   const ranked = r && r.level > 0 ? r : null;
   return h(
@@ -251,8 +249,8 @@ function card(id: string, ink: number, r: Rank | undefined): Child {
         ink
           ? h("span", { class: "card-ink" }, h("b", { class: "num" }, formatNumber(ink)), h("span", null, "с мастило"))
           : null,
-        // The rank over what's left to the next and its bar: a card is narrow, so the rank has a line of its own.
-        ranked ? h("span", { class: "card-rank" }, h("span", null, ranked.name), standing(ranked, false)) : null,
+        // A card is too narrow for both ends' words under the bar: the rank goes over it, what's left under it.
+        ranked ? h("span", { class: "card-rank" }, h("b", null, ranked.name), standing(ranked, false)) : null,
       ],
       "card-leaf",
       { next: "" },
@@ -473,8 +471,9 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
   );
 }
 
-/** Where a chapter stands: its seal, its ink (the book's, as its card shows it), its rank's name, and the ink still to
- * come over its bar (ui.ts, standing). Before a rank, what writes its first: a right answer in the day's issue. */
+/** Where a chapter stands: its seal beside its ink (the book's, as its card shows it), and under them, as wide as the
+ * head, its bar with the rank under its left end and the ink still to come under its right (ui.ts, standing). Before a
+ * rank, what writes its first: a right answer in the day's issue. */
 function stand(id: string, r: Rank | undefined, ink: number): Child {
   const ranked = r && r.level > 0 ? r : null;
   return h(
@@ -485,10 +484,9 @@ function stand(id: string, r: Rank | undefined, ink: number): Child {
       "div",
       { class: "ch-words" },
       ink ? h("p", { class: "ch-ink" }, h("b", { class: "num" }, formatNumber(ink)), " с мастило") : null,
-      ranked
-        ? [h("p", { class: "ch-rank" }, rankName(ranked.level)), standing(ranked, false)]
-        : h("p", { class: "ch-next" }, "Всеки верен отговор в броя на деня вписва факт с мастило."),
+      ranked ? null : h("p", { class: "ch-next" }, "Всеки верен отговор в броя на деня вписва факт с мастило."),
     ),
+    ranked ? standing(ranked) : null,
   );
 }
 

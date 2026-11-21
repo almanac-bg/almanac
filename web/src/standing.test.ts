@@ -1,7 +1,7 @@
-// Where a chapter stands between two ranks (ui.ts, standing), in words and as a bar: what's left to the next rank, the
-// rank's name first where nothing over it says it; before a first seal and past Летопис as well; and the bar filled for
-// the part of the way from the rank's ink to the next one's, never the whole while the next isn't held. Its colours
-// hold their contrast: the bar's fill against its track and the page, by day and by night, and on a chapter's sheet.
+// Where a chapter stands (ui.ts, standing), in words and as a bar: the rank held (none before a first seal) and what's
+// left to the next, past Летопис as well; and the bar filled for the chapter's ink out of the next rank's (past Летопис,
+// within its hundred), never the whole while the next isn't held. Its colours hold their contrast: the bar's fill
+// against its track and the page, by day and by night, and on a chapter's sheet.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
@@ -21,27 +21,40 @@ const at = (level: number, ink: number, from: number, nextAt: number) => ({
   nextAt,
 });
 
-test("the words say the rank and what's left to the next", () => {
-  const nb = (s: string) => s.replaceAll(" ", " ");
-  assert.deepEqual(standingWords(at(2, 7, 5, 15)).map(nb), ["Страница", "още 8 до „Тетрадка“"]);
-  assert.deepEqual(standingWords(at(2, 7, 5, 15), false).map(nb), ["още 8 до „Тетрадка“"]);
-  assert.deepEqual(standingWords(at(0, 0, 0, 1)).map(nb), ["още 1 до „Бележка“"]);
-  assert.deepEqual(standingWords(at(7, 413, 350, 450)).map(nb), ["Летопис · 2", "още 37 до „Летопис · 3“"]);
+test("the words say the rank held and what's left to the next", () => {
+  const sp = (s: string) => s.replaceAll(" ", " ");
+  assert.deepEqual(standingWords(at(2, 7, 5, 15)).map(sp), ["Страница", "още 8 до „Тетрадка“"]);
+  assert.deepEqual(standingWords(at(1, 1, 1, 5)).map(sp), ["Бележка", "още 4 до „Страница“"]);
+  assert.deepEqual(standingWords(at(0, 0, 0, 1)).map(sp), ["Още без печат", "още 1 до „Бележка“"]);
+  assert.deepEqual(standingWords(at(6, 250, 250, 350)).map(sp), ["Летопис", "още 100 до „Летопис · 2“"]);
+  assert.deepEqual(standingWords(at(7, 413, 350, 450)).map(sp), ["Летопис · 2", "още 37 до „Летопис · 3“"]);
   // The next rank's ink reached but not yet counted (a day's count holds it): one still to come, never none.
-  assert.deepEqual(standingWords(at(3, 40, 15, 40), false).map(nb), ["още 1 до „Книга“"]);
+  assert.deepEqual(standingWords(at(3, 40, 15, 40)).map(sp), ["Тетрадка", "още 1 до „Книга“"]);
   // The next rank's name never breaks inside it.
   assert.ok(standingWords(at(7, 413, 350, 450))[1]?.includes("Летопис · 3"));
 });
 
-test("the bar is the part of the way from the rank's ink to the next one's", () => {
-  assert.equal(wayOf(at(2, 5, 5, 15)), 0);
-  assert.equal(wayOf(at(2, 10, 5, 15)), 0.5);
-  assert.equal(wayOf(at(7, 413, 350, 450)), 0.63);
+test("the bar is the ink out of the next rank's, in the words' own units", () => {
+  // 1 of 5, 40 of 100: never empty just past a rank, so a first ink shows on the bar.
+  assert.equal(wayOf(at(1, 1, 1, 5)), 0.2);
+  assert.equal(wayOf(at(4, 40, 40, 100)), 0.4);
+  assert.equal(wayOf(at(2, 5, 5, 15)), 1 / 3);
+  assert.equal(wayOf(at(2, 10, 5, 15)), 2 / 3);
+  assert.equal(wayOf(at(6, 300, 250, 350)), 300 / 350);
   assert.equal(wayOf(at(0, 0, 0, 1)), 0);
   // Held at one to come: as the words say it, never full.
-  assert.equal(wayOf(at(3, 45, 15, 40)), 24 / 25);
-  // A rank never falls, though its ink may (a fact found untrue): an empty bar, never less.
-  assert.equal(wayOf(at(4, 30, 40, 100)), 0);
+  assert.equal(wayOf(at(3, 45, 15, 40)), 39 / 40);
+  // A rank never falls, though its ink may (a fact found untrue): the bar is the ink as it is.
+  assert.equal(wayOf(at(4, 30, 40, 100)), 0.3);
+});
+
+test("past Летопис, each rank a further hundred, the bar is the ink within its hundred", () => {
+  assert.equal(wayOf(at(7, 413, 350, 450)), 0.63);
+  assert.equal(wayOf(at(7, 350, 350, 450)), 0);
+  assert.equal(wayOf(at(8, 499, 450, 550)), 0.49);
+  // Held at one to come, and ink fallen under its rank's: never full, never less than empty.
+  assert.equal(wayOf(at(7, 460, 350, 450)), 0.99);
+  assert.equal(wayOf(at(8, 440, 450, 550)), 0);
 });
 
 const css = readFileSync(new URL("./app.css", import.meta.url), "utf8");

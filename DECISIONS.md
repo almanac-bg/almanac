@@ -54,8 +54,10 @@ packages' doc comments; this file holds only what must not drift.
     counted, never promised to turn into ink. A chapter shows one number, its ink.
   - **Each chapter's seal (печат) is its rank,** from ink, never falling, named for the book, not the person
     (Бележка 1, Страница 5, Тетрадка 15, Книга 40, Том 100, Летопис 250, then „Летопис · 2“ for each further 100):
-    a badge of its own (not the logo); the way to the next rank is said in words over a bar (2026-11-21, in place of
-    four dots: „Страница · още 8 до „Тетрадка““); with a player only the seal shows, on their
+    a badge of its own (not the logo); the way to the next rank is a bar of the chapter's ink out of the next rank's,
+    the rank named under its left end and what's left under its right (2026-11-22: a bar of the way between two ranks
+    was empty just past each, and its ends named nothing, so it didn't show how close the next was: „Страница“, „още 8
+    до „Тетрадка““); with a player only the seal shows, on their
     avatar's corner (2026-11-21: one place, everywhere, never after the name), the name only in the Алманах and on a
     rank-up. No check against guessing: the names claim nothing a count doesn't hold. Avatars are the animals only, all
     free (2026-11-21): a seal's reward is the seal itself, worn as the badge; an avatar is a face, so animals only, and
