@@ -210,7 +210,7 @@ function way(id: string, name: string, note: string): Child {
 }
 
 /** A chapter's card: its colour, its seal as the badge (or its glyph, before a rank) over its name, its ink, and its
- * rank with the ink to the next („Тетрадка · още 15 до „Книга““: the ink is said over it). The corner turned, as a
+ * rank and under it the ink to the next („Тетрадка“, „още 15 до „Книга““: the ink is said over it). The corner turned, as a
  * page of the book. */
 function card(id: string, ink: number, r: Rank | undefined): Child {
   const ranked = r && r.level > 0 ? r : null;
@@ -231,7 +231,15 @@ function card(id: string, ink: number, r: Rank | undefined): Child {
         ink
           ? h("span", { class: "card-ink" }, h("b", { class: "num" }, formatNumber(ink)), h("span", null, "с мастило"))
           : null,
-        ranked ? h("span", { class: "card-rank" }, `${ranked.name} · още\u00a0${left} до „${ranked.next}“`) : null,
+        // The rank over what's left to the next, a line each: no dot between them to hang at a line's end.
+        ranked
+          ? h(
+              "span",
+              { class: "card-rank" },
+              h("span", null, ranked.name),
+              h("span", null, `още\u00a0${left} до „${ranked.next}“`),
+            )
+          : null,
       ],
       "card-leaf",
       { next: "" },

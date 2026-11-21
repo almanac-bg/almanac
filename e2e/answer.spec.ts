@@ -18,8 +18,8 @@ interface Seen {
   covered: number;
   /** Frames with the panel less than opaque: the answers under it showing through. */
   through: number;
-  /** A choice's answers kept whole (the player's, the right one) that changed height from the question to its fact
-   * (re-wrapped as their ends filled). */
+  /** A choice's answers kept whole (the player's, the right one) that changed height from the panel's showing to the
+   * fact (re-wrapped as their shares came): what the answer brings to a row comes in place once, with the panel. */
   rewrapped: number;
   done: boolean;
   right?: { from: number; to: number; height: number; tall: number[]; pic: boolean; pop: number[] };
@@ -36,7 +36,7 @@ async function watch(page: Page): Promise<void> {
     const head = document.querySelector(".question-top");
     const shown = () => document.querySelector(".run-question .after:not([hidden])");
     const choices = [...document.querySelectorAll<HTMLElement>(".run-question .choices > .option")];
-    const tall = choices.map((o) => o.offsetHeight);
+    let tall: number[] | null = null;
     let stuck = head?.classList.contains("stuck");
     const changes = new MutationObserver(() => {
       const now = head?.classList.contains("stuck");
@@ -57,6 +57,7 @@ async function watch(page: Page): Promise<void> {
         seen.covered++;
       if (panel && Number(getComputedStyle(panel).opacity) < 1) seen.through++;
       if (panel && !from) from = t;
+      if (panel && !tall) tall = choices.map((o) => o.offsetHeight);
       if (panel && right) {
         const box = right.getBoundingClientRect();
         const pop = right.getAnimations().find((a) => a instanceof CSSAnimation && a.animationName === "pop");
@@ -77,7 +78,7 @@ async function watch(page: Page): Promise<void> {
       }
       if (from && t - from > 1000) {
         // The rows that stay whole (the player's and the right one: the others go to a line each, as they should).
-        seen.rewrapped = choices.filter((o, i) => o.matches(".right, .wrong") && o.offsetHeight !== tall[i]).length;
+        seen.rewrapped = choices.filter((o, i) => o.matches(".right, .wrong") && o.offsetHeight !== tall?.[i]).length;
         seen.done = true;
         changes.disconnect();
       } else requestAnimationFrame(frame);

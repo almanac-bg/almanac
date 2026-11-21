@@ -184,28 +184,49 @@ const told =
     queueMicrotask(signedIn);
   };
 
-/** Профил's ask to a guest to keep their game, from the first game: a quiet line that opens the form in place; once
- * the code is in, `signedIn` draws Профил again as the profile has it, and it says what came of it (notice). */
-export function keepGame(signedIn: () => void): Child {
+/** Профил's line to a guest, from the first game, one quiet line: the game is only here, „Запази я с имейл“, „Имаш
+ * профил? Влез“ (a profile from elsewhere), and `more` after them; a tap opens its form in the line's place (`signingIn`:
+ * the way in open from the start). Once the code is in, `signedIn` draws Профил again as the profile has it, and it
+ * says what came of it (notice). */
+export function keepGame(signedIn: () => void, signingIn = false, more: Child = null): Child {
   // Where no email is asked for: no offer of one, only why not, and the way (the phone's browser).
-  if (noEmail) return h("p", { class: "muted keep-line" }, `Играта ти е само на това устройство. ${noEmailLine}`);
-  const opened = signal(false);
-  return () =>
-    opened()
-      ? h(
-          "section",
-          { class: "card keep-card" },
-          h("h2", { class: "card-title" }, "Запази играта си"),
-          signIn({ form: "keep-game", primary: false, note: keepNote, enter: "Потвърди", done: told(signedIn) }),
-        )
-      : h(
-          "p",
-          { class: "muted keep-line" },
-          "Играта ти е само на това устройство. ",
-          h("button", { class: "link", type: "button", onclick: () => opened.set(true) }, "Запази я с имейл"),
-          ".",
-        );
+  if (noEmail)
+    return h(
+      "p",
+      { class: "muted keep-line" },
+      `Играта ти е само на това устройство. ${noEmailLine}`,
+      more ? [" ", more] : null,
+    );
+  const opened = signal<"" | "keep" | "in">(signingIn ? "in" : "");
+  const way = (label: string, to: "keep" | "in") =>
+    h("button", { class: "link", type: "button", onclick: () => opened.set(to) }, label);
+  return () => {
+    const o = opened();
+    if (o === "keep")
+      return h(
+        "section",
+        { class: "card keep-card" },
+        h("h2", { class: "card-title" }, "Запази играта си"),
+        signIn({ form: "keep-game", primary: false, note: keepNote, enter: "Потвърди", done: told(signedIn) }),
+      );
+    if (o === "in") return inCard(signedIn, false);
+    return h(
+      "p",
+      { class: "muted keep-line" },
+      "Играта ти е само на това устройство. ",
+      way("Запази я с имейл", "keep"),
+      " · ",
+      way("Имаш профил? Влез", "in"),
+      more ? [" · ", more] : null,
+    );
+  };
 }
+
+/** The form into a profile the player has, on a card of its own. */
+const inCard = (signedIn: () => void, primary: boolean): Child =>
+  h("section", { class: "card keep-card" }, h("h2", { class: "card-title" }, "Влез в профила си"), () =>
+    signIn({ form: "have-profile", primary, done: told(signedIn) }),
+  );
 
 /** The way in for a player who has a profile already (a new phone, another browser): a quiet line (`label`) that
  * opens the form in place (`open`: opened from the start). Signed in, `signedIn` draws the screen again, as the
@@ -216,9 +237,7 @@ export function haveProfile(signedIn: () => void, label = "Имаш профил
   const opened = signal(open);
   return () =>
     opened()
-      ? h("section", { class: "card keep-card" }, h("h2", { class: "card-title" }, "Влез в профила си"), () =>
-          signIn({ form: "have-profile", primary, done: told(signedIn) }),
-        )
+      ? inCard(signedIn, primary)
       : h(
           "p",
           { class: "day-next" },

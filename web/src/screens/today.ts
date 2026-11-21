@@ -698,7 +698,11 @@ function missed(all: () => Reviewed[] | null, rest: () => Child): Child {
             { class: "miss" },
             h(
               "span",
-              { class: `tile ${q.void ? "void" : "wrong"} t-${q.category}`, "aria-label": chapterName(q.category) },
+              {
+                class: `tile ${q.void ? "void" : "wrong"} t-${q.category}`,
+                role: "img",
+                "aria-label": chapterName(q.category),
+              },
               h("span", { class: "tile-pic" }, picture(`topic-${q.category}`)),
             ),
             h("p", { class: "miss-q" }, q.view.text),
@@ -809,7 +813,8 @@ function friendsDay(t: Today): Child {
 }
 
 /** How all of България did with the day: how many got each count of right answers, the player's own bar in ink with
- * „ти“ over it and the average dashed; under it the average, the tens, and the share that knew the hardest question.
+ * „ти“ over it and the average dashed; under it the average, the tens, and the question fewest knew, by its share
+ * („най-малко от десетте“: never „the hardest“, which the issue calls its tenth).
  * From ten players (play.Board.Spread: people only). */
 function bulgariaToday(t: Today, run: State, review: Promise<Reviewed[]>): Child {
   const spread = t.board.spread;
@@ -893,7 +898,7 @@ function bulgariaToday(t: Today, run: State, review: Promise<Reviewed[]>): Child
               "div",
               { class: "fig" },
               h("b", { class: "fig-n" }, percent(x.share)),
-              h("span", { class: "fig-label" }, `отговарят вярно на въпрос ${x.n + 1}, най-трудния днес`),
+              h("span", { class: "fig-label" }, `отговарят вярно на въпрос ${x.n + 1}, най-малко от десетте`),
             )
           : null;
       },
@@ -1111,7 +1116,14 @@ function tomorrow(
       h(
         "p",
         { class: "tomorrow-words" },
-        h("b", { class: "tomorrow-head" }, `Утре, ${weekday(day).toLowerCase()} · Брой\u00a0${issueOf(day)}`),
+        // Its two parts a line each where they don't fit one (large text): no line starts or ends with the dot.
+        h(
+          "b",
+          { class: "tomorrow-head" },
+          h("span", null, `Утре, ${weekday(day).toLowerCase()}`),
+          h("span", { class: "tomorrow-sep" }, " · "),
+          h("span", null, `Брой\u00a0${issueOf(day)}`),
+        ),
         hard
           ? h("span", { class: "tomorrow-hard" }, glyph(hard, 22), ` Трудният въпрос е от ${chapterName(hard)}`)
           : null,

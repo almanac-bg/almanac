@@ -2,7 +2,7 @@
 // and pairs where the real bank is here: bank.ts), answered as a test wants it (right, wrong or close), and what a
 // question's screen must never do whatever its size (layout.spec.ts, answer.spec.ts).
 import { expect, type Page } from "@playwright/test";
-import { bankQuestions, type Q, words } from "./bank.ts";
+import { bankQuestions, portrait, type Q, words } from "./bank.ts";
 
 export type { Q };
 
@@ -13,8 +13,9 @@ export type How = "right" | "wrong" | "close";
 export const closeable = (q: Q) => ["number", "order", "match", "split"].includes(q.type);
 
 /** One question of each kind, the longest the tests' bank has: a choice, a choice of pictures, a choice under a
- * picture, „Вярно или невярно“, an order, pairs, groups, clues and a number; and of an order and of pairs, the one
- * with the longest question too, where that's another (a sheet of five lines over the rows); each named. */
+ * picture, „Вярно или невярно“, an order, pairs, groups, clues and a number; a choice under a portrait (the picture
+ * at its tallest), where the bank has one; and of an order and of pairs, the one with the longest question too, where
+ * that's another (a sheet of five lines over the rows); each named. */
 export function kinds(): { name: string; q: Q }[] {
   const all = bankQuestions().filter((q) => !q.retired);
   const longest = (f: (q: Q) => boolean, size = words) => {
@@ -28,10 +29,13 @@ export function kinds(): { name: string; q: Q }[] {
   const orderAsk = longest(plain("order"), asked);
   const match = longest(plain("match"));
   const matchAsk = longest(plain("match"), asked);
+  const picture = longest((q) => q.type === "choice" && !!q.image);
+  const tall = all.filter(portrait).sort((a, b) => words(b) - words(a))[0];
   return [
     { name: "choice", q: longest(plain("choice")) },
     { name: "pictures", q: longest((q) => !!q.pictures) },
-    { name: "picture", q: longest((q) => q.type === "choice" && !!q.image) },
+    { name: "picture", q: picture },
+    ...(tall && tall.id !== picture.id ? [{ name: "portrait", q: tall }] : []),
     { name: "truefalse", q: longest(plain("truefalse")) },
     { name: "order", q: order },
     ...(orderAsk.id === order.id ? [] : [{ name: "order-asked", q: orderAsk }]),
@@ -272,9 +276,12 @@ export async function panelFlaws(page: Page): Promise<string[]> {
         if (hit && hit !== after && !hit.closest(".after-foot") && after.contains(hit))
           out.push(`under „Напред“ at ${Math.round(y)}: ${hit.tagName.toLowerCase()}.${hit.className}`);
       }
-    // Scrolling, at its top: the fact's first two lines above the fade over the foot.
+    // Scrolling, at its top: the fact's first two lines above the fade over the foot (unless the panel gave way to the
+    // player's row and the right one, right over it: DESIGN.md, Play).
     const fact = after.querySelector<HTMLElement>(".fact p:last-child");
-    if (fact && after.scrollHeight > after.clientHeight + 1 && getComputedStyle(after).position === "fixed") {
+    const rows = [...document.querySelectorAll("article.question button.option:is(.right, .wrong)")];
+    const gave = rows.length > 0 && Math.max(...rows.map((r) => r.getBoundingClientRect().bottom)) > p.top - 16;
+    if (!gave && fact && after.scrollHeight > after.clientHeight + 1 && getComputedStyle(after).position === "fixed") {
       after.scrollTop = 0;
       const lh = Number.parseFloat(getComputedStyle(fact).lineHeight) || 24;
       const fade = (after.querySelector(".after-foot") ?? go).getBoundingClientRect().top - 28;
@@ -285,8 +292,8 @@ export async function panelFlaws(page: Page): Promise<string[]> {
   });
 }
 
-/** Where the answer ended, on a laptop: on the left page under the question, what answered it on the right; the
- * verdict, the fact whole and „Напред“ in sight on the screen, nothing over them. */
+/** Where the answer ended, on a laptop: on the right page, under what answered it, never over the question's sheet
+ * on the left; the verdict, the fact whole and „Напред“ in sight on the screen, nothing over them. */
 export async function beside(page: Page): Promise<string[]> {
   const at = await page.evaluate(() => {
     const box = (s: string) => document.querySelector(s)?.getBoundingClientRect();
@@ -295,16 +302,24 @@ export async function beside(page: Page): Promise<string[]> {
     const fact = box(".after .fact");
     const go = box(".after .up-next-go");
     const verdict = box(".after .verdict");
+    const answers = box(".run-question .answering");
+    const panel = box(".after");
+    const sheet = box(".run-question .q-leaf");
     return {
-      answers: box(".run-question .answering")?.left ?? 0,
-      panel: box(".after")?.right ?? Number.POSITIVE_INFINITY,
+      under:
+        !!answers &&
+        !!panel &&
+        !!sheet &&
+        panel.left >= sheet.right &&
+        panel.left >= answers.left - 1 &&
+        panel.top >= answers.bottom - 1,
       verdict: !!verdict && seen(".verdict", verdict.left + 8, verdict.top + verdict.height / 2),
       fact: !fact || (seen(".fact", fact.left + 8, fact.top + 4) && seen(".fact", fact.left + 8, fact.bottom - 4)),
       go: !!go && seen(".up-next-go", go.left + go.width / 2, go.top + 4) && go.bottom <= innerHeight,
     };
   });
   return [
-    at.panel < at.answers ? "" : "the answer isn't beside what answered it",
+    at.under ? "" : "the answer isn't under what answered it, beside the question",
     at.verdict ? "" : "the verdict is out of sight",
     at.fact ? "" : "the fact isn't whole in sight",
     at.go ? "" : "„Напред“ is out of sight",

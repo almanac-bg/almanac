@@ -123,7 +123,7 @@ test("a topic, ten questions, a question reported, and ten more", async ({ page 
   await page.getByRole("button", { name: "Прати" }).click();
   await expect(page.getByText("Благодарим ти! Ще го прегледаме.")).toBeVisible();
   // One action; the other ways on are quiet links, the way back to its chapter among them.
-  await expect(page.locator(".summary > .actions .btn.primary")).toHaveCount(1);
+  await expect(page.locator(".summary .actions .btn.primary")).toHaveCount(1);
   await expect(page.locator(".result-links").getByRole("link", { name: "Към главата" })).toHaveAttribute(
     "href",
     "/almanac/history",

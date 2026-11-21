@@ -89,17 +89,20 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      глави вече могат да са твой аватар.“; one chapter's: its ladder under it).
   4. Friends who played it, up to five (`.friends-day`): avatar, name, worn seal, their small squares, their score.
   5. The action, past the first results: „Сподели“.
-  6. Tomorrow: the next issue's date set big, „Утре, неделя · Брой 32“, the chapter of its hard question with its
+  6. Tomorrow: the next issue's date set big (over its words with large text), „Утре, неделя · Брой 32“ (a line each
+     with large text, no dot), the chapter of its hard question with its
      glyph („Трудният въпрос е от История“, once tomorrow is drawn), what it makes of the streak; past the first results, the
      reminder's ask under it while reminders are off, a player with a profile's too (a plain button, never a second
      action; three times at most, once a day). Yesterday's issue finished after midnight has today's in its place
      („Вече излезе.“, „Към днешния брой“).
 
-  Everything else is under „Въпросите и фактите“ (`.more`): how all of България spread, and each question with its
-  fact (its verdict never a true-or-not's answer: „Точно“, „Грешно“).
+  Everything else is under „Въпросите и фактите“ (`.more`): how all of България spread (the average's label in a
+  row over the bars, clear of „ти“ over the player's; the question fewest knew named by its number, „най-малко от
+  десетте“, never „най-трудният“, which is the issue's tenth), and each question with its fact (its verdict never a
+  true-or-not's answer: „Точно“, „Грешно“).
 - **Алманах:** its head (Микс and България as two ways to play, no lifetime totals), then the chapters, each a folded
-  card in its colour with its seal as the badge (40px), its ink („180 с мастило“) and its rank with what's left to the
-  next („Тетрадка · още 15 до „Книга““); a counter at zero is hidden, and the head says once how ink is written; a
+  card in its colour with its seal as the badge (40px), its ink („180 с мастило“) and its rank, what's left to the
+  next under it („Тетрадка“, „още 15 до „Книга““: a line each, no dot to hang at a line's end); a counter at zero is hidden, and the head says once how ink is written; a
   chapter's card with no ink yet is its glyph over its name, no taller, never stretched to the inked ones beside it.
   Two across on a phone, five on a big screen (the page's whole width, the head a reading width).
   It leads with the chapter nearest its next step. A chapter's game left half-way today shows under the head, where
@@ -109,10 +112,12 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   (two across on a big screen): ink black, facts met in grey (a thin solid 1.5px grey outline, lighter text). From
   ten facts, a search over them („Търси факт“); fewer are read at a glance. Where grey first shows: „В сиво са всички останали факти, които срещнеш. С мастило се пише само в броя на деня.“
   Its game's result: on the chapter's sheet its chip, the score and its tiles; under it, with no number (grey is never
-  counted), „Фактите от играта са в книгата ти, в сиво.“ While the day's issue waits, „Към въпросите на деня“ is the
+  counted), „Фактите от играта са в книгата ти, в сиво.“ While the day's issue waits, „Към днешния брой“ is the
   action, the streak's stake under it; once it's played, „Още десет въпроса“ the action. The other ways on are quiet
   links in a line: „Още десет въпроса“, „Прегледай въпросите“, „Към главата“ (from Микс and България, which aren't
-  chapters, „Към Алманаха“). Its start (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name.
+  chapters, „Към Алманаха“). On a big screen the result is a spread, as the day's: the sheet on the left page, the
+  action, the ways on and that line on the right, „Прегледай въпросите“ under both in a reading column. Its start
+  (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name.
 - **Приятели:** the board (friends by default, or all of България: its spread and the player's place first, then the
   top rows: the place, the avatar, the name with the row's width and the seal and „ти“ after it, the score and the
   small squares on a line under it, on a line of their own under the score below 340 px or in large text; the
@@ -135,12 +140,14 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   it broken only between its words, the score), their scores as the heroes and „от 10“ in words, the marks, no
   hairlines; a spread on a big screen, the record and the ways on (one width) on the right; its
   marks as the tiles (близо half filled), nothing ringed: speed only breaks a tie.
-- **Профил:** the avatar with the seal worn on its corner, the name; the longest streak and what the week forgives;
+- **Профил:** the avatar with the seal worn on its corner, the name; a guest's ways in one quiet line under it („Играта
+  ти е само на това устройство. Запази я с имейл · Имаш профил? Влез · Как те виждат другите“, each opening its form
+  in the line's place); the longest streak and what the week forgives (that it's used up, only while a streak runs);
   the seal worn on its ladder („Печатът на География“, its ink, Бележка to Летопис, the one reached ringed); the seals
   by chapter, the one worn ringed in ink, another chosen behind „избери друг“; the avatars (every animal,
   and a chapter's art from its Страница, hollow with a grey ring and its name until then, the rule said once under
-  them); the seals two to a row, one under 340px and with large text, a long name wrapping; Настройки
-  last; no list of past games (a game isn't gone over after its day). No
+  them); the seals two to a row, one under 340px and with large text, a long name wrapping; the avatars chosen here,
+  their one place (no page of their own); Настройки last; no list of past games (a game isn't gone over after its day). No
   duplicate avatar in the bar's corner on this page. Another player's page (`/players/<tag>`) is the same head,
   streak and seals, with the way to be friends. Where no email may be asked for (an app's browser that reads what's
   typed: `noEmail`), Профил and Настройки offer none, only the line that says so.
@@ -284,8 +291,9 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
 
 A run (`game/run.ts`) on a phone is a column the screen's height: the head, the pips and the clock at the top (kept in
 sight as the page scrolls, smaller once stuck), the question's sheet under them, what answers it at the foot under the
-thumb. On a laptop (64rem) it's a spread: the head and the sheet on the left; what answers it on the right, the answer
-under it.
+thumb. On a laptop (64rem) it's a spread the page's width (1180px): the head and the sheet (and its picture) on the
+left; what answers it on the right, level with the sheet, and the answer right under it, the page moving just enough
+to show it whole; nothing over the question.
 
 - **The head** (`.question-head`): the cross out („Към Днес“; from a chapter's game „Към Алманаха“), what's played („Брой 31“, the chapter, „Дуел с Мария“
   over it), and the number big: „4/10“ to the eye, „4 от 10“ aloud. Nothing counts right answers in a row.
@@ -294,20 +302,27 @@ under it.
 - **The sheet** (`.q-leaf`, no corner): the chip (and on the day's last question „Най-трудният: число“ beside it), then the
   question. Under 620px of height the sheet is the question with the chapter's glyph beside it (on the day's last, the
   chip's glyph alone beside its tag) and an answer is 52px. Under 680px, while an order or pairs are asked, the sheet
-  is the question beside its glyph a size smaller, cut to as many lines as leave every row and „Готово“ in sight (two
+  is the question beside its glyph a size smaller, the rows right under it (not at the foot), cut to as many lines as
+  leave every row and „Готово“ in sight (two
   at the least; a tap on it reads it all: answering.ts, `clamp`), and the rows and cells are 44px; the pairs' right
-  column, a cell more, has five ninths of the width. A picture over the question takes at most 30% of the
-  height; on a laptop, once answered, it gives the panel under it the room to show whole. A choice of pictures is two
+  column, a cell more, has five ninths of the width. The question is cut by its height, never by `-webkit-box`'s
+  line-clamp (which drops the spaces between whole words in Chromium: `layout.spec.ts`). A picture over the question
+  takes at most 30% of the height, and gives way first where the screen is short: under 620px it shrinks to what
+  leaves every answer in sight. A choice of pictures is two
   by two, the letter and (answered) the ✓ or ✕ in the picture's corners, its name under it across the card.
 - **A cell's words** (`wholeWords()`): a long word breaks only at its syllables (soft hyphens, `lib/words.ts`) and only
   where it's wider than its cell; a punctuation mark stays with its word. Never `break-all`.
-- **Answers** (`.option`): white, a 2px `--line-2` frame, the letter in a box (А–Г, keys 1–4 on a computer).
+- **Answers** (`.option`): white, a 2px `--line-2` frame, the letter in a box (А–Г, keys 1–4 on a computer); a
+  choice's words have the row's width while it's asked.
 - **Answered:** the player's own right answer is ink — a dark fill with white text by day, a light fill with dark
   text by night — and a solid ✓; the right one they didn't give has a 3px ink outline and a ✓ in a ring; their wrong
-  one is hollow and dashed with a ✕ in a dashed ring and „ти“. The rest shrink to a 36px line of their own words, so
+  one is hollow and dashed with a ✕ in a dashed ring and „ти“. The rest shrink to a line of their own words (2.25rem), so
   that the player's row and the right row are right under the question; the page doesn't move, so the question stays
-  whole under the head (only if the panel at its least would cover the right row). The crowd's shares fill in behind
-  each answer. A row's ✓ or ✕ (and an order's value) stays at its end, on a line with its words, never wrapped.
+  whole under the head (only if the panel at its least would cover the right row; moved, the head's foot falls
+  between two parts, never across one: no scrap of the sheet or a row left under it). The crowd's shares fill in
+  behind each answer. After a choice's words, in this order: „ти“, the share, the ✓ or ✕, on a line with them (with
+  large text, on the line under them, at the row's end). An order's value and its ✓ or ✕ stay together at the row's
+  end, on the line under its words where the words would otherwise be squeezed.
 - **Each kind:** true-or-not, two side by side, answered with the ✓ or ✕ beside the word and „ти“ under the player's
   wrong one; order, rows of 48px picked up and put down or dragged by their grip, answered as the right order — a row
   in place with a solid ✓, one out of place hollow and dashed with „при теб: 3-то“ under its words, its value and ✕
@@ -319,12 +334,14 @@ under it.
   44px at the least), answered as what was said, the answer, and both on a scale (the answer a filled square; „ти, вярно“ a filled disc,
   „ти, близо“ half filled, „ти“ hollow).
 - **The answer** (`.after`): docked at a phone's foot, a surface over the answers, at most what leaves the player's
-  row and the right one in sight, and at least the fact's first two lines; a longer fact scrolls in it, fading out
+  row and the right one in sight, and at least the fact's first two lines (an order, pairs or groups: at that least,
+  so their rows stay in sight; where a choice's two rows need more, the panel gives way to them, down to its verdict
+  and „Напред“); a longer fact scrolls in it, fading out
   above „Напред“, which stands on a foot of the panel's colour down to its edge (`.after-foot`): nothing shows under
   it. In it, the verdict, a choice
   missed its right answer in words („Вярно е: Съединението.“; not a choice of pictures, each named under it, nor
   where the question names it), how many got it, „Записано с мастило · глава История“
-  for ink, „Знаеше ли?“ and the fact, a picture's credits (a choice of pictures' too, here where nothing covers
+  for ink, on a question of the date „На този ден“ and what happened that day, „Знаеше ли?“ and the fact, a picture's credits (a choice of pictures' too, here where nothing covers
   them), and „Напред“ (the one action).
 - **Verdicts** are a fixed set, never an answer's own word: „Точно!“, „Вярно!“ (a number near enough to count, not
   spot on), „Не е това.“, „Близо, но не се брои.“, „Времето изтече.“ The verdict's sign is ink: a filled disc with ✓, a half-filled disc, a ✕ or a clock in a dashed
@@ -334,15 +351,17 @@ under it.
 ## Fit and large text
 
 - **Fit** (`e2e/layout.spec.ts`, at 320 × 568, 375 × 600, 390 × 664 and 1366 × 900, by day and by night; every kind of
-  question at its longest in the sample bank, and the real bank's longest orders and pairs where it's here (`private/`;
-  CI has only the sample), answered right, wrong and close: `e2e/kinds.ts`, `e2e/bank.ts`): nothing scrolls
-  sideways; Днес shows „Започни“ whole and high; a question shows every answer or its pad and its action whole,
+  question at its longest in the sample bank, and the real bank's longest orders, pairs and choices and its longest
+  choice under a portrait where it's here (`private/`; CI has only the sample), answered right, wrong and close:
+  `e2e/kinds.ts`, `e2e/bank.ts`): nothing scrolls sideways; Днес shows „Започни“ whole and high; a question shows every answer or its pad and its action whole,
   nothing under the action; once answered, the player's row, the right one and „Напред“ are in sight, nothing under
   „Напред“; a row's sign never on a line of its own, nor a punctuation mark.
 - **Large text:** the text grows with the browser's setting and with „Размер на текста“ (up to twice). Everything is
   in rem from `<html>`; display type grows at half the rate (half px, half rem) and a big numeral is capped by the
   screen's width or height. One-column grids are `minmax(0, 1fr)`; a row of things wraps. `lib/prefs.ts` puts `tight`
-  and `tighter` on `<html>` when the column holds few words, and rows give way to columns there. A media query's rem
+  and `tighter` on `<html>` when the column holds few words, and rows give way to columns there. With `tighter`, an
+  order's or pairs' line on how to answer is read, not shown (the first rows show over „Готово“), and the answer's
+  panel, under the answers, opens with its verdict and the fact's first line in sight. A media query's rem
   is the browser's own size, so a short screen is a phone on its side only with `(orientation: landscape)` too.
   `e2e/layout.spec.ts` holds it at every size above.
 

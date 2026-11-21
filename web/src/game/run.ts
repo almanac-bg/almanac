@@ -592,25 +592,26 @@ function question(
   document.addEventListener("visibilitychange", moveOn);
   // The room the answer's panel takes at the screen's foot on a phone (app.css), kept under the question, so that
   // what's above it can always be seen. Docked there, the least it's ever drawn at shows the fact's first two lines
-  // over the fade above „Напред“ (--least; a longer fact scrolls in it). On a laptop, under the question's picture,
-  // the picture gives it the room to show whole under it.
+  // over the fade above „Напред“ (--least; a longer fact scrolls in it).
+  let roomed = 0;
   const room = () => {
-    page.style.setProperty("--after", `${after.offsetHeight}px`);
     const place = getComputedStyle(after).position;
     const fact = after.querySelector<HTMLElement>(".fact p:last-child");
     const foot = after.querySelector<HTMLElement>(".after-foot");
-    // (Not on a phone on its side: „Напред“ is on the verdict's row there, the fact under it to the panel's foot.)
-    if (place === "fixed" && fact && foot && fact.offsetParent === after && foot.offsetTop > fact.offsetTop) {
+    // (Not on a phone on its side: „Напред“ is on the verdict's row there, the fact under it to the panel's foot. Its
+    // foot is stuck to the panel's edge, so that's told by the verdict's row, not by where the fact is: a panel at
+    // its least has the fact under its foot.)
+    const told = after.firstElementChild as HTMLElement | null;
+    const under = !!told && !!foot && foot.offsetTop >= told.offsetTop + told.offsetHeight;
+    if (place === "fixed" && fact && foot && fact.offsetParent === after && under) {
       const line = Number.parseFloat(getComputedStyle(fact).lineHeight) || 24;
       page.style.setProperty("--least", `${Math.ceil(fact.offsetTop + 2 * line + fade + foot.offsetHeight)}px`);
     }
-    const pic = page.querySelector<HTMLElement>(":scope > .picture");
-    if (pic && place === "sticky" && !after.hidden) {
-      // Where it's laid out on the page, not where it's drawn as the answer comes into place (settle moves it).
-      let top = 0;
-      for (let el: HTMLElement | null = pic; el; el = el.offsetParent as HTMLElement | null) top += el.offsetTop;
-      const gap = Number.parseFloat(getComputedStyle(page).rowGap) || 0;
-      pic.style.setProperty("--fit", `${Math.max(80, Math.floor(innerHeight - top - after.offsetHeight - 2 * gap))}px`);
+    // Its height at its least, once that's known: the page's room under the answers (how far settle can move it).
+    // Never less once it's been more: the page shorter under where it was moved would pull it back down.
+    if (after.offsetHeight > roomed) {
+      roomed = after.offsetHeight;
+      page.style.setProperty("--after", `${roomed}px`);
     }
   };
   // As the panel changes size, a frame later: what room sets changes its size in turn (never within the observer).
@@ -890,11 +891,11 @@ const settling = { duration: 240, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" };
 
 /** Brings the answer into place, its panel shown by `show`, in one movement. On a phone the panel docks at the
  * screen's foot (app.css: it's fixed there) and the answers move up above it, the page moving just enough that the
- * right answer (or, for an order or pairs, the answer's top) shows between the head and the panel; on a laptop the
- * panel shows beside the question, in sight wherever the page is, and the page moves only if the right answer isn't
- * (back up to the question's first line, if the answering had moved it away); at a tablet's width the panel shows
- * under the answers, and the page moves just enough to show it, short of the question's first line going under the
- * head (but the verdict shows). Where everything ends is worked out
+ * right answer (or, for an order or pairs, the answer's top) shows between the head and the panel, the head's foot
+ * between two parts, never across one; on a laptop the panel shows under the answers, beside the question, and the
+ * page moves just enough to show it whole, short of the right answer going under the head; at a tablet's width the
+ * panel shows under the answers, and the page moves just enough to show it, short of the question's first line going
+ * under the head (but the verdict and the fact's first line show). Where everything ends is worked out
  * first, the page already in its last state and the head at the size it will have there (it stays so meanwhile: a
  * head that changed size as the page moved made it jump), and the page goes there at once; then what moved glides
  * from where it was (a head made smaller, its parts too, from their size then), the panel rising with it, opaque, so
@@ -928,33 +929,54 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
   // The docked panel leaves room for them over it, where they are once answered (app.css): the page stays, so the
   // question stays whole under the head; it moves only if the panel at its least would cover them.
   if (right) page.style.setProperty("--keep", `${Math.ceil(keyBox().bottom + 12)}px`);
-  // Docked at a phone's foot (fixed), beside the question on a laptop (sticky, in its own column), or under it.
+  // Docked at a phone's foot (fixed), beside the question on a laptop (under the answers, in the right page), or under
+  // the answers on a tablet.
   const place = getComputedStyle(after).position;
   const docked = place === "fixed";
-  const beside = place === "sticky";
+  // Beside the question: in the right page of a laptop's spread, past the sheet's edge.
+  const sheet = page.querySelector(":scope > .q-leaf")?.getBoundingClientRect();
+  const beside = !docked && !!sheet && after.getBoundingClientRect().left >= sheet.right;
   const ask = page.querySelector(".ask") ?? key;
   const go = after.querySelector<HTMLElement>(".up-next-go");
-  // The verdict's foot as it's laid out, not as it's drawn coming in (app.css: .after > *, enter).
+  // What has to show of the panel, its foot as it's laid out, not as it's drawn coming in (app.css: .after > *,
+  // enter): the fact's first line, or without a fact the verdict.
   const verdict = after.firstElementChild instanceof HTMLElement ? after.firstElementChild : after;
+  const fact = after.querySelector<HTMLElement>(".fact p:last-child");
+  const laid = (el: HTMLElement) => {
+    let y = 0;
+    for (let e: HTMLElement | null = el; e; e = e.offsetParent as HTMLElement | null) y += e.offsetTop;
+    return y;
+  };
   const told = () =>
     after.getBoundingClientRect().top +
-    verdict.offsetTop -
-    (verdict.offsetParent === after ? 0 : after.offsetTop) +
-    verdict.offsetHeight;
+    (fact
+      ? laid(fact) - laid(after) + (Number.parseFloat(getComputedStyle(fact).lineHeight) || 24)
+      : laid(verdict) - laid(after) + verdict.offsetHeight);
   // What has to show between the head's foot and the bottom, and how far the page moves down (or up) for it. Docked:
-  // the right answer above the panel, its top never under the head. Beside: the right answer above the screen's foot,
-  // its top never under the head, and the question's first line too where it fits (the panel shows wherever the page
-  // is). Under the answers: the panel, to the screen's foot, but never the question's first line under the head
-  // (what doesn't fit is a scroll away, „Напред“ at the screen's foot meanwhile, app.css), and always the verdict,
-  // over „Напред“.
+  // the right answer above the panel, its top never under the head. Beside: the whole panel above the screen's foot,
+  // the right answer's top never under the head. Under the answers: the panel, to the screen's foot, but never the question's first line under the head
+  // (what doesn't fit is a scroll away, „Напред“ at the screen's foot meanwhile, app.css), and always the verdict
+  // and the fact's first line, over „Напред“.
   const by = (headFoot: number) => {
     const box = docked || beside ? keyBox() : after.getBoundingClientRect();
     const foot = docked ? after.getBoundingClientRect().top - 12 : innerHeight - 16;
     const below = box.bottom - foot;
     const room = (top: number) => top - headFoot - 12;
     const above = room(docked ? box.top : ask.getBoundingClientRect().top);
-    if (beside) return below > 0 ? Math.max(0, Math.min(below, room(box.top))) : Math.min(0, Math.max(above, below));
-    const least = docked ? 0 : told() - (foot - (go ? go.offsetHeight + 12 : 0));
+    if (beside) {
+      // The whole panel over the screen's foot, a choice's right answer's top never under the head (an order's, pairs'
+      // or groups' rows, all of them the answer, are a scroll away on a short screen: the fact shows whole).
+      const over = after.getBoundingClientRect().bottom - foot;
+      const top = room(box.top);
+      return over > 0 ? Math.max(0, right ? Math.min(over, top) : over) : Math.min(0, Math.max(top, over));
+    }
+    // (Never so far that the verdict's own top goes under the head: with large text, all of it doesn't fit.)
+    const least = docked
+      ? 0
+      : Math.min(
+          told() - (foot - (go ? go.offsetHeight + 12 : 0)),
+          room(after.getBoundingClientRect().top + laid(verdict) - laid(after)),
+        );
     if (below > 0) return Math.max(0, least, Math.min(below, above));
     return above < 0 ? Math.max(above, below) : 0;
   };
@@ -970,8 +992,37 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
   }
   head.stick(head.stuckAt(y - was));
   if (y !== was) scrollTo({ top: y, behavior: "instant" });
+  // Moved, the head's foot falls between two parts, never across one: what it would cut there (the sheet's foot, the
+  // picture's, a row above the right answer) goes whole under it, not a scrap of it left in sight.
+  if (y > was) {
+    const foot = head.node.getBoundingClientRect().bottom;
+    const top = keyBox().top;
+    let cut = 0;
+    for (const el of page.querySelectorAll(
+      ":scope > .q-leaf, :scope > .picture, .answering :is(.hint, .options > *)",
+    )) {
+      const r = el.getBoundingClientRect();
+      if (r.height && r.bottom <= top + 1 && r.top < foot - 1 && r.bottom > foot + 1)
+        cut = Math.max(cut, r.bottom - foot);
+    }
+    if (cut > 0) {
+      // The page a little longer where it ends short of that (app.css, --past): the room under the answers.
+      const want = y + Math.ceil(cut);
+      const short = want - (document.documentElement.scrollHeight - innerHeight);
+      if (short > 0) page.style.setProperty("--past", `${short}px`);
+      y = Math.min(want, Math.max(0, document.documentElement.scrollHeight - innerHeight));
+      scrollTo({ top: y, behavior: "instant" });
+    }
+  }
   // Moved after all (the panel at its least would have covered them): the panel takes the room the move made.
   if (right && y !== was) page.style.setProperty("--keep", `${Math.ceil(keyBox().bottom + 12)}px`);
+  // The player's row and the right one taller than the room over the panel at its least (long answers on a short
+  // phone): the panel gives way to them, down to its verdict and „Напред“, the fact scrolling in it.
+  if (docked && right) {
+    const under = innerHeight - Math.ceil(keyBox().bottom + 12);
+    const least = Number.parseFloat(page.style.getPropertyValue("--least")) || 160;
+    if (under < least) page.style.setProperty("--give", `${Math.max(160, under)}px`);
+  }
   // Where the right answer ends, taken before anything glides: once it does, its box is where it's drawn on the way.
   const keyAt = key.getBoundingClientRect();
   at(settling.duration, () => head.hold(false));

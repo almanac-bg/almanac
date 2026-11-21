@@ -4,10 +4,11 @@
 //
 // - Днес keeps its budget in the HTML's order and shows „Започни“ whole and high; the day's first question (its head
 //   has the issue and the clock), its answer and the day's result scroll nowhere sideways, the clock never over the count, the answer's panel never squeezed.
-// - Every kind of question (the longest the tests' bank has, the real bank's orders and pairs where it's here:
-//   kinds.ts, bank.ts), answered right, wrong and close: at the usual
+// - Every kind of question (the longest the tests' bank has, the real bank's orders, pairs, choices and a portrait
+//   where it's here: kinds.ts, bank.ts), answered right, wrong and close: at the usual
 //   text what answers it and its action whole in sight, nothing under the action; once answered the player's row,
-//   the right one and „Напред“, nothing under „Напред“ (on a laptop, the answer beside the question); at twice the
+//   the right one and „Напред“, nothing under „Напред“ (on a laptop, the answer under what answered it, beside the
+//   question); the question's words with their spaces, however it's cut; at twice the
 //   text every control a scroll away; a row's sign, a punctuation mark or a short word never on a line of its own.
 //   On a laptop's short screen too (1366 × 650; a laptop has no touch screen, here as at 1366 × 900): its action in
 //   sight, the answer beside it.
@@ -131,6 +132,19 @@ async function crowded(page: Page): Promise<string[]> {
     if (!go || go.left < 0 || go.right > document.documentElement.clientWidth) out.push("„Напред“ off the screen");
     return out;
   });
+}
+
+/** The question as it reads (its innerText: what's drawn, what's copied) has its words and the spaces between them,
+ * as the bank has it: a -webkit-box line-clamp drew a cell's whole words (wholeWords) with no space between them in
+ * Chromium („българскитепланини“). Read in Chromium only: WebKit's innerText leaves out the space where a line wraps,
+ * spaces drawn or not. */
+async function spaced(page: Page, q: Q): Promise<string[]> {
+  const shown = await page
+    .locator("article.question .ask")
+    .first()
+    .evaluate((e) => (e as HTMLElement).innerText);
+  const plain = (s: string) => s.replaceAll("\u00ad", "").replace(/\s+/g, " ").trim();
+  return plain(shown) === plain(q.text) ? [] : [`the question reads „${plain(shown)}“`];
 }
 
 /** What of `selector` can't be seen whole at any scroll of `scroller` (the page, or a box that may scroll on its own:
@@ -366,7 +380,7 @@ for (const size of sizes)
         expect(await byDayAndNight(page, () => sideways(page)), "the day's result").toEqual([]);
 
         // A new player's places, the day played.
-        for (const path of ["/almanac", "/me", "/avatar", "/friends", "/settings", "/duel/new"]) {
+        for (const path of ["/almanac", "/me", "/friends", "/settings", "/duel/new"]) {
           await page.goto(path);
           await expect(page.locator("main :is(h1, h2)").first()).toBeVisible();
           await settled(page);
@@ -418,6 +432,7 @@ for (const size of sizes)
             // At the usual text, what answers it and its action whole in sight; at twice it, each control a scroll
             // away, never only under „Готово“, „Отговори“ or the head, nor off the screen's side.
             const asked = await byDayAndNight(page, async () => [
+              ...(browserName === "chromium" ? await spaced(page, q) : []),
               ...(await flaws(page)),
               ...(await brokenWords(page, cells)),
               ...(await crowded(page)),
@@ -528,7 +543,8 @@ for (const size of sizes)
 
 /** Where an answer ended, at the usual text: the player's row and the right one under the head and over the panel;
  * a choice's question still whole under the head, unless the panel at its least would cover the rows, and then moved
- * only as far as they need (DESIGN.md, Play). */
+ * only as far as they need, or on to the edge of what the head would cut there; never a scrap of the sheet, the
+ * picture or a row left under the head's foot (DESIGN.md, Play). */
 async function answerInPlace(page: Page, type: string): Promise<string[]> {
   return page.evaluate((type) => {
     const out: string[] = [];
@@ -541,11 +557,20 @@ async function answerInPlace(page: Page, type: string): Promise<string[]> {
       if (r.top < head - 1) out.push(`a row under the head: ${row.textContent}`);
       if (r.bottom > foot + 1) out.push(`a row under the panel: ${row.textContent}`);
     }
+    const parts = [
+      ...document.querySelectorAll(
+        "article.question > :is(.q-leaf, .picture), article.question .answering .options > *",
+      ),
+    ].map((el) => ({ el, r: el.getBoundingClientRect() }));
+    for (const { el, r } of parts)
+      if (r.height && r.top < head - 1 && r.bottom > head + 1 && !rows.includes(el))
+        out.push(`a scrap under the head: ${el.className} [${Math.round(r.top)}–${Math.round(r.bottom)}]`);
     const leaf = document.querySelector("article.question .q-leaf");
     if (!leaf) out.push("no question's sheet (.q-leaf)");
     else if (type === "choice" || type === "clues") {
       const bottom = Math.max(...rows.map((r) => r.getBoundingClientRect().bottom));
-      if (leaf.getBoundingClientRect().top < head - 1 && !(bottom > foot - 24))
+      const edge = parts.some(({ r }) => r.height && Math.abs(r.bottom - head) <= 2);
+      if (leaf.getBoundingClientRect().top < head - 1 && !(bottom > foot - 24) && !edge)
         out.push("the question went under the head, further than the rows needed");
     }
     return out;
@@ -740,7 +765,7 @@ test.describe("a finger's room", () => {
 
   test("every control on its own has 44px to tap", async ({ page }) => {
     test.setTimeout(90_000);
-    for (const path of ["/", "/settings", "/me", "/almanac", "/avatar", "/friends"]) {
+    for (const path of ["/", "/settings", "/me", "/almanac", "/friends"]) {
       await page.goto(path);
       await expect(page.locator("main :is(h1, h2)").first()).toBeVisible();
       expect(await smallTargets(page), path).toEqual([]);
