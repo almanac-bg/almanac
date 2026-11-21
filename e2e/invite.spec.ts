@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { playRun, startDay } from "./play.ts";
+import { expect, type Page, test } from "@playwright/test";
+import { openGame, playRun, startDay } from "./play.ts";
 
 // A player's invite link: sent from Приятели by the phone's share sheet, or copied on a big screen („Добави ме в
 // АЛМАНАХ: <link>“); opened by a stranger, it's the day's cover with the invite over it, the address the link's until
@@ -91,4 +91,60 @@ test("an invite link: sent, opened by a stranger, the day played, and friends bo
   await expect(cy).toHaveURL(/\/$/);
   await cy.goto("/friends");
   await expect(cy.locator(".friend-list .friend")).toContainText(name);
+});
+
+// A tap kept for the first game outlasts the server down for a moment as that game ends: kept on the device, and
+// taken as the page is opened again. A profile deleted takes its kept tap with it.
+test("a kept tap: kept through a server error at the game's end and taken on a reload, gone with the profile", async ({
+  browser,
+}) => {
+  test.setTimeout(180_000);
+  const ana = await (await browser.newContext()).newPage();
+  await ana.goto("/");
+  await startDay(ana);
+  await playRun(ana);
+  const name = await ana.evaluate(async () => (await (await fetch("/api/me")).json()).user.name as string);
+  const link = new URL(
+    await ana.evaluate(async () => (await (await fetch("/api/invite", { method: "POST" })).json()).url as string),
+  ).pathname;
+  const code = link.slice("/f/".length);
+  const kept = (p: Page) => p.evaluate(() => localStorage.getItem("almanac.invite"));
+
+  // Bo taps before his first game; as it ends the server is down for a moment.
+  const bo = await (await browser.newContext()).newPage();
+  await bo.route(`**/api/invites/${code}`, (r) =>
+    r.request().method() === "POST"
+      ? r.fulfill({ status: 503, json: { error: "busy", message: "Сървърът е зает. Опитай пак." } })
+      : r.continue(),
+  );
+  await bo.goto(link);
+  await bo.locator(".invite-card").getByRole("button", { name: "Добави като приятел" }).click();
+  await expect(bo.locator(".invite-card")).toContainText("Първо изиграй днешния брой.");
+  expect(await kept(bo)).toContain(code);
+  await startDay(bo);
+  await playRun(bo);
+  await expect(bo.locator(".notice").filter({ hasText: "Сървърът е зает." })).toBeVisible();
+  expect(await kept(bo)).toContain(code);
+  await expect(bo).toHaveURL(new RegExp(`${link}$`));
+  // The server back, the page opened again: friends, said over the result, not the invite again.
+  await bo.unroute(`**/api/invites/${code}`);
+  await bo.reload();
+  await expect(bo.locator(".notice").filter({ hasText: /^Вече сте приятели (с|със) / })).toContainText(name);
+  await expect(bo.locator(".invite-card")).toHaveCount(0);
+  await expect(bo).toHaveURL(/\/$/);
+  expect(await kept(bo)).toBeNull();
+
+  // Cy has a profile, but no game finished: the tap waits for it; her profile deleted, it goes with it.
+  const cy = await (await browser.newContext()).newPage();
+  await openGame(cy, "/play/music");
+  await expect(cy.locator(".question-head")).toContainText("1 от 10");
+  await cy.goto(link);
+  await cy.locator(".invite-card").getByRole("button", { name: "Добави като приятел" }).click();
+  await expect(cy.locator(".invite-card")).toContainText("Първо изиграй днешния брой.");
+  expect(await kept(cy)).toContain(code);
+  await cy.goto("/settings");
+  await cy.getByRole("button", { name: "Изтрий профила" }).click();
+  await cy.getByRole("button", { name: "Изтрий профила" }).click();
+  await expect(cy.getByRole("status").filter({ hasText: "Профилът е изтрит." })).toBeVisible();
+  expect(await kept(cy)).toBeNull();
 });

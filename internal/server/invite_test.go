@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/almanac-bg/almanac/internal/play"
 )
 
 // A player's invite link, over HTTP: made for a player who has finished a game, the same when asked again; its page is
@@ -175,5 +177,33 @@ func TestUnfriendEndsTheLinkOverHTTP(t *testing.T) {
 	}
 	if _, fresh := ana.call("POST", "/api/invite", nil); fresh["url"] == link || fresh["url"] == nil {
 		t.Fatalf("Ana's link after: %v", fresh)
+	}
+}
+
+// A link whose player's list is full is refused as such, in the inviter's words (inviter_full), not as the opener's
+// own list full: the client ends the waiting tap on it (invite.ts, final).
+func TestInviterFullOverHTTP(t *testing.T) {
+	g := start(t)
+	ana, anaID := g.guest()
+	played(ana)
+	_, out := ana.call("POST", "/api/invite", nil)
+	code := strings.TrimPrefix(out["url"].(string), g.url+"/f/")
+	for i := range play.MaxFriends {
+		res, err := g.db.Write.Exec(`INSERT INTO users (name, tag, created_at, seen_at) VALUES ('Играч', ?, 0, 0)`,
+			fmt.Sprintf("full%d", i))
+		if err != nil {
+			t.Fatal(err)
+		}
+		other, _ := res.LastInsertId()
+		if _, err := g.db.Write.Exec(`INSERT INTO friends (user_id, friend_id, since, asked) VALUES (?1, ?2, 0, 0), (?2, ?1, 0, 1)`,
+			anaID, other); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bo, _ := g.guest()
+	played(bo)
+	status, out := bo.call("POST", "/api/invites/"+code, nil)
+	if status != http.StatusConflict || out["error"] != "inviter_full" || out["message"] != playerErrors[play.ErrInviterFull].message {
+		t.Fatalf("a full inviter's link taken: %d %v", status, out)
 	}
 }

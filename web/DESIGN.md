@@ -57,12 +57,14 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   - On a big screen, under them, „В броя“: the ten chapters in their order.
   - A new visitor: the cover, „Започни“, and under it „Едни и същи за цяла България.“ In an app's own browser, one
     line under „Започни“: „Имаш игра в браузъра? Отвори там“ (`coverExit`).
-  - Come by an invite link (`/f/<code>`, the address then Днес's): over the issue, the invite (`.invite-card`, on
-    the cover too): the inviter's avatar, name and worn seal, „те кани да сте приятели в АЛМАНАХ.“ and „Добави като
-    приятел“ (an outlined `.btn`: „Започни“ stays the action). The tap says what came of it in the card's line:
-    „Вече сте приятели с Ана.“ and „Към Приятели“; before any game, „Първо изиграй днешния брой. След него ще сте
-    приятели с Ана.“, and as that game ends „Вече сте приятели с Ана.“ is the result's notice. The player's own link:
-    „Това е твоята покана…“, no button; a link gone: „Тази покана вече не важи. Поискай нова връзка.“
+  - Come by an invite link (`/f/<code>`, the address the link's until the invite is answered, then Днес's: an app's
+    own browser opens the invite in the phone's): over the issue, the invite (`.invite-card`, on the cover too): the
+    inviter's avatar, name and worn seal, „те кани да сте приятели в АЛМАНАХ.“ and „Добави като приятел“ (an outlined
+    `.btn`: „Започни“ stays the action). The tap says what came of it in the card's line: „Вече сте приятели с Ана.“
+    and „Към Приятели“; before any game, „Първо изиграй днешния брой. След него ще сте приятели с Ана.“ (the tap kept
+    on the device a week), and as that game ends „Вече сте приятели с Ана.“ is the result's notice, in the card's
+    place. The player's own link: „Това е твоята връзка. Който я отвори, може да те добави с едно докосване.“, no
+    button; a link gone: „Тази връзка вече не важи. Поискай нова.“
   - Nothing over the issue but what came of the player's own step (a profile signed in to, a game brought here, an
     invite opened).
     Others' news is Приятели's: its dot for a friend's duel or request, its line for a friend's yes.

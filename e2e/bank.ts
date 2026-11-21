@@ -2,7 +2,7 @@
 // main checkout's from a worktree; never on CI, which has only the sample), the real bank's extremes with it, the
 // questions a phone's short screen has the least room for (its longest orders, pairs and choices, and its longest choice
 // under a portrait): the program serves them in a copy of the sample bank made for the tests (playwright.config,
-// BANK_DIR), and kinds.ts finds them there as the longest of their kind.
+// BANK_DIR), and kinds.ts finds them there as the longest of their kind, beside the sample's own.
 import { copyFileSync, cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -111,6 +111,11 @@ export function testBank(make: boolean): string {
         copyFileSync(resolve(real ?? "", "images", name), resolve(served, "images", name));
   }
   return "test-results/bank";
+}
+
+/** The sample's questions' ids: those of the tests' bank that a run on CI has too. */
+export function sampleIds(): Set<string> {
+  return new Set([...files(sample).values()].flat().map((q) => q.id));
 }
 
 /** The questions the tests' program serves (testBank's). */

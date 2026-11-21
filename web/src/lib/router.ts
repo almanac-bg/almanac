@@ -201,36 +201,48 @@ function travel(by: number, then: () => void): void {
   history.go(by);
 }
 
-/** Gives the entry shown another address, the screen staying as it is (a board's choice: a reload comes back to it).
- * A game's own entry so renamed stays the game's: its end (release) gives the page under it that address. */
-export function rename(to: string): void {
-  history.replaceState(entry(), "", to);
-  path.set(location.pathname);
+/** Does `fn` now, or, while a move through the history is under way (a game's end going back from its own entry:
+ * release), once the move has arrived: else the move's own address would take away what `fn` writes to the entry
+ * shown, writing it to the entry being left instead (Safari arrives later than Chromium, after a quick answer from
+ * the server). */
+function settled(fn: () => void): void {
+  const last = moves.length - 1;
+  const then = moves[last];
+  if (!then) {
+    fn();
+    return;
+  }
+  moves[last] = () => {
+    then();
+    fn();
+  };
 }
 
-/** Gives the address shown this fragment (`hash`: „#…“, or "" for none), the screen staying as it is. While a move
- * through the history is under way (a game's end going back from its own entry: release), it's given once the move
- * has arrived: else the move's own address would take it away (Safari arrives later than Chromium, after a quick
- * answer from the server), if `still` says it's still wanted then. */
+/** Gives the entry shown another address, the screen staying as it is (a board's choice: a reload comes back to it),
+ * once a move under way has arrived (settled). A game's own entry so renamed stays the game's: its end (release)
+ * gives the page under it that address. */
+export function rename(to: string): void {
+  settled(() => {
+    try {
+      history.replaceState(entry(), "", to);
+    } catch {
+      // too many writes for a moment: the entry keeps the address it had
+    }
+    path.set(location.pathname);
+  });
+}
+
+/** Gives the address shown this fragment (`hash`: „#…“, or "" for none), the screen staying as it is, once a move
+ * under way has arrived (settled), if `still` says it's still wanted then. */
 export function fragment(hash: string, still: () => boolean = () => true): void {
-  const set = () => {
+  settled(() => {
     if (!still()) return; // its screen gone meanwhile
     try {
       history.replaceState(history.state, "", location.pathname + location.search + hash);
     } catch {
       // too many writes for a moment: the address keeps the fragment it had
     }
-  };
-  const last = moves.length - 1;
-  const then = moves[last];
-  if (!then) {
-    set();
-    return;
-  }
-  moves[last] = () => {
-    then();
-    set();
-  };
+  });
 }
 
 /** Keeps this in the entry shown. */

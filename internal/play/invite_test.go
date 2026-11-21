@@ -188,6 +188,13 @@ func TestUnfriendEndsTheLink(t *testing.T) {
 	if has, _ := w.g.HasInvite(ctx, cy); has {
 		t.Fatal("a link made by removing")
 	}
+	// Removing one who is no friend (a second tap, a stale list) removes no one, and the link stays.
+	if err := w.g.Unfriend(ctx, ana, bo); err != nil {
+		t.Fatal(err)
+	}
+	if again, _ := w.g.InviteOf(ctx, ana); again != code {
+		t.Fatalf("Ana's link after removing no one: %s, was %s", again, code)
+	}
 }
 
 // A suspended player's link is no link while they are; a deleted player's goes with them.

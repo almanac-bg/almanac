@@ -327,6 +327,21 @@ test("a game opened from outside, over: the page under it takes its address, ren
   assert.deepEqual(drawn, [], "the result stays on screen as it is");
 });
 
+test("renamed as its game ends, before the way back has arrived: the page under it takes the new address", async () => {
+  router.go("/play/science");
+  router.hold(true);
+  const at = index;
+  router.release({ result: 5 });
+  // An answer that comes before the browser has gone back (Safari's, after a quick one from the server).
+  router.rename("/");
+  assert.equal(index, at, "not yet arrived");
+  await tick();
+  assert.equal(index, at - 1);
+  assert.equal(location.pathname, "/");
+  assert.equal(router.entry().result, 5);
+  assert.equal(entries[at]?.url, "/play/science", "the entry left keeps its own address");
+});
+
 test("a screen that sends the player on as it's drawn: the page it sends to shows", async () => {
   drawn.length = 0;
   router.go("/gone");
