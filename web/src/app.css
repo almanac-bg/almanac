@@ -2468,6 +2468,13 @@
     right: calc(14px + 30px + var(--space-2));
   }
 
+  /* „ти“ on the player's own wrong choice: in the room kept at its end, over how many gave it. */
+  .choices > .option > .yours {
+    position: absolute;
+    top: 6px;
+    right: calc(14px + 30px + var(--space-2));
+  }
+
   .crowd-says {
     margin: 0;
     color: var(--ink-3);
@@ -2615,14 +2622,12 @@
     flex: none;
     min-width: 0;
     padding-inline: 2px;
+    min-height: 1.25rem;
     font-size: 0.9375rem;
     font-weight: 800;
     line-height: 1.25rem;
   }
 
-  .pic-name:empty {
-    display: none;
-  }
 
   /* The share that gave a picture, on its foot's corner: the tile keeps its height as the shares come. */
   .option.pic-option .crowd-share {
@@ -7775,6 +7780,13 @@
     top: auto;
     bottom: 10px;
     translate: none;
+  }
+
+  .tighter .choices > .option > .yours {
+    top: auto;
+    right: auto;
+    bottom: 18px;
+    left: 14px;
   }
 
   /* A run's answer under the answers, as on a tablet, not docked at the screen's foot: there, at this size, it

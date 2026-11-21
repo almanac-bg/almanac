@@ -586,7 +586,8 @@ function question(
     const place = getComputedStyle(after).position;
     const fact = after.querySelector<HTMLElement>(".fact p:last-child");
     const foot = after.querySelector<HTMLElement>(".after-foot");
-    if (place === "fixed" && fact && foot && fact.offsetParent === after) {
+    // (Not on a phone on its side: „Напред“ is on the verdict's row there, the fact under it to the panel's foot.)
+    if (place === "fixed" && fact && foot && fact.offsetParent === after && foot.offsetTop > fact.offsetTop) {
       const line = Number.parseFloat(getComputedStyle(fact).lineHeight) || 24;
       page.style.setProperty("--least", `${Math.ceil(fact.offsetTop + 2 * line + fade + foot.offsetHeight)}px`);
     }
@@ -599,7 +600,8 @@ function question(
       pic.style.setProperty("--fit", `${Math.max(80, Math.floor(innerHeight - top - after.offsetHeight - 2 * gap))}px`);
     }
   };
-  const sized = new ResizeObserver(room);
+  // As the panel changes size, a frame later: what room sets changes its size in turn (never within the observer).
+  const sized = new ResizeObserver(() => requestAnimationFrame(room));
   sized.observe(after);
   onCleanup(() => {
     clearTimeout(advance);

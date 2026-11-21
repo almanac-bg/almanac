@@ -265,8 +265,9 @@ function answerKeys(buttons: HTMLElement[], locked: Signal<boolean>): void {
 /** The ✓ or ✕ on a revealed answer (its colour and words say the same). */
 const sign = () => h("span", { class: "sign", "aria-hidden": "true" });
 
-/** „ти“ on the player's own wrong answer, after its words (held to the last of them). */
-const yours = (): [string, HTMLElement] => ["\u00a0", h("span", { class: "yours" }, "ти")];
+/** „ти“ on the player's own wrong answer: a choice's in its corner, over how many gave it (its words never wrap
+ * anew as the answer shows); a picture's after its name (held to the last word of it). */
+const yours = () => h("span", { class: "yours" }, "ти");
 
 function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<boolean>, display: boolean): Asked {
   const pictures = view.pictures;
@@ -333,7 +334,7 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
           if (cell) append(cell, [wholeWords(name)]);
           b.setAttribute("aria-label", `${letters[i]}: ${name}`);
         }
-        if (how === "wrong") (names[i] ?? b.querySelector(".option-words"))?.append(...yours());
+        if (how === "wrong") names[i] ? names[i].append("\u00a0", yours()) : b.append(yours());
         if (how !== "dim") (b.querySelector(".pic-frame") ?? b).append(sign());
       };
       const own = buttons[mine];
@@ -883,7 +884,7 @@ function truefalse(
         if (truth === mine) b.classList.add("mine");
         const line = b.querySelector(".tf-line");
         if (how !== "dim") line?.append(sign());
-        if (how === "wrong") line?.after(h("span", { class: "yours" }, "ти"));
+        if (how === "wrong") line?.after(yours());
       };
       if (mine !== null) mark(mine ? yes : no, mine);
       let crowd = () => {};
@@ -1338,7 +1339,7 @@ function clues(
         const how = i === reveal.pick ? "right" : i === mine ? "wrong" : "dim";
         b.classList.add(how);
         if (i === mine) b.classList.add("mine");
-        if (how === "wrong") b.querySelector(".option-words")?.append(...yours());
+        if (how === "wrong") b.append(yours());
         if (how !== "dim") b.append(sign());
       };
       const own = buttons[mine];
