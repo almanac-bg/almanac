@@ -5,7 +5,7 @@ import { append, type Child, effect, h, listen, onCleanup, type Signal, signal }
 import { ordinal } from "../lib/ordinal.ts";
 import { play } from "../lib/sound.ts";
 import { hyphenate, withWord } from "../lib/words.ts";
-import { formatNumber, type VerdictKind } from "../ui.ts";
+import { formatNumber, formatValue, type VerdictKind } from "../ui.ts";
 import { percent, rare, withOwn } from "./numbers.ts";
 import { optionSizes, overSizes } from "./sizes.ts";
 import type {
@@ -803,7 +803,7 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
               view.items[item] ?? "",
               how === " missed" && at >= 0 ? h("small", { class: "match-gave" }, `ти: ${ordinal(at + 1, "n")}`) : null,
             ),
-            h("span", { class: "value" }, `${formatNumber(reveal.values?.[item] ?? 0, 0.01)}${unit}`),
+            h("span", { class: "value" }, `${formatValue(reveal.values?.[item] ?? 0)}${unit}`),
             how ? sign() : null,
           );
         }),

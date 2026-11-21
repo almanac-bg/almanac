@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { dateWords, formatNumber, hyphenate, issueOf, issueWords, stakeWords, weekday, withWord } from "./words.ts";
+import {
+  dateWords,
+  formatNumber,
+  formatValue,
+  hyphenate,
+  issueOf,
+  issueWords,
+  stakeWords,
+  weekday,
+  withWord,
+} from "./words.ts";
 
 test("a day as the game writes it: the date, the month in lower case; with its issue, a dateline", () => {
   assert.equal(dateWords("2026-11-17"), "17 ноември");
@@ -115,4 +125,15 @@ test("a number the Bulgarian way: a space between thousands from 10 000, a decim
   assert.equal(formatNumber(-89.2, 0.1), "−89,2");
   assert.equal(formatNumber(-12500), "−12\u00a0500");
   assert.equal(formatNumber(-18), "−18");
+});
+
+test("an order's value with every digit it has: a nanometre isn't 0, π's approximations stay apart", () => {
+  assert.equal(formatValue(1e-9), "0,000000001");
+  assert.equal(formatValue(0.0004), "0,0004");
+  assert.equal(formatValue(3.14159), "3,14159");
+  assert.equal(formatValue(3.142857), "3,142857");
+  assert.equal(formatValue(95.16), "95,16");
+  assert.equal(formatValue(1411778724), "1\u00a0411\u00a0778\u00a0724");
+  assert.equal(formatValue(2022), "2022");
+  assert.equal(formatValue(-570), "−570");
 });

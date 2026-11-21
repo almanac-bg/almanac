@@ -31,6 +31,14 @@ export function formatNumber(n: number, step = 1): string {
     .replace("-", "−");
 }
 
+/** A measured value as the bank gives it, every digit it has, whatever its size: an order's reveal shows a nanometre
+ * (0,000000001 м) and π's approximations (3,14159 and 3,142857) apart, where two decimals would show both as 3,14. */
+export function formatValue(n: number): string {
+  return new Intl.NumberFormat("bg", { maximumSignificantDigits: 15, useGrouping: Math.abs(n) >= 10000 })
+    .format(n)
+    .replace("-", "−");
+}
+
 /** Several things in a sentence, as Bulgarian lists them: „Мария, Бо и Ци“. */
 export function listWords(list: string[]): string {
   return list.length > 1 ? `${list.slice(0, -1).join(", ")} и ${list.at(-1)}` : (list[0] ?? "");
