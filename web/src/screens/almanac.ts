@@ -505,7 +505,8 @@ const entryPicSizes = "(min-width: 56.25rem) 112px, 88px";
 /** A fact as an entry of the book, in the order it was lived: its dateline, the question small (a kicker), the answer
  * as its headword between it and the fact (a statement to judge is its own headword, „Невярно:“ before one that isn't
  * so; an answer of parts a line each), then the fact. Ink (a card with an ink edge and „с мастило“), or grey („в сиво“,
- * outlined thin, lighter). A picture question's picture beside the question and headword, its credit at the foot. What
+ * outlined thin, lighter). A picture question's picture beside the question and headword (a tap shows it large:
+ * showPicture), its credit at the foot. What
  * a search found (`find`) is marked. */
 function entry(f: Learned, find: string[]): Child {
   const im = f.image;
@@ -540,22 +541,70 @@ function entry(f: Learned, find: string[]): Child {
           "div",
           { class: "entry-top" },
           h("div", { class: "entry-head" }, head),
-          h("img", {
-            class: "entry-pic",
-            src: im.src,
-            srcset: im.srcset,
-            sizes: entryPicSizes,
-            width: im.w,
-            height: im.h,
-            alt: im.alt,
-            loading: "lazy",
-            decoding: "async",
-          }),
+          h(
+            "button",
+            {
+              class: "entry-zoom",
+              type: "button",
+              "aria-label": "Виж снимката голяма",
+              onclick: () => showPicture(f, im),
+            },
+            h("img", {
+              class: "entry-pic",
+              src: im.src,
+              srcset: im.srcset,
+              sizes: entryPicSizes,
+              width: im.w,
+              height: im.h,
+              alt: im.alt,
+              loading: "lazy",
+              decoding: "async",
+            }),
+          ),
         )
       : head,
     h("p", { class: "entry-fact" }, textWords(f.fact, find)),
     f.credit ? pictureCredit(f.credit) : null,
   );
+}
+
+/** An entry's picture large, on a sheet over the chapter (its thumbnail's tap): its biggest file (the last in its
+ * srcset), as large as the screen holds it and never cut, its credit under it, the entry's headword its title. One
+ * picture: no zoom, no gallery. Esc, „Затвори“ or a tap beside it puts it away. */
+function showPicture(f: Learned, im: Picture): void {
+  const biggest = im.srcset.split(",").at(-1)?.trim().split(" ")[0] || im.src;
+  const close = () => box.close();
+  const box = h(
+    "dialog",
+    { class: "sheet picture-sheet", "aria-labelledby": "picture-title" },
+    h(
+      "div",
+      { class: "sheet-panel" },
+      h(
+        "div",
+        { class: "sheet-head" },
+        h("h2", { id: "picture-title" }, textWords(f.answer)),
+        h("button", { class: "link", type: "button", onclick: close }, "Затвори"),
+      ),
+      h("img", {
+        class: "picture-large",
+        src: biggest,
+        width: im.w,
+        height: im.h,
+        alt: im.alt,
+        decoding: "async",
+        style: { "--ratio": String(im.w / im.h) },
+      }),
+      f.credit ? pictureCredit(f.credit) : null,
+    ),
+  ) as HTMLDialogElement;
+  // A tap beside the sheet puts it away, as Esc does; put away, it goes (the router closes it with the screen).
+  box.addEventListener("click", (e) => {
+    if (e.target === box) close();
+  });
+  box.addEventListener("close", () => box.remove());
+  document.body.append(box);
+  box.showModal();
 }
 
 /** Whether the chapter drawn next is come to by a turn of its pages (pager). */
