@@ -1078,7 +1078,7 @@ func TestFriendsOverHTTP(t *testing.T) {
 		out["name"] != name(a) || out["friends"] != nil {
 		t.Fatalf("Bo asks: %d %v", status, out)
 	}
-	if _, mine := ana.call("GET", "/api/friends", nil); len(mine["friends"].([]any)) != 0 || mine["invite"] != nil {
+	if _, mine := ana.call("GET", "/api/friends", nil); len(mine["friends"].([]any)) != 0 {
 		t.Fatalf("friends by a request alone: %v", mine)
 	}
 	acceptAll(ana)

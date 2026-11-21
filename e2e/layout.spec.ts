@@ -957,35 +957,6 @@ test.describe("a finger's room", () => {
   });
 });
 
-// An invite opened on a phone, by a stranger: the invite one row over the day's cover, „Започни“ whole on the first
-// screen, over the places' bar where there is one (DESIGN.md, Днес).
-for (const size of sizes.filter((s) => s.width < 1000))
-  test(`${size.width}×${size.height}: an invite opened keeps „Започни“ on the first screen`, async ({ browser }) => {
-    const ana = await (await browser.newContext()).newPage();
-    await ana.goto("/");
-    await daysPlayed(ana, 1);
-    const url = await ana.evaluate(
-      async () => (await (await fetch("/api/invite", { method: "POST" })).json()).url as string,
-    );
-    const bo = await (await browser.newContext({ viewport: { width: size.width, height: size.height } })).newPage();
-    await bo.goto(new URL(url).pathname);
-    await expect(bo.locator(".invite-card")).toBeVisible();
-    await settled(bo);
-    if (process.env.FIT_SHOTS)
-      await bo.screenshot({ path: `${process.env.FIT_SHOTS}/invite-${size.width}x${size.height}.png` });
-    const at = await bo.evaluate(() => {
-      const box = (s: string) => document.querySelector(s)?.getBoundingClientRect();
-      const bar = box(".places-foot");
-      return {
-        card: box(".invite-card")?.height ?? 0,
-        go: box(".issue-go")?.bottom ?? Number.POSITIVE_INFINITY,
-        foot: bar?.height ? bar.top : innerHeight,
-      };
-    });
-    expect(at.card, "the invite, one row").toBeLessThanOrEqual(96);
-    expect(at.go, "„Започни“ whole on the first screen").toBeLessThanOrEqual(Math.min(at.foot, size.go));
-  });
-
 // The questions gone over (the review under a game's result), with twice the text on a 320px phone: a number's scale
 // (its numbers, a mark at an end too) and a right answer's long words keep to the screen's width.
 test.describe("the questions gone over, twice the text, 320 × 568", () => {

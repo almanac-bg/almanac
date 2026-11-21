@@ -13,7 +13,6 @@ import { preparePush } from "./lib/push.ts";
 import { path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
 import { duelNew, duelOne } from "./screens/duel.ts";
-import { forgetOnSignOut, invited, invitePath } from "./screens/invite.ts";
 import { missing } from "./screens/missing.ts";
 import { topic } from "./screens/play.ts";
 import { sharedDay, today } from "./screens/today.ts";
@@ -23,7 +22,7 @@ import { avatar, rosette, worn } from "./ui.ts";
 /** The three places (DECISIONS.md, „The redesign“): where each goes, its name, and which paths are part of it. A game
  * of the day is played on Днес, a topic's from its chapter in the Алманах; a duel is the friends'. */
 const places: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
-  ["/", "Днес", "today", (p) => p === "/" || invitePath.test(p)],
+  ["/", "Днес", "today", (p) => p === "/"],
   ["/almanac", "Алманах", "book", (p) => /^\/(almanac|play)(\/|$)/.test(p)],
   ["/friends", "Приятели", "friends", (p) => /^\/(friends|duel|players)(\/|$)/.test(p)],
 ];
@@ -93,7 +92,6 @@ if (root) {
       { path: /^\/friends$/, view: later(() => import("./screens/friends.ts").then((m) => m.friends)) },
       { path: /^\/settings$/, view: later(() => import("./screens/settings.ts").then((m) => m.settings)) },
       { path: /^\/d\/([0-9]{1,5})-([a-z2-9]{8})$/, view: sharedDay },
-      { path: /^\/f\/([a-z2-9]{10})$/, view: (m) => invited(m, today) },
       { path: /^\/me$/, view: later(() => import("./screens/me.ts").then((m) => m.me)) },
       {
         path: /^\/players\/([A-Za-z0-9_]{3,20})$/,
@@ -104,12 +102,9 @@ if (root) {
   );
   // In a game the frame steps aside (app.css): the question gets the screen. On a new visitor's cover, the places too.
   effect(() => document.documentElement.classList.toggle("playing", playing()));
-  // Днес is the cover at its own address and at an invite's, until the invite is answered (screens/invite.ts).
-  effect(() =>
-    document.documentElement.classList.toggle("cover", cover() && (path() === "/" || invitePath.test(path()))),
-  );
+  // Днес is the cover at its own address.
+  effect(() => document.documentElement.classList.toggle("cover", cover() && path() === "/"));
   watchNews();
-  forgetOnSignOut();
   prepareSound();
   preparePush();
 }

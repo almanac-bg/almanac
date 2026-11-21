@@ -11,8 +11,8 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// Friends are two players who joined up: one asked and the other said yes. Asked by tag or by email, or by the
-// asker's invite link (invite.go), which the one who opens it takes with a tap; never without both. Each friend sees how the other did on the day's questions, and they keep a record of their duels.
+// Friends are two players who joined up: one asked and the other said yes. Asked by tag or by email; never without
+// both. Each friend sees how the other did on the day's questions, and they keep a record of their duels.
 
 var (
 	// ErrSelf is a player asking themselves to be friends.
@@ -45,36 +45,30 @@ func (g *Game) DayRights(ctx context.Context, userID int64, day string, viewer i
 // earns them. a is the one who asked (whose request b accepted): told of the yes (AcceptedOf).
 func (g *Game) befriend(ctx context.Context, a, b int64) error {
 	return g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		_, err := g.befriendIn(tx, a, b)
+		if _, err := tx.Exec(`DELETE FROM friend_requests WHERE (from_id = ?1 AND (to_id = ?2
+			OR to_email = (SELECT email FROM users WHERE id = ?2))) OR (from_id = ?2 AND (to_id = ?1
+			OR to_email = (SELECT email FROM users WHERE id = ?1)))`, a, b); err != nil {
+			return err
+		}
+		var already bool
+		if err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM friends WHERE user_id = ? AND friend_id = ?)`, a, b).
+			Scan(&already); err != nil || already {
+			return err
+		}
+		for _, who := range []int64{a, b} {
+			var n int
+			if err := tx.QueryRow(`SELECT count(*) FROM friends WHERE user_id = ?`, who).Scan(&n); err != nil {
+				return err
+			}
+			if n >= MaxFriends {
+				return ErrManyFriends
+			}
+		}
+		now := store.Ms(g.Now())
+		_, err := tx.Exec(`INSERT OR IGNORE INTO friends (user_id, friend_id, since, asked) VALUES (?, ?, ?, 1), (?, ?, ?, 0)`,
+			a, b, now, b, a, now)
 		return err
 	})
-}
-
-// befriendIn is befriend in a transaction of the caller's: made says whether the two weren't friends before.
-func (g *Game) befriendIn(tx *sql.Tx, a, b int64) (made bool, err error) {
-	if _, err := tx.Exec(`DELETE FROM friend_requests WHERE (from_id = ?1 AND (to_id = ?2
-		OR to_email = (SELECT email FROM users WHERE id = ?2))) OR (from_id = ?2 AND (to_id = ?1
-		OR to_email = (SELECT email FROM users WHERE id = ?1)))`, a, b); err != nil {
-		return false, err
-	}
-	var already bool
-	if err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM friends WHERE user_id = ? AND friend_id = ?)`, a, b).
-		Scan(&already); err != nil || already {
-		return false, err
-	}
-	for _, who := range []int64{a, b} {
-		var n int
-		if err := tx.QueryRow(`SELECT count(*) FROM friends WHERE user_id = ?`, who).Scan(&n); err != nil {
-			return false, err
-		}
-		if n >= MaxFriends {
-			return false, ErrManyFriends
-		}
-	}
-	now := store.Ms(g.Now())
-	_, err = tx.Exec(`INSERT OR IGNORE INTO friends (user_id, friend_id, since, asked) VALUES (?, ?, ?, 1), (?, ?, ?, 0)`,
-		a, b, now, b, a, now)
-	return err == nil, err
 }
 
 // Sent is what came of a friend request: sent, or (when the other had asked first) friends at once.
@@ -308,31 +302,14 @@ func (g *Game) Asked(ctx context.Context, from, to int64) (bool, error) {
 
 // Unfriend ends a friendship, for both, and the duels open between them with it: their time is up now, and each ends
 // as one whose time ran out does (SettleDue: a side left half-way counts as it stood, one never started lapses, one
-// never sent goes), so that neither is left a „Твой ред“ that can't be played. The record between them stays. The
-// remover's link, if they have one, ends with it (a new one takes its place, its day's count kept): else the one
-// removed would be back with a tap on it.
+// never sent goes), so that neither is left a „Твой ред“ that can't be played. The record between them stays.
 func (g *Game) Unfriend(ctx context.Context, userID, friendID int64) error {
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		res, err := tx.Exec(`DELETE FROM friends WHERE (user_id = ?1 AND friend_id = ?2)
-			OR (user_id = ?2 AND friend_id = ?1)`, userID, friendID)
-		if err != nil {
+		if _, err := tx.Exec(`DELETE FROM friends WHERE (user_id = ?1 AND friend_id = ?2)
+			OR (user_id = ?2 AND friend_id = ?1)`, userID, friendID); err != nil {
 			return err
 		}
-		removed, err := res.RowsAffected()
-		if err != nil {
-			return err
-		}
-		var linked bool
-		if err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM invites WHERE user_id = ?)`, userID).Scan(&linked); err != nil {
-			return err
-		}
-		// Only a friend removed ends the link: a removal of no one (a second tap, a stale list) leaves it as it was.
-		if linked && removed > 0 {
-			if _, err := g.newInviteIn(tx, userID); err != nil {
-				return err
-			}
-		}
-		_, err = tx.Exec(`UPDATE duels SET expires_at = min(expires_at, ?3) WHERE kind = 'person' AND ended_at IS NULL
+		_, err := tx.Exec(`UPDATE duels SET expires_at = min(expires_at, ?3) WHERE kind = 'person' AND ended_at IS NULL
 			AND ((a_id = ?1 AND b_id = ?2) OR (a_id = ?2 AND b_id = ?1))`, userID, friendID, store.Ms(g.Now()))
 		return err
 	})

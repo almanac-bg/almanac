@@ -211,3 +211,19 @@ func TestSealWornOnEveryPage(t *testing.T) {
 		t.Fatalf("a seal chosen: %d, want no such way", status)
 	}
 }
+
+// An old personal invite link (/f/<code>, removed 21 Nov 2026), opened from a chat, goes to the day.
+func TestOldInviteLinkGoesToTheDay(t *testing.T) {
+	g := start(t)
+	c := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	for _, path := range []string{"/f/abcdefghij", "/f/"} {
+		res, err := c.Get(g.url + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != http.StatusMovedPermanently || res.Header.Get("Location") != "/" {
+			t.Errorf("%s: %d to %q", path, res.StatusCode, res.Header.Get("Location"))
+		}
+	}
+}

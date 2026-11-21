@@ -34,7 +34,7 @@ func (s *Server) notifyFrom(ctx context.Context, from int64, m push.Message, to 
 }
 
 // friends is the player's side of being friends: their friends, the friend requests to and from them, a yes to one
-// of theirs not told yet, and whether they have an invite link.
+// of theirs not told yet.
 func (s *Server) friends(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -56,16 +56,10 @@ func (s *Server) friends(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	// Whether the player has an invite link already (invite.go): a new one is offered only then.
-	link, err := s.game.HasInvite(r.Context(), u.ID)
-	if err != nil {
-		return err
-	}
 	return ok(w, map[string]any{
 		"friends":  list,
 		"requests": map[string]any{"in": in, "out": out},
 		"accepted": accepted,
-		"link":     link,
 	})
 }
 

@@ -64,12 +64,8 @@ packages' doc comments; this file holds only what must not drift.
     streak's number is never named.
   - **Duels on one's own time:** a friend has 7 days; or a real recording, chosen as „равен“ or „по-силен“. A friend's
     record against you stays: the one count kept between two players.
-  - **Friends** are added by username or email, a request the other says yes to; and (owner's delegation, 21 Nov) a
-    personal invite link: one tap makes friends; bounded. Every review found adding by username the biggest friction (a
-    group of four is six requests); sharing the link is the inviter's yes and the tap the opener's, so nothing waits.
-    One link a player who has finished a game, `/f/<code>`, random and nameless; a new one ends the old; it shows the
-    inviter's name, avatar and seal; a guest's tap waits for their first game; bounded by MaxFriends, 20 friends a link
-    a day, and the limits by network and site. No blocking still: a friend added so is removed as any other.
+  - **Friends** are added by username or email, a request the other says yes to. The personal invite link was removed
+    (21 Nov): little use, much machinery; friends come by username or email.
   - **Приятели's dot is news since the player last looked there** (2026-11-21), on any device: a friend request, a
     duel sent to them, a result of one of their duels (played back or run out). Opening Приятели clears it. It isn't
     a to-do count: as „a duel waits for you“ it stayed lit up to a week after its news was read (the owner hit it), and
@@ -114,7 +110,7 @@ packages' doc comments; this file holds only what must not drift.
   (playing together with a code; the games played in them stay the players'), and blocking players (a request can
   still be declined, a friend removed). The
   Алманах's facts are a chapter's entries, the latest first, each dated with where it was learned (the edition's
-  mockups, chosen 20 Nov), never one list of them all. Friends are added by username or email, or by an invite link (above).
+  mockups, chosen 20 Nov), never one list of them all. Friends are added by username or email.
   Don't bring any of them back, or something in their place, without the owner's call.
 - **Gamification only from what the game really counts:** no invented currencies, no random boxes, never real money.
 

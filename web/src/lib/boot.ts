@@ -20,9 +20,6 @@ export interface Boot {
   day?: unknown;
   /** The day a shared day's link shares (server/share.go), in its page only. */
   shared?: unknown;
-  /** The invite an invite link's page opens (server/invite.go), or `{ gone: true }` for a link that isn't one: in its
-   * page only. */
-  invite?: unknown;
 }
 
 export const boot: Partial<Boot> =
