@@ -111,6 +111,10 @@ for (const scheme of ["light", "dark"] as const)
             }));
             expect(sheet.top, "the question is whole under the head").toBeGreaterThanOrEqual(sheet.head - 1);
             await expect(page.locator(".after .right-said")).toHaveText("Вярно е: Васил Левски.");
+            // How many got it stays right under the verdict, the right answer in words after it.
+            await expect(page.locator(".after > .verdict + .right-said")).toHaveCount(
+              (await page.locator(".after > .crowd-says").count()) ? 0 : 1,
+            );
           }
         });
 

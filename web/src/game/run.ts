@@ -684,7 +684,7 @@ function question(
       // anything counting up from nothing).
       const told = verdict(kind, verdictSays(kind, q.view.type));
       if (told instanceof HTMLElement) told.removeAttribute("role");
-      append(after, [told, rightSaid(q.view, res.reveal, kind), crowd, ...rest]);
+      append(after, [told, crowd, rightSaid(q.view, res.reveal, kind), ...rest]);
       settle(page, head, after, asked.node, at, () => {
         after.hidden = false;
         page.classList.add("answered");
