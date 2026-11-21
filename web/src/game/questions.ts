@@ -149,26 +149,32 @@ export function answered(view: View, reveal: Reveal, given: Answer | null, how?:
   return a.node;
 }
 
-/** The right answer as a screen reader says it after a miss, where one short sentence holds it: „Верният отговор е „Бийтълс“.“
- * (none for an order, pairs or groups: their rows say it). */
 /** An answer named inside a sentence, in quotes unless it brings its own. */
 const quoted = (name: string) => (/^[„"«]/.test(name) ? name : `„${name}“`);
 
+/** The right answer as a screen reader says it after a miss, where one short sentence holds it: „Верният отговор е „Бийтълс“.“
+ * (none for an order, pairs or groups: their rows say it). */
 export function spokenAnswer(view: View, reveal: Reveal): string {
+  if (view.type === "truefalse") return reveal.truth ? "Твърдението е вярно." : "Твърдението е невярно.";
+  const name = answerWords(view, reveal);
+  if (!name) return "";
+  return `Верният отговор е ${view.type === "number" ? name : quoted(name)}.`;
+}
+
+/** The right answer in a few words, where a few words hold it: a choice's or clues' option, a number with its unit,
+ * „Вярно“ or „Невярно“ for a statement; "" for an order, pairs or groups (their rows say it). */
+export function answerWords(view: View, reveal: Reveal): string {
   switch (view.type) {
     case "choice": {
       const pick = reveal.pick ?? -1;
-      const name = reveal.names?.[pick] ?? view.choices?.[pick] ?? view.pictures?.[pick]?.alt;
-      return name ? `Верният отговор е ${quoted(name)}.` : "";
+      return reveal.names?.[pick] ?? view.choices?.[pick] ?? view.pictures?.[pick]?.alt ?? "";
     }
-    case "clues": {
-      const name = view.choices[reveal.pick ?? -1];
-      return name ? `Верният отговор е ${quoted(name)}.` : "";
-    }
+    case "clues":
+      return view.choices[reveal.pick ?? -1] ?? "";
     case "truefalse":
-      return reveal.truth ? "Твърдението е вярно." : "Твърдението е невярно.";
+      return reveal.truth ? "Вярно" : "Невярно";
     case "number":
-      return `Верният отговор е ${formatNumber(reveal.value ?? 0, view.step)}${view.unit ? `\u00a0${view.unit}` : ""}.`;
+      return `${formatNumber(reveal.value ?? 0, view.step)}${view.unit ? `\u00a0${view.unit}` : ""}`;
     default:
       return "";
   }

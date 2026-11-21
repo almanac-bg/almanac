@@ -12,7 +12,7 @@ import (
 )
 
 // today is the day screen's state: the day and its issue (play.Issue), the viewer's streak and run (if any),
-// a friend's duel waiting for them, whether they've finished a game yet,
+// whether they've finished a game yet, the hard question's chapter in tomorrow's issue,
 // how many have played the day (and how well on average), and their friends' day.
 func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.user(r)
@@ -75,14 +75,6 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 		if out["firstDay"], err = s.game.FirstDay(ctx, u.ID, day); err != nil {
 			return nil, err
 		}
-		// A friend said yes to their request: told once (POST /api/told).
-		if out["accepted"], err = s.game.AcceptedOf(ctx, u.ID); err != nil {
-			return nil, err
-		}
-		// A friend's duel waits for them: a quiet line, while it waits.
-		if out["duel"], err = s.game.DuelsWaiting(ctx, u.ID); err != nil {
-			return nil, err
-		}
 		// A game that ended without its result on screen: its news is told on Начало, once (play/told.go).
 		if untold, err := s.game.Untold(ctx, u.ID); err != nil {
 			return nil, err
@@ -111,6 +103,16 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 			}
 			out["run"] = st
 			done = st.Done
+			if st.Done { // tomorrow, as the result says it: the chapter of its last question, the hard one
+				next, _ := time.Parse(time.DateOnly, day)
+				later, err := s.game.IssueTopics(ctx, next.AddDate(0, 0, 1).Format(time.DateOnly))
+				if err != nil {
+					return nil, err
+				}
+				if n := len(later); n > 0 {
+					out["tomorrowHard"] = later[n-1]
+				}
+			}
 			if st.Done { // the entry its right answers wrote that the result shows
 				if out["entry"], err = s.game.EntryOfDay(ctx, u.ID, day); err != nil {
 					return nil, err

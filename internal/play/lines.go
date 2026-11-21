@@ -12,8 +12,8 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// Lines are what Начало tells a player once, in a line above the day, of what others did with them while they were
-// away: a friend said yes to their request (AcceptedOf). Each is told once wherever the player is signed in (Told keeps it), and only while it's news (LinesRecent).
+// Lines are what Приятели tells a player once, in a line over their friends, of what others did with them while they
+// were away: a friend said yes to their request (AcceptedOf). Each is told once wherever the player is signed in (Told keeps it), and only while it's news (LinesRecent).
 
 // LinesRecent is how long a line waits to be told: past it, it's old news.
 const LinesRecent = 7 * 24 * time.Hour

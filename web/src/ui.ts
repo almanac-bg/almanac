@@ -7,7 +7,7 @@ import { hourInBulgaria } from "./lib/day.ts";
 import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
 import { type Scheme, scheme, setScheme } from "./lib/prefs.ts";
 import { formatNumber, formatValue, stakeWords } from "./lib/words.ts";
-import { glyphBox, rankName, sealParts } from "./seal.ts";
+import { glyphBox, rankName, rankNames, sealParts } from "./seal.ts";
 import { topics } from "./state.ts";
 
 export { formatNumber, formatValue };
@@ -256,6 +256,26 @@ export function pips(quarters: number): HTMLElement {
     "span",
     { class: "seal-pips", "aria-hidden": "true" },
     [0, 1, 2, 3].map((i) => h("i", { class: i < quarters ? "on" : undefined })),
+  );
+}
+
+/** The ladder of a chapter's ranks, Бележка to Летопис, each its seal and its name: the one reached (`rank`; Летопис
+ * for „Летопис · 2“ and on, named so) ringed in ink and its name heavy, those below as they are, those to come faded.
+ * On a rank-up and Профил. On a narrow screen only the reached one's name shows (app.css); every seal stays. */
+export function ladder(chapter: string, rank: number, size = 24): HTMLElement {
+  const at = Math.min(rank, rankNames.length);
+  return h(
+    "ol",
+    { class: `ladder t-${chapter}`, "aria-label": `${chapterName(chapter)}: ${rankName(rank)}` },
+    rankNames.map((name, i) => {
+      const step = i + 1;
+      return h(
+        "li",
+        { class: step < at ? "past" : step === at ? "now" : "later", "aria-current": step === at ? "step" : undefined },
+        seal(chapter, step, size),
+        h("span", { class: "ladder-name" }, step === at ? rankName(rank) : name),
+      );
+    }),
   );
 }
 

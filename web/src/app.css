@@ -3002,6 +3002,17 @@
     letter-spacing: -0.01em;
   }
 
+  /* A choice missed: the right answer in words, „Вярно е: Съединението.“ */
+  .right-said {
+    margin: 0;
+    color: var(--ink);
+    font: 800 1.0625rem / 1.3 var(--font-sans);
+  }
+
+  .right-said b {
+    font-weight: 900;
+  }
+
   /* Where a right answer's fact went: „Записано с мастило · глава История“, on a well, the nib before it. */
   .filed {
     display: flex;
@@ -3336,6 +3347,19 @@
     gap: 2px;
     font-size: 0.8125rem;
     text-align: right;
+  }
+
+  /* An open duel: how it stands under the name („Ти: 8 · Иво има още 6 дни“), the name the whole row's width. */
+  .duel-row.open {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  .duel-row.open > .duel-row-end {
+    flex-basis: 100%;
+    justify-items: start;
+    padding-left: 38px;
+    text-align: left;
   }
 
   .duel-state {
@@ -5348,6 +5372,11 @@
     color: inherit;
   }
 
+  .news-rose .ladder {
+    padding: 4px 0 0;
+    background: none;
+  }
+
   /* The seals risen, side by side. */
   .rose-seals {
     display: flex;
@@ -5390,6 +5419,88 @@
   .rankup-art,
   .rankup-more {
     font: 700 0.9375rem / 1.35 var(--font-sans);
+  }
+
+  /* The ladder of a chapter's ranks (ui.ts, ladder): each seal and its name, the one reached ringed in ink, those to
+     come faded. Under 23.75rem only the reached one is named; every seal stays. */
+  .ladder {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 4px;
+    width: 100%;
+    margin: 0;
+    padding: 12px 8px 10px;
+    list-style: none;
+    border-radius: 18px;
+    background: var(--surface);
+  }
+
+  .ladder > li {
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .ladder-name {
+    max-width: 100%;
+    color: var(--ink-3);
+    font: 700 0.6875rem / 1.15 var(--font-sans);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+
+  .ladder > .now .ladder-name {
+    color: var(--ink);
+    font-weight: 900;
+  }
+
+  .ladder > .now .seal {
+    border-radius: 50%;
+    outline: 2.5px solid var(--ink);
+    outline-offset: 3px;
+  }
+
+  .ladder > .later .seal {
+    opacity: 0.35;
+    filter: grayscale(1);
+  }
+
+  /* On the rank-up's sheet the ladder is white, its inks the day's in both themes. */
+  .rankup .ladder {
+    max-width: 26rem;
+    background: #fff;
+  }
+
+  .rankup .ladder-name,
+  .rankup .ladder > .now .ladder-name {
+    color: #16132b;
+  }
+
+  .rankup .ladder > .now .seal {
+    outline-color: #16132b;
+  }
+
+  @media (max-width: 26.875rem) {
+    .ladder {
+      gap: 2px;
+      padding-inline: 4px;
+    }
+
+    .ladder-name {
+      font-size: 0.625rem;
+    }
+  }
+
+  @media (max-width: 23.75rem) {
+    .ladder > :not(.now) .ladder-name {
+      visibility: hidden;
+    }
+  }
+
+  .tight .ladder > :not(.now) .ladder-name {
+    visibility: hidden;
   }
 
   /* The friends who played the day: a row each, the name, their small squares under it (127px whatever the text: beside
@@ -5453,6 +5564,70 @@
   .tomorrow-words b {
     color: var(--ink);
     font-weight: 900;
+  }
+
+  /* None right: the questions missed, each its tile, the question, the answer and the fact (today.ts, missed). */
+  .missed-day {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .missed {
+    display: grid;
+    margin: 0;
+    padding: 4px 18px;
+    list-style: none;
+    border-radius: var(--r-3);
+    background: var(--surface);
+  }
+
+  .miss {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 4px 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .miss:last-child {
+    border-bottom: 0;
+  }
+
+  .miss > .tile {
+    grid-row: span 3;
+    align-self: start;
+  }
+
+  .miss-q,
+  .miss-a,
+  .miss-f {
+    grid-column: 2;
+    margin: 0;
+  }
+
+  .miss-q {
+    color: var(--ink-2);
+    font: 600 0.9375rem / 1.35 var(--font-sans);
+  }
+
+  .miss-a {
+    color: var(--ink);
+    font: 900 1.0625rem / 1.2 var(--font-sans);
+  }
+
+  .miss-f {
+    color: var(--ink-2);
+    font: 500 0.9375rem / 1.45 var(--font-sans);
+  }
+
+  .tomorrow-head,
+  .tomorrow-hard,
+  .tomorrow-streak {
+    display: block;
+  }
+
+  .tomorrow-hard .glyph {
+    vertical-align: middle;
   }
 
   /* „Въпросите и фактите“: the rest of the day, a tap away. */
@@ -6264,10 +6439,10 @@
       }
     }
 
-    /* The answer docks at the screen's foot, in the same place every time, the answers moving up above it (run.ts,
-       settle: it rises with them): the verdict, how everyone answered, the fact, and the way on. It leaves the head
-       and the right answer (--keep, its height) in sight over it, and at least shows the verdict and „Напред“; a fact
-       longer than that scrolls with the panel, „Напред“ staying at its foot. */
+    /* The answer docks at the screen's foot, in the same place every time (run.ts, settle: it rises with the answers):
+       the verdict, how everyone answered, the fact, and the way on. It leaves the head, the question and the right
+       answer (--keep: where it ends, the page unmoved) in sight over it, and at least shows the verdict and „Напред“;
+       a fact longer than that scrolls with the panel, „Напред“ staying at its foot. */
     .run-question .after {
       position: fixed;
       right: 0;
@@ -6275,7 +6450,7 @@
       left: 0;
       z-index: 5;
       max-width: 40rem;
-      max-height: max(10rem, calc(100dvh - var(--keep, 4rem) - 5.5rem));
+      max-height: max(10rem, calc(100dvh - var(--keep, 9.5rem)));
       margin-inline: auto;
       gap: var(--space-3);
       padding: var(--space-4) max(var(--space-4), env(safe-area-inset-right)) var(--app-foot)

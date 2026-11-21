@@ -108,13 +108,15 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await b.reload();
   await expect(b.locator(".friend .friend-tag")).toHaveText(` @${tag}`);
 
-  // Bo hears of her yes on Начало, once, a tap from his friends.
-  await b.goto("/");
-  const yes = b.locator(".streak-notice", { hasText: "Ана Петрова прие поканата ти за приятелство." });
-  await expect(yes.getByRole("link", { name: "Приятели" })).toHaveAttribute("href", "/friends");
+  // Bo hears of her yes in Приятели, once, over his friends; nothing over the day (Днес is the issue and the streak).
+  const yes = b.locator(".friends .accepted-notice");
+  await expect(yes).toHaveText("Ана Петрова прие поканата ти за приятелство.");
   await b.reload();
-  await expect(b.locator(".day")).toBeVisible();
+  await expect(b.locator(".friend")).toHaveCount(1);
   await expect(yes).toHaveCount(0);
+  await b.goto("/");
+  await expect(b.locator(".day")).toBeVisible();
+  await expect(b.locator(".notices")).toBeEmpty();
 });
 
 test("a request turned down, a friend removed", async ({ browser }) => {

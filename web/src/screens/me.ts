@@ -1,7 +1,8 @@
 // Профил: who you are in the game, in its budget's order (DESIGN.md, Places): your avatar with the seal you wear on its
-// corner, your name and tag; the longest streak; your seals, a chapter's each, the one worn ringed and a tap wearing
-// another; the avatars (every animal yours, a chapter's art yours from its Страница); and Настройки, last. A guest is
-// asked to keep their game, and the way in for a profile from elsewhere is apart from it. No lifetime totals.
+// corner, your name and tag; the longest streak; the seal you wear on its ladder of ranks; your seals, a chapter's each,
+// the one worn ringed and a tap wearing another; the avatars (every animal yours, a chapter's art yours from its
+// Страница); and Настройки, last. A guest is asked to keep their game, and the way in for a profile from elsewhere is
+// apart from it. No lifetime totals.
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -29,6 +30,7 @@ let {
   formatNumber,
   categories,
   chapterName,
+  ladder,
   seal,
   worn,
   illustration,
@@ -39,6 +41,8 @@ interface Rank {
   chapter: string;
   level: number;
   name: string;
+  /** The facts in the chapter in ink. */
+  ink?: number;
 }
 
 export function me(kit: Kit) {
@@ -62,6 +66,7 @@ export function me(kit: Kit) {
     formatNumber,
     categories,
     chapterName,
+    ladder,
     seal,
     worn,
     illustration,
@@ -108,6 +113,7 @@ export function me(kit: Kit) {
                 ? null
                 : [keepGame(() => go("/me", true)), haveProfile(() => go("/me", true), "Имаш профил? Влез", signingIn)],
             () => longest(data()),
+            () => wornLadder(data(), ranks()),
             () =>
               user()?.tag
                 ? h(
@@ -213,6 +219,25 @@ function longest(s: Stats | null): Child {
         : "Тази седмица простените дни са използвани: следващият пропуснат ден прекъсва серията.",
     ),
   ];
+}
+
+/** The seal worn, on its ladder: „Печатът на География“, its ink, and the ranks from Бележка to Летопис, the one
+ * reached ringed. Nothing before a first seal. */
+function wornLadder(s: Stats | null, ranks: Rank[] | null): Child {
+  const w = s?.seal;
+  if (!w?.chapter || w.level < 1) return null;
+  const ink = ranks?.find((r) => r.chapter === w.chapter)?.ink;
+  return h(
+    "section",
+    { class: "sect me-ladder" },
+    h(
+      "div",
+      { class: "sect-head" },
+      h("h2", null, `Печатът на ${chapterName(w.chapter)}`),
+      ink ? h("span", { class: "sect-note" }, `${formatNumber(ink)} с мастило`) : null,
+    ),
+    ladder(w.chapter, w.level),
+  );
 }
 
 /** The seals: a chapter's each, once it has a rank, its name under it; the one worn ringed, and a tap wears another

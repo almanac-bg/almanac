@@ -1,17 +1,17 @@
 // What a game brought, said once, at its end, quietly: the ink it wrote in the Алманах (play/ink.go), a right answer
 // in the issue that stayed grey because the book had its fact already, and the chapter nearest its next rank (its
 // seal, how much ink is still to come, and the quarters as pips); or the ranks it raised (play/rank.go): several as
-// one line, and a rise of the player's best rank as the result's one big moment, the seal set large, with the art
-// Страница brings. In a card of its own, once a day, how others' duels against the player's recordings went
-// (play/recordings.go). A game that ended without its result on screen has its news told on Днес later (play/told.go):
-// under its result, if it's the day's; else under a line that says whose it is. A bad game is never celebrated: what's
-// said is what's true of it.
+// one line (one chapter's with its ladder of ranks), and a rise of the player's best rank as the result's one big
+// moment, the seal set large on its ladder, with the art Страница brings. In a card of its own, once a day, how others'
+// duels against the player's recordings went (play/recordings.go). A game that ended without its result on screen has
+// its news told on Днес later (play/told.go): under its result, if it's the day's; else under a line that says whose it
+// is. A bad game is never celebrated: what's said is what's true of it.
 
 import { api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { rankName, rankNames } from "../seal.ts";
 import { refreshSeal } from "../state.ts";
-import { chapterName, pips, seal } from "../ui.ts";
+import { chapterName, ladder, pips, seal } from "../ui.ts";
 
 interface News {
   /** The facts the game wrote in the Алманах in ink (play.News.Ink). */
@@ -106,6 +106,7 @@ function stepLine(s: NonNullable<News["step"]>): Child {
 function roseLine(r: NonNullable<News["rose"]>): Child {
   const said = r.ranks.map((x) => `„${x.name}“ в глава „${chapterName(x.chapter)}“`).join(", ");
   const art = r.ranks.some((x) => x.art) ? " Вече можеш да избереш картината на тази глава за аватар." : "";
+  const one = r.ranks.length === 1 ? r.ranks[0] : undefined;
   return h(
     "div",
     { class: "news-step news-rose" },
@@ -115,6 +116,8 @@ function roseLine(r: NonNullable<News["rose"]>): Child {
       r.ranks.map((x) => seal(x.chapter, x.to ?? rankNames.indexOf(x.name) + 1, 40)),
     ),
     h("p", null, h("a", { href: "/almanac" }, `Нов печат: ${said}.`), art),
+    // One chapter risen: where it stands among the ranks.
+    one ? ladder(one.chapter, one.to ?? rankNames.indexOf(one.name) + 1) : null,
   );
 }
 
@@ -131,6 +134,7 @@ function rankUp(r: NonNullable<News["rose"]>): Child {
     seal(top.chapter, level, 96, "rimmed rankup-seal"),
     h("p", { class: "kicker" }, chapterName(top.chapter)),
     h("h2", { class: "rankup-name" }, level > 0 ? rankName(level) : top.name),
+    level > 0 ? ladder(top.chapter, level, 28) : null,
     top.art ? h("p", { class: "rankup-art" }, "Вече можеш да избереш картината на тази глава за аватар.") : null,
     others.length ? h("p", { class: "rankup-more" }, `И още: ${others.join(", ")}.`) : null,
   );

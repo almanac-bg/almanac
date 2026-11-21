@@ -34,10 +34,38 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.locator(".day-board .lv, .day-board .who-title")).toHaveCount(0);
   await page.goto("/me");
   await expect(page.locator(".me-seals")).toBeVisible();
+  // The seal worn, on its ladder from Бележка to Летопис, the one reached marked.
+  if (await page.locator(".me-seals .rk").count()) {
+    await expect(page.locator(".me-ladder .ladder > li")).toHaveCount(6);
+    await expect(page.locator(".me-ladder .ladder > li.now")).toHaveCount(1);
+  }
 
   await openGame(page, "/play/history");
   await playRun(page);
   await expect(page.locator(".summary")).toBeVisible();
+});
+
+test("a day with none right opens its questions and their facts under the score, and praises nothing", async ({
+  page,
+}) => {
+  await page.goto("/");
+  // The ten given up, one by one (no answer: none right).
+  await page.request.post("/api/guest", { data: {} });
+  const run = await (await page.request.post("/api/day", { data: {} })).json();
+  for (let n = 0; n < 10; n++) {
+    await page.request.post(`/api/runs/${run.id}/show`, { data: {} });
+    await page.request.post(`/api/runs/${run.id}/start`, { data: { n } });
+    expect((await page.request.post(`/api/runs/${run.id}/answer`, { data: { n, answer: null } })).ok()).toBe(true);
+  }
+  await page.goto("/");
+  await expect(page.locator(".score-n")).toHaveText("0");
+  // Right under the score: the first four, each with its fact, and the way to the rest.
+  await expect(page.locator(".result-score + .missed-day .miss")).toHaveCount(4);
+  await expect(page.locator(".missed-day .sect-note")).toHaveText("1–4 от 10");
+  await page.getByRole("button", { name: "Още 6 въпроса" }).click();
+  await expect(page.locator(".reviewed")).toHaveCount(10);
+  await expect(page.getByRole("button", { name: "Въпросите и фактите" })).toHaveCount(0);
+  await expect(page.locator(".screen")).not.toContainText(/[Бб]раво|[Пп]оздрав|[Сс]упер|[Оо]тлично/);
 });
 
 test("the day says how its other players did with each question: under the verdict, and in the review", async ({

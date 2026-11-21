@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// A duel with a friend over HTTP: started, played as any run, sent (the friend told by a push, a dot in Приятели, a
-// line on Начало), played back (the first told the result); only theirs to see and play. Against a recording, too.
+// A duel with a friend over HTTP: started, played as any run, sent (the friend told by a push and a dot in
+// Приятели), played back (the first told the result); only theirs to see and play. Against a recording, too.
 func TestADuelOverHTTP(t *testing.T) {
 	s, g, fake, subscribe := pushWorld(t)
 	ana, anaID := g.guest()
@@ -44,12 +44,9 @@ func TestADuelOverHTTP(t *testing.T) {
 	playRun(ana, map[string]any{"id": duel["runId"]})
 	pushes("/bo", 1)
 
-	// Bo hears of it: a dot in Приятели, a line on Начало, the duel his to play.
+	// Bo hears of it: a dot in Приятели, the duel his to play.
 	if _, w := bo.call("GET", "/api/friends/requests", nil); w["duels"] != 1.0 || w["requests"] != 0.0 {
 		t.Fatalf("waiting for Bo: %v", w)
-	}
-	if _, day := bo.call("GET", "/api/day", nil); day["duel"] == nil || day["duel"].(map[string]any)["id"] != float64(id) {
-		t.Fatalf("Начало's line: %v", day["duel"])
 	}
 	if _, list := bo.call("GET", "/api/duels", nil); len(list["yours"].([]any)) != 1 {
 		t.Fatalf("Bo's duels: %v", list)
