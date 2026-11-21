@@ -31,6 +31,8 @@ var (
 	ErrNoInvite = errors.New("no such invite")
 	// ErrInviteSpent is a link that has made InviteADay friends today.
 	ErrInviteSpent = errors.New("invite spent for today")
+	// ErrInviterFull is a link whose player has MaxFriends already (the opener's own list full is ErrManyFriends).
+	ErrInviterFull = errors.New("inviter's friends full")
 )
 
 // Invite is a link as the one who opens it sees it: whose it is, and how the opener stands with them.
@@ -144,7 +146,8 @@ type Taken struct {
 
 // TakeInvite makes the player who opened a link friends with whose it is: at once, the inviter as the one who asked.
 // ErrNoInvite for a link that isn't; ErrSelf for one's own; Already for a friend already (whatever the day's count);
-// ErrInviteSpent once the link has made InviteADay friends today; ErrManyFriends when either list is full.
+// ErrInviteSpent once the link has made InviteADay friends today; ErrInviterFull when the inviter's list is full,
+// ErrManyFriends when the opener's is.
 func (g *Game) TakeInvite(ctx context.Context, code string, userID int64) (Taken, error) {
 	var t Taken
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
@@ -169,6 +172,13 @@ func (g *Game) TakeInvite(ctx context.Context, code string, userID int64) (Taken
 		}
 		if took >= InviteADay {
 			return ErrInviteSpent
+		}
+		var theirs int
+		if err := tx.QueryRow(`SELECT count(*) FROM friends WHERE user_id = ?`, from).Scan(&theirs); err != nil {
+			return err
+		}
+		if theirs >= MaxFriends {
+			return ErrInviterFull
 		}
 		made, err := g.befriendIn(tx, from, userID)
 		if err != nil || !made {

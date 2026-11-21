@@ -140,7 +140,7 @@ func TestInviteBounds(t *testing.T) {
 		}
 	}
 	fullCode, _ := w.g.InviteOf(ctx, full)
-	if _, err := w.g.TakeInvite(ctx, fullCode, cy); !errors.Is(err, ErrManyFriends) {
+	if _, err := w.g.TakeInvite(ctx, fullCode, cy); !errors.Is(err, ErrInviterFull) {
 		t.Fatalf("into a full list: %v", err)
 	}
 	cyCode, _ := w.g.InviteOf(ctx, cy)

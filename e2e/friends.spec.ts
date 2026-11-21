@@ -153,15 +153,16 @@ test("a request turned down, a friend removed", async ({ browser }) => {
   await a.locator(".invitation").getByRole("button", { name: "Приеми" }).click();
   await expect(a.locator(".friend")).toHaveCount(1);
   await a.getByRole("button", { name: "Премахни приятел" }).click();
+  // Asked first: „Отказ“ leaves him there.
   await a.locator(".friend").getByRole("button", { name: "Премахни" }).click();
-  await expect(a.locator(".friend")).toHaveCount(0);
-  // „Върни“ for a few seconds brings him back, nothing done.
-  await a.locator(".removed-line").getByRole("button", { name: "Върни" }).click();
+  const sure = a.getByRole("dialog");
+  await expect(sure.getByRole("heading")).toHaveText(/^Премахваш ли .+ от приятелите си\?$/);
+  await sure.getByRole("button", { name: "Отказ" }).click();
+  await expect(a.getByRole("dialog")).toHaveCount(0);
   await expect(a.locator(".friend")).toHaveCount(1);
+  // Said yes to, it's done at once.
   await a.locator(".friend").getByRole("button", { name: "Премахни" }).click();
-  await expect(a.locator(".removed-line")).toBeVisible();
-  // Then it's done.
-  await expect(a.locator(".removed-line")).toHaveCount(0, { timeout: 10_000 });
+  await a.getByRole("dialog").getByRole("button", { name: "Премахни" }).click();
   await expect(a.locator(".friend")).toHaveCount(0);
   await b.reload();
   await expect(

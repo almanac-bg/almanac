@@ -15,6 +15,7 @@ import { embedded, handMark, handToken, outsideLink } from "../lib/embedded.ts";
 import { askToKeep } from "../lib/keep.ts";
 import { fragment } from "../lib/router.ts";
 import { notice, type User, user } from "../state.ts";
+import { invitePath } from "./invite.ts";
 import { noEmail, noEmailLine, signIn } from "./signin.ts";
 
 /** This page's app browser, if it's in one. */
@@ -319,12 +320,14 @@ export function exitWay(stake: () => string | null): Child {
 }
 
 /** The cover's one small line in an app's own browser, under „Започни“: a game kept in the phone's browser is there.
- * On Android a tap opens it; on an iPhone the tap names the app's menu. */
+ * On Android a tap opens it (at the invite the page is at, while it is: screens/invite.ts); on an iPhone the tap
+ * names the app's menu. */
 export function coverExit(): Child {
   if (!app) return null;
   const named = signal(false);
   const go = () => {
-    if (app?.platform === "android") location.assign(outsideLink(`${location.origin}/`));
+    const at = invitePath.test(location.pathname) ? location.pathname : "/";
+    if (app?.platform === "android") location.assign(outsideLink(`${location.origin}${at}`));
     else named.set(true);
   };
   return h(

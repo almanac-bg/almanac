@@ -39,7 +39,7 @@ const (
 var invitePath = regexp.MustCompile(`^/f/([a-z2-9]{10})$`)
 
 // errInviteBusy is a network past its budget of links looked up.
-var errInviteBusy = &apiError{http.StatusTooManyRequests, "too_many", "Твърде много покани оттук. Опитай пак след малко."}
+var errInviteBusy = &apiError{http.StatusTooManyRequests, "too_many", "Твърде много връзки оттук. Опитай пак след малко."}
 
 // inviteURL is a link's address.
 func (s *Server) inviteURL(code string) string { return s.cfg.PublicURL + "/f/" + code }
