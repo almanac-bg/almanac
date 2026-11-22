@@ -171,9 +171,9 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
 - **Приятели:** the people and the duels (the day's board is Днес's), on one page with no tabs (owner, 2026-11-22),
   one column on a big screen too; the page's „Приятели“ is a screen reader's only, each section headed in sight
   (`.sect-head`), a list's count in brackets after its name. Top to bottom: who asks to be friends (a row each,
-  „Приеми“ and „Откажи“); „Чакащи дуели (7)“, the open duels, while there are any (theirs to play first,
-  then those waiting: a duel to play stays first on the page until it's played; the count is of duels, a pile's
-  every one); „Приятели (5)“, „Премахни приятел“ at the right, a friend's yes to a request one line over the friends,
+  „Приеми“ and „Откажи“); „Чакащи дуели (3)“, the duels the player has to play, while there are any (a duel
+  to play stays first on the page until it's played); one the player sent, the friend's to play, isn't listed
+  (owner, 2026-11-22: it only muddled the list), but for the one just played, as it lands, once; „Приятели (5)“, „Премахни приятел“ at the right, a friend's yes to a request one line over the friends,
   told once, then a row each friend: avatar with its seal, the name across the row, never cut, and under it the duels
   between the two in words, quiet, the record heavier („Дуели помежду ви: 3 победи, 1 загуба“, with „равенства“ if
   any; „Още нямате дуели“ before the first): never the friend's day, which is the board's (owner, 2026-11-22);
@@ -186,12 +186,16 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   или имейл.“ A friend removed only after a sheet asks „Премахваш ли Иво от приятелите си?“, „Премахни“ in red and
   „Отказ“, then at once, the duels open between them ending as if their time were up; then adding and the requests
   sent; last, the duels played, under „Последните 10 изиграни дуела“ („Изиграни дуели“ while there are fewer: the
-  list is the last ten and says so). All there is of a duel is in Приятели: there is no page of its result
+  list is the last ten and says so); under the last, while there are more, „Всички изиграни дуели (37)“ opens them
+  all in a dialog (`.duels-all`, as the questions' sheet: its head stays as the cards scroll under it), ten at a
+  time, the latest first, each a card as in the list, and under them „По-нови“ and „По-стари“ either side of
+  „Страница 2 от 4“, each off at its end (owner, 2026-11-22). All there is of a duel is in Приятели: there is no page of its result
   (DECISIONS.md).
   Every duel is a card (`.duel-card`, one a row on a big screen too, as on a phone; owner, 2026-11-22: the cards
   read better than compact rows): the two face to face, no label over them (every duel is with a friend), the
-  player's avatar with its seal and „Ти“ on the left, the other's with their name on the right, each a way to that
-  profile (the player's own to Профил), its name underlined under a pointer, as a name is everywhere; between them how
+  player's avatar with its seal and „Ти“ on the left, the other's with their name on the right; on an open one
+  („Чакащи дуели“) each a way to that profile (the player's own to Профил), its name underlined under a pointer, as
+  a name is everywhere, and on a played one neither, the card its questions whole (owner, 2026-11-22); between them how
   it stands: „Твой ред“ or „Чакаш“ (quiet) over „още 6 дни“; a played one's score, a heavy numeral („8:6“), over its
   end as a chip, told apart at a glance by fill and line, never red or green („✓ Победа“ filled in ink, „Загуба“
   outlined and quiet, „Равенство“ outlined in ink); one that ran out „Изтече“ alone. Under the two, of a game played to
@@ -203,15 +207,16 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   even in that too, „Равенство“ and nothing more). A duel the player's to play has „Играй“ at its foot, a link to its
   game and the card's one action (the card itself leads nowhere, owner, 2026-11-22), ringed in ink and filled, the
   page's action. Once the player's own game in it is played (one waiting for the friend, one played), the card opens
-  its questions' dialog, on any day: a button laid over the whole card (`.duel-card-open`), under the names' links,
+  its questions' dialog, on any day: a button laid over the whole card (`.duel-card-open`), under an open one's names' links,
   with nothing on it to say so; under a pointer, or reached by the keyboard, its line lights; a screen reader hears
   „Въпросите от дуела с Иво“. At large text (`.tight`) the two are under each other, each a row. No „Реванш“: a new
   duel starts from the friend's row. Nothing ringed but the duel to play, no time on any of it: time never counts.
   Every duel the player has to play is in one stack, whoever sent it (owner, 2026-11-22), in the order they were
   challenged: the first on top, its card whole, the edges of one or two more under it, each a little narrower, as
-  sheets lie in a stack (`.duel-pile`); beside its „Играй“, „Избери дуел (4)“ opens them all in a dialog („Чакат те 4
+  sheets lie in a stack (`.duel-pile`); under its „Играй“, „Виж всички (4)“ opens them all in a dialog („Чакат те 4
   дуела“), in the same order, a row each: who it's with (avatar and name, a way to their profile), how long is left
-  („Довърши своята игра“ before it, of one the player began), and its own „Играй“; „Затвори“ in its head, beside the title, as every sheet that's gone through has it.
+  („Довърши своята игра“ before it, of one the player began), and its own „Играй“; „Затвори“ in its head, beside the
+  title, as every sheet that's gone through has it.
   A duel named in the address (`?duel=<id>`: its game just ended, or an old link to its page) is first in its group,
   brought into sight, and its result lands there once (`feel.duel`: the marks fill pair by pair, the score counts
   up, the chip lands with the end's sound), never again. The record between two is the friend's row's, never a duel's. Friends are added in one field, „име или

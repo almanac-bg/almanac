@@ -171,8 +171,8 @@ for (const scheme of ["light", "dark"] as const) {
     expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
 
     // Its questions in their dialog, each with how it went for the two, its answers and its fact: a button over the
-    // row, named for them; her name a way to her profile.
-    await expect(card.getByRole("link", { name: "Мария" })).toHaveAttribute("href", "/players/maria");
+    // card, named for them; no name a link on a played card.
+    await expect(card.getByRole("link")).toHaveCount(0);
     await card.getByRole("button", { name: "Въпросите от дуела с Мария" }).click();
     const sheet = page.locator("dialog.review-sheet");
     await expect(sheet.locator(".reviewed")).toHaveCount(2);

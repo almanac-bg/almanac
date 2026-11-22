@@ -568,11 +568,13 @@ func (g *Game) endDue(ctx context.Context, duelID, runID int64) error {
 
 // Duels are a player's duels, as Приятели lists them: theirs to play (sent to them, or their own side not finished),
 // sent and waiting for the friend, and those played (the latest ended first, DuelsShown of them, the last: the list
-// says so). Each one played, or waiting, as its card shows it whole (duelMore): there's no other page of it.
+// says so; all of them, PlayedAll, a page at a time: DuelsPlayed). Each one played, or waiting, as its card shows it
+// whole (duelMore): there's no other page of it.
 type Duels struct {
-	Yours  []DuelView `json:"yours"`
-	Theirs []DuelView `json:"theirs"`
-	Played []DuelView `json:"played"`
+	Yours     []DuelView `json:"yours"`
+	Theirs    []DuelView `json:"theirs"`
+	Played    []DuelView `json:"played"`
+	PlayedAll int        `json:"playedAll"`
 }
 
 // DuelsShown is how many duels played Приятели lists: the last ten.
@@ -609,6 +611,64 @@ func (g *Game) DuelsOf(ctx context.Context, userID int64) (Duels, error) {
 				out.Played = append(out.Played, v)
 			}
 		}
+	}
+	out.PlayedAll, err = g.playedCount(ctx, userID)
+	return out, err
+}
+
+// playedWhere is, in a query whose ?1 is a player, the duels of theirs that have ended (played back, lapsed): those
+// Приятели lists as played.
+const playedWhere = `(a_id = ?1 OR (b_id = ?1 AND sent_at IS NOT NULL)) AND ended_at IS NOT NULL`
+
+// playedCount is how many duels of a player's have ended.
+func (g *Game) playedCount(ctx context.Context, userID int64) (int, error) {
+	var n int
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT count(*) FROM duels WHERE `+playedWhere, userID).Scan(&n)
+	return n, err
+}
+
+// PlayedPage is a page of a player's duels played (DuelsPlayed): DuelsShown of them, the latest ended first, and how
+// many pages there are in all (at least one).
+type PlayedPage struct {
+	Duels []DuelView `json:"duels"`
+	Page  int        `json:"page"`
+	Pages int        `json:"pages"`
+}
+
+// DuelsPlayed is a page of a player's duels played, from 1 (the latest, as Приятели lists them), each as its card shows
+// it whole (duelMore); a page past the last is the last.
+func (g *Game) DuelsPlayed(ctx context.Context, userID int64, page int) (PlayedPage, error) {
+	out := PlayedPage{Duels: []DuelView{}, Page: page, Pages: 1}
+	n, err := g.playedCount(ctx, userID)
+	if err != nil {
+		return out, err
+	}
+	out.Pages = max(1, (n+DuelsShown-1)/DuelsShown)
+	out.Page = min(max(page, 1), out.Pages)
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT id FROM duels WHERE `+playedWhere+`
+		ORDER BY ended_at DESC, id DESC LIMIT ?2 OFFSET ?3`, userID, DuelsShown, (out.Page-1)*DuelsShown)
+	if err != nil {
+		return out, err
+	}
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return out, err
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return out, err
+	}
+	for _, id := range ids {
+		v, err := g.DuelOf(ctx, userID, id)
+		if err != nil {
+			return out, err
+		}
+		out.Duels = append(out.Duels, v)
 	}
 	return out, nil
 }

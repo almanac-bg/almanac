@@ -204,6 +204,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/runs/{id}/share", s.share)
 	api("POST /api/questions/{id}/report", s.report)
 	api("GET /api/duels", s.duels)
+	api("GET /api/duels/played", s.duelsPlayed)
 	api("POST /api/duels", s.newDuel)
 	api("GET /api/duels/{id}", s.duelOne)
 	api("POST /api/duels/{id}/play", s.playDuel)

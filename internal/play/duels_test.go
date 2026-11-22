@@ -567,3 +567,61 @@ func TestUnfriendEndsTheirDuels(t *testing.T) {
 		t.Fatalf("a duel played: %+v", d)
 	}
 }
+
+// The duels played are all a player's, a page of DuelsShown at a time, the latest ended first, as Приятели lists the
+// first of them; the other side sees those sent to them. A page past the last is the last.
+func TestDuelsPlayedByPage(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, cy := w.user(), w.user()
+	w.befriend(ana, cy)
+	const n = 2*DuelsShown + 3
+	for i := range n {
+		at := store.Ms(w.now.Add(time.Duration(i) * time.Minute))
+		var sent any
+		if i%2 == 0 {
+			sent = at // sent to Cy: hers too
+		}
+		if _, err := w.db.Write.Exec(`INSERT INTO duels (questions, a_id, b_id, created_at, sent_at, expires_at, ended_at,
+			outcome) VALUES ('[]', ?, ?, ?, ?, ?, ?, 'expired')`, ana, cy, at, sent, at, at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	list, err := w.g.DuelsOf(ctx, ana)
+	if err != nil || list.PlayedAll != n || len(list.Played) != DuelsShown {
+		t.Fatalf("Ana's duels: %d of %d, %v", len(list.Played), list.PlayedAll, err)
+	}
+	ids := func(vs []DuelView) []int64 {
+		out := []int64{}
+		for _, v := range vs {
+			out = append(out, v.ID)
+		}
+		return out
+	}
+	var all []int64
+	for page := 1; page <= 3; page++ {
+		p, err := w.g.DuelsPlayed(ctx, ana, page)
+		if err != nil || p.Page != page || p.Pages != 3 {
+			t.Fatalf("page %d: %+v %v", page, p, err)
+		}
+		if page == 1 && !slices.Equal(ids(p.Duels), ids(list.Played)) {
+			t.Fatalf("the first page isn't Приятели's list: %v, %v", ids(p.Duels), ids(list.Played))
+		}
+		all = append(all, ids(p.Duels)...)
+	}
+	if len(all) != n || !slices.IsSortedFunc(all, func(a, b int64) int { return cmpInt(int(b), int(a)) }) {
+		t.Fatalf("all the pages: %v", all)
+	}
+	if p, _ := w.g.DuelsPlayed(ctx, ana, 9); p.Page != 3 || len(p.Duels) != 3 {
+		t.Fatalf("past the last: %+v", p)
+	}
+	if p, _ := w.g.DuelsPlayed(ctx, ana, 0); p.Page != 1 || len(p.Duels) != DuelsShown {
+		t.Fatalf("before the first: %+v", p)
+	}
+	if list, _ := w.g.DuelsOf(ctx, cy); list.PlayedAll != (n+1)/2 {
+		t.Fatalf("Cy's: %d", list.PlayedAll)
+	}
+	if p, _ := w.g.DuelsPlayed(ctx, w.user(), 1); p.Pages != 1 || len(p.Duels) != 0 {
+		t.Fatalf("none: %+v", p)
+	}
+}

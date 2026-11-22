@@ -31,6 +31,21 @@ func (s *Server) duels(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, list)
 }
 
+// duelsPlayed is a page of the player's duels played (play.DuelsPlayed: ?page=, from 1), for Приятели's dialog of
+// them all.
+func (s *Server) duelsPlayed(w http.ResponseWriter, r *http.Request) error {
+	u, err := s.mustUser(r)
+	if err != nil {
+		return err
+	}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	out, err := s.game.DuelsPlayed(r.Context(), u.ID, page)
+	if err != nil {
+		return err
+	}
+	return ok(w, out)
+}
+
 // newDuel starts a duel with a friend ({"friend": id}); one with them left unfinished is gone on with instead. It
 // answers with the duel, and the player's run in it to play.
 func (s *Server) newDuel(w http.ResponseWriter, r *http.Request) error {

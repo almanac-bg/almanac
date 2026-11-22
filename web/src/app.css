@@ -3565,8 +3565,10 @@
     list-style: none;
   }
 
+  /* Its layers its own (the names over its button): nothing of it rises over what scrolls over it (a sheet's head). */
   .duel-card {
     position: relative;
+    isolation: isolate;
     display: grid;
     gap: 10px;
     width: 100%;
@@ -3620,19 +3622,42 @@
     }
   }
 
-  /* „Играй“ at a card's foot, and, on the stack, „Избери дуел (3)“ beside it. */
+  /* „Играй“ at a card's foot, and, on the stack, „Виж всички (3)“ under it. */
   .duel-card-acts {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
     gap: var(--space-2);
   }
 
-  .duel-card-acts > .btn {
-    flex: 1 1 10rem;
+  /* A card on a sheet, the sheet's white around it: on the page's ground, as on the page, its seals ringed so. */
+  .duels-all .duel-card {
+    --ring: var(--bg);
+    background: var(--bg);
+  }
+
+  /* All the duels played, a page at a time, in a dialog: „По-нови“ and „По-стари“ either side of where the page is. */
+  .pages {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .pages > .btn {
+    flex: none;
+    min-height: 2.75rem;
+    padding-inline: var(--space-4);
+    white-space: nowrap;
+  }
+
+  .pages-at {
+    flex: 1;
+    color: var(--ink-3);
+    font: var(--t-fine);
+    text-align: center;
   }
 
   /* The duels to play, one stack: the first challenged on top, the edges of one or two more under it, each a little
-     narrower, as sheets lie in a stack; „Избери дуел (3)“ on it opens them all. */
+     narrower, as sheets lie in a stack; „Виж всички (3)“ on it opens them all. */
   .duel-pile {
     position: relative;
     isolation: isolate;
@@ -3783,7 +3808,7 @@
      duel's): the game's sheet, a reading column wide, never the whole height of a phone (the page shows over it, and
      a tap there puts it away); its head, „Въпросите“ and „Затвори“, stays as the questions scroll under it; under the
      head whose questions they are, then each question a card. */
-  .review-sheet .sheet-panel {
+  :is(.review-sheet, .duels-all) .sheet-panel {
     --pad: 20px;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -3793,7 +3818,7 @@
     padding: 0 var(--pad) calc(var(--space-5) + env(safe-area-inset-bottom));
   }
 
-  .review-sheet .sheet-head {
+  :is(.review-sheet, .duels-all) .sheet-head {
     position: sticky;
     top: 0;
     z-index: 1;
@@ -3811,7 +3836,7 @@
   }
 
   @media (min-width: 56.25rem) {
-    .review-sheet .sheet-panel {
+    :is(.review-sheet, .duels-all) .sheet-panel {
       --pad: var(--space-6);
       max-height: calc(100% - 2 * var(--space-6));
       padding-bottom: var(--pad);

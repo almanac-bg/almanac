@@ -1,11 +1,11 @@
 // A duel as a card, and the cards as Приятели lists them (friends.ts). The card is all there is of a duel
-// (DECISIONS.md: no page of its result): the two face to face (each a way to their profile, the player's own to
-// Профил) with how it stands between them, how each question went for each side (two rows of ten small squares, as the
+// (DECISIONS.md: no page of its result): the two face to face (on an open one each a way to their profile, the
+// player's own to Профил) with how it stands between them, how each question went for each side (two rows of ten small squares, as the
 // boards draw them), one quiet line where there's more to say; theirs to play, „Играй“, the card's one way to its game
 // (the card itself leads nowhere); and, once the player's own game is played, a tap anywhere on it but a name opens its
 // questions in their dialog (results.ts, reviewSheet), on any day (play.Review). A new duel starts from a friend's row
 // (or their profile), never from a card. Every duel the player has to play is in one stack (owner, 2026-11-22), in the
-// order they were challenged: the first on top, the rest under it as the edges of sheets, and „Избери дуел“ on it
+// order they were challenged: the first on top, the rest under it as the edges of sheets, and „Виж всички“ on it
 // opens them all in a dialog, in the same order, each with its own „Играй“. The duel just played, or named by an old
 // link to it (`top`), comes first in its own group (a result first of the played, one sent first of those waiting for a
 // friend), in sight, and its score counts up once as it lands (feel.ts: duel), never again.
@@ -17,12 +17,13 @@ import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
 import type { SoundName } from "../lib/sound.ts";
 import type { Look } from "../ui.ts";
-import type { DuelMark, Duels, DuelView, Side } from "./duel.ts";
+import type { DuelMark, Duels, DuelView, PlayedPage, Side } from "./duel.ts";
 
 // The app's pieces, set as the cards are drawn (duelGroup).
 let {
   api,
   avatar,
+  errorText,
   feelKit,
   formatNumber,
   h,
@@ -33,6 +34,7 @@ let {
   play,
   profileHref,
   reviewSheet,
+  signal,
   playerRow,
   withWord,
 } = {} as Kit;
@@ -177,25 +179,28 @@ const playLink = (d: DuelView, first: boolean, cls = ""): Child =>
     "Играй",
   );
 
-/** A duel as a card: the two face to face, the player on the left, each a way to their profile, with how it stands
+/** A duel as a card: the two face to face, the player on the left (open, each a way to their profile), with how it stands
  * between them (cardMiddle), the duel question by question (marksRows), and what more there is to say on one quiet
  * line (noteLine). Theirs to play, „Играй“ at its foot, the card's one way to its game (`play`: the first, filled; the
- * card itself leads nowhere). Once the player's own game in it is played, a button laid over the whole card (under its
- * names' links) opens its questions, nothing on it to say so but its light under a pointer. `stack`: the duels to play
- * (all of them, it the first), the edges of sheets under the card and „Избери дуел (3)“ by its „Играй“, which opens
+ * card itself leads nowhere). Once the player's own game in it is played, a button laid over the whole card (under an open
+ * one's names' links) opens its questions, nothing on it to say so but its light under a pointer. `stack`: the duels to play
+ * (all of them, it the first), the edges of sheets under the card and „Виж всички (3)“ under its „Играй“, which opens
  * them in a dialog. `top`: the duel named in the address, shown in sight, its result landing as a moment, once. */
 function duelCard(d: DuelView, play = false, stack: DuelView[] = [], top = false): Child {
   const them = d.opponent;
   const note = noteLine(d);
+  // The names lead to the profiles on a duel still open only (owner, 2026-11-22): a played card is its questions, the
+  // whole of it.
+  const open = d.state === "yours" || d.state === "theirs";
   const card = h(
     "div",
     { class: `duel-card s-${d.state}${play ? " turn" : ""}${top ? " landed" : ""}`, id: `duel-${d.id}` },
     h(
       "span",
       { class: "duel-card-sides" },
-      cardSide("Ти", d.you?.look ?? {}, d.you?.name ?? "", tagOf(d.you)),
+      cardSide("Ти", d.you?.look ?? {}, d.you?.name ?? "", open ? tagOf(d.you) : ""),
       h("span", { class: "duel-card-mid" }, cardMiddle(d)),
-      cardSide(them?.name ?? "Съперник", them?.look ?? {}, them?.name ?? "", tagOf(them)),
+      cardSide(them?.name ?? "Съперник", them?.look ?? {}, them?.name ?? "", open ? tagOf(them) : ""),
     ),
     marksRows(d),
     note ? h("span", { class: "duel-card-note" }, note) : null,
@@ -213,7 +218,7 @@ function duelCard(d: DuelView, play = false, stack: DuelView[] = [], top = false
                   "aria-haspopup": "dialog",
                   onclick: () => choose(stack),
                 },
-                `Избери дуел (${formatNumber(stack.length)})`,
+                `Виж всички (${formatNumber(stack.length)})`,
               )
             : null,
         )
@@ -277,6 +282,79 @@ function choose(stack: DuelView[]): void {
   box.addEventListener("close", () => box.remove());
   document.body.append(box);
   box.showModal();
+}
+
+/** Every duel the player has played, in a dialog over the page, a page of ten at a time (play.DuelsPlayed), the latest
+ * first, each a card as Приятели has it; under them „По-нови“ and „По-стари“ either side of where the page is
+ * („Страница 2 от 4“), each off at its end. */
+function allPlayed(): void {
+  const page = signal<PlayedPage | null>(null);
+  const error = signal("");
+  const load = async (n: number) => {
+    error.set("");
+    try {
+      page.set(await api<PlayedPage>("GET", `/api/duels/played?page=${n}`));
+      list?.scrollTo({ top: 0 });
+    } catch (err) {
+      error.set(errorText(err));
+    }
+  };
+  let list: HTMLElement | undefined;
+  const go = (step: number) => () => {
+    const p = page.peek();
+    if (p) void load(p.page + step);
+  };
+  const box = h(
+    "dialog",
+    { class: "sheet duels-all", "aria-labelledby": "duels-all-title" },
+    h(
+      "div",
+      {
+        class: "sheet-panel",
+        ref: (el) => {
+          list = el as HTMLElement;
+        },
+      },
+      h(
+        "div",
+        { class: "sheet-head" },
+        h("h2", { id: "duels-all-title" }, "Изиграни дуели"),
+        h("button", { class: "link", type: "button", onclick: () => box.close() }, "Затвори"),
+      ),
+      () => {
+        const p = page();
+        if (!p) return error() ? h("p", { class: "bad", role: "alert" }, error()) : h("p", { class: "muted" }, "…");
+        return [
+          h(
+            "ul",
+            { class: "duel-cards" },
+            p.duels.map((v) => duelCard(shown(v))),
+          ),
+          error() ? h("p", { class: "bad", role: "alert" }, error()) : null,
+          p.pages > 1
+            ? h(
+                "nav",
+                { class: "pages", "aria-label": "Страници" },
+                h("button", { class: "btn inline", type: "button", disabled: p.page <= 1, onclick: go(-1) }, "По-нови"),
+                h("span", { class: "pages-at" }, `Страница ${formatNumber(p.page)} от ${formatNumber(p.pages)}`),
+                h(
+                  "button",
+                  { class: "btn inline", type: "button", disabled: p.page >= p.pages, onclick: go(1) },
+                  "По-стари",
+                ),
+              )
+            : null,
+        ];
+      },
+    ),
+  ) as HTMLDialogElement;
+  box.addEventListener("click", (e) => {
+    if (e.target === box) box.close();
+  });
+  box.addEventListener("close", () => box.remove());
+  document.body.append(box);
+  box.showModal();
+  void load(1);
 }
 
 /** Whether the duel named in the address was brought into sight on this visit to the page (duelGroup's `sight`): once,
@@ -347,6 +425,7 @@ export function duelGroup(
   ({
     api,
     avatar,
+    errorText,
     feelKit,
     formatNumber,
     h,
@@ -357,6 +436,7 @@ export function duelGroup(
     play,
     profileHref,
     reviewSheet,
+    signal,
     playerRow,
     withWord,
   } = kit);
@@ -370,17 +450,20 @@ export function duelGroup(
     duelCard(v, play, stack, v.id === named?.id),
     news(v),
   ];
-  const group = (heading: string, cards: Child[]) =>
+  const group = (heading: string, cards: Child[], after: Child = null) =>
     h(
       "section",
       { class: `sect duels-${which}` },
       h("div", { class: "sect-head" }, h("h2", null, heading)),
       h("ul", { class: "duel-cards" }, cards),
+      after,
     );
   if (which === "open") {
     // The duels to play, in the order they were challenged: the first sent (or begun) first, the first to lapse.
     const toPlay = first((v) => v.state === "yours", d.yours).sort((a, b) => (a.until ?? 0) - (b.until ?? 0));
-    const waiting = first((v) => v.state === "theirs", d.theirs);
+    // One the player sent and the friend hasn't played is theirs to do, not the player's: not listed (owner,
+    // 2026-11-22: it only muddled the list), but for the one just played, as it lands, once (its score, sent).
+    const waiting = named?.state === "theirs" ? [named] : [];
     const [head] = toPlay;
     const cards = [head ? card(head, true, toPlay) : null, ...waiting.map((v) => card(v))];
     return toPlay.length || waiting.length
@@ -388,10 +471,20 @@ export function duelGroup(
       : null;
   }
   const played = first((v) => v.state !== "yours" && v.state !== "theirs", d.played);
+  // More played than listed: a way to all of them, under the last, in a dialog a page at a time.
+  const more =
+    d.playedAll > d.played.length
+      ? h(
+          "button",
+          { class: "btn duels-all-open", type: "button", "aria-haspopup": "dialog", onclick: allPlayed },
+          `Всички изиграни дуели (${formatNumber(d.playedAll)})`,
+        )
+      : null;
   return played.length
     ? group(
         d.played.length >= playedShown ? `Последните ${playedShown} изиграни дуела` : "Изиграни дуели",
         played.map((p) => card(p)),
+        more,
       )
     : null;
 }
