@@ -200,6 +200,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/runs/{id}/start", s.start)
 	api("POST /api/runs/{id}/answer", s.answer)
 	api("GET /api/runs/{id}/review", s.review)
+	api("GET /api/runs/{id}/friends", s.reviewFriends)
 	api("POST /api/runs/{id}/share", s.share)
 	api("POST /api/questions/{id}/report", s.report)
 	api("GET /api/duels", s.duels)

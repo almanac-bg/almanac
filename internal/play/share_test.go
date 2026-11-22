@@ -9,7 +9,7 @@ func TestShareShape(t *testing.T) {
 		{Right: true}, {Right: true}, {}, {Right: true}, {Void: true},
 		{Right: true}, {Close: true}, {Right: true}, {Right: true}, {},
 	}}
-	sh := Share{Code: "k4f2m7qa", Day: "2026-11-20", Issue: Issue("2026-11-20"), Shape: shapeOf(s)}
+	sh := Share{Code: "k4f2m7qa", Day: "2026-11-20", Issue: Issue("2026-11-20"), Shape: shapeOf(s.Trail)}
 	if sh.Shape != "1101312110" || sh.Rights() != 6 || sh.Counted() != 9 {
 		t.Fatalf("shape %q, %d right of %d", sh.Shape, sh.Rights(), sh.Counted())
 	}

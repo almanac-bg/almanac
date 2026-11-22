@@ -3855,6 +3855,124 @@
     margin: 0;
   }
 
+  /* The day's questions gone over: how the player's friends who finished the day did with each, under how Bulgaria
+     did (results.ts, friendsOn). Up to four, each by name as a duel's sides are; more, two rows, those who got it and
+     those who didn't: a few faces one over another, each ringed in the card's colour, the first names and how
+     many more (on two lines rather than cut, on a narrow phone), and a chevron that turns as the row opens to its whole list. */
+  .friends-on {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .friends-few {
+    gap: var(--space-2) var(--space-4);
+  }
+
+  .friends-few .duel-q-side {
+    flex: 0 1 auto;
+  }
+
+  .friends-group {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .friends-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: 44px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--ink-3);
+    font: inherit;
+    font-size: 0.9375rem;
+    font-weight: 800;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .friends-row.right,
+  .friends-list.right {
+    color: var(--ink);
+  }
+
+  .friends-faces {
+    display: flex;
+    flex: none;
+  }
+
+  .friends-faces .avatar.s {
+    --size: 24px;
+    box-shadow: 0 0 0 2px var(--bg);
+  }
+
+  .friends-faces .avatar + .avatar {
+    margin-inline-start: -8px;
+  }
+
+  /* A narrow phone: three faces, the names the room. */
+  @media (max-width: 23.5rem) {
+    .friends-faces .avatar:nth-child(n + 4) {
+      display: none;
+    }
+  }
+
+  .friends-names {
+    flex: 1;
+    min-width: 0;
+    padding-block: var(--space-1);
+  }
+
+  .friends-more {
+    color: var(--ink-3);
+    transition: transform 150ms ease-out;
+  }
+
+  .friends-row[aria-expanded="true"] .friends-more {
+    transform: rotate(90deg);
+  }
+
+  .friends-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
+    margin: 0 0 var(--space-2);
+    padding: 0;
+    color: var(--ink-3);
+    font-size: 0.9375rem;
+    font-weight: 800;
+    list-style: none;
+  }
+
+  .friends-list[hidden] {
+    display: none;
+  }
+
+  .friends-chip {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .friends-chip .avatar.s {
+    --size: 24px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .friends-row:hover .friends-names {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
   /* A friend to start a duel with (/duel/new): a row, the whole of it a button (never a way to a profile: under a
      pointer the row lights by its line, and no name is underlined): the avatar, the name with the duels between the
      two under it, „Дуел“ at its end. */

@@ -628,7 +628,7 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
   `.verdict`, `.right-said`, `.after`, `.up-next-go`; `.issue`, `.issue-go`, `.today-side`, `.result`, `.result-main`, `.score-n`,
   `.tiles .tile`, `.tomorrow`, `.result-share`, `.share-sheet`, `.streak-chip`, `.streak-notice`, `.day-news`, `.missed-day`;
   `.summary`, `.reviewed`, `.news-facts`; `.toc-row`, `.entry`; `.day-board`, `.rank-row`, `.friend`, `.invitation`,
-  `.accepted-notice`, `.duels`, `.duel-cards` (`.landed`), `.duel-card` (`.turn`, `.s-<state>`), `.duel-card-mid`, `.duel-card-go`, `.duel-chip`, `.duel-card-marks`, `.duel-card-acts`, `.review-sheet`, `.review-of`, `.duel-q-side`, `.tile-tap`, `.lit`, `.friend-stat`, `.tab-dot`, `.duel-pick`, `.their-line`; `.me-ladder`, `.ladder`.
+  `.accepted-notice`, `.duels`, `.duel-cards` (`.landed`), `.duel-card` (`.turn`, `.s-<state>`), `.duel-card-mid`, `.duel-card-go`, `.duel-chip`, `.duel-card-marks`, `.duel-card-acts`, `.review-sheet`, `.review-of`, `.duel-q-side`, `.friends-on`, `.friends-row`, `.friends-faces`, `.friends-list`, `.friends-chip`, `.tile-tap`, `.lit`, `.friend-stat`, `.tab-dot`, `.duel-pick`, `.their-line`; `.me-ladder`, `.ladder`.
 
 ## Before a UI change ships
 

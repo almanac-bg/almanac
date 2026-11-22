@@ -103,6 +103,12 @@ packages' doc comments; this file holds only what must not drift.
     duel's), opened by „Прегледай въпросите“, by the score's card, and by a tile at its question (2026-11-22, the
     owner: the list in the page made the result long, and a duel had a second kind of it). A
     wrong game is never celebrated; a best rank rising and a ten of ten are the only big moments.
+  - **The day's questions say how the player's friends did** (owner, 2026-11-22): in the day's questions' dialog,
+    under how Bulgaria did with each question, which of the friends who finished the day got it right (up to four by
+    name, each with their sign; more, two rows, those who did and those who didn't, each opening to its whole list);
+    never before the player has finished, never anyone's answers. The day is the same ten for everyone, and this turns
+    a score into something to talk about. The day's issue only: a duel's dialog shows its two sides, a chapter's game
+    has no friends in it.
   - **The player's nouns are a closed list:** Брой, близо, серия, Алманах (глави, факти, мастило), печат, игра на
     главата (всички глави, България), приятели, класация, дуел (запис), споделяне, профил, напомняне. Adding one is the owner's
     call.

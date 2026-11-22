@@ -65,6 +65,63 @@ test("friends on the day: who has played it, and how each went", async ({ browse
   await friends.getByRole("tab", { name: "Всички" }).click();
   await expect(friends.locator(".rank-row").filter({ hasText: ana })).toHaveCount(1);
   await expect(friends.locator(".rank-row.me")).toHaveCount(1);
+
+  // His questions gone over: under how Bulgaria did with each, how his friend did, as she played it: her face, her
+  // sign and her name, in ink where she got it right; a „близо“ isn't right.
+  const hers = await a.evaluate(async () =>
+    ((await (await fetch("/api/day")).json()).run.trail as { right: boolean; void?: boolean }[]).map((m) =>
+      m.void ? "void" : m.right ? "right" : "not",
+    ),
+  );
+  const review = b.getByRole("dialog", { name: "Въпросите" });
+  await b.getByRole("button", { name: "Прегледай въпросите" }).click();
+  await expect(review.locator(".reviewed")).toHaveCount(10);
+  for (const [n, mark] of hers.entries()) {
+    const on = review.locator(`.reviewed[data-n="${n}"] .friends-on`);
+    if (mark === "void") {
+      await expect(on).toHaveCount(0);
+      continue;
+    }
+    // One friend: no line over her, her sign says it.
+    await expect(on.locator(".crowd-says")).toHaveCount(0);
+    await expect(on.locator(".duel-q-side")).toHaveCount(1);
+    await expect(on.locator(".duel-q-side")).toContainText(ana);
+    await expect(on.locator(".duel-q-side.right")).toHaveCount(mark === "right" ? 1 : 0);
+  }
+  await review.getByRole("button", { name: "Затвори" }).click();
+
+  // With many friends (as the server would send them), each question is two rows, those who got it and those who
+  // didn't, each a few faces and names that opens to the whole list.
+  await b.route("**/api/runs/*/friends", (route) =>
+    route.fulfill({
+      json: {
+        friends: ["Стоян Тодоров", "Огнян Ангелов", "Мария", "Niki", "Йордан", "Елена99"].map((name, i) => ({
+          name,
+          avatar: "fox",
+          marks: (i < 2 ? "1" : i === 2 ? "2" : "0").repeat(10),
+        })),
+      },
+    }),
+  );
+  await b.getByRole("button", { name: "Прегледай въпросите" }).click();
+  const first = review.locator(".reviewed").first();
+  await expect(first.locator(".friends-on .crowd-says")).toHaveText(
+    "От 6\u00a0твои приятели го познаха само Стоян Тодоров и Огнян Ангелов.",
+  );
+  const [knew, not] = [first.locator(".friends-row.right"), first.locator(".friends-row:not(.right)")];
+  await expect(knew).toContainText("Стоян и Огнян");
+  await expect(not).toContainText("Мария, Niki и още 2");
+  await expect(not.locator(".friends-faces .avatar")).toHaveCount(4);
+  await expect(not).toHaveAttribute("aria-expanded", "false");
+  await expect(first.locator(".friends-list").last()).toBeHidden();
+  await not.click();
+  await expect(not).toHaveAttribute("aria-expanded", "true");
+  const list = first.locator(".friends-list:not(.right)");
+  await expect(list).toBeVisible();
+  await expect(list.locator(".friends-chip")).toHaveText(["◩Мария: Близо", "Niki", "Йордан", "Елена99"]);
+  await review.getByRole("button", { name: "Затвори" }).click();
+  await b.unroute("**/api/runs/*/friends");
+
   // Приятели is the people and the duels: the day's board isn't there.
   await b.goto("/friends");
   await expect(b.locator(".friend")).toHaveCount(1);

@@ -14,6 +14,7 @@
 // is then the ask to keep it and be reminded.
 
 import { picture } from "../art/picture.ts";
+import type { FriendDay } from "../game/knew.ts";
 import { news } from "../game/news.ts";
 import { closeLine, count, percent, withOwn } from "../game/numbers.ts";
 import { answerWords } from "../game/questions.ts";
@@ -553,12 +554,17 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   // The day's board's tab, as the player chose it (none yet: dayBoard opens it).
   const among = signal<Among | null>(null);
   // The day's questions in their dialog, at one of them (`at`: a tile's); asked again if they failed (reviewOf keeps
-  // only a review that came).
+  // only a review that came). With them, how the friends who finished the day did with each, asked each time it opens
+  // (a friend may have played since); not asked of a player without friends.
   const openReview = (at?: number) =>
     reviewSheet({
       load: () => reviewOf(run.id),
       of: `Брой\u00a0${t.issue ?? issueOf(t.day)} · ${dateWords(t.day)} · ${run.rights} от ${of}`,
       at,
+      friends:
+        fresh.peek().befriended === false && !fresh.peek().friends?.length
+          ? undefined
+          : () => api<{ friends: FriendDay[] }>("GET", `/api/runs/${run.id}/friends`).then((r) => r.friends),
     });
   const order = t.topics ?? [];
   // The streak with today's, the game's stake, and the reminder's ask. A guest in an app's own browser has the way out
