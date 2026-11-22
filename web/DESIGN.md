@@ -101,7 +101,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      reminder's ask under it while reminders are off, a player with a profile's too (a plain button, never a second
      action; three times at most, once a day). Yesterday's issue finished after midnight has today's in its place
      („Вече излезе.“, „Към днешния брой“).
-  6. The day's board (`.day-board`, `dayBoard()`): one card, „Класация“ and two tabs, Приятели and България (among
+  6. The day's board (`.day-board`, `dayBoard()`): one card, „Класация“ and two tabs, Приятели and Всички (the second not „България“, which names the questions about Bulgaria; among
      friends once the player has any; with none, on all България). It's there once the day as it stands with the game
      played has come (before, the board names nobody to the player and shows no squares), never for yesterday's issue
      finished late, and never before the day is played: Днес is then the issue alone. Among friends: each who played,

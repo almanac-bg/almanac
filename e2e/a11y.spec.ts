@@ -104,7 +104,7 @@ for (const scheme of ["light", "dark"] as const) {
     await expect(page.locator(".day-board .rank-row").first()).toBeVisible();
     // The result's moment over (feel.ts: the tiles, the score), every part as it stays.
     await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"));
-    for (const tab of ["България", "Приятели"]) {
+    for (const tab of ["Всички", "Приятели"]) {
       await page.locator(".day-board").getByRole("tab", { name: tab }).click();
       const { violations } = await new AxeBuilder({ page }).analyze();
       expect(

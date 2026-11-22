@@ -827,7 +827,7 @@ function dayBoard(t: Today, run: State, among: Signal<Among | null>): Child {
       "Класация сред",
       [
         ["friends", "Приятели"],
-        ["all", "България"],
+        ["all", "Всички"],
       ],
       now,
       (v) => among.set(v),

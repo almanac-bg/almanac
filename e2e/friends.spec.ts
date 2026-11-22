@@ -14,7 +14,7 @@ test("friends on the day: who has played it, and how each went", async ({ browse
   await playedFair(a);
   await a.reload();
   const hersBoard = a.locator(".day-board");
-  await expect(hersBoard.getByRole("tab", { name: "България" })).toHaveAttribute("aria-selected", "true");
+  await expect(hersBoard.getByRole("tab", { name: "Всички" })).toHaveAttribute("aria-selected", "true");
   await hersBoard.getByRole("tab", { name: "Приятели" }).click();
   await expect(hersBoard).toContainText("Още нямаш приятели.");
   await expect(hersBoard.getByRole("link", { name: "Добави приятели" })).toHaveAttribute("href", "/friends");
@@ -62,7 +62,7 @@ test("friends on the day: who has played it, and how each went", async ({ browse
     await expect(worn).toHaveAttribute("aria-label", /^Печат: [^:]+$/);
   }
   // All България a tap away, on the same card, the two of them on it.
-  await friends.getByRole("tab", { name: "България" }).click();
+  await friends.getByRole("tab", { name: "Всички" }).click();
   await expect(friends.locator(".rank-row").filter({ hasText: ana })).toHaveCount(1);
   await expect(friends.locator(".rank-row.me")).toHaveCount(1);
   // Приятели is the people and the duels: the day's board isn't there.
@@ -262,7 +262,7 @@ test("the day's board at 320 px, the day played: the rows hold their squares, an
     }
     await expect(page.locator(".duels").getByRole("link", { name: "Нов дуел" })).toBeVisible();
     await page.goto("/");
-    for (const tab of ["Приятели", "България"]) {
+    for (const tab of ["Приятели", "Всички"]) {
       await page.locator(".day-board").getByRole("tab", { name: tab }).click();
       const rows = page.locator(".day-board .rank-row");
       await expect(rows.first().locator(".mini")).toBeVisible();
@@ -310,7 +310,7 @@ test("a day of none right isn't rubbed in: no place on the board of all Бълг
     await page.locator("nav.places-foot").getByRole("link", { name: "Днес" }).click();
     // No friends: the board opens on all България.
     const board = page.locator(".day-board");
-    await expect(board.getByRole("tab", { name: "България" })).toHaveAttribute("aria-selected", "true");
+    await expect(board.getByRole("tab", { name: "Всички" })).toHaveAttribute("aria-selected", "true");
     await expect(board.locator(".board-note")).toHaveText(
       rights ? /^В България си на 20\S* място от 53\.$/ : "Днес играха 53 души.",
     );
