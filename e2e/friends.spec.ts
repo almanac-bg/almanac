@@ -154,7 +154,7 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   // one first: a request is a player's.
   await b.goto("/friends");
   await b.locator(".friends").getByRole("button", { name: "Добави приятел" }).click();
-  await expect(b.getByText("Още нямаш приятели тук. Добави ги по потребителско име или имейл.")).toBeVisible();
+  await expect(b.getByText(/^Още нямаш приятели тук\. С приятел можете да играете дуели/)).toBeVisible();
   // The field's hint is whole at every width: the button goes under the field before the hint is cut.
   const field = b.getByLabel("Потребителско име или имейл на приятел");
   for (const width of [320, 390, 430, 1366]) {
@@ -274,7 +274,7 @@ test("a request turned down, a friend removed", async ({ browser }) => {
   await a.getByRole("dialog").getByRole("button", { name: "Премахни" }).click();
   await expect(a.locator(".friend")).toHaveCount(0);
   await b.reload();
-  await expect(b.getByText("Още нямаш приятели тук. Добави ги по потребителско име или имейл.")).toBeVisible();
+  await expect(b.getByText(/^Още нямаш приятели тук\. С приятел можете да играете дуели/)).toBeVisible();
 });
 
 test("a friend just accepted is on the day's board at once", async ({ browser }) => {

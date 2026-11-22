@@ -333,10 +333,10 @@ async function offSyllable(page: Page, selector: string): Promise<string[]> {
  * word of a name or a button broken, a friend's „Дуел“, a tab or a duel's card past the screen's edge, a place's name
  * at the foot cut („Алмана…“). */
 async function placeFlaws(page: Page): Promise<string[]> {
-  const names = ".friend-name, .duel-card-name, .segmented button, .friend-act, .places-foot a";
+  const names = ".friend-name, .segmented button, .friend-act, .places-foot a";
   const off = await page.evaluate(() => {
     const out: string[] = [];
-    for (const e of document.querySelectorAll(".friend-act, .segmented button, .duel-card"))
+    for (const e of document.querySelectorAll(".friend-act, .segmented button, .duel-row"))
       if (e.getBoundingClientRect().right > innerWidth + 1) out.push(`off the screen's edge: ${e.textContent}`);
     for (const a of document.querySelectorAll(".places-foot a"))
       if (a.scrollWidth > a.clientWidth + 1 || getComputedStyle(a).textOverflow === "ellipsis")
@@ -641,7 +641,7 @@ for (const size of sizes)
             await page.goto(path);
             await expect(page.locator("main :is(h1, h2)").first()).toBeVisible();
             // The friend and the duels in, before what they look like is measured.
-            if (path.startsWith("/friends")) await expect(page.locator(".friend, .duel-card").first()).toBeVisible();
+            if (path.startsWith("/friends")) await expect(page.locator(".friend, .duel-row").first()).toBeVisible();
             if (path === "/") await textIs(page, percent);
             await settled(page);
             expect.soft(await byDayAndNight(page, () => placeFlaws(page)), `${path}${at}`).toEqual([]);

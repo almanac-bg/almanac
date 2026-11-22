@@ -170,47 +170,50 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name.
 - **Приятели:** the people and the duels (the day's board is Днес's), on one page with no tabs (owner, 2026-11-22),
   one column on a big screen too; the page's „Приятели“ is a screen reader's only, each section headed in sight
-  (`.sect-head`). Top to bottom: who asks to be friends (a row each, „Приеми“ and „Откажи“); „Чакащи“, the open duels, while there are any (theirs to play first, then those
-  waiting: a duel to play stays first on the page until it's played); „Приятели“, „Премахни приятел“ at the right, a friend's
-  yes to a request one line over the friends, told once, then a row each friend: avatar with its seal,
-  the name across the row, never cut, and under it two things, each an icon and its number alone, in figures of one
-  width so the rows line up (`.friend-stat`): the day's issue (the calendar of Днес, „7/10“; „—“, quieter, while it
-  isn't played) and the duels between the two (two swords crossed, `--i-duel`, „3:1“, the viewer's wins first; left
-  out before the first duel). Each says itself whole as its tooltip on a big screen and to a screen reader
-  („Днешният брой: 7 от 10“, „Днешният брой: още не е изигран“, „Дуели помежду ви: 3 победи, 1 загуба“, with
-  „равенства“ if any): never a bare „днес още не“, which says neither what nor whose; „Дуел“ at the row's end, the
-  one way to start a duel here (the other is the friend's profile): there is no „Нов дуел“ and no picker; a friend
-  removed only after a sheet asks „Премахваш ли Иво от приятелите си?“, „Премахни“ in red and
+  (`.sect-head`), a list's count in brackets after its name. Top to bottom: who asks to be friends (a row each,
+  „Приеми“ and „Откажи“); „Чакащи дуели (7)“, the open duels, while there are any (theirs to play first,
+  then those waiting: a duel to play stays first on the page until it's played; the count is of duels, a pile's
+  every one); „Приятели (5)“, „Премахни приятел“ at the right, a friend's yes to a request one line over the friends,
+  told once, then a row each friend: avatar with its seal, the name across the row, never cut, and under it the duels
+  between the two in words, quiet, the record heavier („Дуели помежду ви: 3 победи, 1 загуба“, with „равенства“ if
+  any; „Още нямате дуели“ before the first): never the friend's day, which is the board's (owner, 2026-11-22);
+  „Дуел“ at the row's end, a button (`.btn.inline`, 44px high), the one way to start a duel here (the other is the
+  friend's profile): there is no „Нов дуел“ and no picker. While three duels the player sent wait for the friend
+  (play.DuelsToOne), „Дуел“ is off and a quiet line under the record says why („Три дуела чакат. Нов — щом изиграе
+  някой.“). With no friends yet, one paragraph says what a friend brings, for duels can't be found before one
+  (owner, 2026-11-22): „Още нямаш приятели тук. С приятел можете да играете дуели: едни и същи десет въпроса, всеки
+  ги играе, когато може. И всеки ден ще виждате как сте изиграли днешния брой. Добави приятел по потребителско име
+  или имейл.“ A friend removed only after a sheet asks „Премахваш ли Иво от приятелите си?“, „Премахни“ in red and
   „Отказ“, then at once, the duels open between them ending as if their time were up; then adding and the requests
-  sent; last, the duels played, under „Последните 10 изиграни“ („Изиграни“ while there are fewer: the list is the
-  last ten and says so). The card is all there is of a duel: there is no page of its result
-  (DECISIONS.md). A duel is a card, never a person's row
-  (`.duel-card`, one a row on a big screen too, as on a phone): the two face to face, no label over them (every duel
-  is with a friend), the player's avatar with its seal and „Ти“ on the left, the other's with their name on the
-  right, and between them how it stands: „Твой ред“ or „Чакаш“ (quiet) over „още 6 дни“; a played one's score, a
-  heavy numeral („8:6“), over its end as a chip, told apart at a glance by fill and line, never red or green
-  („✓ Победа“ filled in ink, „Загуба“ outlined and quiet, „Равенство“ outlined in ink); one that ran out „Изтече“
-  alone. One quiet line under them where there's more to say: „Довърши своята игра.“ once its first question was
-  shown, „Ти: 8 от 10“ while waiting, why it ran out („Иво не го изигра навреме.“), what broke a tie on even right
-  answers („Равен брой верни · реши по-близкото число“: nothing else does; even in that too, „Равенство“ and nothing
-  more). Under the two, of a game played to its end, the duel question by question: the player's row of marks over
-  the other's (`.duel-card-marks`: a 20px avatar, then ten small squares in ink as the boards draw them, `mini()`:
-  right filled, близо half, wrong hollow; the player's alone while the friend still has theirs to play); then the
-  quiet line. Once the player's own game in it is played, the card is a button, the whole of it, to its questions'
-  dialog, on any day, with no button on it to say so (one drew the eye from the duel): a tap or a click anywhere on
-  it, or Enter and Space, opens it; under a pointer, or reached by the keyboard, its line lights; a screen reader
-  hears „Въпросите от дуела с Иво“, then what the card says. No „Реванш“ on a card: a new duel starts from the
-  friend's row. A duel to play is one link to its
-  game, the whole card (under a pointer its line lights); any other card is neither, and no name in a card is
-  underlined (none is a way to a profile). The first „Твой ред“ is ringed in ink with „Играй“ in
-  it, the page's action. A duel named in the address (`?duel=<id>`: its game just ended, or an old link to
-  its page) is first in its group, brought into sight, and its result lands there once (`feel.duel`: the marks fill
-  pair by pair, the score counts up, the chip lands with the end's sound), never again. At large text (`.tight`) the
-  two are under each other, each a row. The record between two is the friend's row's, never a card's. Friends are
-  added in one field, „име или имейл“; requests sent wait under „Изпратени покани“.
-  Only two friends of one name show their @username. A played card opens the questions' dialog (above), under its
-  head whose duel it is and its score, each question with how it went for the two; the card's two
-  rows of marks always. Nothing ringed, no time on any of them: time never counts.
+  sent; last, the duels played, under „Последните 10 изиграни дуела“ („Изиграни дуели“ while there are fewer: the
+  list is the last ten and says so). All there is of a duel is in Приятели: there is no page of its result
+  (DECISIONS.md).
+  Every duel is a row, compact, built as a friend's (`.duel-row`, ui.ts `playerRow`, on its list's card of rows,
+  owner, 2026-11-22: cards were too long): the other's avatar with its seal and their name (a way to their profile,
+  underlined under a pointer, as a name is everywhere); under the name, of an open one, how it stands, „Твой ред ·
+  още 6 дни“ („Твой ред“ heavy) or „Чакаш · още 2 дни“ (quiet); the duel question by question (`.duel-card-marks`:
+  a 20px avatar, then ten small squares in ink as the boards draw them, `mini()`: right filled, близо half, wrong
+  hollow; the player's alone while the friend still has theirs to play, both once there's a result); then one quiet
+  line where there's more to say: „Довърши своята игра.“ once its first question was shown, „Ти: 8 от 10“ while
+  waiting, „Още 2 дуела чакат.“ on a pile (one friend's several sent to the player are one row, the next to lapse),
+  why it ran out („Иво не го изигра навреме. Ти: 8 от 10.“), what broke a tie on even right answers („Равен брой
+  верни · реши по-близкото число“: nothing else does), a player gone. At the row's end: of one the player's to play,
+  „Играй“ (`.btn.inline`, 44px high), a link to its game and the row's one action (the row itself leads nowhere,
+  owner, 2026-11-22), the first such filled, the page's action, the others outlined; of a played one, the score, a
+  numeral („8:6“), over its end as a chip, told apart at a glance by fill and line, never red or green („✓ Победа“
+  filled in ink, „Загуба“ outlined and quiet, „Равенство“ outlined in ink); one that ran out „Изтече“ alone. On the
+  narrowest phones (under 360px) and at large text (`.tight`) the marks take a line of their own across the row.
+  Once the player's own game in it is played (one waiting for the friend, one played), the row opens its questions'
+  dialog, on any day: a button laid over the whole row (`.duel-row-open`), under the name's link, with nothing on it
+  to say so; under a pointer, or reached by the keyboard, its line lights; a screen reader hears „Въпросите от дуела
+  с Иво“. The row reaches 8px into its card's sides, as the player's own row on a board, for that light. No
+  „Реванш“: a new duel starts from the friend's row. Nothing ringed, no time on any of it: time never counts.
+  A duel named in the address (`?duel=<id>`: its game just ended, or an old link to its page) is first in its group,
+  brought into sight, and its result lands there once (`feel.duel`: the marks fill pair by pair, the score counts
+  up, the chip lands with the end's sound), never again. The record between two is the friend's row's, never a duel's. Friends are added in one field, „име или
+  имейл“; requests sent wait under „Изпратени покани“. Only two friends of one name show their @username. The
+  questions' dialog (above) says under its head whose duel it is and its score, each question with how it went for
+  the two.
 - **Профил:** one column, on a big screen too: the avatar with the seal worn on its corner and a pencil on its top corner (a phone: always; a big screen: as the pointer
   comes over it, with the tooltip „Смени аватара“), the
   name, the @username and by it, on the same line where it fits, the streak as it is now, sized to the head (the
@@ -618,7 +621,7 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
   `.verdict`, `.right-said`, `.after`, `.up-next-go`; `.issue`, `.issue-go`, `.today-side`, `.result`, `.result-main`, `.score-n`,
   `.tiles .tile`, `.tomorrow`, `.result-share`, `.share-sheet`, `.streak-chip`, `.streak-notice`, `.day-news`, `.missed-day`;
   `.summary`, `.reviewed`, `.news-facts`; `.toc-row`, `.entry`; `.day-board`, `.rank-row`, `.friend`, `.invitation`,
-  `.accepted-notice`, `.duels`, `.duel-cards` (`.landed`), `.duel-card` (`.turn`, `.s-<state>`), `.duel-card-mid`, `.duel-card-go`, `.duel-chip`, `.duel-card-marks`, `.duel-card-acts`, `.review-sheet`, `.review-of`, `.duel-q-side`, `.friends-on`, `.friends-row`, `.friends-faces`, `.friends-list`, `.friends-chip`, `.tile-tap`, `.lit`, `.friend-stat`, `.their-line`; `.me-ladder`, `.ladder`.
+  `.accepted-notice`, `.duels`, `.duel-row` (`.turn`, `.landed`, `.s-<state>`), `.duel-row-state`, `.duel-card-go`, `.duel-chip`, `.duel-card-marks`, `.review-sheet`, `.review-of`, `.duel-q-side`, `.friends-on`, `.friends-row`, `.friends-faces`, `.friends-list`, `.friends-chip`, `.tile-tap`, `.lit`, `.friend-record`, `.friend-full`, `.duel-row-open`, `.their-line`; `.me-ladder`, `.ladder`.
 
 ## Before a UI change ships
 

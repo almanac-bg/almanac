@@ -3552,147 +3552,68 @@
     inset: -2px 0;
   }
 
-  /* Duels as cards (Приятели, screens/duelcards.ts), each all there is of its duel, told from a friend's
-     row at a glance: the two face to face, how it stands between them, the duel question by
-     question, and what it leads to. One to play is a link to its game, the whole of it; one whose game the player has
-     played is a button to its questions, the whole of it; any other is neither. One a row, on a phone and a big
-     screen alike. */
-  .duel-cards {
-    display: grid;
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .duel-card {
-    display: grid;
-    gap: 10px;
-    width: 100%;
-    margin: 0;
-    padding: var(--space-4);
-    border: 0;
-    border-radius: var(--r-3);
-    background: var(--surface);
-    color: var(--ink);
-    font: inherit;
-    text-align: start;
-    text-decoration: none;
-  }
-
-  button.duel-card {
-    cursor: pointer;
-  }
-
-  /* Under a pointer, or reached by the keyboard, a card that leads somewhere lights whole, by its line: no name in
-     it is a link, so none is underlined. */
-  @media (hover: hover) and (pointer: fine) {
-    :is(a, button).duel-card:hover {
-      box-shadow: inset 0 0 0 2px var(--line-2);
-    }
-
-    a.duel-card.turn:hover {
-      box-shadow: inset 0 0 0 4px var(--ink);
-    }
-  }
-
-  :is(a, button).duel-card:focus-visible {
-    box-shadow: inset 0 0 0 2px var(--line-2);
-  }
-
-  a.duel-card.turn:focus-visible {
-    box-shadow: inset 0 0 0 4px var(--ink);
-  }
-
-  /* One friend's duels sent to the player, a pile: the card on top, the edges of one or two more under it, each a
-     little narrower, as sheets lie in a stack. The count is on the card's line. */
-  .duel-pile {
+  /* The duels in Приятели (screens/duelcards.ts), each a row, compact, as a friend's (ui.ts, playerRow), on a card of
+     rows: the other's avatar and name; under the name how an open one stands, the duel question by question and one
+     quiet line; at the row's end „Играй“ (theirs to play) or a played one's score over its end. A button laid over the
+     row opens its questions; the name, its link, lies over the button. */
+  /* 8px into the card's sides, as the player's own row on a board (.rank-row.me), for its light to frame it. */
+  .duel-row {
     position: relative;
-    isolation: isolate;
-    padding-bottom: 8px;
+    margin: 0 -8px;
+    padding-inline: 8px;
   }
 
-  .duel-pile[data-more="2"] {
-    padding-bottom: 16px;
-  }
-
-  .duel-pile::before,
-  .duel-pile[data-more="2"]::after {
-    position: absolute;
-    z-index: -1;
-    inset: 0 var(--space-3) 0;
-    border-radius: var(--r-3);
-    background: var(--surface);
-    box-shadow: inset 0 0 0 1px var(--line);
-    content: "";
-  }
-
-  .duel-pile[data-more="2"]::before {
-    bottom: 8px;
-  }
-
-  .duel-pile[data-more="2"]::after {
-    inset-inline: calc(var(--space-3) * 2);
-    z-index: -2;
-    opacity: 0.7;
-  }
-
-  /* The duel waiting for the player first: ringed in ink, „Играй“ in it. */
-  .duel-card.turn {
-    gap: var(--space-3);
-    padding: var(--space-4);
-    box-shadow: inset 0 0 0 3px var(--ink);
-  }
-
-  /* The two sides of one width, whatever their names: what stands between them is in the card's middle. */
-  .duel-card-sides {
+  .duel-row .friend-day {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    align-items: start;
-    align-self: center;
-    gap: var(--space-2);
+    gap: 4px;
   }
 
-  .duel-card-side {
+  .duel-row .friend-text {
+    position: relative;
+    z-index: 1;
+    justify-self: start;
+  }
+
+  .duel-row-end {
     display: grid;
+    grid-area: act;
+    justify-self: end;
     justify-items: center;
-    gap: 6px;
-    min-width: 0;
+    gap: 4px;
     text-align: center;
   }
 
-  /* A name as heavy as a friend's in the list (.friend-name). */
-  .duel-card-name {
-    max-width: 100%;
-    font: 800 0.875rem / 1.25 var(--font-sans);
-  }
-
-  .duel-card-mid {
-    display: grid;
-    align-self: center;
-    justify-items: center;
-    gap: 6px;
-    text-align: center;
-  }
-
-  .duel-card-state {
-    font: 900 1.0625rem / 1.2 var(--font-sans);
-  }
-
-  /* Nothing for the player to do: said quietly. */
-  :is(.s-theirs, .s-expired) .duel-card-state {
-    color: var(--ink-3);
-    font-weight: 800;
-  }
-
-  .duel-card-left {
+  /* How an open duel stands, under the name: „Твой ред“ heavy, „Чакаш“ (nothing for the player to do) quiet. */
+  .duel-row-state {
     color: var(--ink-3);
     font: var(--t-fine);
   }
 
-  /* A played duel's score, a heavy numeral over its chip. */
+  .duel-card-state {
+    color: var(--ink);
+    font-weight: 900;
+  }
+
+  .s-theirs .duel-card-state {
+    color: var(--ink-3);
+    font-weight: 800;
+  }
+
+  /* „Играй“ at a row's end: a row's button, 44px to tap, the first filled (the page's action), the others outlined. */
+  .btn.duel-card-go {
+    min-height: 2.75rem;
+    padding-inline: var(--space-4);
+    font-size: 1rem;
+  }
+
+  .duel-row-end > .duel-card-state {
+    color: var(--ink-3);
+    font: 800 0.9375rem / 1.2 var(--font-sans);
+  }
+
+  /* A played duel's score, a numeral over its chip. */
   .duel-card-score {
-    font: 900 2rem / 1 var(--font-numeral);
+    font: 900 1.375rem / 1 var(--font-numeral);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
@@ -3719,11 +3640,11 @@
     box-shadow: inset 0 0 0 1.5px var(--ink);
   }
 
-  /* What more a card says (the player's score while they wait, why it ran out, what broke a tie): one quiet line. */
+  /* What more a row says (the player's score while they wait, why it ran out, what broke a tie, a pile's count): one
+     quiet line. */
   .duel-card-note {
     color: var(--ink-3);
     font: var(--t-fine);
-    text-align: center;
   }
 
   /* A played duel's score: each side's a number of its own, of one width while the landing counts them up. */
@@ -3737,8 +3658,8 @@
      the boards draw them), whose it is before it. */
   .duel-card-marks {
     display: grid;
-    justify-content: center;
-    gap: 5px;
+    justify-content: start;
+    gap: 3px;
   }
 
   .duel-card-row {
@@ -3750,6 +3671,43 @@
   .duel-card-row .avatar.s {
     --size: 20px;
     margin: 0;
+  }
+
+  /* Too narrow for the marks beside the row's end (the narrowest phones), or at large text: the marks a line of their
+     own across the row, under the avatar too. */
+  @media (max-width: 359px) {
+    .rows > .duel-row {
+      grid-template-areas:
+        "pic name act"
+        "day day day";
+    }
+  }
+
+  .tight .duel-row {
+    grid-template-areas:
+      "pic name act"
+      "day day day";
+  }
+
+  .duel-row-open {
+    position: absolute;
+    inset: 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-2);
+    background: transparent;
+    cursor: pointer;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .duel-row-open:hover {
+      box-shadow: inset 0 0 0 2px var(--line-2);
+    }
+  }
+
+  .duel-row-open:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--line-2);
   }
 
   /* A game's questions gone over, in their dialog (results.ts, reviewSheet: the day's issue's, a chapter's game's, a
@@ -4410,7 +4368,7 @@
   }
 
   /* What's around a seal on a card: the card's surface; on the player's own row, its well. */
-  :is(.card, .rows, .invitation, .duel-card) {
+  :is(.card, .rows, .invitation) {
     --ring: var(--surface);
   }
 
@@ -6651,6 +6609,7 @@
      corner; the name across the row (on two lines rather than cut); their day on a line under it; and what comes
      before the avatar (a board's place) or at the row's end (a friend's duel). */
   .friend,
+  .duel-row,
   .rank-row {
     display: grid;
     align-items: center;
@@ -6659,7 +6618,8 @@
     padding: var(--space-2) 0;
   }
 
-  .friend {
+  .friend,
+  .duel-row {
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
       "pic name act"
@@ -6683,7 +6643,7 @@
       "pic day";
   }
 
-  :is(.friend, .rank-row) > .avatar {
+  :is(.friend, .duel-row, .rank-row) > .avatar {
     grid-area: pic;
   }
 
@@ -6750,10 +6710,33 @@
     font: 600 1rem / 1.45 var(--font-sans);
   }
 
-  /* A friend's way to a duel (or „Премахни“), at the row's end. */
+  /* A friend's way to a duel, a button (or „Премахни“), at the row's end: 44px to tap, the row no taller for it. */
   .friend-act {
     grid-area: act;
     justify-self: end;
+  }
+
+  .btn.friend-act {
+    min-height: 2.75rem;
+    padding-inline: var(--space-4);
+  }
+
+  /* The duels between the two, in words, under the name: the record heavier. */
+  .friend-record {
+    color: var(--ink-3);
+    font: var(--t-fine);
+  }
+
+  .friend-record b {
+    color: var(--ink-2);
+    font-weight: 800;
+  }
+
+  /* Three duels sent wait for the friend: why „Дуел“ is off, under the record. */
+  .friend-full {
+    flex-basis: 100%;
+    color: var(--ink-3);
+    font: var(--t-fine);
   }
 
   .friend-text {
@@ -6796,27 +6779,6 @@
     gap: 2px var(--space-3);
     color: var(--ink-3);
     font: var(--t-label);
-  }
-
-  /* One thing about a friend under their name (friends.ts, stat): an icon, then its number alone, in figures of one
-     width so the rows line up; nothing to count yet, quieter. */
-  .friend-stat {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    color: var(--ink-2);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
-  .friend-stat .i {
-    width: 1.125em;
-    height: 1.125em;
-    color: var(--ink-3);
-  }
-
-  .friend-stat.none {
-    color: var(--ink-3);
   }
 
   /* A tag typed after its @. */
@@ -8009,35 +7971,6 @@
 
   .tight .streak-chip .status-text {
     flex: 1 1 100%;
-  }
-
-  /* A duel's card: the two under each other, how it stands between them, each a row (the avatar, the name beside
-     it with the card's width for its words). */
-  .tight .duel-card-sides {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-3);
-  }
-
-  .tight .duel-card-side {
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    justify-items: start;
-    gap: var(--space-3);
-    text-align: left;
-  }
-
-  .tight .duel-card-mid {
-    justify-self: start;
-    justify-items: start;
-    text-align: left;
-  }
-
-  .tight .duel-card-note {
-    text-align: left;
-  }
-
-  .tight .duel-card-marks {
-    justify-content: start;
   }
 
   /* Tomorrow: its date over its words, which have the column's width; the issue's name and its number a line each,

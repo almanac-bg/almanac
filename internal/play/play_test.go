@@ -902,8 +902,7 @@ func TestFriends(t *testing.T) {
 	// A duel between them counts in the record, from each side.
 	w.duel(ana, bo, repeat(w.right, Length), repeat(w.wrong, Length))
 	list, err := w.g.FriendsOf(ctx, ana)
-	if err != nil || len(list) != 1 || list[0].ID != bo || list[0].Won != 1 || list[0].Lost != 0 ||
-		list[0].Today == nil || list[0].Today.Rights != Length {
+	if err != nil || len(list) != 1 || list[0].ID != bo || list[0].Won != 1 || list[0].Lost != 0 {
 		t.Fatalf("Ana's friends: %+v %v", list, err)
 	}
 	if list, _ := w.g.FriendsOf(ctx, bo); len(list) != 1 || list[0].Lost != 1 {
