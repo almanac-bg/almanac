@@ -344,8 +344,7 @@ type Friend struct {
 	Drawn int `json:"drawn"`
 }
 
-// FriendsOf lists a player's friends: those who've played today first, best first (as the day's board has them, and
-// equal ones by name), then the rest by name. A friend's
+// FriendsOf lists a player's friends by name (the day's ranking is the board's). A friend's
 // day played at a script's speed is theirs alone to see (fair.go).
 func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	db := g.DB.Read
@@ -405,17 +404,9 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 			list[i].Drawn = n
 		}
 	}
+	// By name, as a list of people is read (the day's ranking is the board's): Latin before Cyrillic, each in its
+	// alphabet's order, which lower case in Unicode keeps for Bulgarian.
 	slices.SortStableFunc(list, func(a, b Friend) int {
-		switch {
-		case a.Today != nil && b.Today == nil:
-			return -1
-		case a.Today == nil && b.Today != nil:
-			return 1
-		case a.Today != nil && a.Today.Rights != b.Today.Rights:
-			return b.Today.Rights - a.Today.Rights
-		case a.Today != nil && a.Today.tie != b.Today.tie:
-			return a.Today.tie.cmp(b.Today.tie)
-		}
 		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 	})
 	return list, rows.Err()

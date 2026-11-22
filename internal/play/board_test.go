@@ -462,3 +462,28 @@ func TestSecondPlayOffOthersBoards(t *testing.T) {
 		t.Fatalf("Bo's friends: %+v", list)
 	}
 }
+
+// The friends list is by name, as a list of people is read, whoever played today: the day's ranking is the board's.
+func TestFriendsByName(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	me := w.user()
+	for _, name := range []string{"Яна", "Борис", "Ana", "ивайло"} {
+		id := w.user()
+		if _, err := w.db.Write.Exec(`UPDATE users SET name = ? WHERE id = ?`, name, id); err != nil {
+			t.Fatal(err)
+		}
+		w.befriend(me, id)
+	}
+	list, err := w.g.FriendsOf(ctx, me)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, f := range list {
+		names = append(names, f.Name)
+	}
+	if want := []string{"Ana", "Борис", "ивайло", "Яна"}; !slices.Equal(names, want) {
+		t.Fatalf("by name: %v, not %v", names, want)
+	}
+}
