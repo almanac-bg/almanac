@@ -19,7 +19,17 @@
 // that's over isn't kept in memory. FIT_SHOTS=<folder> keeps a picture of each question before and after its answer.
 import { expect, type Page, test } from "@playwright/test";
 import { answerAs, beside, closeable, flaws, kinds, panelFlaws, type Q, unseenAnswers } from "./kinds.ts";
-import { cutOrOverlapping, daysPlayed, dealt, keptPlayer, knows, linkedNames, moveOn, startDay } from "./play.ts";
+import {
+  cutOrOverlapping,
+  daysPlayed,
+  dealt,
+  keptPlayer,
+  knows,
+  linkedNames,
+  moveOn,
+  playRun,
+  startDay,
+} from "./play.ts";
 
 const sizes = [
   { width: 320, height: 568, go: 500 },
@@ -320,13 +330,13 @@ async function offSyllable(page: Page, selector: string): Promise<string[]> {
 }
 
 /** What of a place is wrong at this size: the page sideways, a name cut or run into its neighbour (play.ts), a short
- * word of a name or a button broken, a friend's „Дуел“ or a tab past the screen's edge, a place's name at the foot cut
- * („Алмана…“). */
+ * word of a name or a button broken, a friend's „Дуел“, a tab or a duel's card past the screen's edge, a place's name
+ * at the foot cut („Алмана…“). */
 async function placeFlaws(page: Page): Promise<string[]> {
-  const names = ".friend-name, .duel-row .who-name, .segmented button, .friend-act, .places-foot a";
+  const names = ".friend-name, .duel-card-name, .duel-pick .who-name, .segmented button, .friend-act, .places-foot a";
   const off = await page.evaluate(() => {
     const out: string[] = [];
-    for (const e of document.querySelectorAll(".friend-act, .segmented button, .duel-row"))
+    for (const e of document.querySelectorAll(".friend-act, .segmented button, .duel-card, .duel-pick"))
       if (e.getBoundingClientRect().right > innerWidth + 1) out.push(`off the screen's edge: ${e.textContent}`);
     for (const a of document.querySelectorAll(".places-foot a"))
       if (a.scrollWidth > a.clientWidth + 1 || getComputedStyle(a).textOverflow === "ellipsis")
@@ -615,6 +625,7 @@ for (const size of sizes)
           "/me",
           `/players/${kept.tag}`,
           "/friends",
+          "/friends?tab=duels",
           "/almanac",
           "/almanac/history",
           "/almanac/literature",
@@ -631,8 +642,8 @@ for (const size of sizes)
             await page.goto(path);
             await expect(page.locator("main :is(h1, h2)").first()).toBeVisible();
             // The friend and the duels in, before what they look like is measured.
-            if (path === "/friends" || path === "/duel/new")
-              await expect(page.locator(".friend, .duel-pick").first()).toBeVisible();
+            if (path.startsWith("/friends") || path === "/duel/new")
+              await expect(page.locator(".friend, .duel-card, .duel-pick").first()).toBeVisible();
             if (path === "/") await textIs(page, percent);
             await settled(page);
             expect.soft(await byDayAndNight(page, () => placeFlaws(page)), `${path}${at}`).toEqual([]);
@@ -977,3 +988,52 @@ test.describe("the questions gone over, twice the text, 320 × 568", () => {
     expect(await sideways(page)).toEqual([]);
   });
 });
+
+// The day's board's rows, on a phone and on a laptop: every row's ten squares start in one column, whatever its
+// score's digits („10 от 10“ is wider than „9 от 10“), on both its tabs.
+for (const width of [390, 1366])
+  test.describe(`the day's board at ${width} px`, () => {
+    test.use({
+      viewport: { width, height: 900 },
+      colorScheme: "light",
+      ...(width > 1000 ? { isMobile: false, hasTouch: false } : {}),
+    });
+
+    test("every row's squares start in one column", async ({ page }) => {
+      test.setTimeout(120_000);
+      await page.goto("/");
+      await startDay(page);
+      await playRun(page);
+      await expect(page.locator(".day-board")).toBeVisible();
+      // The day as the server says it: a row of every width of score, each with its squares; Днес opened again from
+      // another place, so that it asks for the day.
+      const row = (name: string, rights: number, place: number, me = false) => ({
+        name,
+        rights,
+        of: 10,
+        place,
+        me,
+        trail: Array.from({ length: 10 }, (_, i) => ({ right: i < rights })),
+      });
+      const rows = [row("Ана", 10, 1), row("Бо", 9, 2), row("Цвета", 1, 3), row("Аз", 0, 4, true)];
+      await page.route("**/api/day", async (route) => {
+        const day = await (await route.fetch()).json();
+        day.friends = rows;
+        day.befriended = true;
+        day.board = { ...day.board, players: 53, place: 4, top: rows, mine: rows[3] };
+        await route.fulfill({ json: day });
+      });
+      // The places at the foot on a phone, at the top on a laptop: whichever is shown.
+      const places = page.locator(":is(nav.places, nav.places-foot):visible");
+      await places.getByRole("link", { name: "Алманах" }).click();
+      await places.getByRole("link", { name: "Днес" }).click();
+      for (const tab of ["Приятели", "Всички"]) {
+        await page.locator(".day-board").getByRole("tab", { name: tab }).click();
+        const minis = page.locator(".day-board .rank-row .mini");
+        await expect(minis).toHaveCount(4);
+        await expect(page.locator(".day-board .rank-row .rank-score").first()).toHaveText(/^10\sот\s10$/);
+        const lefts = await minis.evaluateAll((all) => all.map((el) => el.getBoundingClientRect().left));
+        expect(Math.max(...lefts) - Math.min(...lefts), `${tab}: the squares start at ${lefts}`).toBeLessThanOrEqual(1);
+      }
+    });
+  });

@@ -389,20 +389,19 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands, gap = 
 }
 
 /** What a duel's moment needs besides its card (screens/outcome.ts): each side's right answers question by question (the
- * other's none while the duel waits for them), the end's sound, and the question that decided it (from 1; 0: none). */
+ * other's none while the duel waits for them), and the end's sound. */
 export interface DuelPlan {
   mine: number[];
   theirs: number[];
   end: SoundName;
-  decided: number;
 }
 
 /**
  * A duel's result as a moment, once (at most 1.6 s; a tap anywhere jumps to the end). The verdict waits while the
- * marks fill pair by pair, 75 ms apart, a pluck on the scale for each of the player's right ones and a muted thud for
- * each that wasn't; the two scores count up with them, so the lead changes hands as it did, and the band behind the
- * question that decided it lights as it's reached. Then the verdict and the scores land, the winner's in full ink,
- * with the end's sound (the motif over a low D for a win, a soft fall for a loss). Resolves once it's over.
+ * duel is gone through question by question, 75 ms apart, a pluck on the scale for each of the player's right ones
+ * and a muted thud for each that wasn't; the two scores count up with them, so the lead changes hands as it did (the
+ * card's marks, where it has them, fill pair by pair). Then the verdict and the scores land, the winner's in full
+ * ink, with the end's sound (the motif over a low D for a win, a soft fall for a loss). Resolves once it's over.
  */
 export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<void> {
   const { play, format } = hands;
@@ -423,8 +422,8 @@ export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<v
     if (el) moving.push(el.animate([from, {}], { duration: 240, delay, easing: settleIn, fill: "backwards" }));
   };
   const pips = [...card.querySelectorAll<HTMLElement>(".duel-pip")];
-  const n = pips.length / 2;
-  const rows = [pips.slice(0, n), pips.slice(n)];
+  const n = Math.max(plan.mine.length, plan.theirs.length);
+  const rows = [pips.slice(0, pips.length / 2), pips.slice(pips.length / 2)];
   const scores = [...card.querySelectorAll<HTMLElement>(".duel-score[data-n]")];
   const finals = scores.map((p) => Number(p.dataset.n ?? 0));
   const sums = [0, 0];
@@ -447,8 +446,7 @@ export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<v
         );
     }
     at(t, () => {
-      const mine = rows[0]?.[i];
-      if (mine && i < plan.mine.length) play(mine.classList.contains("wrong") ? "dud" : "pip", i);
+      if (i < plan.mine.length) play(plan.mine[i] ? "pip" : "dud", i);
       sums[0] = (sums[0] ?? 0) + (plan.mine[i] ?? 0);
       sums[1] = (sums[1] ?? 0) + (plan.theirs[i] ?? 0);
       scores.forEach((p, k) => {
@@ -456,7 +454,6 @@ export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<v
       });
     });
   }
-  if (plan.decided > 1) rise(card.querySelector(".duel-band"), first + (plan.decided - 1) * step, { opacity: 0 });
   const landAt = first + n * step + 50;
   for (const el of card.querySelectorAll(".duel-head h1, .duel-line")) rise(el, landAt);
   for (const p of scores)
@@ -526,7 +523,7 @@ function roll(el: HTMLElement, from: string, to: string): Promise<void> {
 }
 
 /** The streak one day longer, in its chip (drawn with the new number): once `after` has come (the result has landed),
- * the number rolls up from the day before (a first streak's words come in with it: never „0 дни в серията“), its words
+ * the number rolls up from the day before (a first streak's words come in with it: never „0 дни без прекъсване“), its words
  * (`label`, of a number) following the number shown: never a number its words don't fit. The flame swells once
  * with a gold glow, and the streak's sound. Resolves once it's over. */
 export async function streak(

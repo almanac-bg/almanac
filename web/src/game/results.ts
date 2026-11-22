@@ -6,12 +6,12 @@ import { type Child, h, signal } from "../lib/dom.ts";
 import { calm } from "../lib/prefs.ts";
 import { feelKit, play } from "../lib/sound.ts";
 import { categories } from "../state.ts";
-import { chip, fact, type Look, leaf, tiles, who } from "../ui.ts";
+import { avatar, chip, fact, type Look, leaf, tiles, who } from "../ui.ts";
 import { closeLine, closeWords } from "./numbers.ts";
-import { answered, crowdLine, picture } from "./questions.ts";
+import { answered, answerWords, crowdLine, picture } from "./questions.ts";
 import { report } from "./report.ts";
 import { trail } from "./run.ts";
-import type { Reviewed, Score, State } from "./types.ts";
+import type { Reviewed, Score, State, TheirMark } from "./types.ts";
 
 /** A finished run: the score as the screen's big number (its right answers), a line about it (the place), and the
  * marks; right under it what to do next (`next`: the gold action, then „Прегледай въпросите“ and the others, as
@@ -179,7 +179,7 @@ export function nextSteps(main: Child, others: Child[]): Child {
 /** Going over a game, once it's over: each question, the answer, what was given, the fact behind it, and a word
  * about the question if something's wrong with it. In two parts: the button, kept with the other ways on under the result, and
  * the list it opens, kept for the end of the screen; the button takes the player there. */
-export function reviewParts(load: () => Promise<Reviewed[]>): { button: Child; list: Child; opened: () => boolean } {
+function reviewParts(load: () => Promise<Reviewed[]>): { button: Child; list: Child; opened: () => boolean } {
   const items = signal<Reviewed[] | null>(null);
   const error = signal("");
   let heading: HTMLElement | null = null;
@@ -208,40 +208,102 @@ export function reviewParts(load: () => Promise<Reviewed[]>): { button: Child; l
   return { button, list, opened: () => items() !== null };
 }
 
+/** A duel's two sides, for its questions gone over (`reviewed`): each one's avatar, the other's name, and how each
+ * question went for the other (none: a duel that ran out, a player gone since). */
+export interface Versus {
+  mine?: string;
+  theirs?: string;
+  name: string;
+  marks: TheirMark[];
+}
+
+/** How a question went: its sign where it stands alone, and its word. The word never reads as a true-or-not
+ * statement's answer („Вярно“, „Невярно“): right is „Точно“ for every kind, as in the run (verdictSays), and wrong
+ * „Грешно“, as the tiles' marks say it. */
+const verdicts = {
+  void: ["–", "Не се брои"],
+  right: ["✓", "Точно"],
+  close: ["◩", "Близо"],
+  wrong: ["✕", "Грешно"],
+  missed: ["–", "Без отговор"],
+} as const;
+
+/** One side of a duel on one question: whose (the avatar; the name for a screen reader) and how it went. */
+function side(name: string, look: string | undefined, kind: keyof typeof verdicts): Child {
+  const [sign, word] = verdicts[kind];
+  return h(
+    "span",
+    { class: kind === "right" ? "duel-q-side right" : "duel-q-side" },
+    avatar(look, { size: "s", name }),
+    h("span", { class: "sr" }, `${name}: `),
+    h("span", { class: "duel-q-sign", "aria-hidden": "true" }, sign),
+    word,
+  );
+}
+
 /** A game's questions gone over, under their heading: each with the answer, what was given, how others answered,
- * the fact behind it, and a word about the question if something's wrong with it. */
-export function reviewed(all: Reviewed[], heading: Child): Child {
+ * the fact behind it, and a word about the question if something's wrong with it. A duel's (`versus`): each a short
+ * row, the question, how it went for the two side by side, and the answer in words where a few hold it; the answers
+ * as they were given and the fact a tap away. */
+export function reviewed(all: Reviewed[], heading: Child, versus?: Versus): Child {
   return h(
     "section",
     { class: "review" },
     heading,
     all.map((it) => {
-      // The verdict never reads as a true-or-not statement's answer („Вярно“, „Невярно“): as in the run (verdictSays),
-      // right is „Точно“ for every kind, as in the run, and wrong „Грешно“, as the tiles' marks say it.
-      const [kind, word] = it.void
-        ? ["void", "Не се брои"]
-        : it.right
-          ? ["right", "Точно"]
-          : it.close
-            ? ["close", "Близо"]
-            : it.given
-              ? ["wrong", "Грешно"]
-              : ["wrong", "Без отговор"];
-      return h(
-        "article",
-        { class: `reviewed ${kind}` },
-        h(
-          "p",
-          { class: "reviewed-head" },
-          h("span", { class: "kicker" }, `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""}`),
-          h("span", { class: "reviewed-says" }, word),
-        ),
-        h("h3", { class: "ask" }, it.view.text),
+      const kind = it.void ? "void" : it.right ? "right" : it.close ? "close" : it.given ? "wrong" : "missed";
+      const kicker = h(
+        "span",
+        { class: "kicker" },
+        `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""}`,
+      );
+      const body = () => [
         picture(it.view),
         answered(it.view, it.reveal, it.given, it.right ? "right" : it.close ? "partial" : "wrong"),
         crowdLine(it.view.type, it.reveal.crowd, it.right),
         fact(it.reveal.fact, it.reveal.day),
         report(it.reveal.id),
+      ];
+      if (!versus)
+        return h(
+          "article",
+          { class: `reviewed ${kind === "missed" ? "wrong" : kind}` },
+          h("p", { class: "reviewed-head" }, kicker, h("span", { class: "reviewed-says" }, verdicts[kind][1])),
+          h("h3", { class: "ask" }, it.view.text),
+          body(),
+        );
+      const theirs = versus.marks[it.n];
+      const answer = answerWords(it.view, it.reveal);
+      const open = signal(false);
+      return h(
+        "article",
+        { class: "reviewed duel-q" },
+        h("p", { class: "reviewed-head" }, kicker),
+        h("h3", { class: "ask" }, it.view.text),
+        h(
+          "p",
+          { class: "duel-q-sides" },
+          side("Ти", versus.mine, kind),
+          theirs
+            ? side(
+                versus.name,
+                versus.theirs,
+                theirs.right ? "right" : theirs.close ? "close" : theirs.missed ? "missed" : "wrong",
+              )
+            : null,
+        ),
+        answer ? h("p", { class: "duel-q-answer" }, "Верният отговор: ", h("b", null, answer)) : null,
+        h(
+          "button",
+          {
+            class: "link tap muted duel-q-more",
+            type: "button",
+            "aria-expanded": () => String(open()),
+            onclick: () => open.set(!open.peek()),
+          },
+          () => (open() ? "Скрий" : "Отговорите и фактът"),
+        ),
+        () => (open() ? h("div", { class: "duel-q-body" }, body()) : null),
       );
     }),
   );

@@ -992,43 +992,6 @@ func TestFriendRequests(t *testing.T) {
 	}
 }
 
-func TestDecided(t *testing.T) {
-	marks := func(rights string) []DuelMark {
-		out := make([]DuelMark, len(rights))
-		for i, r := range rights {
-			out[i] = DuelMark{Right: r == '1'}
-		}
-		return out
-	}
-	sum := func(m []DuelMark) (n int) {
-		for _, x := range m {
-			n += b2i(x.Right)
-		}
-		return n
-	}
-	for _, c := range []struct {
-		name string
-		a, b []DuelMark
-		want int
-	}{
-		{"ahead from the first", marks("101"), marks("000"), 1},
-		{"a lead lost and taken back on the last", marks("1001"), marks("0100"), 4},
-		{"even after the second, ahead from the third", marks("101"), marks("010"), 3},
-		{"the other won it on the second", marks("100"), marks("110"), 2},
-		{"even right answers: the tie broken", marks("10"), marks("01"), 0},
-		{"nothing played", nil, nil, 0},
-	} {
-		if got := decided(c.a, c.b, sum(c.a), sum(c.b)); got != c.want {
-			t.Errorf("%s: decided on %d, want %d", c.name, got, c.want)
-		}
-	}
-	// A question that counts for nobody is in the marks but not in the score: the last question's lead is the score's.
-	if got := decided(marks("11"), marks("10"), 1, 1); got != 0 {
-		t.Errorf("decided by a void question: %d", got)
-	}
-}
-
-// A duel goes by right answers, then as the board breaks a tie (how close the number came); even in both, a draw.
 func TestDuelScore(t *testing.T) {
 	base := duelScore{rights: 7, tie: tiebreak{closeness: 500}}
 	for _, c := range []struct {

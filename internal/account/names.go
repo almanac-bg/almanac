@@ -125,16 +125,19 @@ func (a *Accounts) ResetName(ctx context.Context, userID int64) (name, tag strin
 	return name, tag, err
 }
 
-// NormalTag is a tag as it's kept — 3 to 20 latin letters, digits and underscores, starting with a letter,
-// lowercase, without the @ it's written with — or ErrBadTag. (Whether a new one is free to take is Retag's: a tag
+// NormalTag is a tag as it's kept — 3 to 20 latin letters, digits, underscores and dots, starting with a letter, a
+// dot never last nor two in a row („ivan.petrov“; never „ivan.“ or „ivan..petrov“), lowercase, without the @ it's
+// written with — or ErrBadTag. A dot is kept as written, as an underscore is: „ivan.petrov“, „ivan_petrov“ and
+// „ivanpetrov“ are three tags, each looked up only as itself. (Whether a new one is free to take is Rename's: a tag
 // is looked up by this too.)
 func NormalTag(s string) (string, error) {
 	s = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(s), "@"))
-	if len(s) < TagMin || len(s) > TagMax || s[0] < 'a' || s[0] > 'z' {
+	if len(s) < TagMin || len(s) > TagMax || s[0] < 'a' || s[0] > 'z' || s[len(s)-1] == '.' ||
+		strings.Contains(s, "..") {
 		return "", ErrBadTag
 	}
 	for _, r := range s {
-		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '_' {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '_' && r != '.' {
 			return "", ErrBadTag
 		}
 	}

@@ -1,8 +1,10 @@
-// A duel's result, the most dramatic moment in the game, for every way a duel ends (against a friend, or against a
-// recording): the two face to face with their scores, the winner in full ink and the other quieter; the duel question
-// by question, the two rows of marks aligned, the question that decided it, and on a tie what broke it; then (a second
-// page on a big screen) the record between the two and what to do next. One that lapsed says so. The first time it
-// shows, it lands as a moment (feel.ts: duel), never again.
+// A duel's result, for every way a duel ends (against a friend, or against a recording), made to read at a glance:
+// one head (the verdict, the two face to face with their scores, the winner in full ink and the other quieter, and
+// under them, small, what broke a tie and the record between the two); what to do next (one action, one way back);
+// then the duel question by question, each a row: the question, how it went for the two side by side, the answer,
+// and the fact a tap away (results.ts, reviewed). The questions are gone over on the day the player's own game ended
+// (play.Review); after it the head has the two rows of marks in their place. One that lapsed says so. The first time
+// it shows, it lands as a moment (feel.ts: duel), never again.
 //
 // It loads on its own, with its style (outcome.css) and the game's feel, the first time a duel's result shows (kit.ts:
 // duelResult; asked for as a duel starts, so it's in by its end), and is handed the app's pieces: it imports only types.
@@ -15,7 +17,6 @@ import type { DuelMark, DuelView, Side } from "./duel.ts";
 
 // The app's pieces, set as a result is drawn (outcome).
 let {
-  api,
   avatar,
   feelKit,
   formatNumber,
@@ -24,11 +25,10 @@ let {
   landing,
   nameWords,
   nextSteps,
-  ordinal,
   play,
   profileHref,
   record,
-  reviewParts,
+  reviewed,
   topics,
   recordingName,
   trail,
@@ -39,17 +39,17 @@ let {
 /** How many questions a duel has. */
 const total = 10;
 
-/** What to do next, where the screen that shows a result has its own: the gold button, and plain ones beside it. */
+/** What to do next: the gold button, and at most one plain one under it. */
 export interface Steps {
   main: Child;
-  also?: Child[];
+  also?: Child;
 }
 
-/** A duel as it ended (`d`, as one duel's view has it); what to do next (`again`: a rematch, another duel; else the
- * way back to Приятели); and what the game earned (`more`). */
-export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child): Child {
+/** A duel as it ended (`d`, as one duel's view has it); what to do next (`steps`: a rematch or another duel, and the
+ * way back to Приятели); what the game earned (`more`); and its questions, while they can be gone over (`questions`:
+ * DuelView.review). */
+export function outcome(kit: Kit, d: DuelView, steps: Steps, more: Child, questions: Reviewed[] | null): Child {
   ({
-    api,
     avatar,
     feelKit,
     formatNumber,
@@ -58,45 +58,38 @@ export function outcome(kit: Kit, d: DuelView, again: Child | Steps, more: Child
     landing,
     nameWords,
     nextSteps,
-    ordinal,
     play,
     profileHref,
     record,
-    reviewParts,
+    reviewed,
     topics,
     recordingName,
     trail,
     tieWords,
     withWord,
   } = kit);
-  const steps = again && typeof again === "object" && "main" in again ? again : null;
-  const next = steps ? steps.main : (again as Child);
-  const questions =
-    d.runId && d.you?.done
-      ? reviewParts(async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${d.runId}/review`)).questions)
-      : null;
-  const head = d.state === "expired" ? plain(d) : hero(d);
-  // Two sides on a big screen (DESIGN.md, a spread): the result on the left; what to do next, what it meant and what
-  // the game earned on the right. One column on a phone, in that order: the next duel in sight under the result.
+  // Two sides on a big screen (DESIGN.md, a spread): the result on the left; what to do next and what the game earned
+  // on the right; the questions under both, a reading column. One column on a phone, in that order: the next duel in
+  // sight under the result.
   return h(
     "section",
     { class: "screen duel-result spread" },
-    h("div", { class: "duel-main page-1" }, head),
-    h(
-      "div",
-      { class: "duel-side page-2" },
-      // The gold button is another duel where there's one, else the way back to Приятели; the rest are plain, side by
-      // side.
-      nextSteps(
-        next ?? toDuels(true),
-        steps ? [questions?.button, ...(steps.also ?? [])] : [questions?.button, next ? toDuels(false) : null],
-      ),
-      d.state === "expired" ? null : meant(d),
-      more,
-    ),
-    questions?.list,
+    h("div", { class: "duel-main page-1" }, d.state === "expired" ? plain(d, !questions) : hero(d, !questions)),
+    h("div", { class: "duel-side page-2" }, nextSteps(steps.main, [steps.also]), more),
+    questions
+      ? reviewed(questions, h("h2", { class: "section-title" }, "Въпрос по въпрос"), {
+          mine: bare(d.you),
+          theirs: bare(d.opponent),
+          name: d.opponent?.name ?? "Съперникът",
+          // Nothing of a duel that ran out, nor of a player gone since: the player's own game alone.
+          marks: d.state === "expired" || d.opponent?.gone ? [] : (d.opponent?.marks ?? []),
+        })
+      : null,
   );
 }
+
+/** Small beside a mark: the avatar alone, without its frame. */
+const bare = (s?: Side) => s?.look?.avatar?.split("/")[0];
 
 /** „Дуел с Мария“, or a recording as it was chosen and whose: „По-силен запис · Краси“. */
 function kicker(d: DuelView): string {
@@ -114,8 +107,9 @@ const headings: Record<DuelView["state"], string> = {
   expired: "Дуелът изтече",
 };
 
-/** A duel with a result: the card that holds it, landing once as a moment. */
-function hero(d: DuelView): Child {
+/** A duel with a result: the card that holds it, landing once as a moment. With `marked`, the duel question by
+ * question as two rows of marks (its questions can't be gone over any more; while they can, their rows say it). */
+function hero(d: DuelView, marked: boolean): Child {
   const you = d.you as Side;
   const them = d.opponent;
   const mine = you?.marks ?? [];
@@ -136,8 +130,8 @@ function hero(d: DuelView): Child {
       h("span", { class: "duel-colon", "aria-hidden": "true" }, ":"),
       them ? face(them, them.name, them.tag ?? "", d.state === "lost" && !them.gone) : h("div", { class: "duel-face" }),
     ),
-    marks(d, mine, theirs),
-    h("p", { class: "duel-line" }, line(d)),
+    marked ? marks(d, mine, theirs) : null,
+    meant(d),
   ) as HTMLElement;
   land(card, d, mine, theirs);
   return card;
@@ -159,14 +153,13 @@ function face(s: Side, label: string, tag: string, won: boolean): Child {
       ? [h("b", { class: "duel-score none" }, "–"), h("span", { class: "duel-rights" }, "Играчът вече го няма")]
       : [
           h("b", { class: "duel-score", "data-n": s.rights }, formatNumber(s.rights)),
-          h("span", { class: "duel-rights" }, `от\u00a0${total}`),
+          h("span", { class: "duel-rights" }, `от ${total}`),
         ],
   );
 }
 
 /** The duel question by question: the player's marks over the other's, aligned (right filled, близо half filled,
- * wrong hollow), and a band behind the question that decided it. Time never counts, so no mark says how long it
- * took or who was quicker; gold is the mark's alone. */
+ * wrong hollow). Time never counts, so no mark says how long it took or who was quicker. */
 function marks(d: DuelView, mine: DuelMark[], theirs: DuelMark[]): Child {
   const words = (m: DuelMark) => (m.right ? "вярно" : m.close ? "близо" : m.missed ? "без отговор" : "грешно");
   const them = d.opponent?.name ?? "съперникът";
@@ -181,51 +174,38 @@ function marks(d: DuelView, mine: DuelMark[], theirs: DuelMark[]): Child {
   const label = [
     `Въпрос по въпрос. Ти: ${rightWords(rights(mine))}`,
     theirs.length ? `; ${them}: ${rightWords(rights(theirs))}` : "",
-    d.decided ? `; ${d.state === "won" ? "ти" : them} водеше от ${ordinal(d.decided)}я въпрос до края` : "",
   ].join("");
-  // Small beside the marks: the avatar alone, without its frame.
-  const bare = (s?: Side) => s?.look?.avatar?.split("/")[0];
-  const you = { avatar: bare(d.you) };
-  const other = { avatar: bare(d.opponent) };
   return h(
     "div",
     { class: "duel-marks", role: "img", "aria-label": label },
-    d.decided && d.decided > 1
-      ? h("span", { class: "duel-band", style: { "grid-row": "1 / span 2", "grid-column": String(d.decided + 1) } })
-      : null,
-    h("span", { class: "duel-who", style: { "grid-row": "1", "grid-column": "1" } }, avatar(you.avatar, { size: "s" })),
+    h(
+      "span",
+      { class: "duel-who", style: { "grid-row": "1", "grid-column": "1" } },
+      avatar(bare(d.you), { size: "s" }),
+    ),
     Array.from({ length: total }, (_, i) => pip(mine[i], 1, i)),
     h(
       "span",
       { class: "duel-who", style: { "grid-row": "2", "grid-column": "1" } },
-      avatar(other.avatar, { size: "s", name: d.opponent?.name }),
+      avatar(bare(d.opponent), { size: "s", name: d.opponent?.name }),
     ),
     Array.from({ length: total }, (_, i) => pip(theirs[i], 2, i)),
   );
 }
 
-/** What decided the duel: on even right answers, and only then, what broke the tie as on the day's board
- * (play.duelScore, tieWords): the number nearer (even in that too, a draw, which says nothing more); else the
- * question from which the winner led to the end. */
-function line(d: DuelView): string {
-  const them = d.opponent?.name ?? "Съперникът";
-  if (d.opponent?.gone) return ""; // their game went with them: nothing to set the player's against
-  const tie = tieWords(d);
-  if (tie) return `${tie.charAt(0).toUpperCase()}${tie.slice(1)}.`;
-  if (!d.decided) return "";
-  if (d.decided >= total) return "Реши го последният въпрос.";
-  const from = d.decided === 1 ? "първия" : `${ordinal(d.decided)}я`;
-  return d.state === "won" ? `Водеше от ${from} въпрос до края.` : `${them} водеше от ${from} въпрос до края.`;
-}
-
-/** What the duel meant: the record against this person, or, against a recording, whose game it was. */
+/** Under the two, small, each said once: on even right answers what broke the tie, as on the day's board
+ * (play.duelScore, tieWords: the number nearer; even in that too it's a draw, which says nothing more); against a
+ * recording, whose game it was; the record against this person. Nothing of a player gone since: their game went with
+ * them. */
 function meant(d: DuelView): Child {
   const rec = d.record;
   const them = d.opponent?.name ?? "";
   const topic = d.topic ? topics.find((t) => t.id === d.topic)?.name : "";
+  const tie = d.opponent?.gone ? "" : tieWords(d);
   return h(
     "div",
     { class: "duel-meant" },
+    tie ? h("p", { class: "duel-line" }, `${tie.charAt(0).toUpperCase()}${tie.slice(1)}.`) : null,
     d.recorded && d.opponent
       ? h("p", { class: "duel-why" }, `Записът е от истинска игра на ${them}${topic ? ` в глава „${topic}“` : ""}.`)
       : null,
@@ -233,27 +213,17 @@ function meant(d: DuelView): Child {
       ? h(
           "p",
           { class: "duel-record" },
-          h("span", null, `Срещу ${them} досега:`),
-          h(
-            "span",
-            { class: "duel-record-end" },
-            h(
-              "b",
-              { class: "duel-record-n", "aria-label": record(rec.won, rec.lost, rec.drawn) },
-              `${rec.won}:${rec.lost}`,
-            ),
-            rec.drawn
-              ? h("span", { class: "duel-why" }, `и ${rec.drawn} ${rec.drawn === 1 ? "равенство" : "равенства"}`)
-              : null,
-          ),
+          `Срещу ${them} досега: `,
+          h("b", { "aria-label": record(rec.won, rec.lost, rec.drawn) }, `${rec.won}:${rec.lost}`),
+          rec.drawn ? ` и ${rec.drawn} ${rec.drawn === 1 ? "равенство" : "равенства"}` : null,
         )
       : null,
   );
 }
 
 /** A duel without a result: who didn't play it in time (or, from before, that it was cut off), and the player's own
- * game if they played it. */
-function plain(d: DuelView): Child {
+ * game if they played it (`marked`: with its marks, where its questions can't be gone over any more). */
+function plain(d: DuelView, marked: boolean): Child {
   const you = d.you;
   const them = d.opponent?.name ?? "Приятелят ти";
   const why =
@@ -279,16 +249,13 @@ function plain(d: DuelView): Child {
             "p",
             { class: "duel-mine-score" },
             h("b", { class: "duel-mine-n" }, formatNumber(you.rights)),
-            ` от\u00a0${total}`,
+            ` от ${total}`,
           ),
-          trail(you.marks ?? [], total),
+          marked ? trail(you.marks ?? [], total) : null,
         )
       : null,
   ];
 }
-
-const toDuels = (main: boolean) =>
-  h("a", { class: main ? "btn primary big" : "btn", href: "/friends" }, "Към Приятели");
 
 /** Where the results already landed are kept, on this device: a duel's lands once, never again on a reload or a visit
  * back. */
@@ -320,12 +287,7 @@ function land(card: HTMLElement, d: DuelView, mine: DuelMark[], theirs: DuelMark
       feel
         .duel(
           card,
-          {
-            mine: mine.map((m) => (m.right ? 1 : 0)),
-            theirs: theirs.map((m) => (m.right ? 1 : 0)),
-            end,
-            decided: d.decided ?? 0,
-          },
+          { mine: mine.map((m) => (m.right ? 1 : 0)), theirs: theirs.map((m) => (m.right ? 1 : 0)), end },
           hands(),
         )
         .then(done),

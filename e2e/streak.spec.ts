@@ -22,7 +22,7 @@ test("Профил shows the streak as it is now in its head, never an ended one
   // this week has forgiven nothing, whatever today's weekday; then the last two.
   await daysPlayed(page, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 2, 1);
   await page.goto("/me");
-  await expect(page.locator(".me-head .me-streak")).toHaveText("2 дни в серията");
+  await expect(page.locator(".me-head .me-streak")).toHaveText("2 дни без прекъсване");
   // What the week forgives is the pointer's, resting on it (a phone has it where a day missed is forgiven): not a line
   // of the page.
   await expect(page.locator(".me-head .me-streak")).toHaveAttribute(
@@ -75,7 +75,7 @@ test("a week's streak on Днес, and the day played makes it one more: no shee
   // Six days: the seventh makes it seven; nothing is noted (DECISIONS.md, „The direction“: no notes as rewards).
   await daysPlayed(page, 6, 5, 4, 3, 2, 1);
   await page.reload();
-  await expect(page.locator(".streak-chip.unlit")).toContainText("6дни в серията");
+  await expect(page.locator(".streak-chip.unlit")).toContainText("6дни без прекъсване");
   await startDay(page);
   await playRun(page);
   await expect(page.locator(".summary .tomorrow")).toContainText("С него серията ти става 8.");

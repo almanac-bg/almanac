@@ -39,9 +39,12 @@ func TestNational(t *testing.T) {
 		t.Errorf("counted %v, with e used and b's day today", n)
 	}
 	for _, d := range NationalDays {
-		if len(d.On) != 5 || d.What == "" {
-			t.Errorf("%+v: a day is MM-DD, and says what it marks", d)
+		if len(d.On) != 5 || d.Name == "" {
+			t.Errorf("%+v: a day is MM-DD, and has its name", d)
 		}
+	}
+	if NationalName("2027-03-03") != "Освобождението" || NationalName("2027-03-04") != "" || NationalName("") != "" {
+		t.Error("a national day is named by its date, any year; another day has no name")
 	}
 	if !slices.IsSortedFunc(NationalDays, func(x, y NationalDay) int { return strings.Compare(x.On, y.On) }) {
 		t.Error("the national days are in the year's order")

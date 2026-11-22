@@ -83,7 +83,7 @@ var playerErrors = map[error]*apiError{
 	account.ErrNameLink:     {http.StatusBadRequest, "bad_name", "След точка в името трябва да има интервал: името не може да е адрес на сайт."},
 	account.ErrNameReserved: {http.StatusBadRequest, "reserved_name", "Това име е запазено за играта. Избери друго."},
 	account.ErrNameRude:     {http.StatusBadRequest, "bad_name", "Това име звучи грубо. Избери друго."},
-	account.ErrBadTag:       {http.StatusBadRequest, "bad_tag", "Потребителското име трябва да е от 3 до 20 знака: латински букви, цифри или _, като първият е буква."},
+	account.ErrBadTag:       {http.StatusBadRequest, "bad_tag", "Потребителското име трябва да е от 3 до 20 знака: латински букви, цифри, точка или _, като първият е буква. Точката не може да е последна, нито две една след друга."},
 	account.ErrTagTaken:     {http.StatusConflict, "tag_taken", "Това потребителско име е заето. Опитай друго."},
 	account.ErrSuspended:    {http.StatusForbidden, "suspended", "Този профил е спрян от екипа на играта."},
 }

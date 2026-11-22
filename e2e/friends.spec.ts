@@ -14,7 +14,7 @@ test("friends on the day: who has played it, and how each went", async ({ browse
   await playedFair(a);
   await a.reload();
   const hersBoard = a.locator(".day-board");
-  await expect(hersBoard.getByRole("tab", { name: "България" })).toHaveAttribute("aria-selected", "true");
+  await expect(hersBoard.getByRole("tab", { name: "Всички" })).toHaveAttribute("aria-selected", "true");
   await hersBoard.getByRole("tab", { name: "Приятели" }).click();
   await expect(hersBoard).toContainText("Още нямаш приятели.");
   await expect(hersBoard.getByRole("link", { name: "Добави приятели" })).toHaveAttribute("href", "/friends");
@@ -62,7 +62,7 @@ test("friends on the day: who has played it, and how each went", async ({ browse
     await expect(worn).toHaveAttribute("aria-label", /^Печат: [^:]+$/);
   }
   // All България a tap away, on the same card, the two of them on it.
-  await friends.getByRole("tab", { name: "България" }).click();
+  await friends.getByRole("tab", { name: "Всички" }).click();
   await expect(friends.locator(".rank-row").filter({ hasText: ana })).toHaveCount(1);
   await expect(friends.locator(".rank-row.me")).toHaveCount(1);
   // Приятели is the people and the duels: the day's board isn't there.
@@ -74,9 +74,9 @@ test("friends on the day: who has played it, and how each went", async ({ browse
 test("friends by tag: a name and a tag of one's own, a request, a yes", async ({ browser }, info) => {
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
-  const tag = `ana_${info.project.name.slice(0, 3)}${Date.now() % 100000}`;
+  const tag = `ana.p_${info.project.name.slice(0, 3)}${Date.now() % 100000}`;
 
-  // Ana becomes a player, and takes a full name (anyone's) and a tag (hers alone).
+  // Ana becomes a player, and takes a full name (anyone's) and a tag (hers alone, with a dot in it).
   await a.goto("/friends");
   await a.locator(".friends").getByRole("button", { name: "Добави приятел" }).click();
   await a.goto("/settings");
@@ -142,8 +142,12 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   // Who asks, as every row of players has them: the avatar, the name (a way to their profile), and the ask under it.
   await expect(a.locator(".invitation a.who .avatar")).toHaveCount(1);
   await expect(a.locator(".invitation .invitation-line")).toHaveText("Иска да сте приятели.");
+  // While it waits, a dot on the „Приятели“ tab (seen from „Дуели“ too); answered, the dot goes.
+  const aFriends = a.getByRole("tab", { name: "Приятели" });
+  await expect(aFriends.locator(".tab-dot")).toHaveCount(1);
   await a.locator(".invitation").getByRole("button", { name: "Приеми" }).click();
   await expect(a.locator(".friend")).toHaveCount(1);
+  await expect(aFriends.locator(".tab-dot")).toHaveCount(0);
   await b.reload();
   // One friend of that name: the name alone, the @username left to her profile.
   await expect.poll(() => readText(b.locator(".friend .friend-name"))).toMatch(/^Ана Петрова/);
@@ -158,6 +162,14 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await b.goto("/");
   await expect(b.locator(".day")).toBeVisible();
   await expect(b.locator(".notices")).toBeEmpty();
+
+  // Her name in Приятели takes him to her page, by her tag, dot and all; and the page opens by it at once too.
+  await b.goto("/friends");
+  await b.locator(".friend a.friend-name").click();
+  await expect(b).toHaveURL(new RegExp(`/players/${tag.replace(".", "\\.")}$`));
+  await expect(b.locator(".me-tag")).toHaveText(`@${tag}`);
+  await b.reload();
+  await expect(b.locator(".me-tag")).toHaveText(`@${tag}`);
 });
 
 test("a request turned down, a friend removed", async ({ browser }) => {
@@ -247,14 +259,14 @@ test("the day's board at 320 px, the day played: the rows hold their squares, an
           { childList: true, subtree: true },
         );
       }, percent);
-    await page.goto("/friends");
+    await page.goto("/friends?tab=duels");
     if (percent !== 100) {
       await expect(page.locator("html")).toHaveCSS("font-size", `${(16 * percent) / 100}px`);
       await expect(page.locator("html")).toHaveClass(/\btight\b/);
     }
     await expect(page.locator(".duels").getByRole("link", { name: "Нов дуел" })).toBeVisible();
     await page.goto("/");
-    for (const tab of ["Приятели", "България"]) {
+    for (const tab of ["Приятели", "Всички"]) {
       await page.locator(".day-board").getByRole("tab", { name: tab }).click();
       const rows = page.locator(".day-board .rank-row");
       await expect(rows.first().locator(".mini")).toBeVisible();
@@ -302,7 +314,7 @@ test("a day of none right isn't rubbed in: no place on the board of all Бълг
     await page.locator("nav.places-foot").getByRole("link", { name: "Днес" }).click();
     // No friends: the board opens on all България.
     const board = page.locator(".day-board");
-    await expect(board.getByRole("tab", { name: "България" })).toHaveAttribute("aria-selected", "true");
+    await expect(board.getByRole("tab", { name: "Всички" })).toHaveAttribute("aria-selected", "true");
     await expect(board.locator(".board-note")).toHaveText(
       rights ? /^В България си на 20\S* място от 53\.$/ : "Днес играха 53 души.",
     );

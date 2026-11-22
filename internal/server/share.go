@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/card"
 	"github.com/almanac-bg/almanac/internal/play"
 )
@@ -165,8 +166,8 @@ func (s *Server) card(w http.ResponseWriter, r *http.Request) {
 		day := play.IssueDay(issue)
 		topics, err := s.game.IssueTopics(r.Context(), day)
 		if err == nil {
-			b, err = s.cards.draw(r.Context(), name, card.Card{Issue: issue, Date: play.DateWords(day), Topics: topics,
-				Shape: m[2]})
+			b, err = s.cards.draw(r.Context(), name, card.Card{Issue: issue, Date: play.DateWords(day),
+				National: bank.NationalName(day), Topics: topics, Shape: m[2]})
 		}
 		if err != nil {
 			if r.Context().Err() == nil {

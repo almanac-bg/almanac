@@ -58,10 +58,14 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
     tiles so far, and „Продължи“; yesterday's left so just before midnight, while the game lets it be finished
     (`play.DayGrace`), comes first, with its date and „Вчерашният брой. Довърши го до 00:15.“ Come by a shared link:
     „Някой позна 7 от 10. А ти?“ and the shared tiles.
+  - On a national day (`bank.NationalDays`) its name is one quiet line under the date, in the weekday's type
+    (`.issue-national`: „3 март“, „Освобождението“), and the share and the card say it after the issue; nothing else
+    marks it. The questions dated to the day come first in its draw, but the issue stays one question a chapter, never
+    a themed ten, and those of them on the date have their „На този ден“, as any day's.
   - On a phone the cover is under half the screen (its date sized by the height), so that „Започни“ is whole by 500px
     on 320 × 568 and 540px on 375 × 600 (`layout.spec.ts`). With large text its display type stays near its usual size
     (the date by the height) and „Около три минути“ gives way (`.issue-time`), so the cover never fills the screen.
-  - The streak (`.streak-chip`): the flame, the number and „дни в серията“, from three days; under it one line: what
+  - The streak (`.streak-chip`): the flame, the number and „дни без прекъсване“ (one: „ден“), from three days; under it one line: what
     came of the days just missed (told once), a day the week forgave, or while the day waits what it makes of the
     streak (`stakeLine`). Below three days, what came of the days just missed is that line on its own, in the
     streak's place (`.streak-notice`).
@@ -101,7 +105,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      reminder's ask under it while reminders are off, a player with a profile's too (a plain button, never a second
      action; three times at most, once a day). Yesterday's issue finished after midnight has today's in its place
      („Вече излезе.“, „Към днешния брой“).
-  6. The day's board (`.day-board`, `dayBoard()`): one card, „Класация“ and two tabs, Приятели and България (among
+  6. The day's board (`.day-board`, `dayBoard()`): one card, „Класация“ and two tabs, Приятели and Всички (the second not „България“, which names the questions about Bulgaria; among
      friends once the player has any; with none, on all България). It's there once the day as it stands with the game
      played has come (before, the board names nobody to the player and shows no squares), never for yesterday's issue
      finished late, and never before the day is played: Днес is then the issue alone. Among friends: each who played,
@@ -150,32 +154,47 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   chapters, „Към Алманаха“). On a big screen the result is a spread, as the day's: the sheet on the left page, the
   action, the ways on and that line on the right, „Прегледай въпросите“ under both in a reading column. Its start
   (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name.
-- **Приятели:** the people and the duels (the day's board is Днес's); the friends (their heading for a screen reader
-  only, right under the page's „Приятели“, „Премахни приятел“ at the right; a row each: avatar with its seal,
-  the name across the row, never cut, today's score and the duels between you „дуели 3 : 1“ under it; the column half
-  a big screen, the duels the other half; a friend removed only after a sheet asks „Премахваш ли Иво от приятелите си?“, „Премахни“ in red and
-  „Отказ“, then at once, the duels open between them ending as if their time were up); the duels (shown once there
-  are friends or duels, or the day is played: „Нов дуел“ against a recording needs no friend; „Твой ред“ the page's
-  action, „Чакаш“, „Изиграни“: an open one how it stands under the name, „Изиграй същите десет въпроса · още 6 дни“,
-  „Довърши своята игра“ once its first question was shown, „Ти: 8 · още 6 дни“; a played one at the right its end
-  as a chip, told apart at a glance by fill and line, never red or green („✓ Победа“ filled in ink, „Загуба“ outlined
-  and quiet, „Равенство“ outlined in ink), its score beside it, a heavy numeral („8:6“), and on a line of its own
-  under the row, the row's width, what more there is to say: that it was against a recording, and what broke a tie on
-  even right answers („Равен брой верни · реши по-близкото число“: nothing else does; even in that too, „Равенство“
-  and nothing more); one that ran out „Изтече“ alone at
-  the right, why under the row („Иво не го изигра навреме.“); the record between two is the friend's
+- **Приятели:** the people and the duels (the day's board is Днес's), two tabs at the page's top, „Приятели“ and
+  „Дуели“, the day's board's own (`segmented`), of one weight: no heading over them (the page's „Приятели“ is a screen
+  reader's only, as each tab's own heading is), one column on a big screen too. „Дуели“ carries a dot while a duel
+  waits for the player (`tabDot`), and opens first then, else „Приятели“ (which has the dot while someone asks to be friends); a duel that comes later lights the dot and
+  never moves the page. The tab chosen is in the address (`?tab=duels`): back and a reload keep it. Under „Приятели“:
+  „Премахни приятел“ at the right; a row each: avatar with its seal,
+  the name across the row, never cut, today's score and the duels between you „дуели 3 : 1“ under it; a friend removed only after a sheet asks „Премахваш ли Иво от приятелите си?“, „Премахни“ in red and
+  „Отказ“, then at once, the duels open between them ending as if their time were up; then adding and the requests.
+  Under „Дуели“: what a duel is in a line, the open ones (theirs to play first, then those waiting), „Изиграни“ (the
+  last five), „Нов дуел“ always (against a recording it needs no friend). A duel is a card, never a person's row
+  (`.duel-card`, two a row on a big screen): its kind at the top as a small label, „С приятел“ or „Срещу запис“; then
+  the two face to face, the player's avatar with its seal and „Ти“ on the left, the other's with their name on the
+  right, and between them how it stands: „Твой ред“ or „Чакаш“ (quiet) over „още 6 дни“; a played one's score, a
+  heavy numeral („8:6“), over its end as a chip, told apart at a glance by fill and line, never red or green
+  („✓ Победа“ filled in ink, „Загуба“ outlined and quiet, „Равенство“ outlined in ink); one that ran out „Изтече“
+  alone. One quiet line under them where there's more to say: „Довърши своята игра.“ once its first question was
+  shown, „Ти: 8 от 10“ while waiting, why it ran out („Иво не го изигра навреме.“), what broke a tie on even right
+  answers („Равен брой верни · реши по-близкото число“: nothing else does; even in that too, „Равенство“ and nothing
+  more). The whole card is one link to the duel: under a pointer its line lights, and no name is underlined (none is a
+  way to a profile). The first „Твой ред“ is ringed in ink with „Играй“ in it, the page's action. At large text
+  (`.tight`) the two are under each other, each a row. The record between two is the friend's
   row's alone). Friends are added in one field, „име или имейл“; a
   friend's yes to a request is one line over the friends, told once; requests sent wait under „Изпратени покани“.
   Only two friends of one name show their @username. A duel's result, as the day's: a white card, the kicker, the
   verdict („Победа“, „Загуба“, „Равенство“) as its h1, the two face to face, each a column (the avatar with its seal, the name under
-  it broken only between its words, the score), their scores as the heroes and „от 10“ in words, the marks, no
-  hairlines; a spread on a big screen, the ways on (one width) and the record under them on the right (a phone has
-  them in that order too: the next duel in sight under the result); its marks as the tiles (близо ◩),
-  nothing ringed, no time on any of them: time never counts.
+  it broken only between its words, the score), their scores as the heroes and „от 10“ in words, and under them,
+  small and said once each, what broke a tie, whose game a recording was and the record („Срещу Иво досега: 3:1 и 1
+  равенство“); no hairlines. Then one action („Реванш“, „Още един дуел срещу запис“) and one way back („Към
+  Приятели“), no more; a spread on a big screen as the day's, the two of one width on the right (a phone has them
+  under the card: the next duel in sight under the result). Then „Въпрос по въпрос“ (`reviewed()` with the two
+  sides; a reading column on a big screen): each question a short white card: its number and chapter, the question,
+  how it went for the two side by side, each half the row (the small avatar, „✓ Точно“ in ink, „✕ Грешно“, „◩
+  Близо“, „– Без отговор“ quieter: a question that parted them shows at a glance), „Верният отговор: …“ where a few
+  words hold it, and „Отговорите и фактът“, which opens in place what the day's review shows (the answers as given,
+  how others answered, the fact). The questions are there on the day the player's own game ended; after it the card
+  has the two rows of marks in their place (the tiles' squares, близо ◩), never both. Nothing ringed, no time on any
+  of them: time never counts.
 - **Профил:** one column, on a big screen too: the avatar with the seal worn on its corner and a pencil on its top corner (a phone: always; a big screen: as the pointer
   comes over it, with the tooltip „Смени аватара“), the
   name, the @username and by it, on the same line where it fits, the streak as it is now, sized to the head (the
-  flame, „58 дни в серията“; never an ended one's, nothing while none runs; no card of its own). What the week
+  flame, „58 дни без прекъсване“; never an ended one's, nothing while none runs; no card of its own). What the week
   forgives is no line of the page: the streak's `title`, for a pointer resting on it (that it's used up, only while a
   streak runs); a phone is told it where it matters, when a day missed is forgiven. A guest's ways in one quiet line
   under it („Играта ти е само на това устройство. Запази я с имейл · Имаш профил? Влез“: the first opens its form in
@@ -356,7 +375,7 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
 - **What a tap brings up** under it (an ask, an answer: „Нова връзка“, „Добави“, „Изтрий профила“) is scrolled into
   sight whole, clear of a phone's places at the foot (`inSight()`).
 - **Rows of players:** `who()` (the avatar with its seal, and the name), `playerRow()` (a friend's
-  `.friend` and a board's `.rank-row`, one build: Приятели and the day's board), `.duel-row`. **Avatars** (`avatar()`): the drawn animal
+  `.friend` and a board's `.rank-row`, one build: Приятели and the day's board), `.duel-pick` (a friend to start a duel with). A duel in a list is a card, not a row (`.duel-card`). **Avatars** (`avatar()`): the drawn animal
   on a rounded tile of its scene, the seal worn on its corner. Only the fifteen animals: an avatar is a face.
 - **What went wrong** is never a dead end: `failure()` says what happened, offers „Опитай пак“ where it can help, and
   always a way on.
@@ -511,11 +530,12 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
 
 ## The share
 
-- **The text:** „Брой 42 · 8/10 · серия 23 дни“ (the streak from three days), the squares ■ right, ◩ близо (U+25E9, the upper left half, as the tiles), □ not, and the
+- **The text:** „Брой 42 · 8/10 · серия 23 дни“ (the streak from three days; on a national day its date and name after
+  the issue, „Брой 112 · 3 март · Освобождението · 8/10“), the squares ■ right, ◩ близо (U+25E9, the upper left half, as the tiles), □ not, and the
   link whole, „https://almanac.bg/d/…“, so that every messenger links it (`game/share.ts`). Unsigned.
 - **The card** (`internal/card`, `/card/<issue>-<shape>.png`), drawn once, by the server, one look in every theme: the
   picture a shared link's preview shows, and the one the sheet shows and shares. The mark and the name, „Брой N“ big
-  with its date, the ten tiles two rows of five (filled with the glyph on a white tile, the upper left half, dashed and hollow: they part in
+  with its date (on a national day „3 март · Освобождението“), the ten tiles two rows of five (filled with the glyph on a white tile, the upper left half, dashed and hollow: they part in
   grey too), and
   almanac.bg. No score, no streak, no name. In the same look the site's own picture (`/og.png`): the mark and the name,
   „Десет въпроса на ден, едни и същи за цяла България.“, a day's ten tiles and almanac.bg.
@@ -547,7 +567,7 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
 ## In code
 
 - `ui.ts`: `leaf`, `glyph`, `chip`, `tiles`, `mini`, `seal`, `standing`, `sealList`, `ladder`, `avatar`, `who`, `verdict`,
-  `fact`, `filed`, `segmented`, `failure`, `rosette`, `back`, `nameWords`, `textWords`, `emailWords`, `inSight`.
+  `fact`, `filed`, `segmented`, `tabDot`, `failure`, `rosette`, `back`, `nameWords`, `textWords`, `emailWords`, `inSight`.
 - `game/run.ts`: `trail`, `questionHead`, `timer`, `settle`; `game/questions.ts` each kind; `game/news.ts` what a game
   wrote; `game/share.ts` the share.
 - **Selectors:** a part has its own class (`.status-n`), not a tag under a class; Biome flags the other kind. A class
@@ -556,7 +576,7 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
   `.verdict`, `.right-said`, `.after`, `.up-next-go`; `.issue`, `.issue-go`, `.today-side`, `.result`, `.result-main`, `.score-n`,
   `.tiles .tile`, `.tomorrow`, `.result-share`, `.share-sheet`, `.streak-chip`, `.streak-notice`, `.day-entry`, `.missed-day`;
   `.summary`, `.reviewed`, `.news-facts`; `.toc-row`, `.entry`; `.day-board`, `.rank-row`, `.friend`, `.invitation`,
-  `.accepted-notice`, `.duels`, `.duel-turn`, `.duel-row`, `.their-line`; `.me-ladder`, `.ladder`.
+  `.accepted-notice`, `.duels`, `.duel-card` (`.turn`, `.s-<state>`), `.duel-card-mid`, `.duel-card-go`, `.duel-chip`, `.tab-dot`, `.duel-pick`, `.their-line`; `.me-ladder`, `.ladder`.
 
 ## Before a UI change ships
 

@@ -36,7 +36,7 @@ var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/(me|friends|settings|almanac)$`),
 	regexp.MustCompile(`^/signin$`),
 	regexp.MustCompile(`^/duel/([0-9]{1,12}|new)$`),
-	regexp.MustCompile(`^/players/[A-Za-z0-9_]{3,20}$`),
+	regexp.MustCompile(`^/players/[A-Za-z0-9_.]{3,20}$`),
 	sharePath, // a shared day (share.go)
 }
 
@@ -61,7 +61,7 @@ var screens = []struct {
 	{regexp.MustCompile(`^/settings$`), "settings.js"},
 	{regexp.MustCompile(`^/almanac(/[a-z]+)?$`), "almanac.js"},
 	{regexp.MustCompile(`^/friends$`), "friends.js"},
-	{regexp.MustCompile(`^/players/[A-Za-z0-9_]{3,20}$`), "player.js"},
+	{regexp.MustCompile(`^/players/[A-Za-z0-9_.]{3,20}$`), "player.js"},
 }
 
 // screenOf is the file of path's screen, if it loads on its own ("" if it's in app.js).

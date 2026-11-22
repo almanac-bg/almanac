@@ -704,10 +704,44 @@ func TestTags(t *testing.T) {
 	if _, _, err := a.Rename(ctx, one.ID, nil, new("otsirh")); err != nil {
 		t.Fatalf("one's own tag again: %v", err)
 	}
-	for _, bad := range []string{"ab", "1abc", "иван", "a b c", "a.b.c", "abcdefghijklmnopqrstu"} {
+	for _, bad := range []string{
+		"ab", "1abc", "иван", "a b c", "abcdefghijklmnopqrstu",
+		// A dot between the rest only: never first, last, or two in a row; nor past the length.
+		".ivan", "@.ivan", "ivan.", "ivan..petrov", "i..", "a.", "ivan.petrov.ivanov.b1", "ivan,petrov", "ivan-petrov",
+	} {
 		if _, err := NormalTag(bad); !errors.Is(err, ErrBadTag) {
 			t.Errorf("%q passed", bad)
 		}
+	}
+	for tag, want := range map[string]string{
+		"a.b": "a.b", "@Ivan.Petrov": "ivan.petrov", "a.b.c": "a.b.c", "ivan_.p1": "ivan_.p1", "a1.2b": "a1.2b",
+	} {
+		if got, err := NormalTag(tag); err != nil || got != want {
+			t.Errorf("%q: %q %v, want %q", tag, got, err, want)
+		}
+	}
+	// A dot is a letter of the tag as written: with it and without it are two tags, each taken only as itself, in
+	// either case.
+	if _, tag, err := a.Rename(ctx, one.ID, nil, new("Ivan.Petrov")); err != nil || tag != "ivan.petrov" {
+		t.Fatalf("a tag with a dot: %q %v", tag, err)
+	}
+	if _, _, err := a.Rename(ctx, two.ID, nil, new("IVAN.PETROV")); !errors.Is(err, ErrTagTaken) {
+		t.Fatalf("a taken tag with a dot, in other case: %v", err)
+	}
+	if _, tag, err := a.Rename(ctx, two.ID, nil, new("ivanpetrov")); err != nil || tag != "ivanpetrov" {
+		t.Fatalf("the same without its dot: %q %v", tag, err)
+	}
+	if _, _, err := a.Rename(ctx, one.ID, nil, new("otsirh")); err != nil {
+		t.Fatal(err)
+	}
+	// What a dot parts is read whole: a reserved word or a rude one, dotted, is still that.
+	for _, fake := range []string{"ad.min", "al.ma.nac", "sup.port"} {
+		if _, _, err := a.Rename(ctx, two.ID, nil, new(fake)); !errors.Is(err, ErrNameReserved) {
+			t.Errorf("%q: %v", fake, err)
+		}
+	}
+	if _, _, err := a.Rename(ctx, two.ID, nil, new("pu.tka")); !errors.Is(err, ErrNameRude) {
+		t.Errorf("a rude word, dotted: %v", err)
 	}
 	for _, fake := range []string{"admin", "almanac_team", "almanakh", "the_admin1", "support"} {
 		if _, _, err := a.Rename(ctx, two.ID, nil, new(fake)); !errors.Is(err, ErrNameReserved) {

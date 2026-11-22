@@ -14,6 +14,8 @@ import (
 
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
+
+	"github.com/almanac-bg/almanac/internal/bank"
 )
 
 var day = []string{"movies", "technology", "history", "nature", "geography", "literature", "music", "general",
@@ -24,11 +26,13 @@ var day = []string{"movies", "technology", "history", "nature", "geography", "li
 func TestDraw(t *testing.T) {
 	pictures := map[string]func() ([]byte, error){"site": Site}
 	for name, c := range map[string]Card{
-		"seven":   {Issue: 9, Date: "20 ноември", Topics: day, Shape: "1102111013"},
-		"ten":     {Issue: 365, Date: "11 ноември", Topics: day, Shape: "1111111111"},
-		"none":    {Issue: 42, Date: "23 декември", Topics: day, Shape: "0000000000"},
-		"near":    {Issue: 10, Date: "21 ноември", Topics: day, Shape: "2222222222"},
-		"wide":    {Issue: 10000, Date: "29 септември", Topics: day, Shape: "1201201201"},
+		"seven": {Issue: 9, Date: "20 ноември", Topics: day, Shape: "1102111013"},
+		"ten":   {Issue: 365, Date: "11 ноември", Topics: day, Shape: "1111111111"},
+		"none":  {Issue: 42, Date: "23 декември", Topics: day, Shape: "0000000000"},
+		"near":  {Issue: 10, Date: "21 ноември", Topics: day, Shape: "2222222222"},
+		"wide":  {Issue: 10000, Date: "29 септември", Topics: day, Shape: "1201201201"},
+		"national": {Issue: 194, Date: "24 май", National: "Денят на българската азбука и култура", Topics: day,
+			Shape: "1101110111"},
 		"unknown": {Issue: 3, Date: "14 ноември", Topics: day[:7], Shape: "101101"},
 	} {
 		pictures[name] = func() ([]byte, error) { return Draw(c) }
@@ -204,10 +208,14 @@ func TestFacesHaveTheLetters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	months := "януари февруари март април май юни юли август септември октомври ноември декември"
+	// The date says its month, and a national day's name after it (bank.NationalName).
+	dates := "0123456789 · януари февруари март април май юни юли август септември октомври ноември декември"
+	for _, d := range bank.NationalDays {
+		dates += d.Name
+	}
 	for name, text := range map[string]string{
 		"sofia-sans-900":                 Name + "Брой" + Line,
-		"sofia-sans-800":                 Address + "0123456789 " + months,
+		"sofia-sans-800":                 Address + dates,
 		"sofia-sans-extra-condensed-900": "0123456789",
 	} {
 		f, err := opentype.NewFace(all[name], &opentype.FaceOptions{Size: 20, DPI: 72, Hinting: font.HintingNone})
