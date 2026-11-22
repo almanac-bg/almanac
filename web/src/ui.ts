@@ -331,11 +331,11 @@ export function standing(s: Standing, named = true): HTMLElement {
 /** A chapter's rank as Профил and a player's page have it (play.ChapterRank). */
 export type ChapterRank = Standing;
 
-/** A player's head, one look on Профил and on a player's page: the avatar with the seal worn on its corner (`face`:
- * on Профил a button with „Смени“ under it), the name, the @username, the streak as it is now under them (`streak`:
- * its days, „Играе от 11 дни без прекъсване“ on another's page, „Играеш от …“ on one's own, `own`; nothing while
- * there's none, never an ended one's, DECISIONS.md). `why`, Профил's only: what the week forgives, said when the
- * pointer rests on the streak (a phone has it where a day missed is forgiven). */
+/** A player's head, one look on Профил and on a player's page: the avatar (`face`: on Профил a button with „Смени“
+ * under it), the name, the @username, the streak as it is now under them (`streak`: its days, „Играе от 11 дни без
+ * прекъсване“ on another's page, „Играеш от …“ on one's own, `own`; nothing while there's none, never an ended one's,
+ * DECISIONS.md). `why`, Профил's only: what the week forgives, said when the pointer rests on the streak (a phone has
+ * it where a day missed is forgiven). */
 export function profileHead(
   face: Child,
   name: Child,
@@ -372,11 +372,10 @@ function streakLine(days: number | undefined, why: string | undefined, own: bool
   );
 }
 
-/** „Печати“, one section on Профил and on a player's page: the seals' list (sealList), the one worn on the avatar
- * (`worn`: its chapter) first, or `none` before a first seal; beside the heading the book's whole ink, the rows'
- * summed („47 факта с мастило“; nothing at none). */
-export function sealsSection(ranks: ChapterRank[], none: Child, worn?: string): HTMLElement {
-  const had = sealsHad(ranks, worn);
+/** „Печати“, one section on Профил and on a player's page: the seals' list (sealList), or `none` before a first seal;
+ * beside the heading the book's whole ink, the rows' summed („47 факта с мастило“; nothing at none). */
+export function sealsSection(ranks: ChapterRank[], none: Child): HTMLElement {
+  const had = sealsHad(ranks);
   const ink = had.reduce((n, r) => n + r.ink, 0);
   return h(
     "section",
@@ -393,22 +392,18 @@ export function sealsSection(ranks: ChapterRank[], none: Child, worn?: string): 
   );
 }
 
-/** The chapters with a rank, the most ink first (then in the bank's order), so that the first is the seal worn on
- * the avatar's corner (play.sealOf: the highest rank, then the most ink) and the list explains the badge; `worn`, where
- * it's known, first whatever its ink (a tie the server broke by the day it came). */
-function sealsHad(ranks: ChapterRank[], worn?: string): ChapterRank[] {
+/** The chapters with a rank, the most ink first (then in the bank's order: a stable sort keeps it). */
+function sealsHad(ranks: ChapterRank[]): ChapterRank[] {
   return categories
     .map((c) => ranks.find((r) => r.chapter === c.id))
     .filter((r): r is ChapterRank => !!r && r.level > 0)
-    .map((r, i) => ({ r, i, first: r.chapter === worn ? 0 : 1 }))
-    .sort((a, b) => a.first - b.first || b.r.ink - a.r.ink || a.i - b.i)
-    .map(({ r }) => r);
+    .sort((a, b) => b.ink - a.ink);
 }
 
 /** A player's seals, one list, a row a chapter with a rank, the most ink first (sealsHad): the seal (its glyph in
  * it); the chapter's name with its ink at the row's end; under them where it stands (standing: its bar, „Страница“
- * under its left end and „още 8 до „Тетрадка““ under its right). A view, never a choice: the one worn is the best
- * (play.sealOf), the first row. Nothing before a first seal: the page says what brings one. */
+ * under its left end and „още 8 до „Тетрадка““ under its right). A view, never a choice. Nothing before a first seal:
+ * the page says what brings one. */
 function sealList(had: ChapterRank[]): Child {
   if (!had.length) return null;
   return h(
@@ -465,22 +460,6 @@ export function ladder(chapter: string, rank: number, size = 24): HTMLElement {
       );
     }),
   );
-}
-
-/** A player's worn seal, as it shows on their avatar's corner: none for a player without one. */
-export interface Worn {
-  chapter: string;
-  level: number;
-}
-
-/** The seal a player wears, on their avatar's corner (avatar), sized by the avatar's own size (app.css,
- * `.avatar > .seal`; `size` only says whether Летопис's number fits on it); nothing without one. Only the seal: its
- * rank's word is the Алманах's, never with a name, nor read out there („Печат: История“). */
-function worn(w: Worn | null | undefined, size: number): Child {
-  if (!w?.chapter || w.level < 1) return null;
-  const s = seal(w.chapter, w.level, size);
-  s.setAttribute("aria-label", `Печат: ${chapterName(w.chapter)}`);
-  return s;
 }
 
 /** A topic's small picture, as on a chip (decoration), in the topic's own tone wherever it's put; a plain dot for all
@@ -633,8 +612,6 @@ export const record = (won: number, lost: number, drawn: number) =>
 /** How a player shows to others: their avatar (a shape). */
 export interface Look {
   avatar?: string;
-  /** The seal they wear on their avatar's corner (play.Seal), if any. */
-  seal?: Worn | null;
 }
 
 /** Every avatar's name: the animals, each anyone's to choose from the first day (play.Animals), in the order the
@@ -667,18 +644,15 @@ function fromName(name: string): string {
 }
 
 /** An avatar: the drawn animal in its own colours, on a rounded tile of its scene (DECISIONS.md: an avatar is a face,
- * so an animal, in its own colours), with the seal the player wears (`seal`) on the tile's lower right corner: the one
- * place a seal goes with a player, wherever they show (the bar, a row, a card, a profile). `id` is the shape, as the
- * server sends a look; what isn't an animal is the one their name gives. The picture is for the eye (the name is said
- * in words nearby); the seal is read out („Печат: История“). */
-export function avatar(id: string | undefined, opts: { size?: "s" | "l"; name?: string; seal?: Worn | null } = {}) {
+ * so an animal, in its own colours, and nothing on it: never a seal). `id` is the shape, as the server sends a look;
+ * what isn't an animal is the one their name gives. The picture is for the eye (the name is said in words nearby). */
+export function avatar(id: string | undefined, opts: { size?: "s" | "l"; name?: string } = {}) {
   const shape = id && Object.hasOwn(shapeNames, id) ? id : fromName(opts.name ?? "");
   return h(
     "span",
-    // The shape's class gives it its colours and its scene's (app.css, .tone-natural); the size, its seal's too.
+    // The shape's class gives it its colours and its scene's (app.css, .tone-natural).
     { class: ["avatar", opts.size, "tone-natural", `sh-${shape}`].filter(Boolean).join(" ") },
     h("span", { class: "avatar-tile", "aria-hidden": "true" }, picture(shape, "avatar-pic")),
-    worn(opts.seal, opts.size === "l" ? 48 : 24),
   );
 }
 
@@ -789,7 +763,7 @@ export function pictureCredit(c: Credit): Child {
 /** A player's name as a line holds it (DESIGN.md, Names): it breaks between its words first, each word held whole,
  * going to the next line whole where it fits there; only a word wider than its line breaks, at its syllables, with a
  * hyphen (a surname too), in either alphabet („Maximi-lian“). A word that follows the name (`after`: „ти“, an
- * @username) stays with its last syllable, never alone on a line (`.name-end`); the seal is on the avatar, never here.
+ * @username) stays with its last syllable, never alone on a line (`.name-end`).
  * CSS keeps `overflow-wrap: break-word` for a word no syllable can save (figures). */
 export function nameWords(name: string, after: Child = null): Child {
   const words = name.trim().split(/\s+/);
@@ -811,13 +785,12 @@ export function emailWords(email: string): Child[] {
   return email.split(/(?<=@)|(?=\.)/).flatMap((part, i) => (i ? [h("wbr"), part] : [part]));
 }
 
-/** A player on a board or a list: their avatar with their seal on its corner, and their name; with their tag, a link
- * to their profile. */
+/** A player on a board or a list: their avatar and their name; with their tag, a link to their profile. */
 export function who(name: Child, look: Look = {}, extra: Child = null, plainName = "", tag = ""): Child {
   return h(
     tag ? "a" : "span",
     tag ? { class: "who", href: profileHref(tag) } : { class: "who" },
-    avatar(look.avatar, { size: "s", name: plainName, seal: look.seal }),
+    avatar(look.avatar, { size: "s", name: plainName }),
     h(
       "span",
       { class: "who-text" },
@@ -834,11 +807,11 @@ export function who(name: Child, look: Look = {}, extra: Child = null, plainName
 }
 
 /** A player's row, a friend's or a board's (Приятели's lists, Днес's friends): what comes before the avatar (a board's
- * place), the avatar with its seal, the name across the row (a way to their profile; on a second line rather than
+ * place), the avatar, the name across the row (a way to their profile; on a second line rather than
  * cut), their day on a line under it, and what comes after (a friend's duel). */
 export function playerRow(
   cls: string,
-  look: { name: string; avatar?: string; seal?: Score["seal"] },
+  look: { name: string; avatar?: string },
   tag: string | undefined,
   name: Child,
   day: Child,
@@ -849,7 +822,7 @@ export function playerRow(
     "li",
     { class: cls },
     before,
-    avatar(look.avatar, { name: look.name, seal: look.seal }),
+    avatar(look.avatar, { name: look.name }),
     h(
       "div",
       { class: "friend-text" },

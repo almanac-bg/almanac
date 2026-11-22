@@ -294,23 +294,13 @@ func (s *Server) probeWrites(ctx context.Context) (writes, low bool) {
 	return p.writes, p.low
 }
 
-// me is who the player is (nil: no one yet), and the seal they wear (play.Look), for the frame's avatar.
+// me is who the player is (nil: no one yet).
 func (s *Server) me(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.user(r)
 	if err != nil {
 		return err
 	}
-	out := map[string]any{"user": u}
-	if u != nil {
-		look, err := s.game.LookOf(r.Context(), u.ID)
-		if err != nil {
-			return err
-		}
-		if look.Seal != nil {
-			out["seal"] = look.Seal
-		}
-	}
-	return ok(w, out)
+	return ok(w, map[string]any{"user": u})
 }
 
 // How many guests a network may start in an hour, and a site (an IPv6 /48; address.go).

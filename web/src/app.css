@@ -571,7 +571,7 @@
     margin-left: auto;
   }
 
-  /* The player's avatar, with the seal they wear on its corner (ui.ts, avatar). */
+  /* The player's avatar (ui.ts, avatar). */
   .bar-me {
     display: grid;
     place-items: center;
@@ -3611,9 +3611,8 @@
     gap: var(--space-2);
   }
 
-  /* A card on a sheet, the sheet's white around it: on the page's ground, as on the page, its seals ringed so. */
+  /* A card on a sheet, the sheet's white around it: on the page's ground, as on the page. */
   .duels-all .duel-card {
-    --ring: var(--bg);
     background: var(--bg);
   }
 
@@ -4401,7 +4400,7 @@
   }
 
   /* ---- Avatars: the drawn animal in its own colours, on a rounded tile of its scene (a card's corner, 28% of its
-     size: glyphs have it too), the seal worn on its lower right corner ---- */
+     size: glyphs have it too), nothing on it ---- */
 
   .avatar {
     --size: 40px;
@@ -4427,30 +4426,6 @@
     inset: 6%;
     width: 88%;
     height: 88%;
-  }
-
-  /* The seal worn, on the tile's lower right corner, 45% of the avatar (no less than 14px: it reads on a 28px one), on
-     a ring of what's around it (the page; a card's surface where it's on one: --ring), so it stands off the picture.
-     One rule wherever a player shows: the bar, the boards, friends, duels, requests, Профил. */
-  .avatar > .seal {
-    --seal: max(14px, calc(var(--size) * 0.45));
-    position: absolute;
-    right: calc(var(--seal) * -0.2);
-    bottom: calc(var(--seal) * -0.2);
-    width: var(--seal);
-    height: var(--seal);
-    border-radius: 50%;
-    background: var(--ring, var(--bg));
-    box-shadow: 0 0 0 max(1.5px, calc(var(--seal) * 0.07)) var(--ring, var(--bg));
-  }
-
-  /* What's around a seal on a card: the card's surface; on the player's own row, its well. */
-  :is(.card, .rows, .invitation, .duel-card) {
-    --ring: var(--surface);
-  }
-
-  .rank-row.me {
-    --ring: var(--surface-2);
   }
 
   .bar-me .avatar {
@@ -4639,7 +4614,7 @@
     --size: 72px;
   }
 
-  /* ---- Профил: the avatar with the seal worn, the name, the tag and the streak now; the seals; Настройки (the avatars on a
+  /* ---- Профил: the avatar, the name, the tag and the streak now; the seals; Настройки (the avatars on a
      sheet: screens/avatar.ts). A player's page is laid out the same (.screen.me): the head, how you stand with them,
      the seals ---- */
 
@@ -4657,7 +4632,7 @@
     gap: 18px;
   }
 
-  /* The avatar, the seal worn on its corner (.avatar > .seal); on one's own Профил a button, „Смени“ under it as a
+  /* The avatar; on one's own Профил a button, „Смени“ under it as a
      link, the whole of it a tap that opens the animals. */
   .me-avatar {
     display: flex;
@@ -4677,7 +4652,7 @@
     cursor: pointer;
   }
 
-  /* The pencil on the avatar's top corner (the seal has the bottom one): on a phone always, on a big screen as the
+  /* The pencil on the avatar's top corner: on a phone always, on a big screen as the
      pointer comes over the avatar or the keyboard reaches it. */
   .me-avatar-edit {
     position: absolute;
@@ -4874,7 +4849,7 @@
     min-width: 0;
   }
 
-  .seal-worn {
+  .seals-none {
     margin-bottom: 10px;
     color: var(--ink-2);
     font: var(--t-note);
@@ -6652,8 +6627,7 @@
 
   /* ---- Rows of players: a board, the friends; Приятели, and Днес's friends ---- */
 
-  /* A player's row, a friend's or a board's (ui.ts, playerRow), one build: the avatar with its seal on its
-     corner; the name across the row (on two lines rather than cut); their day on a line under it; and what comes
+  /* A player's row, a friend's or a board's (ui.ts, playerRow), one build: the avatar; the name across the row (on two lines rather than cut); their day on a line under it; and what comes
      before the avatar (a board's place) or at the row's end (a friend's duel). */
   .friend,
   .rank-row {

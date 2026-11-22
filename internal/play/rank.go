@@ -23,10 +23,8 @@ import (
 // one rank's ink to the next's (ChapterRank: From, NextAt) as a bar. There's no check of guessing: a tapper climbs as slowly as their ink does.
 //
 // A rank risen is told once, with the game's news (NewsOf: Rose), several at once as one; Бележка, the first, never.
-// A seal's reward is the seal itself: it unlocks nothing (an avatar is an animal: progress.go, SetAvatar). The player
-// wears their best seal on their avatar's corner, never chosen (sealOf: the highest rank, the more ink on a tie, then
-// the chapter whose rank came first). It goes with their look (progress.go: Look) wherever others see their name
-// (boards, friends, requests, duels, the profile), read from the ranks kept like all of this.
+// A seal's reward is the seal itself: it unlocks nothing (an avatar is an animal: progress.go, SetAvatar), and it is
+// never on the avatar (the owner, 2026-11-22): a player's seals are shown on their profile and in their Алманах.
 
 // Rank is a step of the ladder: its name, and the ink it starts at.
 type Rank struct {
@@ -97,13 +95,11 @@ type ChapterRank struct {
 	Ink     int    `json:"ink"`
 	Next    string `json:"next"`
 	NextAt  int    `json:"nextAt"`
-	// Day is the day it rose to its level (YYYY-MM-DD): of two best seals alike, the one that came first is worn.
-	Day string `json:"-"`
 }
 
 func chapterRank(chapter string, k keptRank) ChapterRank {
 	return ChapterRank{Chapter: chapter, Level: k.level, Name: RankName(k.level), From: RankFrom(k.level),
-		Quarter: k.quarter, Ink: k.ink, Next: RankName(k.level + 1), NextAt: RankFrom(k.level + 1), Day: k.day}
+		Quarter: k.quarter, Ink: k.ink, Next: RankName(k.level + 1), NextAt: RankFrom(k.level + 1)}
 }
 
 // rightChance is the chance a guess at a question of each kind is right: one of four options; one of two; an order of
@@ -116,12 +112,11 @@ var rightChance = map[string]float64{"choice": 0.25, "clues": 0.25, "truefalse":
 // keptRank is a chapter's rank as the ranks table keeps it.
 type keptRank struct {
 	level, quarter, ink, told int
-	day                       string
 }
 
 // ranksOf reads a player's kept ranks, by chapter.
 func ranksOf(ctx context.Context, db querier, userID int64) (map[string]keptRank, error) {
-	rows, err := db.QueryContext(ctx, `SELECT chapter, level, quarter, ink, told, day FROM ranks WHERE user_id = ?`,
+	rows, err := db.QueryContext(ctx, `SELECT chapter, level, quarter, ink, told FROM ranks WHERE user_id = ?`,
 		userID)
 	if err != nil {
 		return nil, err
@@ -131,7 +126,7 @@ func ranksOf(ctx context.Context, db querier, userID int64) (map[string]keptRank
 	for rows.Next() {
 		var c string
 		var k keptRank
-		if err := rows.Scan(&c, &k.level, &k.quarter, &k.ink, &k.told, &k.day); err != nil {
+		if err := rows.Scan(&c, &k.level, &k.quarter, &k.ink, &k.told); err != nil {
 			return nil, err
 		}
 		out[c] = k
@@ -143,8 +138,8 @@ func ranksOf(ctx context.Context, db querier, userID int64) (map[string]keptRank
 // of the bank's at the rank its ink makes (the ink of games that can't be played on now: an issue still being played,
 // yesterday's finished after midnight or one brought by a merge, counts when it finishes, or once its day is over if
 // it's left: writtenIn), never lower than it was. A rank risen waits to be told (told below level).
-func (g *Game) countRanks(ctx context.Context, userID int64, day string) error {
-	return countRanksIn(ctx, g.DB.Read, g.DB.Write, g.Bank(), userID, day, g.Now())
+func (g *Game) countRanks(ctx context.Context, userID int64) error {
+	return countRanksIn(ctx, g.DB.Read, g.DB.Write, g.Bank(), userID, g.Now())
 }
 
 // execer is what writes: the database, or a transaction.
@@ -154,7 +149,7 @@ type execer interface {
 
 // countRanksIn is countRanks, read by r and written by w (a transaction, both, where the book was just written again
 // in it: rewriteBook), by bank b, at the time now (what counts: writtenIn).
-func countRanksIn(ctx context.Context, r querier, w execer, b *bank.Bank, userID int64, day string, now time.Time) error {
+func countRanksIn(ctx context.Context, r querier, w execer, b *bank.Bank, userID int64, now time.Time) error {
 	ink, err := inkIn(ctx, r, b, userID, now)
 	if err != nil {
 		return err
@@ -176,11 +171,10 @@ func countRanksIn(ctx context.Context, r querier, w execer, b *bank.Bank, userID
 		if ok && level == was.level && quarter == was.quarter && n == was.ink {
 			continue
 		}
-		if _, err := w.ExecContext(ctx, `INSERT INTO ranks (user_id, chapter, level, quarter, ink, day, told)
-			VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) ON CONFLICT (user_id, chapter) DO UPDATE SET
-				level = max(ranks.level, excluded.level), quarter = excluded.quarter, ink = excluded.ink,
-				day = CASE WHEN excluded.level > ranks.level THEN excluded.day ELSE ranks.day END`,
-			userID, c.ID, level, quarter, n, day, told); err != nil {
+		if _, err := w.ExecContext(ctx, `INSERT INTO ranks (user_id, chapter, level, quarter, ink, told)
+			VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT (user_id, chapter) DO UPDATE SET
+				level = max(ranks.level, excluded.level), quarter = excluded.quarter, ink = excluded.ink`,
+			userID, c.ID, level, quarter, n, told); err != nil {
 			return err
 		}
 	}
@@ -198,42 +192,6 @@ func (g *Game) RanksOf(ctx context.Context, userID int64) ([]ChapterRank, error)
 		ranks = append(ranks, chapterRank(c.ID, kept[c.ID]))
 	}
 	return ranks, nil
-}
-
-// Worn is a seal as it shows on a player's avatar to others (Look): its chapter and level, no more (its word is
-// the Алманах's, never beside a name; the way to the next shows on the player's own pages).
-type Worn struct {
-	Chapter string `json:"chapter"`
-	Level   int    `json:"level"`
-}
-
-// Seal is the seal a player wears: a chapter's rank (ChapterRank), drawn.
-type Seal = ChapterRank
-
-// SealOf is the seal a player wears: their best (sealOf); nil with no rank at all.
-func (g *Game) SealOf(ctx context.Context, userID int64) (*Seal, error) {
-	ranks, err := g.RanksOf(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	return sealOf(ranks), nil
-}
-
-// sealOf is the seal a player's ranks make theirs, never chosen (DECISIONS.md: the badge is the best seal): the
-// highest rank, then the more ink in its chapter, then the chapter whose rank came first (its day), then the bank's
-// order (ranks are in it); nil before any rank.
-func sealOf(ranks []ChapterRank) *Seal {
-	var best *Seal
-	for i, r := range ranks {
-		if r.Level == 0 {
-			continue
-		}
-		if best == nil || r.Level > best.Level || r.Level == best.Level && (r.Ink > best.Ink ||
-			r.Ink == best.Ink && r.Day != "" && (best.Day == "" || r.Day < best.Day)) {
-			best = &ranks[i]
-		}
-	}
-	return best
 }
 
 // Rose is the ranks risen since the player was last told, told once as one (News.Rose): each chapter's from and to,

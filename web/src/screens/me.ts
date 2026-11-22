@@ -1,10 +1,9 @@
-// Профил: who you are in the game, in its budget's order (DESIGN.md, Places): your avatar with the seal you wear on its
-// corner (a tap on it, its pencil on it, opens the animals on a sheet: screens/avatar.ts), your name and tag with the
-// streak as it is now by it, and the day you started playing under them, as another's page has it; your seals, one
-// list, a row a chapter with its rank, its progress to the next and its ink, the most ink first (the one worn is the
-// best: never chosen; the first row), the book's whole ink beside „Печати“; and Настройки, last. One column, on a big
-// screen too. A guest is asked to keep their game, and the way in for a profile from elsewhere is apart from it (the
-// sign-in page: screens/signin.ts, signInPage). Nobody on this device yet: that page instead. No lifetime totals but
+// Профил: who you are in the game, in its budget's order (DESIGN.md, Places): your avatar (a tap on it, its pencil on
+// it, opens the animals on a sheet: screens/avatar.ts), your name and tag, and the streak as it is now under them, as
+// another's page has it; your seals, one list, a row a chapter with its rank, its progress to the next and its ink, the
+// most ink first, the book's whole ink beside „Печати“; and Настройки, last. One column, on a big screen too. A guest
+// is asked to keep their game, and the way in for a profile from elsewhere is apart from it (the sign-in page:
+// screens/signin.ts, signInPage). Nobody on this device yet: that page instead. No lifetime totals but
 // the book's ink (DECISIONS.md: ink, summed, earned only by the day's issue). No way to the page
 // as others see it (/players/<tag>, which opens this page for one's own tag): it is this one without what's one's own
 // (the avatar's pencil, Настройки, the week's forgiving on the streak).
@@ -122,9 +121,9 @@ export function me(kit: Kit) {
   );
 }
 
-/** Who you are: your avatar as you wear it, the seal you wear on its corner, and a pencil on it (a tap on the avatar
- * opens the animals: `pick`); your name and tag, the streak as it is now under them (said to you: „Играеш от …“).
- * The same head as another's page (ui.ts, profileHead), but for what the week forgives: yours, on the streak for a pointer resting on it. */
+/** Who you are: your avatar, and a pencil on it (a tap on the avatar opens the animals: `pick`); your name and tag,
+ * the streak as it is now under them (said to you: „Играеш от …“). The same head as another's page (ui.ts,
+ * profileHead), but for what the week forgives: yours, on the streak for a pointer resting on it. */
 function head(data: () => Stats | null, pick: () => void): Child {
   return profileHead(
     // The avatar is the button: a pencil on its corner says so (on a big screen as the pointer comes over it, with the
@@ -132,7 +131,7 @@ function head(data: () => Stats | null, pick: () => void): Child {
     h(
       "button",
       { class: "me-avatar", type: "button", "aria-label": "Смени аватара", title: "Смени аватара", onclick: pick },
-      () => avatar(look(), { size: "l", name: user.peek()?.name, seal: data()?.seal }),
+      () => avatar(look(), { size: "l", name: user.peek()?.name }),
       h("span", { class: "me-avatar-edit", "aria-hidden": "true" }, h("span", { class: "i i-pencil" })),
     ),
     () => nameWords(user()?.name ?? "Профил"),
@@ -152,20 +151,18 @@ function forgives(s: Stats | null): string | undefined {
 }
 
 /** The seals, as another's page has them (ui.ts, sealsSection): a row a chapter with a rank, its ink as the book has it
- * now (the number its Алманах card shows: Stats.ink); a view, no choice (the one worn on the avatar is the best:
- * play.sealOf). Before any: what brings the first. */
+ * now (the number its Алманах card shows: Stats.ink); a view, no choice. Before any: what brings the first. */
 function seals(ranks: ChapterRank[] | null, s: Stats | null): Child {
   if (!ranks) return null;
   return sealsSection(
     ranks.map((r) => ({ ...r, ink: s?.ink?.[r.chapter] ?? r.ink })),
     [
-      h("p", { class: "seal-worn" }, "Още нямаш печат."),
+      h("p", { class: "seals-none" }, "Още нямаш печат."),
       h(
         "p",
         { class: "small" },
         "Печат за тема получаваш с първия ѝ факт с мастило — при верен отговор в броя на деня.",
       ),
     ],
-    s?.seal?.chapter,
   );
 }

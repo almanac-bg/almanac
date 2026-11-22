@@ -94,7 +94,7 @@ func (w *world) dayHistory(user int64, all []answered) {
 // countRanks counts a player's ranks as a day's issue finishing would.
 func (w *world) countRanks(user int64) {
 	w.t.Helper()
-	if err := w.g.countRanks(w.t.Context(), user, w.g.Today()); err != nil {
+	if err := w.g.countRanks(w.t.Context(), user); err != nil {
 		w.t.Fatal(err)
 	}
 }
@@ -252,29 +252,11 @@ func TestRanksToldOnce(t *testing.T) {
 	}
 }
 
-// The seal worn is the best, never chosen (the more ink on a tie). An avatar is an animal, everyone's; a chapter's art
-// is never one, whatever its rank: a seal is worn on the avatar, never as it.
-func TestSealAndAvatar(t *testing.T) {
+// An avatar is an animal, everyone's; a chapter's art is never one, whatever its rank.
+func TestNoChapterAvatar(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
-	if s, err := w.g.SealOf(ctx, ana); s != nil || err != nil {
-		t.Fatalf("a seal of nothing: %+v %v", s, err)
-	}
-	var all []answered
-	for topic, n := range map[string]int{"geography": 6, "history": 7, "music": 1} {
-		k := 0
-		for _, q := range w.b.Live(topic, "") {
-			if q.Extra().Fact != "" && k < n {
-				all, k = append(all, answered{q.Base().ID, true}), k+1
-			}
-		}
-	}
-	w.dayHistory(ana, all)
-	w.countRanks(ana)
-	if s, _ := w.g.SealOf(ctx, ana); s == nil || s.Chapter != "history" || s.Name != "Страница" {
-		t.Fatalf("the best seal, on a tie the more ink: %+v", s)
-	}
 	for _, art := range []string{"history", "geography", "music"} {
 		if err := w.g.SetAvatar(ctx, ana, art); !errors.Is(err, ErrNoAvatar) {
 			t.Fatalf("a chapter's art as an avatar (%s): %v", art, err)
@@ -282,50 +264,6 @@ func TestSealAndAvatar(t *testing.T) {
 	}
 	if err := w.g.SetAvatar(ctx, ana, "lynx"); err != nil {
 		t.Fatalf("an animal: %v", err)
-	}
-}
-
-// The badge is the player's best seal, never chosen (DECISIONS.md): the highest rank; on a tie the more ink in its
-// chapter; then the chapter whose rank came first; then the bank's order. The look beside a name, read from the
-// ranks kept in one query, says the same.
-func TestBestSeal(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	for _, c := range []struct {
-		name  string
-		ranks []ChapterRank
-		want  string
-	}{
-		{"the highest rank, whatever its ink", []ChapterRank{
-			{Chapter: "geography", Level: 2, Ink: 14}, {Chapter: "history", Level: 3, Ink: 15}}, "history"},
-		{"a tie on rank: the more ink", []ChapterRank{
-			{Chapter: "geography", Level: 3, Ink: 20}, {Chapter: "history", Level: 3, Ink: 16}}, "geography"},
-		{"a tie on rank and ink: the rank that came first", []ChapterRank{
-			{Chapter: "geography", Level: 3, Ink: 16, Day: "2026-11-03"},
-			{Chapter: "history", Level: 3, Ink: 16, Day: "2026-11-12"}}, "geography"},
-		{"a tie on all of it: the bank's order", []ChapterRank{
-			{Chapter: "history", Level: 3, Ink: 16, Day: "2026-11-03"},
-			{Chapter: "geography", Level: 3, Ink: 16, Day: "2026-11-03"}}, ""},
-	} {
-		u := w.user()
-		w.kept(u, c.ranks...)
-		want := c.want
-		if want == "" {
-			// The bank's order between the two.
-			for _, cat := range w.b.Categories {
-				if cat.ID == "history" || cat.ID == "geography" {
-					want = cat.ID
-					break
-				}
-			}
-		}
-		s, err := w.g.SealOf(ctx, u)
-		if err != nil || s == nil || s.Chapter != want {
-			t.Errorf("%s: %+v %v, want %s", c.name, s, err, want)
-		}
-		if l, err := w.g.LookOf(ctx, u); err != nil || l.Seal == nil || l.Seal.Chapter != want {
-			t.Errorf("%s, the look: %+v %v, want %s", c.name, l.Seal, err, want)
-		}
 	}
 }
 
@@ -464,8 +402,8 @@ func TestIssueLeftUnfinishedCountsOnceItsDayIsOver(t *testing.T) {
 	}
 	// Профил says each chapter's ink as its Алманах card does: the book's.
 	st, err := w.g.StatsOf(ctx, ana)
-	if err != nil || st.Seal == nil || !maps.Equal(st.Ink, ink) {
-		t.Fatalf("Профил's ink %v of %+v, the book's %v (%v)", st.Ink, st.Seal, ink, err)
+	if err != nil || !maps.Equal(st.Ink, ink) {
+		t.Fatalf("Профил's ink %v, the book's %v (%v)", st.Ink, ink, err)
 	}
 }
 

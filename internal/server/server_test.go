@@ -1005,15 +1005,15 @@ func TestLinkPreviews(t *testing.T) {
 	p, id := g.guest()
 	_, me := p.call("GET", "/api/me", nil)
 	u := me["user"].(map[string]any)
-	if _, err := g.db.Write.Exec(`INSERT INTO ranks (user_id, chapter, level, quarter, ink, day, told)
-		VALUES (?1, 'history', 3, 0, 15, '2026-11-20', 3)`, id); err != nil {
+	if _, err := g.db.Write.Exec(`INSERT INTO ranks (user_id, chapter, level, quarter, ink, told)
+		VALUES (?1, 'history', 3, 0, 15, 3)`, id); err != nil {
 		t.Fatal(err)
 	}
 	body := page("/players/" + u["tag"].(string))
 	if !strings.Contains(body, u["name"].(string)+" (@"+u["tag"].(string)+") в АЛМАНАХ") {
 		t.Fatal("a player's preview")
 	}
-	// Beside a name only the seal shows, never its rank's word; and nothing the page can't know of them.
+	// Never a rank's word beside a name; and nothing the page can't know of them.
 	for _, word := range append([]string{"вание", "Играе всеки ден"}, rankWords()...) {
 		if strings.Contains(body, word) {
 			t.Fatalf("a player's preview says %q", word)
@@ -1283,7 +1283,7 @@ func TestAvatarChosen(t *testing.T) {
 		out["avatar"] != "lynx" {
 		t.Fatalf("a lynx: %d %v", status, out)
 	}
-	// A chapter's art is never an avatar, whatever its rank: a seal is worn on the avatar (play/progress.go).
+	// A chapter's art is never an avatar, whatever its rank (play/progress.go).
 	for _, bad := range []string{"crown", "fox-gold", "fox/ring", "", "history"} {
 		if status, out := p.call("PATCH", "/api/me/look", map[string]any{"avatar": bad}); status != 400 ||
 			out["error"] != "no_avatar" {

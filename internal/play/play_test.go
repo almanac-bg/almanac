@@ -824,7 +824,7 @@ func TestStats(t *testing.T) {
 	ctx := t.Context()
 	u := w.user()
 	empty, err := w.g.StatsOf(ctx, u)
-	if err != nil || empty.Seal != nil {
+	if err != nil || len(empty.Ink) != 0 {
 		t.Fatalf("a newcomer's stats: %+v %v", empty, err)
 	}
 	day, _ := w.g.StartDay(ctx, u)
@@ -835,8 +835,7 @@ func TestStats(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Streak != 1 ||
-		s.Seal == nil || s.Seal.Level == 0 {
+	if s.Streak != 1 || len(s.Ink) == 0 {
 		t.Fatalf("stats %+v", s)
 	}
 	// No lifetime totals (DECISIONS.md, „The direction“): nothing that counts them is said.

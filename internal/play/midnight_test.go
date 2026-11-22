@@ -41,8 +41,8 @@ func (w *world) sundayLate(user int64) int64 {
 	return s.ID
 }
 
-// What follows a run is judged by the run, not by when it's done: the sweep's retry after midnight keeps the ranks it
-// raised on the run's day, not the next one, however late it comes.
+// What follows a run is judged by the run, not by when it's done: the sweep's retry after midnight still counts the
+// ranks from the Sunday issue's ink, however late it comes.
 func TestAfterRetryAcrossMidnight(t *testing.T) {
 	w := setup(t)
 	ctx := context.Background()
@@ -65,10 +65,8 @@ func TestAfterRetryAcrossMidnight(t *testing.T) {
 		time.Date(2026, 11, 16, 1, 0, 0, 0, Bulgaria).UnixMilli(), dayRun(t, w, bo)); err != nil {
 		t.Fatal(err)
 	}
-	week := func(user int64, day string) int {
-		return w.count(`SELECT count(*) FROM ranks WHERE user_id = ? AND day = ?`, user, day)
-	}
-	// Ana's is retried at 00:05, Bo's an hour after midnight: Sunday's week, both.
+	ranked := func(user int64) int { return w.count(`SELECT count(*) FROM ranks WHERE user_id = ?`, user) }
+	// Ana's is retried at 00:05, Bo's an hour after midnight.
 	w.at(16, 0, 5, 0)
 	if err := w.g.AfterDue(ctx); err != nil {
 		t.Fatal(err)
@@ -78,10 +76,12 @@ func TestAfterRetryAcrossMidnight(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, u := range []int64{ana, bo} {
-		if week(u, "2026-11-15") == 0 || week(u, "2026-11-16") != 0 {
-			t.Fatalf("player %d: ranks kept on Sunday %d, on Monday %d", u, week(u, "2026-11-15"),
-				week(u, "2026-11-16"))
+		if ranked(u) == 0 {
+			t.Fatalf("player %d: no ranks from Sunday's issue", u)
 		}
+	}
+	if n := w.count(`SELECT count(*) FROM runs_after`); n != 0 {
+		t.Fatalf("%d runs still to follow up", n)
 	}
 }
 

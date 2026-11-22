@@ -4,12 +4,11 @@ import (
 	"context"
 )
 
-// Stats is how a player stands, as Профил shows them their own: their avatar and seal (rank.go), the streak as it is
+// Stats is how a player stands, as Профил shows them their own: their avatar, each chapter's ink (rank.go: Профил's seals), the streak as it is
 // now (never the longest: an ended streak's number is never named). No lifetime totals, and no list of past games: a
 // game isn't gone over after its day (DECISIONS.md, „The direction“ and „Removed to keep the game simple“).
 type Stats struct {
 	Avatar string `json:"avatar"` // a shape (Look)
-	Seal   *Seal  `json:"seal,omitempty"`
 	// Ink is each chapter's ink as the book has it now, the number its Алманах card shows (InkOf: an issue still being
 	// played in it too, which the ranks count as it finishes): Профил's seals say it beside each rank.
 	Ink      map[string]int `json:"ink,omitempty"`
@@ -33,9 +32,6 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 	}
 	s.Streak, s.Spare, s.Forgiven = streak.Days, streak.Spare, g.InWeek(streak.Forgiven)
 	if s.Week, err = g.Week(ctx, userID); err != nil {
-		return s, err
-	}
-	if s.Seal, err = g.SealOf(ctx, userID); err != nil || s.Seal == nil {
 		return s, err
 	}
 	s.Ink, err = g.InkOf(ctx, userID)

@@ -5,8 +5,7 @@
 import { listWords } from "../lib/words.ts";
 
 /** A friend's game of the day, beside its questions (play.FriendDay): who, and each of the ten in the issue's order as
- * a share says it ('1' right, '2' близо, '0' wrong or not answered, '3' one that counts for nobody); their face
- * without the seal, which covered it that small. */
+ * a share says it ('1' right, '2' близо, '0' wrong or not answered, '3' one that counts for nobody); their face. */
 export interface FriendDay {
   name: string;
   avatar?: string;

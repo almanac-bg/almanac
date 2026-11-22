@@ -12,7 +12,6 @@ import { api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { formatNumber } from "../lib/words.ts";
 import { rankName, rankNames } from "../seal.ts";
-import { refreshSeal } from "../state.ts";
 import { chapterName, ladder, seal } from "../ui.ts";
 
 interface News {
@@ -60,8 +59,6 @@ export function news(
         (n) => {
           data.set(n);
           if (n.rose?.best && bestTo) bestTo(rankUp(n.rose));
-          // Ink written, or a rank risen: the seal worn may be another now (a first one, or the best risen).
-          if (n.ink || n.rose) refreshSeal();
         },
         () => {},
       ),

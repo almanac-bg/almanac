@@ -14,8 +14,7 @@ test("a topic's game never tells how well the topic is known, and the avatar is 
   await expect(page.locator(".summary")).toBeVisible();
   await expect(page.locator(".summary")).not.toContainText(/XP|[Нн]иво \d|[Пп]остижени|оценка|Познавач|Новак/);
 
-  // The avatar, on its sheet over Профил: every animal, none locked, and nothing else (a seal is worn on it, never as
-  // it).
+  // The avatar, on its sheet over Профил: every animal, none locked, and nothing else (never a seal).
   await page.goto("/me");
   await page.getByRole("button", { name: "Смени аватара" }).click();
   const sheet = page.getByRole("dialog", { name: "Аватар" });

@@ -131,11 +131,11 @@ func TestMergeBringsProgress(t *testing.T) {
 		_, _ = w.db.Write.Exec(`DELETE FROM users WHERE id = ?`, from) // as signing in does
 	}
 
-	// The guest's ranks: the higher of the two in each chapter, as a rank never falls; the seal worn their best.
+	// The guest's ranks: the higher of the two in each chapter, as a rank never falls.
 	for _, q := range []string{
-		`INSERT INTO ranks (user_id, chapter, level, quarter, ink, day, told) VALUES
-			(?1, 'geography', 3, 1, 18, '2026-11-10', 3), (?1, 'history', 1, 0, 2, '2026-11-09', 1)`,
-		`INSERT INTO ranks (user_id, chapter, level, quarter, ink, day, told) VALUES (?2, 'history', 2, 0, 6, '2026-11-11', 2)`,
+		`INSERT INTO ranks (user_id, chapter, level, quarter, ink, told) VALUES
+			(?1, 'geography', 3, 1, 18, 3), (?1, 'history', 1, 0, 2, 1)`,
+		`INSERT INTO ranks (user_id, chapter, level, quarter, ink, told) VALUES (?2, 'history', 2, 0, 6, 2)`,
 	} {
 		if _, err := w.db.Write.Exec(q, guest, owner); err != nil {
 			t.Fatal(err)
@@ -148,9 +148,6 @@ func TestMergeBringsProgress(t *testing.T) {
 		if r.Level != want {
 			t.Errorf("%s after: %+v, want level %d", r.Chapter, r, want)
 		}
-	}
-	if s, _ := w.g.SealOf(ctx, owner); s == nil || s.Chapter != "geography" {
-		t.Fatalf("the seal after: %+v", s)
 	}
 }
 

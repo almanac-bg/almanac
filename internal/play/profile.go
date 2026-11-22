@@ -6,7 +6,7 @@ import (
 	"errors"
 )
 
-// A profile is a player as anyone may see them, found by their tag: how they look, the seal they wear, their ranks by
+// A profile is a player as anyone may see them, found by their tag: how they look, their ranks by
 // chapter (rank.go: kept as each day's issue finishes, never as they play) (DECISIONS.md, „The direction“), and their
 // streak as it is now (runs.go: its days, nothing more): never an ended one's, nor the longest (an ended streak's
 // number is never named), nor what their week has forgiven (theirs). No lifetime totals, and nothing of how well they
@@ -21,9 +21,7 @@ type Profile struct {
 	// Me says it's the viewer's own.
 	Me bool `json:"me,omitempty"`
 	Look
-	// Seal is the seal they wear (none before a rank), whole (its name, the way to the next): over the look's, which says
-	// only its chapter and level. Ranks their ranks in the bank's chapters.
-	Seal  *Seal         `json:"seal,omitempty"`
+	// Ranks are their ranks in the bank's chapters.
 	Ranks []ChapterRank `json:"ranks"`
 	// Streak is their streak's days as it is now (StreakNow.Days): none while there's none.
 	Streak int `json:"streak,omitempty"`
@@ -64,7 +62,6 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 	if p.Ranks, err = g.RanksOf(ctx, id); err != nil {
 		return p, err
 	}
-	p.Seal = sealOf(p.Ranks)
 	if p.Streak, err = g.Streak(ctx, id); err != nil {
 		return p, err
 	}

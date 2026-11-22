@@ -43,24 +43,10 @@ test("friends on the day: who has played it, and how each went", async ({ browse
   await expect(friends.locator(".rank-row").filter({ hasText: ana }).locator(".rank-score")).toHaveText(
     /^\d+\sот\s10$/,
   );
-  // On each avatar's corner, the seal its player wears, as the server says it (none before a rank: her ink is her right
-  // answers'), in her chapter's colour; never after the name.
-  const seal = await b.evaluate(
-    async () =>
-      ((await (await fetch("/api/friends")).json()).friends[0].seal ?? null) as {
-        chapter: string;
-        level: number;
-      } | null,
-  );
+  // A face and a name, no seal on either (the owner, 2026-11-22).
   const row = friends.locator(".rank-row").filter({ hasText: ana });
-  const worn = row.locator(".avatar > .seal");
-  await expect(worn).toHaveCount(seal ? 1 : 0);
-  await expect(row.locator(".friend-name .seal")).toHaveCount(0);
-  if (seal) {
-    await expect(worn).toHaveClass(new RegExp(`t-${seal.chapter}`));
-    // Read out as a seal and its chapter: never the rank's word, which is the Алманах's.
-    await expect(worn).toHaveAttribute("aria-label", /^Печат: [^:]+$/);
-  }
+  await expect(row.locator(".avatar")).toHaveCount(1);
+  await expect(row.locator(".seal")).toHaveCount(0);
   // All България a tap away, on the same card, the two of them on it.
   await friends.getByRole("tab", { name: "Всички" }).click();
   await expect(friends.locator(".rank-row").filter({ hasText: ana })).toHaveCount(1);

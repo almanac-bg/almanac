@@ -50,7 +50,7 @@ var factsRule = `WITH met AS (
 	SELECT ?1, question_id, ink, at, run_id FROM ranked WHERE k = 1`
 
 // rewriteBook writes a player's book again from their answers (rewriteFacts) and counts their ranks again from it
-// (countRanksIn), on the day it's done: a rank never falls, and one risen by it is told with the next news, as any
+// (countRanksIn): a rank never falls, and one risen by it is told with the next news, as any
 // is. Whatever writes a book again does it so, so that a chapter's seal is never behind its ink („15 с мастило ·
 // Страница“), but for the ink of a day's issue still being played: it counts as that issue finishes, as any issue's
 // does, or once its day is over (ranks change only then: the privacy page says so).
@@ -58,7 +58,7 @@ func rewriteBook(ctx context.Context, tx *sql.Tx, b *bank.Bank, userID int64, no
 	if err := rewriteFacts(tx, userID); err != nil {
 		return err
 	}
-	return countRanksIn(ctx, tx, tx, b, userID, dayOf(now), now)
+	return countRanksIn(ctx, tx, tx, b, userID, now)
 }
 
 // rewriteFacts writes a player's book again from their answers, by the whole rule (factsRule); rewriteBook counts

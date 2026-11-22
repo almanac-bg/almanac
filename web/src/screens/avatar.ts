@@ -1,5 +1,5 @@
 // The avatar's choice: how a player shows to others. An avatar is a face, so an animal, every one anyone's from the
-// first day (play.Shapes); a seal is worn on it, never chosen as it (DECISIONS.md). A choice made rarely, so it's a
+// first day (play.Shapes); never a seal, on it or as it (DECISIONS.md). A choice made rarely, so it's a
 // sheet over Профил (pickAvatar), opened by the player's own avatar or „Смени“ under it, never a part of the page: the
 // animals, each with its name, the one worn ringed; a tap wears it, and once it's kept the sheet goes.
 

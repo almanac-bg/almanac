@@ -498,7 +498,7 @@ func (g *Game) friendsBoard(ctx context.Context, day string, userID int64, trail
 // how each of the ten went for them.
 type FriendDay struct {
 	Name string `json:"name"`
-	// Avatar is their face alone, without the seal: beside a question it's small, and the seal covered it.
+	// Avatar is their face (a shape).
 	Avatar string `json:"avatar"`
 	// Marks are the ten in the issue's order, as a share says them (Share.Shape): '1' right, '2' close (not right),
 	// '0' wrong or not answered, '3' a question that counts for nobody.

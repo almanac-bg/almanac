@@ -38,7 +38,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
 
 - **The frame** (`app.ts`): the bar holds the rosette and „АЛМАНАХ“ in spaced capitals (a way to Днес); on a big
   screen the three places as an icon and a word on pills (`.places`; Днес a calendar, Алманах a book, Приятели two
-  people; every name bold); the avatar with the seal the player wears on its corner
+  people; every name bold); the player's avatar
   (`.bar-me`), or „Вход“ (the sign-in page, `/signin`). On a phone the places float at the foot (`.places-foot`): a
   pill clear of every edge, its icon over its name, the current one on a well, a dot on Приятели while something has come there since the player last looked (a request, a
   duel sent, a duel's result), gone as it opens. One frame, the same everywhere: the mark is always at the left. It
@@ -116,7 +116,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      place („В България си на 20-о място от 53.“; with none right only „Днес играха 53 души.“, alone on the board
      nothing), then the best twenty and the player's own row under them if further down. A row: the place (shared by
      those as many right and as close on the number, never told apart by time: 1, 2, 2, 4; the player first among
-     their equals), then the row built as a friend's (`scoreRow()`): the avatar with its seal, the name with the row's
+     their equals), then the row built as a friend's (`scoreRow()`): the avatar, the name with the row's
      width and „ти“ after it, and on one line under the name the score (a heavy numeral as a friend's, never
      display-sized) and the small squares after it, under the score only where the line is too narrow (under 360 px;
      in large text, as a friend's day, the line runs under the place and the avatar too). The tab chosen stays while
@@ -172,7 +172,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   „Приеми“ and „Откажи“); „Чакащи дуели (3)“, the duels the player has to play, while there are any (a duel
   to play stays first on the page until it's played); one the player sent, the friend's to play, isn't listed
   (owner, 2026-11-22: it only muddled the list), but for the one just played, as it lands, once; „Приятели (5)“, „Премахни приятел“ at the right, a friend's yes to a request one line over the friends,
-  told once, then a row each friend: avatar with its seal, the name across the row, never cut, and under it the duels
+  told once, then a row each friend: avatar, the name across the row, never cut, and under it the duels
   between the two in words, quiet, the record heavier („Дуели помежду ви: 3 победи, 1 загуба“, with „равенства“ if
   any; „Още нямате дуели“ before the first): never the friend's day, which is the board's (owner, 2026-11-22);
   „Дуел“ at the row's end, a button (`.btn.inline`, 44px high), the one way to start a duel here (the other is the
@@ -191,7 +191,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   (DECISIONS.md).
   Every duel is a card (`.duel-card`, one a row on a big screen too, as on a phone; owner, 2026-11-22: the cards
   read better than compact rows): the two face to face, no label over them (every duel is with a friend), the
-  player's avatar with its seal and „Ти“ on the left, the other's with their name on the right; no name on a
+  player's avatar and „Ти“ on the left, the other's with their name on the right; no name on a
   duel's card, nor in its dialogs, is a link: a profile opens from the friends' list (owner, 2026-11-22); between them how
   it stands: „Твой ред“ or „Чакаш“ (quiet) over „още 6 дни“; a played one's score, a heavy numeral („8:6“), over its
   end as a chip, told apart at a glance by fill and line, never red or green („✓ Победа“ filled in ink, „Загуба“
@@ -220,7 +220,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   имейл“; requests sent wait under „Изпратени покани“. Only two friends of one name show their @username. The
   questions' dialog (above) says under its head whose duel it is and its score, each question with how it went for
   the two.
-- **Профил:** one column, on a big screen too: the avatar with the seal worn on its corner and a pencil on its top corner (a phone: always; a big screen: as the pointer
+- **Профил:** one column, on a big screen too: the avatar with a pencil on its top corner (a phone: always; a big screen: as the pointer
   comes over it, with the tooltip „Смени аватара“), the
   name, the @username and under it the streak as it is now, a quiet line, its number heavy, no flame („Играеш от 58
   дни без прекъсване“, „Играе от …“ on another's page; never an ended one's, nothing while none runs; no card of its
@@ -230,14 +230,14 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   under it („Играта ти е само на това устройство. Запази я с имейл · Имаш профил? Влез“: the first opens its form in
   the line's place, the second is the sign-in page); „Печати“, and beside it at the right the book's whole ink, the
   rows' summed („47 факта с мастило“, „1 факт с мастило“; nothing at none: ink only, so no second score), one list on
-  a card (`sealList()`), a row a chapter with a rank (only those earned), the most ink first, then the bank's order,
-  the seal worn on the avatar's corner first (so the list explains the badge): its seal; its name with its
+  a card (`sealList()`), a row a chapter with a rank (only those earned), the most ink first, then the bank's order:
+  its seal; its name with its
   ink at the line's end („27 с мастило“, the book's count; under the name where they don't fit); under them where it
-  stands (`standing()`); a view of the ranks: nothing to tap, none ringed, no single chapter's ladder (the one worn is
-  the best, never chosen: on the avatar's corner); Настройки last. No way to the page as others see it: it is this one
+  stands (`standing()`); a view of the ranks: nothing to tap, none ringed, no single chapter's ladder; Настройки
+  last. No way to the page as others see it: it is this one
   without what's one's own. No list of past games (a
   game isn't gone over after its day). No duplicate avatar in the bar's corner on this page. The avatars, the fifteen
-  animals and nothing else (an avatar is a face: a seal is worn on it, never chosen as it), are a choice made rarely,
+  animals and nothing else (an avatar is a face: never a seal, on it or as it), are a choice made rarely,
   so never on the page: a sheet (`screens/avatar.ts`) opened by the avatar (one button, its pencil on it), the one
   worn ringed; a tap wears one and, once it's kept, puts the sheet away. Another player's page (`/players/<tag>`) is
   laid out the same, one column (`profileHead`, `sealsSection`): the same head without a way to change it, their streak under the @username as Профил has it, said of them („Играе
@@ -394,12 +394,10 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   under the left, never cut. On the page the bar is the chapter's deep colour over a track of it; on a chapter's
   sheet the sheet's ink (`standing.test.ts` holds both 3:1, day and night). The seal itself never shows it. By day a fine
   outline in the deep colour; on a sheet (its own colour, often) a 2px ink rim (`.rimmed`), and a filled seal there a
-  lighter disc of its colour, so Бележка, a thin open ring, shows the sheet through it and Страница doesn't. With a
-  player only the seal shows, never its rank's word, and only in one place: on their avatar's lower right corner
-  (`avatar(id, { seal })`), 45% of the avatar (14px at the least), on a ring of what's around it (the page, or a card's
-  surface: `--ring`), wherever the player shows (the bar, the boards, friends, requests, duels, Профил),
-  never after the name. The word is the Алманах's and a rank-up's. The seal worn is the player's best, never chosen
-  (play.sealOf). A seal's reward is the seal itself: it unlocks nothing.
+  lighter disc of its colour, so Бележка, a thin open ring, shows the sheet through it and Страница doesn't. A
+  player's seals are on their profile („Печати“) and in their Алманах, never beside their name nor on their avatar
+  (the owner, 2026-11-22: a face, nothing over it). The word is the Алманах's, Профил's and a rank-up's. A seal's
+  reward is the seal itself: it unlocks nothing.
 - **The ladder** (`ladder()`, `.ladder`): a chapter's six ranks in a row, each its seal and name; the one reached ringed
   in ink, its name heavy; those to come faded (with large text, two rows of three). On a rank-up. Six equal
   columns, the reached seal's ring inside its own; sized by the ladder's own width (a container query), so that under
@@ -424,9 +422,9 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   at rest (its row or place says whose it is), and under a pointer underlined whole.
 - **What a tap brings up** under it (an ask, an answer: „Нова връзка“, „Добави“, „Изтрий профила“) is scrolled into
   sight whole, clear of a phone's places at the foot (`inSight()`).
-- **Rows of players:** `who()` (the avatar with its seal, and the name), `playerRow()` (a friend's
+- **Rows of players:** `who()` (the avatar and the name), `playerRow()` (a friend's
   `.friend` and a board's `.rank-row`, one build: Приятели and the day's board), `.duel-pick` (a friend to start a duel with: a button, its name never a link). A duel in a list is a card, not a row (`.duel-card`). **Avatars** (`avatar()`): the drawn animal
-  on a rounded tile of its scene, the seal worn on its corner. Only the fifteen animals: an avatar is a face.
+  on a rounded tile of its scene, nothing on it. Only the fifteen animals: an avatar is a face.
 - **What went wrong** is never a dead end: `failure()` says what happened, offers „Опитай пак“ where it can help, and
   always a way on.
 

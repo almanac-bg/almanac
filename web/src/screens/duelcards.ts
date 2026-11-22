@@ -49,7 +49,7 @@ const playedShown = 10;
 const shown = (d: DuelView): DuelView =>
   d.opponent?.gone ? { ...d, opponent: { ...d.opponent, look: { avatar: "gone" } } } : d;
 
-/** Small beside a row of marks: the avatar alone, without its seal. */
+/** Small beside a row of marks: the avatar's shape. */
 const bare = (s?: Side) => s?.look?.avatar?.split("/")[0];
 
 /** A duel that has a result. */
@@ -82,12 +82,12 @@ function noteLine(d: DuelView): string {
   return tieWords(d);
 }
 
-/** One side of a duel's card: the avatar with its seal, the name under it (the player's own: „Ти“); never a link. */
+/** One side of a duel's card: the avatar, the name under it (the player's own: „Ти“); never a link. */
 const cardSide = (name: string, look: Look, plainName: string): Child =>
   h(
     "span",
     { class: "duel-card-side" },
-    avatar(look.avatar, { name: plainName, seal: look.seal }),
+    avatar(look.avatar, { name: plainName }),
     h("span", { class: "duel-card-name" }, nameWords(name)),
   );
 
@@ -247,16 +247,12 @@ function choose(stack: DuelView[]): void {
       h(
         "ol",
         { class: "rows duel-stack-list" },
-        // Each a row as a friend's in Приятели (ui.ts, playerRow): the avatar with its seal, the name (no link), how
+        // Each a row as a friend's in Приятели (ui.ts, playerRow): the avatar, the name (no link), how
         // long is left on the line under it, „Играй“ at its end.
         stack.map((d) =>
           playerRow(
             "friend duel-stack-row",
-            {
-              name: d.opponent?.name ?? "",
-              avatar: d.opponent?.look?.avatar,
-              seal: d.opponent?.look?.seal ?? undefined,
-            },
+            { name: d.opponent?.name ?? "", avatar: d.opponent?.look?.avatar },
             undefined,
             nameWords(d.opponent?.name ?? "Съперник"),
             d.first ? `Довърши своята игра · ${leftWords(d.until ?? 0)}` : leftWords(d.until ?? 0),
