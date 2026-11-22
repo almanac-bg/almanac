@@ -127,9 +127,9 @@ export function me(kit: Kit) {
 }
 
 /** Who you are: your avatar as you wear it, the seal you wear on its corner, and a pencil on it (a tap on the avatar
- * opens the animals: `pick`); your name and tag, the streak as it is now by it; the day you started (`since`); a name
- * still the one drawn says so, with the way to change it. The same head as another's page (ui.ts, profileHead), but
- * for what the week forgives: yours, on the streak for a pointer resting on it. */
+ * opens the animals: `pick`); your name and tag, the streak as it is now by it; the day you started (`since`, said
+ * to you: „Играеш от …“); a name still the one drawn says so, with the way to change it. The same head as another's
+ * page (ui.ts, profileHead), but for what the week forgives: yours, on the streak for a pointer resting on it. */
 function head(data: () => Stats | null, since: () => string | undefined, pick: () => void): Child {
   return profileHead(
     // The avatar is the button: a pencil on its corner says so (on a big screen as the pointer comes over it, with the
@@ -155,6 +155,7 @@ function head(data: () => Stats | null, since: () => string | undefined, pick: (
             h("a", { class: "link", href: "/settings#name" }, "Смени го"),
           )
         : null,
+    true,
   );
 }
 
