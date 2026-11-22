@@ -9,7 +9,7 @@ test("Профил: one list of seals, the best worn on the avatar, never chosen
   await ranked(page, 3, { music: 30, history: 20 });
   await page.goto("/me");
   // One list, a row a chapter: its seal, its name and its ink, and under them a bar of its ink out of the next rank's
-  // (15 of 40, even at the rank's first ink), the rank under its left end and what's left under its right. Nothing to
+  // in steps (40: 20, 10, 5 and five of one; 20 of 40 fills the first), the rank under its left end and what's left under its right. Nothing to
   // tap, nothing ringed as worn, no way to choose; no single chapter's ladder over it.
   const rows = page.locator(".me-seals .seal-list .seal-row");
   await expect(rows).toHaveCount(10);
@@ -20,7 +20,11 @@ test("Профил: one list of seals, the best worn on the avatar, never chosen
   await expect(history.locator(".standing-now")).toHaveText("Тетрадка");
   await expect(history.locator(".standing-next")).toHaveText(/^още\s20\sдо\s„Книга“$/);
   await expect(history.locator(".standing-bar")).toBeVisible();
-  expect(await history.locator(".standing-bar > i").evaluate((i) => (i as HTMLElement).style.width)).toBe("50%");
+  expect(
+    await history
+      .locator(".standing-bar > span > i")
+      .evaluateAll((is) => is.map((i) => (i as HTMLElement).style.width)),
+  ).toEqual(["100%", "0%", "0%", "0%", "0%", "0%", "0%", "0%"]);
   // The most ink first, then the bank's order: the first row is the seal worn on the avatar's corner, which it
   // explains. Beside „Печати“, the book's whole ink, the rows' summed.
   await expect(rows.locator(".seal-row-name")).toHaveText([

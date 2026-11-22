@@ -56,7 +56,10 @@ packages' doc comments; this file holds only what must not drift.
     counted, never promised to turn into ink. A chapter shows one number, its ink.
   - **Each chapter's seal (печат) is its rank,** from ink, never falling, named for the book, not the person
     (Бележка 1, Страница 5, Тетрадка 15, Книга 40, Том 100, Летопис 250, then „Летопис · 2“ for each further 100):
-    a badge of its own (not the logo); the way to the next rank is a bar of the chapter's ink out of the next rank's,
+    a badge of its own (not the logo); the way to the next rank is a bar of the chapter's ink out of the next rank's, in
+    steps (2026-11-22, the owner: how many are left should show without reading a number; the way halved, and its right
+    end halved again, until five or fewer are left, one ink each, so a long way is a few big steps and the last few are
+    facts),
     the rank named under its left end and what's left under its right (2026-11-22: a bar of the way between two ranks
     was empty just past each, and its ends named nothing, so it didn't show how close the next was: „Страница“, „още 8
     до „Тетрадка““); with a player only the seal shows, on their

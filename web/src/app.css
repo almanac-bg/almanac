@@ -1510,7 +1510,7 @@
     font: 900 12.5px var(--font-numeral);
   }
 
-  /* Where a chapter stands (ui.ts, standing): a bar filled for the chapter's ink out of the next rank's, and under it
+  /* Where a chapter stands (ui.ts, standing): a bar of steps filled for the chapter's ink out of the next rank's, and under it
      its two ends named, the rank held at the left in ink, what's left to the next at the right. On the page, the
      chapter's deep colour (4.5:1 on it, by day and night) over a track of it; on a chapter's sheet, where its colour
      is the paper, the sheet's ink. Where the two don't fit on a line (large text), the right goes under the left, at
@@ -1546,18 +1546,24 @@
     font-weight: inherit;
   }
 
+  /* The bar's steps (ui.ts, barOf): each takes its share, the last ones never narrower than round. */
   .standing-bar {
-    display: block;
+    display: flex;
+    gap: 3px;
     height: 8px;
+  }
+
+  .standing-bar > span {
+    flex: 0 1 0;
+    min-width: 8px;
     border-radius: 4px;
     background: color-mix(in srgb, var(--td) 20%, transparent);
     overflow: hidden;
   }
 
-  .standing-bar > i {
+  .standing-bar > span > i {
     display: block;
     height: 100%;
-    border-radius: inherit;
     background: var(--td);
   }
 
@@ -1565,11 +1571,11 @@
     color: inherit;
   }
 
-  .leaf .standing-bar {
+  .leaf .standing-bar > span {
     background: color-mix(in srgb, #16132b 18%, transparent);
   }
 
-  .leaf .standing-bar > i {
+  .leaf .standing-bar > span > i {
     background: #16132b;
   }
 

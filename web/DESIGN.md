@@ -371,9 +371,11 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
 
   Then „Летопис · N“ for each further 100, its number on a tab from 32px. 24px at the least. How far towards the next
   rank is said and drawn by one component, `standing()`, everywhere (Профил's seals, a chapter's page and card, the
-  result's line): a bar filled for the chapter's ink out of the next rank's (1 of 5 a fifth, 40 of 100 two fifths: its
-  length says how near the next is in the words' own units, and a first ink shows), past Летопис the ink within its
-  hundred (`from`, `nextAt`: play.ChapterRank), never full while the next isn't held; under it its two ends named:
+  result's line): a bar of steps filled for the chapter's ink out of the next rank's (1 of 5, 40 of 100: a first ink
+  shows), past Летопис the ink within its hundred (`from`, `nextAt`: play.ChapterRank), never full while the next
+  isn't held. The steps are counted at a glance, never read: the way halved, and its right end halved again, until
+  five or fewer are left, those one ink each (5: 1·1·1·1·1; 15: 8·4·1·1·1; 250: nine steps, 125 to 1), each step half
+  as wide as the one before, the last two alike, none narrower than round (`barOf`); under it its two ends named:
   at the left the rank held, bold, in ink („Страница“, „Летопис · 2“; before a first seal „Още без печат“), at the
   right what's left to the next („още 8 до „Тетрадка““, breaking only between „още 8“ and „до „Тетрадка““). On a
   card, too narrow for both, the rank over the bar and the right one alone under it. With large text the right goes
