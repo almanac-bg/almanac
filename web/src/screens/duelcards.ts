@@ -5,7 +5,7 @@
 // (the row itself leads nowhere), and, played, the score over its end. Once the player's own game in it is played, a
 // tap anywhere on the row but the name opens its questions in their dialog (results.ts, reviewSheet), on any day
 // (play.Review). A new duel starts from a friend's row (or their profile), never from a duel. Several sent to the
-// player by one friend are one row, a pile, the next to lapse on top, the count on its line. The duel just played, or
+// player by one friend are one row, a pile, the earliest on top, unfolded from its line to choose which to play. The duel just played, or
 // named by an old link to it (`top`), comes first in its own group (a result first of the played, one sent first of
 // those waiting for a friend), in sight, and its score counts up once as it lands (feel.ts: duel), never again.
 //
@@ -13,7 +13,7 @@
 
 import type { Reviewed } from "../game/types.ts";
 import type { Kit } from "../kit.ts";
-import type { Child } from "../lib/dom.ts";
+import type { Child, Signal } from "../lib/dom.ts";
 import type { SoundName } from "../lib/sound.ts";
 import type { DuelMark, Duels, DuelView, Side } from "./duel.ts";
 
@@ -31,8 +31,14 @@ let {
   play,
   playerRow,
   reviewSheet,
+  signal,
   withWord,
 } = {} as Kit;
+
+/** The piles unfolded (their senders, `sender`), kept while the page is drawn anew every quarter minute: made anew
+ * with each visit to the page (its `sight`, one object a visit), all folded. */
+let unfolded: Signal<Set<string>> | null = null;
+let unfoldedFor: object | null = null;
 
 /** How many questions a duel has. */
 const total = 10;
@@ -64,10 +70,9 @@ function tieWords(d: DuelView): string {
  * score while the other has the same ten to play. A played one: why one that ran out has no score (and the player's
  * own, if they played), that a player is gone (their game went with them), and what broke a tie on even right
  * answers. The pair's record is said once, on the friend (Приятели), not on each duel. */
-function noteLine(d: DuelView, more: number): string {
+function noteLine(d: DuelView): string {
   const them = d.opponent;
   const mine = `Ти: ${formatNumber(d.you?.rights ?? 0)} от ${total}`;
-  if (more) return more === 1 ? "Още един дуел чака." : `Още ${formatNumber(more)} дуела чакат.`;
   if (d.state === "yours") return d.first ? "Довърши своята игра." : "";
   if (d.state === "theirs") return mine;
   if (d.state === "expired") {
@@ -166,11 +171,11 @@ function questions(d: DuelView): void {
  * for the player, the page's one action, filled; the others outlined), and, played, its end (endOf). Once the
  * player's own game in it is played, the row is a button to its questions, the whole of it but the name (a button laid
  * over the row, under the name's link), nothing on it to say so but its light under a pointer. `more`: how many more
- * from the same friend lie under it, a pile (the count on its line). `top`: the duel named in the address, shown in
+ * from the same friend lie under it, a pile (`fold`, on its line, unfolds them; `inPile`: one of them, set in). `top`: the duel named in the address, shown in
  * sight, its result landing as a moment, once. */
-function duelRow(d: DuelView, play = false, more = 0, top = false): Child {
+function duelRow(d: DuelView, play = false, more = 0, top = false, fold: Child = null, inPile = false): Child {
   const them = d.opponent;
-  const note = noteLine(d, more);
+  const note = noteLine(d);
   const open = d.state === "yours" || d.state === "theirs";
   const end =
     d.state === "yours"
@@ -187,11 +192,13 @@ function duelRow(d: DuelView, play = false, more = 0, top = false): Child {
         ? null
         : endOf(d);
   const row = playerRow(
-    [`duel-row s-${d.state}`, play && "turn", more && "duel-pile", top && "landed"].filter(Boolean).join(" "),
+    [`duel-row s-${d.state}`, play && "turn", more && "duel-pile", inPile && "in-pile", top && "landed"]
+      .filter(Boolean)
+      .join(" "),
     { name: them?.name ?? "", avatar: them?.look?.avatar, seal: them?.look?.seal ?? undefined },
     tagOf(them) || undefined,
     nameWords(them?.name ?? "Съперник"),
-    [open ? stateLine(d) : null, marksRows(d), note ? h("span", { class: "duel-card-note" }, note) : null],
+    [open ? stateLine(d) : null, marksRows(d), note ? h("span", { class: "duel-card-note" }, note) : null, fold],
     null,
     end ? h("span", { class: "duel-row-end" }, end) : null,
   );
@@ -280,6 +287,8 @@ function piles(list: DuelView[]): [DuelView, ...DuelView[]][] {
     if (key) by.set(key, fresh);
     out.push(fresh);
   }
+  // Each pile the earliest sent first (the first to lapse), whatever order the list came in.
+  for (const p of out) p.sort((a, b) => (a.until ?? 0) - (b.until ?? 0));
   return out;
 }
 
@@ -312,15 +321,48 @@ export function duelGroup(
     play,
     playerRow,
     reviewSheet,
+    signal,
     withWord,
   } = kit);
   sighted = sight;
+  if (!unfolded || unfoldedFor !== sight) {
+    unfolded = signal(new Set<string>());
+    unfoldedFor = sight;
+  }
+  const folds = unfolded;
   const rest = (v: DuelView) => v.id !== top?.id;
   const named = top && shown(top);
   const first = (state: (v: DuelView) => boolean, list: DuelView[]) =>
     named && state(named) ? [named, ...list.filter(rest).map(shown)] : list.filter(rest).map(shown);
   const news = (v: DuelView) => (v.id === named?.id && under ? h("li", { class: "duel-news" }, under) : null);
-  const row = (v: DuelView, play = false, more = 0) => [duelRow(v, play, more, v.id === named?.id), news(v)];
+  const row = (v: DuelView, play = false, more = 0, fold: Child = null, inPile = false) => [
+    duelRow(v, play, more, v.id === named?.id, fold, inPile),
+    news(v),
+  ];
+  // A pile: its first (the earliest sent, the next to lapse) a row, „Още 2 дуела чакат“ on it a way to unfold the
+  // rest under it, each a row of its own with its own „Играй“, to choose which to play; again, to fold them.
+  const pile = ([o, ...more]: [DuelView, ...DuelView[]], play: boolean): Child => {
+    const key = sender(o);
+    if (!more.length || !key) return row(o, play);
+    const isOpen = () => folds().has(key);
+    const flip = () => {
+      const next = new Set(folds.peek());
+      if (!next.delete(key)) next.add(key);
+      folds.set(next);
+    };
+    const fold = h(
+      "button",
+      { class: "link duel-pile-fold", type: "button", "aria-expanded": () => String(isOpen()), onclick: flip },
+      () =>
+        isOpen()
+          ? "Скрий другите"
+          : more.length === 1
+            ? "Още един дуел чака"
+            : `Още ${formatNumber(more.length)} дуела чакат`,
+      h("span", { class: "i i-right", "aria-hidden": "true" }),
+    );
+    return [row(o, play, more.length, fold), () => (isOpen() ? more.map((m) => row(m, false, 0, null, true)) : null)];
+  };
   const group = (heading: string, items: Child[]) =>
     h(
       "section",
@@ -336,7 +378,7 @@ export function duelGroup(
     return open.length
       ? group(
           `Чакащи дуели (${formatNumber(open.reduce((n, pile) => n + pile.length, 0))})`,
-          open.map(([o, ...more], i) => row(o, i === 0 && o.state === "yours", more.length)),
+          open.map((p, i) => pile(p, i === 0 && p[0].state === "yours")),
         )
       : null;
   }

@@ -195,7 +195,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   a 20px avatar, then ten small squares in ink as the boards draw them, `mini()`: right filled, близо half, wrong
   hollow; the player's alone while the friend still has theirs to play, both once there's a result); then one quiet
   line where there's more to say: „Довърши своята игра.“ once its first question was shown, „Ти: 8 от 10“ while
-  waiting, „Още 2 дуела чакат.“ on a pile (one friend's several sent to the player are one row, the next to lapse),
+  waiting,
   why it ran out („Иво не го изигра навреме. Ти: 8 от 10.“), what broke a tie on even right answers („Равен брой
   верни · реши по-близкото число“: nothing else does), a player gone. At the row's end: of one the player's to play,
   „Играй“ (`.btn.inline`, 44px high), a link to its game and the row's one action (the row itself leads nowhere,
@@ -208,6 +208,10 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   to say so; under a pointer, or reached by the keyboard, its line lights; a screen reader hears „Въпросите от дуела
   с Иво“. The row reaches 8px into its card's sides, as the player's own row on a board, for that light. No
   „Реванш“: a new duel starts from the friend's row. Nothing ringed, no time on any of it: time never counts.
+  One friend's several duels sent to the player are one row, a pile (owner, 2026-11-22): the earliest sent on top
+  (the first to lapse), its avatar a tile on one or two more, as sheets lie in a stack; on its line „Още 2 дуела
+  чакат“ (a chevron down) unfolds the rest under it, earliest first, each a row of its own, set in, with its own
+  „Играй“, to choose which to play; „Скрий другите“ (the chevron up) folds them. Each visit opens them folded.
   A duel named in the address (`?duel=<id>`: its game just ended, or an old link to its page) is first in its group,
   brought into sight, and its result lands there once (`feel.duel`: the marks fill pair by pair, the score counts
   up, the chip lands with the end's sound), never again. The record between two is the friend's row's, never a duel's. Friends are added in one field, „име или
