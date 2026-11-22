@@ -150,20 +150,27 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   chapters, „Към Алманаха“). On a big screen the result is a spread, as the day's: the sheet on the left page, the
   action, the ways on and that line on the right, „Прегледай въпросите“ under both in a reading column. Its start
   (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name.
-- **Приятели:** the people and the duels (the day's board is Днес's); the friends (their heading for a screen reader
-  only, right under the page's „Приятели“, „Премахни приятел“ at the right; a row each: avatar with its seal,
-  the name across the row, never cut, today's score and the duels between you „дуели 3 : 1“ under it; the column half
-  a big screen, the duels the other half; a friend removed only after a sheet asks „Премахваш ли Иво от приятелите си?“, „Премахни“ in red and
-  „Отказ“, then at once, the duels open between them ending as if their time were up); the duels (shown once there
-  are friends or duels, or the day is played: „Нов дуел“ against a recording needs no friend; „Твой ред“ the page's
-  action, „Чакаш“, „Изиграни“: an open one how it stands under the name, „Изиграй същите десет въпроса · още 6 дни“,
-  „Довърши своята игра“ once its first question was shown, „Ти: 8 · още 6 дни“; a played one at the right its end
-  as a chip, told apart at a glance by fill and line, never red or green („✓ Победа“ filled in ink, „Загуба“ outlined
-  and quiet, „Равенство“ outlined in ink), its score beside it, a heavy numeral („8:6“), and on a line of its own
-  under the row, the row's width, what more there is to say: that it was against a recording, and what broke a tie on
-  even right answers („Равен брой верни · реши по-близкото число“: nothing else does; even in that too, „Равенство“
-  and nothing more); one that ran out „Изтече“ alone at
-  the right, why under the row („Иво не го изигра навреме.“); the record between two is the friend's
+- **Приятели:** the people and the duels (the day's board is Днес's), two tabs at the page's top, „Приятели“ and
+  „Дуели“, the day's board's own (`segmented`), of one weight: no heading over them (the page's „Приятели“ is a screen
+  reader's only, as each tab's own heading is), one column on a big screen too. „Дуели“ carries a dot while a duel
+  waits for the player (`tabDot`), and opens first then, else „Приятели“ (which has the dot while someone asks to be friends); a duel that comes later lights the dot and
+  never moves the page. The tab chosen is in the address (`?tab=duels`): back and a reload keep it. Under „Приятели“:
+  „Премахни приятел“ at the right; a row each: avatar with its seal,
+  the name across the row, never cut, today's score and the duels between you „дуели 3 : 1“ under it; a friend removed only after a sheet asks „Премахваш ли Иво от приятелите си?“, „Премахни“ in red and
+  „Отказ“, then at once, the duels open between them ending as if their time were up; then adding and the requests.
+  Under „Дуели“: what a duel is in a line, the open ones (theirs to play first, then those waiting), „Изиграни“ (the
+  last five), „Нов дуел“ always (against a recording it needs no friend). A duel is a card, never a person's row
+  (`.duel-card`, two a row on a big screen): its kind at the top as a small label, „С приятел“ or „Срещу запис“; then
+  the two face to face, the player's avatar with its seal and „Ти“ on the left, the other's with their name on the
+  right, and between them how it stands: „Твой ред“ or „Чакаш“ (quiet) over „още 6 дни“; a played one's score, a
+  heavy numeral („8:6“), over its end as a chip, told apart at a glance by fill and line, never red or green
+  („✓ Победа“ filled in ink, „Загуба“ outlined and quiet, „Равенство“ outlined in ink); one that ran out „Изтече“
+  alone. One quiet line under them where there's more to say: „Довърши своята игра.“ once its first question was
+  shown, „Ти: 8 от 10“ while waiting, why it ran out („Иво не го изигра навреме.“), what broke a tie on even right
+  answers („Равен брой верни · реши по-близкото число“: nothing else does; even in that too, „Равенство“ and nothing
+  more). The whole card is one link to the duel: under a pointer its line lights, and no name is underlined (none is a
+  way to a profile). The first „Твой ред“ is ringed in ink with „Играй“ in it, the page's action. At large text
+  (`.tight`) the two are under each other, each a row. The record between two is the friend's
   row's alone). Friends are added in one field, „име или имейл“; a
   friend's yes to a request is one line over the friends, told once; requests sent wait under „Изпратени покани“.
   Only two friends of one name show their @username. A duel's result, as the day's: a white card, the kicker, the
@@ -364,7 +371,7 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
 - **What a tap brings up** under it (an ask, an answer: „Нова връзка“, „Добави“, „Изтрий профила“) is scrolled into
   sight whole, clear of a phone's places at the foot (`inSight()`).
 - **Rows of players:** `who()` (the avatar with its seal, and the name), `playerRow()` (a friend's
-  `.friend` and a board's `.rank-row`, one build: Приятели and the day's board), `.duel-row`. **Avatars** (`avatar()`): the drawn animal
+  `.friend` and a board's `.rank-row`, one build: Приятели and the day's board), `.duel-pick` (a friend to start a duel with). A duel in a list is a card, not a row (`.duel-card`). **Avatars** (`avatar()`): the drawn animal
   on a rounded tile of its scene, the seal worn on its corner. Only the fifteen animals: an avatar is a face.
 - **What went wrong** is never a dead end: `failure()` says what happened, offers „Опитай пак“ where it can help, and
   always a way on.
@@ -555,7 +562,7 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
 ## In code
 
 - `ui.ts`: `leaf`, `glyph`, `chip`, `tiles`, `mini`, `seal`, `standing`, `sealList`, `ladder`, `avatar`, `who`, `verdict`,
-  `fact`, `filed`, `segmented`, `failure`, `rosette`, `back`, `nameWords`, `textWords`, `emailWords`, `inSight`.
+  `fact`, `filed`, `segmented`, `tabDot`, `failure`, `rosette`, `back`, `nameWords`, `textWords`, `emailWords`, `inSight`.
 - `game/run.ts`: `trail`, `questionHead`, `timer`, `settle`; `game/questions.ts` each kind; `game/news.ts` what a game
   wrote; `game/share.ts` the share.
 - **Selectors:** a part has its own class (`.status-n`), not a tag under a class; Biome flags the other kind. A class
@@ -564,7 +571,7 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
   `.verdict`, `.right-said`, `.after`, `.up-next-go`; `.issue`, `.issue-go`, `.today-side`, `.result`, `.result-main`, `.score-n`,
   `.tiles .tile`, `.tomorrow`, `.result-share`, `.share-sheet`, `.streak-chip`, `.streak-notice`, `.day-entry`, `.missed-day`;
   `.summary`, `.reviewed`, `.news-facts`; `.toc-row`, `.entry`; `.day-board`, `.rank-row`, `.friend`, `.invitation`,
-  `.accepted-notice`, `.duels`, `.duel-turn`, `.duel-row`, `.their-line`; `.me-ladder`, `.ladder`.
+  `.accepted-notice`, `.duels`, `.duel-card` (`.turn`, `.s-<state>`), `.duel-card-mid`, `.duel-card-go`, `.duel-chip`, `.tab-dot`, `.duel-pick`, `.their-line`; `.me-ladder`, `.ladder`.
 
 ## Before a UI change ships
 

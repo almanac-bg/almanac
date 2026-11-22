@@ -142,8 +142,12 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   // Who asks, as every row of players has them: the avatar, the name (a way to their profile), and the ask under it.
   await expect(a.locator(".invitation a.who .avatar")).toHaveCount(1);
   await expect(a.locator(".invitation .invitation-line")).toHaveText("Иска да сте приятели.");
+  // While it waits, a dot on the „Приятели“ tab (seen from „Дуели“ too); answered, the dot goes.
+  const aFriends = a.getByRole("tab", { name: "Приятели" });
+  await expect(aFriends.locator(".tab-dot")).toHaveCount(1);
   await a.locator(".invitation").getByRole("button", { name: "Приеми" }).click();
   await expect(a.locator(".friend")).toHaveCount(1);
+  await expect(aFriends.locator(".tab-dot")).toHaveCount(0);
   await b.reload();
   // One friend of that name: the name alone, the @username left to her profile.
   await expect.poll(() => readText(b.locator(".friend .friend-name"))).toMatch(/^Ана Петрова/);
@@ -255,7 +259,7 @@ test("the day's board at 320 px, the day played: the rows hold their squares, an
           { childList: true, subtree: true },
         );
       }, percent);
-    await page.goto("/friends");
+    await page.goto("/friends?tab=duels");
     if (percent !== 100) {
       await expect(page.locator("html")).toHaveCSS("font-size", `${(16 * percent) / 100}px`);
       await expect(page.locator("html")).toHaveClass(/\btight\b/);
