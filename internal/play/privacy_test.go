@@ -3,24 +3,30 @@ package play
 import (
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 )
 
-// A profile, anyone's to see, shows the seal and the ranks by chapter (DECISIONS.md, „The direction“), and the streak
+// ranked is whether any of a player's ranks is reached.
+func ranked(ranks []ChapterRank) bool {
+	return slices.ContainsFunc(ranks, func(r ChapterRank) bool { return r.Level > 0 })
+}
+
+// A profile, anyone's to see, shows the ranks by chapter (DECISIONS.md, „The direction“), and the streak
 // only as it is now (TestProfileShowsTheStreakNow): no lifetime totals and nothing of mastery. The ranks are kept as a
 // day's issue finishes, so a game under way never shows; nor does the day they started.
-func TestProfileShowsSealAndRanks(t *testing.T) {
+func TestProfileShowsRanks(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
 	p, err := w.g.ProfileOf(ctx, "player1", 0)
-	if err != nil || p.Seal != nil || len(p.Ranks) != len(w.b.Categories) {
+	if err != nil || ranked(p.Ranks) || len(p.Ranks) != len(w.b.Categories) {
 		t.Fatalf("a newcomer's profile: %+v %v", p, err)
 	}
 	w.dayGame(ana, nil)
 	w.g.AfterWait(ctx, ana)
-	if p, err = w.g.ProfileOf(ctx, "player1", 0); err != nil || p.Seal == nil {
+	if p, err = w.g.ProfileOf(ctx, "player1", 0); err != nil || !ranked(p.Ranks) {
 		t.Fatalf("after a day: %+v %v", p, err)
 	}
 	// A topic's game, under way: nothing of it shows.
@@ -29,8 +35,8 @@ func TestProfileShowsSealAndRanks(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.play(ana, s.ID, w.right)
-	if again, _ := w.g.ProfileOf(ctx, "player1", 0); again.Seal == nil || *again.Seal != *p.Seal {
-		t.Fatalf("a game under way moved the profile: %+v, was %+v", again.Seal, p.Seal)
+	if again, _ := w.g.ProfileOf(ctx, "player1", 0); !slices.Equal(again.Ranks, p.Ranks) {
+		t.Fatalf("a game under way moved the profile: %+v, was %+v", again.Ranks, p.Ranks)
 	}
 	out, _ := json.Marshal(p)
 	for _, total := range []string{`"days"`, `"games"`, `"answers"`, `"right"`, `"duels"`, `"won"`, `"mastery"`, `"best"`, `"ended"`, `"forgiven"`, `"spare"`, `"left"`, `"since"`} {

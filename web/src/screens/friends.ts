@@ -47,8 +47,6 @@ interface Friend {
   name: string;
   tag: string;
   avatar?: string;
-  /** The seal they wear on their avatar (play.Seal). */
-  seal?: { chapter: string; level: number };
   won: number;
   lost: number;
   drawn: number;
@@ -61,7 +59,7 @@ interface Request {
   id: number;
   name?: string;
   tag?: string;
-  /** Who asks, as they show to others: their seal on their avatar (play.Look). */
+  /** Who asks, as they show to others (play.Look). */
   look?: Look;
   email?: string;
 }
@@ -234,8 +232,8 @@ function page(kit: Kit): Child {
 
   return [invitations(), group("open"), friendsList(), group("played")];
 
-  /** Who asks to be friends, at the page's top: each as every row of players has them (their avatar, name and seal, a
-   * way to their profile), what they ask on a line of its own under the name, and the two answers. */
+  /** Who asks to be friends, at the page's top: each as every row of players has them (their avatar and name, a way
+   * to their profile), what they ask on a line of its own under the name, and the two answers. */
   function invitations(): Child {
     return () =>
       (data()?.requests.in ?? []).map((r) =>

@@ -592,7 +592,7 @@ func TestACopyWeighsItsTables(t *testing.T) {
 	b := w.backer(w.db.Read)
 	w.at = time.Date(2026, 11, 15, 10, 0, 0, 0, time.UTC)
 	if _, err := w.db.Write.Exec(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 100)
-		INSERT INTO ranks (user_id, chapter, level, ink, day) SELECT 1, 'c' || i, 1, i, '2026-11-15' FROM n`); err != nil {
+		INSERT INTO ranks (user_id, chapter, level, ink) SELECT 1, 'c' || i, 1, i FROM n`); err != nil {
 		t.Fatal(err)
 	}
 	if r, err := b.Once(t.Context()); err != nil || len(r.Warnings) != 0 {
@@ -616,7 +616,7 @@ func TestACopyWeighsItsTables(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, q := range []string{`PRAGMA foreign_keys = OFF`, `INSERT INTO ranks (user_id, chapter, level, ink, day) VALUES (99, 'history', 1, 1, '2026-11-15')`, `PRAGMA foreign_keys = ON`} {
+	for _, q := range []string{`PRAGMA foreign_keys = OFF`, `INSERT INTO ranks (user_id, chapter, level, ink) VALUES (99, 'history', 1, 1)`, `PRAGMA foreign_keys = ON`} {
 		if _, err := conn.ExecContext(t.Context(), q); err != nil {
 			t.Fatal(err)
 		}

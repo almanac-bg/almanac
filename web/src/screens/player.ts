@@ -1,6 +1,6 @@
 // Another player's profile, by their tag (/players/tag), laid out as Профил is (screens/me.ts: one column, on a big
-// screen too): the same head (their avatar with the seal they wear on its corner, their name and tag, and the day they
-// started playing), with their streak as it is now by the tag (never an ended one's), a card of how you stand with
+// screen too): the same head (their avatar, their name and tag, and their streak as it is now under them, never an
+// ended one's), a card of how you stand with
 // them under it (friends: the duels between you and „Дуел“; or the request either way), and the same „Печати“ (ui.ts:
 // profileHead, sealsSection). Nothing that's only theirs (play/profile.go: no week's forgiving), and nothing that's
 // only one's own (Смени, Настройки). One's own, opened by its tag, is Профил: the page goes there (ui.ts, profileHref,
@@ -35,7 +35,6 @@ interface Profile {
   tag: string;
   me?: boolean;
   avatar: string;
-  seal?: { chapter: string; level: number };
   ranks: ChapterRank[];
   // The streak as it is now (none: none runs).
   streak?: number;
@@ -97,13 +96,13 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
       "div",
       { class: "me-intro" },
       profileHead(
-        h("span", { class: "me-avatar" }, avatar(p.avatar, { size: "l", name: p.name, seal: p.seal })),
+        h("span", { class: "me-avatar" }, avatar(p.avatar, { size: "l", name: p.name })),
         nameWords(p.name),
         p.tag,
         () => p.streak,
       ),
       relation(p, load),
-      sealsSection(p.ranks, h("p", { class: "seal-worn" }, "Още няма печат."), p.seal?.chapter),
+      sealsSection(p.ranks, h("p", { class: "seals-none" }, "Още няма печат.")),
     );
   });
 }

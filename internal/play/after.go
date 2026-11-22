@@ -14,7 +14,7 @@ import (
 )
 
 // After a run: once its last answer is kept, a run has more to do, each in a write of its own: its duel is settled
-// once both sides have played (settleRun), and what it brought is kept (afterRun: the milestones noted in the book).
+// once both sides have played (settleRun), and what it brought is kept (afterRun: the ranks counted again from the book).
 // The transaction that finishes the run notes that it's due (runs_after, afterDue), so none of it is lost to a closed connection or a restart in between: the request that finished the run settles it at
 // once, on a context of its own that the player leaving doesn't cancel (finished: the result shows the duel's outcome), and
 // hands the rest to the background (afterLater), so that the last answer doesn't wait for the player's history to be
@@ -22,9 +22,9 @@ import (
 // done. The sweep each minute does whatever that left (AfterDue), a few times more, waiting longer each time, before
 // it gives up. All of it may be done again safely: a duel is settled once, a note kept once.
 //
-// What a run earned is judged by the run, never by the clock it's looked at on (played): a run of the day's questions
-// counts for its own day though its last answer came after midnight (DayGrace), and so does the sweep's retry of it
-// hours later: what it reached is noted on that day.
+// What a run earned is judged by the run, never by the clock it's looked at on: the ink of a run of the day's questions
+// is its own day's though its last answer came after midnight (DayGrace; ink.go, writtenIn), and so is the sweep's
+// retry of it hours later.
 //
 // It never fails the request that finished the run: the answer is kept, whatever happens after it.
 
@@ -195,46 +195,33 @@ func (g *Game) afterSettled(ctx context.Context, userID, runID int64) error {
 	return err
 }
 
-// played is a finished game as what follows it sees it: whose, what kind, and the days it counts on.
+// played is a finished game as what follows it sees it: whose, and what kind.
 type played struct {
 	user, run int64
 	kind      string
-	// day is the day it counts for: a run of the day's questions, its own day; any other game, the day it ended.
-	day string
 }
 
 // playedOf is a player's finished run as what follows it sees it (ErrNoRun: no such run of theirs).
 func (g *Game) playedOf(ctx context.Context, userID, runID int64) (played, error) {
 	p := played{user: userID, run: runID}
-	var finished sql.NullInt64
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT kind, coalesce(day, ''), finished_at FROM runs
-		WHERE id = ? AND user_id = ?`, runID, userID).Scan(&p.kind, &p.day, &finished)
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT kind FROM runs WHERE id = ? AND user_id = ?`, runID, userID).
+		Scan(&p.kind)
 	if errors.Is(err, sql.ErrNoRows) {
 		return p, ErrNoRun
 	}
-	if err != nil {
-		return p, err
-	}
-	if p.kind != "day" || p.day == "" {
-		end := g.Now()
-		if finished.Valid {
-			end = time.UnixMilli(finished.Int64)
-		}
-		p.day = dayOf(end)
-	}
-	return p, nil
+	return p, err
 }
 
 // dayOf is the day a moment is in, in Bulgaria (YYYY-MM-DD).
 func dayOf(t time.Time) string { return t.In(Bulgaria).Format(time.DateOnly) }
 
 // afterRun keeps what a player's game, just finished, brought them: their ranks, after a day's issue (rank.go: only
-// it writes ink), counted on the day it counts for (played).
+// it writes ink).
 func (g *Game) afterRun(ctx context.Context, p played) error {
 	if p.kind != "day" {
 		return nil
 	}
-	return g.countRanks(ctx, p.user, p.day)
+	return g.countRanks(ctx, p.user)
 }
 
 // AfterDue does what follows the finished runs that their own requests left undone (cut off by a restart, or failed),

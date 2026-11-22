@@ -1,9 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { daysPlayed, playedBefore, playRun, ranked, startDay } from "./play.ts";
 
-test("Профил: one list of seals, the best worn on the avatar, never chosen; only animals as avatars", async ({
-  page,
-}) => {
+test("Профил: one list of seals, never chosen, none on the avatar; only animals as avatars", async ({ page }) => {
   await page.goto("/");
   // Every chapter at Тетрадка: music with the most ink, history next, the rest at the rank's first (15).
   await ranked(page, 3, { music: 30, history: 20 });
@@ -25,8 +23,7 @@ test("Профил: one list of seals, the best worn on the avatar, never chosen
       .locator(".standing-bar > span > i")
       .evaluateAll((is) => is.map((i) => (i as HTMLElement).style.width)),
   ).toEqual(["100%", "0%", "0%", "0%", "0%", "0%", "0%", "0%"]);
-  // The most ink first, then the bank's order: the first row is the seal worn on the avatar's corner, which it
-  // explains. Beside „Печати“, the book's whole ink, the rows' summed.
+  // The most ink first, then the bank's order. Beside „Печати“, the book's whole ink, the rows' summed.
   await expect(rows.locator(".seal-row-name")).toHaveText([
     "Музика",
     "История",
@@ -43,8 +40,8 @@ test("Профил: one list of seals, the best worn on the avatar, never chosen
   await expect(page.locator(".me-seals .sect-note")).toHaveText("170 факта с\u00a0мастило");
   await expect(page.locator(".me-seals button, .ladder")).toHaveCount(0);
   await expect(page.locator(".screen")).not.toContainText(/избери|Носиш|Печатът на/);
-  // The badge is the best (every chapter alike in rank and day: the most ink), on the avatar's corner: the first row.
-  await expect(page.locator(".me-avatar .avatar > .seal")).toHaveClass(/\bt-music\b/);
+  // The avatar is a face, nothing on it (the owner, 2026-11-22): no seal, here or in the bar.
+  await expect(page.locator(".avatar .seal")).toHaveCount(0);
   // No day they started: the streak says how long they've kept at it.
   await expect(page.locator(".me-head")).not.toContainText(/\d{4}\u00a0г\./);
   expect((await page.request.patch("/api/me/seal", { data: { chapter: "music" } })).ok()).toBe(false);

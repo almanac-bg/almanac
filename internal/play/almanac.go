@@ -63,10 +63,8 @@ type Almanac struct {
 	// Page is which page of the chapter this is, from 0: the one asked for, or the one that holds the fact asked for
 	// (AlmanacQuery.Fact).
 	Page int `json:"page,omitempty"`
-	// Ranks are each of the bank's chapters' seals, as kept (rank.go); Seal the one the player wears. The first page
-	// only.
+	// Ranks are each of the bank's chapters' seals, as kept (rank.go). The first page only.
 	Ranks []ChapterRank `json:"ranks,omitempty"`
-	Seal  *Seal         `json:"seal,omitempty"`
 	// Since is the day the player's book began: their first game's.
 	Since string `json:"since,omitempty"`
 }
@@ -236,7 +234,6 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, aq AlmanacQuery) (Al
 		if out.Ranks, err = g.RanksOf(ctx, userID); err != nil {
 			return out, err
 		}
-		out.Seal = sealOf(out.Ranks)
 	}
 	return out, nil
 }

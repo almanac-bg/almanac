@@ -164,13 +164,19 @@ func (w *world) about(p *player) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	seal, err := w.g.SealOf(ctx, p.id)
+	ranks, err := w.g.RanksOf(ctx, p.id)
 	if err != nil {
 		return "", err
 	}
 	rank := "no rank"
-	if seal != nil {
-		rank = seal.Name + " in " + seal.Chapter
+	var best play.ChapterRank
+	for _, r := range ranks {
+		if r.Level > best.Level {
+			best = r
+		}
+	}
+	if best.Level > 0 {
+		rank = best.Name + " in " + best.Chapter
 	}
 	friends, err := w.g.FriendsOf(ctx, p.id)
 	if err != nil {

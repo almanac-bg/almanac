@@ -74,19 +74,6 @@ export const cover = signal(false);
  * game brought from another browser (screens/keep.ts), a profile signed in to (screens/signin.ts, signInPage). */
 export const notice = signal("");
 
-/** The seal the player wears (play.Seal), on the frame's avatar: as the page came with it, and as the server last
- * said it since (GET /api/me after a rank risen, Профил's numbers, a seal chosen). */
-export const wornSeal = signal<{ chapter: string; level: number } | null>(boot.seal ?? null);
-
-/** Asks the server again which seal the player wears (a rank just risen may have changed it). */
-export function refreshSeal(): void {
-  if (!user.peek()) return;
-  api<{ seal?: { chapter: string; level: number } }>("GET", "/api/me").then(
-    (r) => wornSeal.set(r.seal ?? null),
-    () => {},
-  );
-}
-
 /** Whether something has come to Приятели since the player last looked there, on any device (play.FriendsNews): a
  * friend request, a duel sent to them, a result of one of their duels. The dot on Приятели: news, not what waits there. */
 export const friendsNews = signal(false);

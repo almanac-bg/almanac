@@ -64,13 +64,12 @@ packages' doc comments; this file holds only what must not drift.
     facts),
     the rank named under its left end and what's left under its right (2026-11-22: a bar of the way between two ranks
     was empty just past each, and its ends named nothing, so it didn't show how close the next was: „Страница“, „още 8
-    до „Тетрадка““); with a player only the seal shows, on their
-    avatar's corner (2026-11-21: one place, everywhere, never after the name), the name only in the Алманах and on a
-    rank-up. No check against guessing: the names claim nothing a count doesn't hold. Avatars are the animals only, all
-    free (2026-11-21): a seal's reward is the seal itself, worn as the badge; an avatar is a face, so animals only, and
-    the profile gets simpler. Mastery is hidden: it steers chapter games and duels.
-    The badge is the player's best seal, never chosen (the highest rank, then the most ink, then the rank that came
-    first: a choice nobody playing saw the point of, and the best says the most).
+    до „Тетрадка““); a player's seals are on their profile and in their Алманах, never with their name nor on their
+    avatar (the owner, 2026-11-22, „махни печата от аватара навсякъде“: it had been on the avatar's corner since
+    2026-11-21), the rank's name only in the Алманах, on Профил and on a rank-up; no seal is worn, none chosen. No
+    check against guessing: the names claim nothing a count doesn't hold. Avatars are the animals only, all free
+    (2026-11-21): a seal's reward is the seal itself; an avatar is a face, so animals only, and the profile gets
+    simpler. Mastery is hidden: it steers chapter games and duels.
     These are the only levels, titles and unlocks; nothing else adds up across games (no XP, currencies, goals,
     achievements, notes as rewards, lifetime totals, rating, divisions, leagues, rooms). Anything live stays out until
     the owner reopens it.
@@ -117,7 +116,7 @@ packages' doc comments; this file holds only what must not drift.
     name, each with their sign; more, two rows, those who did and those who didn't, each opening to its whole list);
     never before the player has finished, never anyone's answers. The day is the same ten for everyone, and this turns
     a score into something to talk about. The day's issue only: a duel's dialog shows its two sides, a chapter's game
-    has no friends in it. The faces there are without the seal (owner, 2026-11-22): that small, it covered them.
+    has no friends in it. The faces there are the avatars alone, as everywhere.
   - **The player's nouns are a closed list:** Брой, близо, серия, тема, Алманах (глави, факти, мастило), печат, игра
     по тема, приятели, класация, дуел, споделяне, профил, напомняне. Adding one is the owner's
     call.

@@ -18,7 +18,7 @@ import { missing } from "./screens/missing.ts";
 import { topic } from "./screens/play.ts";
 import { signInPage } from "./screens/signin.ts";
 import { sharedDay, today } from "./screens/today.ts";
-import { cover, friendsNews, look, playing, user, watchNews, wornSeal } from "./state.ts";
+import { cover, friendsNews, look, playing, user, watchNews } from "./state.ts";
 import { avatar, rosette } from "./ui.ts";
 
 /** The three places (DECISIONS.md, „The redesign“): where each goes, its name, and which paths are part of it. A game
@@ -65,16 +65,14 @@ if (root) {
         { class: "bar" },
         h("a", { href: "/", class: "brand", "aria-label": "АЛМАНАХ, днешният брой" }, rosette(), "АЛМАНАХ"),
         h("nav", { class: "places", "aria-label": "Основна навигация" }, placeLinks()),
-        // The player's avatar with the seal they wear: Профил, and Настройки in it (not on Профил itself, whose page
+        // The player's avatar: Профил, and Настройки in it (not on Профил itself, whose page
         // has it). Without a profile yet (or on the cover, not signed in), the way in; on the way in itself, nothing.
         () => {
           if (path() === "/signin") return null;
           const u = user();
           if (!u || (cover() && !u.email)) return h("a", { class: "bar-in", href: "/signin" }, "Вход");
           if (path() === "/me") return null;
-          return h("a", { class: "bar-me", href: "/me", "aria-label": "Профил" }, () =>
-            avatar(look(), { seal: wornSeal() }),
-          );
+          return h("a", { class: "bar-me", href: "/me", "aria-label": "Профил" }, () => avatar(look()));
         },
       ),
     ),

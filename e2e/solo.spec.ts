@@ -57,9 +57,9 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.locator(".day-board .lv, .day-board .who-title")).toHaveCount(0);
   await page.goto("/me");
   await expect(page.locator(".me-seals")).toBeVisible();
-  // The seals one list, a row a chapter with a rank, and the best of them worn on the avatar's corner.
+  // The seals one list, a row a chapter with a rank; none on the avatar.
+  await expect(page.locator(".avatar .seal")).toHaveCount(0);
   if (await page.locator(".me-seals .seal-row").count()) {
-    await expect(page.locator(".me-avatar .avatar > .seal")).toHaveCount(1);
     await expect(page.locator(".me-seals .seal-row").first().locator(".standing-bar")).toBeVisible();
   }
 

@@ -70,8 +70,7 @@ interface Learned {
 }
 
 /** A page of the book (play.Almanac): its facts, how many the chapter (and the search) lists, each chapter's ink (its
- * one number: grey is listed, never counted); with the first page, each chapter's rank, the seal worn, and the day the
- * book began. */
+ * one number: grey is listed, never counted); with the first page, each chapter's rank and the day the book began. */
 interface Page {
   facts: Learned[];
   /** Which page this is, from 0: the one asked for, or the one that holds the fact asked for. */
@@ -79,7 +78,6 @@ interface Page {
   found: number;
   ink: Record<string, number>;
   ranks?: Rank[];
-  seal?: Rank;
   since?: string;
 }
 

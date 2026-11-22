@@ -5,9 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"slices"
-	"strings"
 )
 
 // Progress is ink and the streak (DECISIONS.md, „The direction“): the player's Алманах, a chapter per topic with the
@@ -19,8 +17,8 @@ import (
 // What a game brings is told once, at its end (NewsOf): what it wrote in the book, the ranks it raised, or the
 // chapter nearest its next. A bad game brings no praise: what it's told is what's true of it.
 //
-// Every animal is every player's from the first day (Shapes), and nothing else is an avatar: a chapter's seal is worn
-// on the avatar's corner (rank.go), never chosen as one.
+// Every animal is every player's from the first day (Shapes), and nothing else is an avatar: a chapter's seal is never
+// one, and never on one (the owner, 2026-11-22: a face, nothing over it).
 
 // ErrNoAvatar is an avatar there's no such thing as.
 var ErrNoAvatar = errors.New("no such avatar")
@@ -39,45 +37,18 @@ var (
 // it (account.AnimalOf: the animal of their drawn name).
 func DefaultAvatar(userID int64) string { return Starters[max(userID, 0)%int64(len(Starters))] }
 
-// Look is how a player shows to others: their avatar (a shape), and the seal they wear on its corner (rank.go:
-// none before a rank).
+// Look is how a player shows to others: their avatar (a shape), the face beside their name. Nothing else: a player's
+// seals are on their profile, never on the face.
 type Look struct {
 	Avatar string `json:"avatar"`
-	Seal   *Worn  `json:"seal,omitempty"`
 }
 
-// lookColumns read a player's look in a query over users u, as one text for lookOf: the avatar chosen, and their
-// ranks as kept (rank.go), each "chapter level ink day". A player's ranks are a dozen rows read by their key: a board
-// of N names is N such reads, never a count of anyone's ink.
-const lookColumns = `coalesce(u.avatar, '') || char(31) ||
-	coalesce((SELECT group_concat(k.chapter || ' ' || k.level || ' ' || k.ink || ' ' || k.day, ',') FROM ranks k
-		WHERE k.user_id = u.id AND k.level > 0), '')`
+// lookColumns read a player's look in a query over users u, for lookOf: the avatar chosen.
+const lookColumns = `coalesce(u.avatar, '')`
 
-// lookOf makes a look from what lookColumns read: the avatar chosen, or the one the game gives; and the seal worn, by
-// the one rule (sealOf) over the bank's chapters.
-func (g *Game) lookOf(userID int64, read string) Look {
-	avatar, kept, _ := strings.Cut(read, "\x1f")
-	look := Look{Avatar: cmp.Or(avatar, DefaultAvatar(userID))}
-	if kept == "" {
-		return look
-	}
-	byChapter := map[string]ChapterRank{}
-	for e := range strings.SplitSeq(kept, ",") {
-		var r ChapterRank
-		if _, err := fmt.Sscan(e, &r.Chapter, &r.Level, &r.Ink, &r.Day); err == nil {
-			byChapter[r.Chapter] = r
-		}
-	}
-	var ranks []ChapterRank
-	for _, c := range g.Bank().Categories {
-		if r, ok := byChapter[c.ID]; ok {
-			ranks = append(ranks, r)
-		}
-	}
-	if s := sealOf(ranks); s != nil {
-		look.Seal = &Worn{Chapter: s.Chapter, Level: s.Level}
-	}
-	return look
+// lookOf makes a look from what lookColumns read: the avatar chosen, or the one the game gives.
+func (g *Game) lookOf(userID int64, avatar string) Look {
+	return Look{Avatar: cmp.Or(avatar, DefaultAvatar(userID))}
 }
 
 // LookOf is how a player shows to others.
@@ -87,8 +58,7 @@ func (g *Game) LookOf(ctx context.Context, userID int64) (Look, error) {
 	return g.lookOf(userID, read), err
 }
 
-// SetAvatar changes a player's avatar: an animal of Shapes ("fox"). An avatar is a face, so an animal only: a seal is
-// worn on it, never as it (DECISIONS.md).
+// SetAvatar changes a player's avatar: an animal of Shapes ("fox"). An avatar is a face, so an animal only (DECISIONS.md).
 func (g *Game) SetAvatar(ctx context.Context, userID int64, shape string) error {
 	if !slices.Contains(Shapes, shape) {
 		return ErrNoAvatar
