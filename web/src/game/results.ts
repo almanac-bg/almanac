@@ -1,23 +1,25 @@
 // The end of a game: how it went, then what to do next (another game, the questions to go over with their answers),
-// laid out the same on every result screen.
+// laid out the same on every result screen. The questions gone over are one dialog for every game (reviewSheet): the
+// day's issue, a chapter's game, a duel.
 
 import { api, errorText } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { calm } from "../lib/prefs.ts";
 import { feelKit, play } from "../lib/sound.ts";
 import { categories } from "../state.ts";
-import { avatar, chip, fact, type Look, leaf, tiles, who } from "../ui.ts";
+import { avatar, chapterName, chip, fact, type Look, leaf, tiles, who } from "../ui.ts";
 import { closeLine, closeWords } from "./numbers.ts";
-import { answered, answerWords, crowdLine, picture } from "./questions.ts";
+import { answered, crowdLine, picture } from "./questions.ts";
 import { report } from "./report.ts";
 import { trail } from "./run.ts";
 import type { Reviewed, Score, State, TheirMark } from "./types.ts";
 
 /** A finished run: the score as the screen's big number (its right answers), a line about it (the place), and the
  * marks; right under it what to do next (`next`: the gold action, then „Прегледай въпросите“ and the others, as
- * buttons, or with `quiet` as plain links in a line); then whatever the screen adds (`more`: what the game earned);
- * and at the end, once opened, the questions. A chapter's game (`chapter`) is a spread on a big screen, as the day's
- * result is: its sheet on the left page, the ways on and what it wrote on the right, the questions under both. */
+ * buttons, or with `quiet` as plain links in a line); then whatever the screen adds (`more`: what the game earned).
+ * The questions open in their dialog (reviewSheet): by the button, by a tap on the score's card, and by a tile, at its
+ * question. A chapter's game (`chapter`) is a spread on a big screen, as the day's result is: its sheet on the left
+ * page, the ways on and what it wrote on the right. */
 export function summary(
   s: State,
   line: Child,
@@ -26,26 +28,44 @@ export function summary(
   moment = true,
   chapter = "",
 ): Child {
-  const questions = reviewParts(
-    async () => (await api<{ questions: Reviewed[] }>("GET", `/api/runs/${s.id}/review`)).questions,
+  let asked: Promise<Reviewed[]> | null = null;
+  const load = () => {
+    asked ??= api<{ questions: Reviewed[] }>("GET", `/api/runs/${s.id}/review`).then((r) => r.questions);
+    // One that failed is asked again when the dialog next opens.
+    asked.catch(() => {
+      asked = null;
+    });
+    return asked;
+  };
+  const of = `${chapter ? `${chapterName(chapter)} · ` : ""}${s.rights} от ${outOf(s)}`;
+  const open = (at?: number) => reviewSheet({ load, of, at });
+  const button = h(
+    "button",
+    { class: "btn", type: "button", "aria-haspopup": "dialog", onclick: () => open() },
+    "Прегледай въпросите",
   );
   const perfect = outOf(s) > 0 && s.rights === outOf(s);
-  const hero = chapter ? chapterCard(s, chapter) : scoreCard(s, line);
+  const hero = chapter ? chapterCard(s, chapter, open) : scoreCard(s, line);
+  opensReview(hero, open);
   if (moment) land(hero, s.id, perfect, s.kind === "day");
   const steps = next.quiet
-    ? [h("div", { class: "actions" }, next.main), quietSteps([questions.button, ...(next.also ?? [])])]
-    : nextSteps(next.main, [questions.button, ...(next.also ?? [])]);
+    ? [h("div", { class: "actions" }, next.main), quietSteps([button, ...(next.also ?? [])])]
+    : nextSteps(next.main, [button, ...(next.also ?? [])]);
   if (chapter) {
     hero.classList.add("page-1");
-    return h(
-      "section",
-      { class: "summary spread" },
-      hero,
-      h("div", { class: "page-2 stack" }, steps, more),
-      questions.list,
-    );
+    return h("section", { class: "summary spread" }, hero, h("div", { class: "page-2 stack" }, steps, more));
   }
-  return h("section", { class: "summary" }, hero, steps, more, questions.list);
+  return h("section", { class: "summary" }, hero, steps, more);
+}
+
+/** A result's card opens the game's questions: a tap anywhere on it but on a control of its own (a tile opens them at
+ * its question: ui.ts, tiles; a link on the card is its own). The way by keys is the button beside it, „Прегледай
+ * въпросите“, and each tile. */
+export function opensReview(card: HTMLElement, open: () => void): void {
+  card.classList.add("opens");
+  card.addEventListener("click", (e) => {
+    if (!(e.target as Element).closest("a, button")) open();
+  });
 }
 
 /** A finished game's score, as its result has it: the right answers big (the close ones beside them), a line about
@@ -79,8 +99,8 @@ export function scoreCard(s: State, line: Child) {
 }
 
 /** A chapter's game, as its result has it: on the chapter's sheet, its chip (the glyph and the name), the right
- * answers big, and the tiles in its colour. */
-export function chapterCard(s: State, chapter: string): HTMLElement {
+ * answers big, and the tiles in its colour, each a way to its question gone over (`open`). */
+export function chapterCard(s: State, chapter: string, open?: (at: number) => void): HTMLElement {
   const perfect = outOf(s) > 0 && s.rights === outOf(s);
   return leaf(
     chapter,
@@ -99,6 +119,7 @@ export function chapterCard(s: State, chapter: string): HTMLElement {
         Array.from({ length: s.total }, () => chapter),
         s.total,
         "Как мина играта",
+        open,
       ),
     ],
     "result-score score-leaf chapter-score",
@@ -173,39 +194,73 @@ export function nextSteps(main: Child, others: Child[]): Child {
   return h("div", { class: "actions" }, main, rest.length ? h("div", { class: "result-actions" }, rest) : null);
 }
 
-/** Going over a game, once it's over: each question, the answer, what was given, the fact behind it, and a word
- * about the question if something's wrong with it. In two parts: the button, kept with the other ways on under the result, and
- * the list it opens, kept for the end of the screen; the button takes the player there. */
-function reviewParts(load: () => Promise<Reviewed[]>): { button: Child; list: Child; opened: () => boolean } {
-  const items = signal<Reviewed[] | null>(null);
-  const error = signal("");
-  let heading: HTMLElement | null = null;
-  const show = () => {
-    if (!heading?.isConnected) return;
-    heading.focus({ preventScroll: true });
-    heading.scrollIntoView({ block: "start", behavior: calm.peek() ? "auto" : "smooth" });
-  };
-  const open = async () => {
-    if (items.peek()) return show();
-    try {
-      items.set(await load());
-      error.set("");
-      requestAnimationFrame(show);
-    } catch (err) {
-      error.set(errorText(err));
-    }
-  };
-  const button = h("button", { class: "btn", type: "button", onclick: open }, "Прегледай въпросите");
-  const list = () => {
-    const all = items();
-    if (!all) return error() ? h("p", { class: "bad", role: "alert" }, error()) : null;
-    heading = h("h2", { class: "section-title review-head", tabindex: -1 }, "Въпросите");
-    return reviewed(all, heading);
-  };
-  return { button, list, opened: () => items() !== null };
+/** What a game's questions gone over are of, and how they open. */
+export interface ReviewOf {
+  /** The game's questions, asked for as the dialog opens. */
+  load: () => Promise<Reviewed[]>;
+  /** Whose questions they are, under the heading: the issue and its score, the chapter, a duel's two. */
+  of: string;
+  /** A duel's two sides: each question says how it went for both. */
+  versus?: Versus;
+  /** The question to open at (its place, from 0), marked for a moment: the tile tapped. */
+  at?: number;
 }
 
-/** A duel's two sides, for its questions gone over (`reviewed`): each one's avatar, the other's name, and how each
+/** A game's questions gone over, the one dialog for every game (the day's issue, a chapter's game, a duel), on the
+ * game's sheet over the page: „Въпросите“ and „Затвори“ at its head, which stays as the list scrolls under it, whose
+ * they are under it, then each question with its answers (the player's and the right one; in a duel how it went for
+ * the other side too) and its fact (reviewed). Opened at a question (`at`), that one is at the top and tinted in its
+ * chapter's colour for a moment (app.css, .lit). Esc, „Затвори“ or a tap beside it puts it away. */
+export function reviewSheet(o: ReviewOf): void {
+  const all = signal<Reviewed[] | null>(null);
+  const error = signal("");
+  const close = () => box.close();
+  const box = h(
+    "dialog",
+    { class: "sheet review-sheet", "aria-labelledby": "review-title" },
+    h(
+      "div",
+      { class: "sheet-panel" },
+      h(
+        "div",
+        { class: "sheet-head" },
+        h("h2", { id: "review-title" }, "Въпросите"),
+        h("button", { class: "link", type: "button", onclick: close }, "Затвори"),
+      ),
+      h("p", { class: "muted review-of" }, o.of),
+      () => {
+        const list = all();
+        if (list) return reviewed(list, o.versus);
+        return error() ? h("p", { class: "bad", role: "alert" }, error()) : h("p", { class: "muted" }, "…");
+      },
+    ),
+  ) as HTMLDialogElement;
+  // A tap beside the sheet puts it away, as Esc does; put away, it goes (the router closes it with the screen).
+  box.addEventListener("click", (e) => {
+    if (e.target === box) close();
+  });
+  box.addEventListener("close", () => box.remove());
+  document.body.append(box);
+  box.showModal();
+  o.load().then(
+    (list) => {
+      all.set(list);
+      if (o.at === undefined) return;
+      // Once the list is drawn: the question asked for right under the head, and marked. The list alone is moved
+      // (scrollIntoView would move the sheet in its dialog too, off its place).
+      requestAnimationFrame(() => {
+        const q = box.querySelector<HTMLElement>(`[data-n="${o.at}"]`);
+        const [panel, head] = [box.querySelector(".sheet-panel"), box.querySelector(".sheet-head")];
+        if (!q || !panel || !head) return;
+        panel.scrollTop += q.getBoundingClientRect().top - head.getBoundingClientRect().bottom - 8;
+        q.classList.add("lit");
+      });
+    },
+    (err) => error.set(errorText(err)),
+  );
+}
+
+/** A duel's two sides, for its questions gone over (reviewSheet): each one's avatar, the other's name, and how each
  * question went for the other (none: a duel that ran out, a player gone since). */
 export interface Versus {
   mine?: string;
@@ -238,69 +293,51 @@ function side(name: string, look: string | undefined, kind: keyof typeof verdict
   );
 }
 
-/** A game's questions gone over, under their heading: each with the answer, what was given, how others answered,
- * the fact behind it, and a word about the question if something's wrong with it. A duel's (`versus`): each a short
- * row, the question, how it went for the two side by side, and the answer in words where a few hold it; the answers
- * as they were given and the fact a tap away. */
-export function reviewed(all: Reviewed[], heading: Child, versus?: Versus): Child {
+/** A game's questions gone over: each a card with its number and chapter and how it went, the question, the answers
+ * as they were given with the right one, how others answered, the fact behind it, and a word about the question if
+ * something's wrong with it. A duel's (`versus`): how it went for the two side by side under the question, in place of
+ * the one word. */
+function reviewed(all: Reviewed[], versus?: Versus): Child {
   return h(
     "section",
     { class: "review" },
-    heading,
     all.map((it) => {
       const kind = it.void ? "void" : it.right ? "right" : it.close ? "close" : it.given ? "wrong" : "missed";
-      const kicker = h(
-        "span",
-        { class: "kicker" },
-        `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""}`,
-      );
-      const body = () => [
+      const theirs = versus?.marks[it.n];
+      // Each fact a note of its own name among the ten („Знаеше ли? Въпрос 3“): ten of one name tell a screen reader
+      // nothing apart.
+      const note = fact(it.reveal.fact, it.reveal.day);
+      if (note instanceof HTMLElement)
+        note.setAttribute("aria-label", `${note.getAttribute("aria-label")} Въпрос ${it.n + 1}`);
+      return h(
+        "article",
+        { class: `reviewed ${kind === "missed" ? "wrong" : kind} t-${it.category}`, "data-n": it.n },
+        h(
+          "p",
+          { class: "reviewed-head" },
+          h("span", { class: "kicker" }, `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""}`),
+          versus ? null : h("span", { class: "reviewed-says" }, verdicts[kind][1]),
+        ),
+        h("h3", { class: "ask" }, it.view.text),
+        versus
+          ? h(
+              "p",
+              { class: "duel-q-sides" },
+              side("Ти", versus.mine, kind),
+              theirs
+                ? side(
+                    versus.name,
+                    versus.theirs,
+                    theirs.right ? "right" : theirs.close ? "close" : theirs.missed ? "missed" : "wrong",
+                  )
+                : null,
+            )
+          : null,
         picture(it.view),
         answered(it.view, it.reveal, it.given, it.right ? "right" : it.close ? "partial" : "wrong"),
         crowdLine(it.view.type, it.reveal.crowd, it.right),
-        fact(it.reveal.fact, it.reveal.day),
+        note,
         report(it.reveal.id),
-      ];
-      if (!versus)
-        return h(
-          "article",
-          { class: `reviewed ${kind === "missed" ? "wrong" : kind}` },
-          h("p", { class: "reviewed-head" }, kicker, h("span", { class: "reviewed-says" }, verdicts[kind][1])),
-          h("h3", { class: "ask" }, it.view.text),
-          body(),
-        );
-      const theirs = versus.marks[it.n];
-      const answer = answerWords(it.view, it.reveal);
-      const open = signal(false);
-      return h(
-        "article",
-        { class: "reviewed duel-q" },
-        h("p", { class: "reviewed-head" }, kicker),
-        h("h3", { class: "ask" }, it.view.text),
-        h(
-          "p",
-          { class: "duel-q-sides" },
-          side("Ти", versus.mine, kind),
-          theirs
-            ? side(
-                versus.name,
-                versus.theirs,
-                theirs.right ? "right" : theirs.close ? "close" : theirs.missed ? "missed" : "wrong",
-              )
-            : null,
-        ),
-        answer ? h("p", { class: "duel-q-answer" }, "Верният отговор: ", h("b", null, answer)) : null,
-        h(
-          "button",
-          {
-            class: "link tap muted duel-q-more",
-            type: "button",
-            "aria-expanded": () => String(open()),
-            onclick: () => open.set(!open.peek()),
-          },
-          () => (open() ? "Скрий" : "Отговорите и фактът"),
-        ),
-        () => (open() ? h("div", { class: "duel-q-body" }, body()) : null),
       );
     }),
   );

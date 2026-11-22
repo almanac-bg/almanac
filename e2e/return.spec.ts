@@ -21,6 +21,6 @@ test("a player who comes back: the day played one short card, its questions a ta
   await expect(gold).toHaveCount(1);
   await expect(gold).toHaveText("Сподели");
 
-  await card.getByRole("button", { name: "Въпросите и фактите" }).click();
-  await expect(page.locator(".review .reviewed")).toHaveCount(10);
+  await card.getByRole("button", { name: "Прегледай въпросите" }).click();
+  await expect(page.getByRole("dialog", { name: "Въпросите" }).locator(".review .reviewed")).toHaveCount(10);
 });

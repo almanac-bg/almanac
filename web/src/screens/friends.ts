@@ -36,7 +36,6 @@ let {
   failure,
   profileHref,
   record,
-  rightsOf,
   withWord,
   who,
   inSight,
@@ -101,7 +100,6 @@ export function friends(kit: Kit): Child {
     failure,
     profileHref,
     record,
-    rightsOf,
     withWord,
     who,
     inSight,
@@ -458,8 +456,21 @@ function addFriend(reload: () => Promise<void>): Child {
   );
 }
 
-/** A friend: their name (with their @username only where another friend has the same name: `same`), their day and the
- * duels between you under it, and a duel a tap away (while changing the list, removing them instead). */
+/** One thing about a friend on the line under their name: an icon, then the number alone („7/10“, „3:1“), in figures
+ * of one width so the rows line up; what it is in whole words (`words`) as its tooltip on a big screen and for a
+ * screen reader. `none`: nothing to count yet, quieter. */
+const stat = (icon: string, figure: string, words: string, none = false): Child =>
+  h(
+    "span",
+    { class: none ? "friend-stat none" : "friend-stat", role: "img", title: words, "aria-label": words },
+    h("span", { class: `i i-${icon}`, "aria-hidden": "true" }),
+    figure,
+  );
+
+/** A friend: their name (with their @username only where another friend has the same name: `same`); under it the
+ * day's issue (the calendar, „7/10“; „—“ while it isn't played) and the duels between the two (the crossed swords,
+ * „3:1“, the viewer's wins first: the one count kept between two players; left out before the first duel), each said
+ * whole by its tooltip; and a duel a tap away (while changing the list, removing them instead). */
 function row(f: Friend, remove: () => void, challenge: () => void, editing: () => boolean, same = false): Child {
   const played = f.won + f.lost + f.drawn;
   return playerRow(
@@ -468,19 +479,10 @@ function row(f: Friend, remove: () => void, challenge: () => void, editing: () =
     f.tag,
     [nameWords(f.name), h("span", { class: same ? "friend-tag same" : "friend-tag" }, ` @${f.tag}`)],
     [
-      h(
-        "span",
-        null,
-        f.today ? ["днес ", rightsOf(f.today.rights, f.today.of)] : h("span", { class: "muted" }, "днес още не"),
-      ),
-      // The pair's record: the one count kept between two players.
-      played
-        ? h(
-            "span",
-            { class: "record", title: `Дуели помежду ви: ${record(f.won, f.lost, f.drawn)}` },
-            `дуели\u00a0${f.won}:${f.lost}`,
-          )
-        : null,
+      f.today
+        ? stat("today", `${f.today.rights}/${f.today.of}`, `Днешният брой: ${f.today.rights} от ${f.today.of}`)
+        : stat("today", "—", "Днешният брой: още не е изигран", true),
+      played ? stat("duel", `${f.won}:${f.lost}`, `Дуели помежду ви: ${record(f.won, f.lost, f.drawn)}`) : null,
     ],
     null,
     () =>

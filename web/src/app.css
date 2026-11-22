@@ -166,6 +166,7 @@
     --i-pencil: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17z'/%3E%3Cpath d='M13.5 8.5l2 2'/%3E%3C/svg%3E");
     --i-today: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='5' width='17' height='15.5' rx='3'/%3E%3Cpath d='M8 3v4M16 3v4M3.5 10h17'/%3E%3Ccircle cx='12' cy='15.25' r='1.75' fill='%23000' stroke='none'/%3E%3C/svg%3E");
     --i-book: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 18.5V5.5A2.5 2.5 0 0 1 7.5 3H19v14H7.5A2.5 2.5 0 0 0 5 19.5 1.5 1.5 0 0 0 6.5 21H19'/%3E%3Cpath d='M9 7.5h6'/%3E%3C/svg%3E");
+    --i-duel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 4l16 16M13.5 18.5l5-5M20 4L4 20M10.5 18.5l-5-5'/%3E%3C/svg%3E");
     --i-friends: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='8' r='3.25'/%3E%3Cpath d='M3 19.5c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5'/%3E%3Cpath d='M15.5 4.9a3.25 3.25 0 0 1 0 6.2M17.5 14.3c2 .6 3.5 2.4 3.5 5.2'/%3E%3C/svg%3E");
   }
 
@@ -507,6 +508,11 @@
 
   .i-friends {
     --i: var(--i-friends);
+  }
+
+  /* Two swords crossed: the duels between two players (a friend's row). */
+  .i-duel {
+    --i: var(--i-duel);
   }
 
   /* ---- The frame: the bar, the places ---- */
@@ -1361,6 +1367,29 @@
   .tile.void .tile-pic {
     opacity: 0.4;
     background: none;
+  }
+
+  /* A result's tile is a way to its question gone over (ui.ts, tiles): a button over the whole of it, a little taller
+     than the tile under a finger; and the card they're on opens the questions too (results.ts, opensReview). */
+  .tile-tap {
+    appearance: none;
+    position: absolute;
+    inset: 0;
+    padding: 0;
+    border: 0;
+    border-radius: inherit;
+    background: none;
+    cursor: pointer;
+  }
+
+  .tile-tap::before {
+    content: "";
+    position: absolute;
+    inset: -8px 0;
+  }
+
+  .opens {
+    cursor: pointer;
   }
 
   /* Still to come (a day half-played). */
@@ -3666,8 +3695,7 @@
     margin: 0;
   }
 
-  /* What a card leads to (its questions, another duel): small buttons in a row at its foot, wrapping where two don't
-     fit. */
+  /* What a card leads to, its questions: a small button at its foot. */
   .duel-card-acts {
     display: flex;
     flex-wrap: wrap;
@@ -3682,11 +3710,6 @@
     font-size: 0.875rem;
   }
 
-  .duel-card-no {
-    font-size: 0.8125rem;
-    text-align: center;
-  }
-
   /* Two cards a row where there's room for both; the one named in the address (just played) alone at the head. */
   @media (min-width: 48rem) {
     .duel-cards {
@@ -3698,39 +3721,82 @@
     }
   }
 
-  /* A duel's questions on a sheet („Въпросите“: results.ts, reviewed): under its heading whose duel it is, then each
-     question a short tinted card: its number and chapter, the question, how it went for the two side by side, the
-     answer; the answers as they were given and the fact a tap away. */
-  .duel-sheet .sheet-panel {
+  /* A game's questions gone over, in their dialog (results.ts, reviewSheet: the day's issue's, a chapter's game's, a
+     duel's): the game's sheet, a reading column wide, never the whole height of a phone (the page shows over it, and
+     a tap there puts it away); its head, „Въпросите“ and „Затвори“, stays as the questions scroll under it; under the
+     head whose questions they are, then each question a card. */
+  .review-sheet .sheet-panel {
+    --pad: 20px;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-3);
-    width: min(100%, 36rem);
+    width: min(100%, 40rem);
+    max-height: calc(100% - var(--space-5));
+    padding: 0 var(--pad) calc(var(--space-5) + env(safe-area-inset-bottom));
   }
 
-  .duel-sheet .review {
-    gap: var(--space-2);
+  .review-sheet .sheet-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: 0 calc(-1 * var(--pad));
+    padding: var(--space-4) var(--pad) var(--space-3);
+    background: var(--surface);
   }
 
-  .duel-q.reviewed {
-    gap: var(--space-2);
-    padding: var(--space-4) var(--space-4) var(--space-1);
+  .review-sheet .review {
+    gap: var(--space-3);
+  }
+
+  .review-sheet .reviewed {
     border-radius: var(--r-2);
   }
 
-  .duel-q .ask {
-    font-size: 1.0625rem;
-    line-height: 1.4375rem;
+  @media (min-width: 56.25rem) {
+    .review-sheet .sheet-panel {
+      --pad: var(--space-6);
+      max-height: calc(100% - 2 * var(--space-6));
+      padding-bottom: var(--pad);
+    }
   }
 
-  /* The two, side by side, each half the row: the player's on the left, the other's on the right, as on the card.
-     Right in ink, anything else quieter, so a question that parted them shows at a glance. With large text, where two
-     don't fit a row, one under the other. */
+  /* What a tap led to, marked for a moment: a question of the dialog (the tile tapped), a fact of a chapter (the
+     day's ink): a soft tint of its chapter's colour over it, which fades away; nothing moves. With less motion it
+     shows as long and then goes at once (the calm rules, at the end). */
+  .lit {
+    position: relative;
+  }
+
+  .lit::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--tv, var(--ink));
+    opacity: 0;
+    pointer-events: none;
+    animation: lit 1.8s ease-out;
+  }
+
+  @keyframes lit {
+    0%,
+    20% {
+      opacity: 0.22;
+    }
+
+    100% {
+      opacity: 0;
+    }
+  }
+
+  /* In a duel, how a question went for the two, side by side under it, each half the row: the player's on the left,
+     the other's on the right, as on the card. Right in ink, anything else quieter, so a question that parted them
+     shows at a glance. With large text, where two don't fit a row, one under the other. */
   .duel-q-sides {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2) var(--space-3);
-    margin: var(--space-1) 0 0;
+    margin: 0;
   }
 
   .duel-q-side {
@@ -3750,29 +3816,6 @@
   .duel-q-side .avatar.s {
     --size: 24px;
     margin: 0;
-  }
-
-  .duel-q-answer {
-    margin: 0;
-    color: var(--ink-3);
-    font-size: 0.9375rem;
-    overflow-wrap: break-word;
-  }
-
-  .duel-q-answer b {
-    color: var(--ink);
-    font-weight: 800;
-  }
-
-  .duel-q-more {
-    font-size: 0.9375rem;
-  }
-
-  .duel-q-body {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-3);
-    padding-bottom: var(--space-3);
   }
 
   /* A friend to start a duel with (/duel/new): a row, the whole of it a button (never a way to a profile: under a
@@ -4924,11 +4967,6 @@
 
   /* A shared day's score over the same ten, as its link brought it. */
 
-  /* The questions, once opened at the end of a result: „Прегледай въпросите“ brings their heading to the top. */
-  .review-head {
-    scroll-margin-top: var(--space-5);
-  }
-
   /* The picture by a streak's notice. */
 
   /* A day missed that the streak forgave. */
@@ -5850,7 +5888,7 @@
   }
 
   /* ---- The day's result, in its budget's order: the score on its sheet, what the day wrote in the book, the friends,
-     the action, tomorrow; „Въпросите и фактите“ under them ---- */
+     the action, tomorrow; the questions and their facts a tap away, in their dialog ---- */
 
   .result-main,
   .result-side {
@@ -6325,7 +6363,7 @@
     white-space: nowrap;
   }
 
-  /* „Въпросите и фактите“: the rest of the day, a tap away. */
+  /* „Прегледай въпросите“: the rest of the day, a tap away in its dialog. */
   .more {
     appearance: none;
     display: flex;
@@ -6347,24 +6385,11 @@
     height: 20px;
   }
 
-  /* „Въпросите и фактите“ (and a game's „Прегледай въпросите“): a reading column, never the spread's whole width. */
-  .result-review,
-  .spread > .review {
-    max-width: 45rem;
-  }
-
   /* A chapter game's ways on after its one action: quiet links in a line, wrapping where they must. */
   .result-links {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-2) var(--space-5);
-  }
-
-  .result-review {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-5);
-    padding-top: var(--space-5);
   }
 
   /* How all of България did, on the day's board's България tab: eleven bars, 0 to 10, the player's in ink, the
@@ -6558,8 +6583,8 @@
       display: grid;
     }
 
-    /* The result: the score and what the day wrote on the left page, the action, tomorrow and the day's board on the right;
-       what's under „Въпросите и фактите“ across both. */
+    /* The result: the score and what the day wrote on the left page, the action, tomorrow and the day's board on the
+       right. */
     .result.spread > .result-main {
       grid-column: 1 / span 7;
     }
@@ -6786,9 +6811,25 @@
     font: 700 0.875rem / 1.2 var(--font-sans);
   }
 
-  .record {
+  /* One thing about a friend under their name (friends.ts, stat): an icon, then its number alone, in figures of one
+     width so the rows line up; nothing to count yet, quieter. */
+  .friend-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .friend-stat .i {
+    width: 1.125em;
+    height: 1.125em;
     color: var(--ink-3);
-    font: 700 0.8125rem / 1.3 var(--font-sans);
+  }
+
+  .friend-stat.none {
+    color: var(--ink-3);
   }
 
   /* A tag typed after its @. */
@@ -7022,6 +7063,11 @@
   :root.calm *::after {
     animation: none;
     transition: none;
+  }
+
+  /* What a tap led to is still marked (.lit), as long, and then isn't: shown and gone, with no fade between. */
+  :root.calm .lit::after {
+    animation: lit 1.8s step-end;
   }
 
   /* A switch: a row with words on the left and a knob on the right, all of it the switch's to tap (a label). */

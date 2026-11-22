@@ -339,7 +339,8 @@ func TestOnThisDay(t *testing.T) {
 	}
 }
 
-// A game is gone over on the day it ended (one ended just before midnight, right after it too), never days later.
+// A game is gone over on the day it ended (one ended just before midnight, right after it too), never days later;
+// a duel's on any day (TestDuelWithAFriend).
 func TestReviewOnItsDay(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -1118,6 +1119,16 @@ func TestAlmanacPages(t *testing.T) {
 	}
 	if err != nil || !slices.Equal(got, want[4:8]) || a.Found != len(ids) || a.Since != "" {
 		t.Fatalf("the second page of fours: %v (%d found, since %q) %v", got, a.Found, a.Since, err)
+	}
+	// By a fact of it: the page that holds it, whichever it is (the first for one the book hasn't).
+	for i, id := range want {
+		a, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Fact: id, Limit: 4})
+		if err != nil || a.Page != i/4 || !slices.ContainsFunc(a.Facts, func(l Learned) bool { return l.ID == id }) {
+			t.Fatalf("the page of fact %d (%s): page %d, %v", i, id, a.Page, err)
+		}
+	}
+	if a, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Fact: "none", Limit: 4}); err != nil || a.Page != 0 || len(a.Facts) != 4 {
+		t.Fatalf("the page of a fact the book hasn't: %+v %v", a, err)
 	}
 	var history []string
 	for _, id := range want {

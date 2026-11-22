@@ -1,9 +1,10 @@
 // A duel as a card, and the cards as Приятели's „Дуели“ lists them (friends.ts). The card is all there is of a duel
 // (DECISIONS.md: no page of its result): its kind, the two face to face with how it stands between them, how each
 // question went for each side (two rows of ten small squares, as the boards draw them), one quiet line where there's
-// more to say, and what it leads to: its questions on a sheet, on the day the player's own game ended (play.Review),
-// and another duel (a rematch, another recording). The duel just played, or named by an old link to it, comes first
-// (`top`), and its score counts up once as it lands (feel.ts: duel), never again.
+// more to say, and one thing it leads to: its questions in their dialog (results.ts, reviewSheet), once the player's
+// own game is played, on any day (play.Review). A new duel starts from „Нов дуел“ under the cards, never from a card.
+// The duel just played, or named by an old link to it, comes first (`top`), and its score counts up once as it lands
+// (feel.ts: duel), never again.
 //
 // It's Приятели's, loaded with it, and is handed the app's pieces: it imports only types.
 
@@ -12,27 +13,11 @@ import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
 import type { SoundName } from "../lib/sound.ts";
 import type { Look } from "../ui.ts";
-import type { DuelMark, Duels, DuelView, Side, To } from "./duel.ts";
+import type { DuelMark, Duels, DuelView, Side } from "./duel.ts";
 
 // The app's pieces, set as the cards are drawn (duelCards).
-let {
-  api,
-  avatar,
-  errorText,
-  feelKit,
-  formatNumber,
-  go,
-  h,
-  hands,
-  leftWords,
-  mini,
-  nameWords,
-  play,
-  reviewed,
-  signal,
-  startDuel,
-  withWord,
-} = {} as Kit;
+let { api, avatar, feelKit, formatNumber, h, hands, leftWords, mini, nameWords, play, reviewSheet, withWord } =
+  {} as Kit;
 
 /** How many questions a duel has. */
 const total = 10;
@@ -134,39 +119,7 @@ function marksRows(d: DuelView): Child {
   return rows.length ? h("span", { class: "duel-card-marks" }, rows) : null;
 }
 
-/** What a button on a card couldn't do (another duel past a limit), kept by its duel while the list is drawn again. */
-const said = new Map<number, string>();
-
-/** A small button on a played card that starts another duel (a rematch, the other way round; another recording), and
- * says so on the card if it can't (a limit reached). */
-function again(d: DuelView, label: string, to: To, no: { set(text: string): void }): Child {
-  const busy = signal(false);
-  return h(
-    "button",
-    {
-      class: "btn inline",
-      type: "button",
-      disabled: busy,
-      onclick: async () => {
-        busy.set(true);
-        said.clear();
-        no.set("");
-        try {
-          const next = await startDuel(to);
-          if (next) go(`/duel/${next.id}`);
-        } catch (err) {
-          said.set(d.id, errorText(err));
-          no.set(said.get(d.id) ?? "");
-        } finally {
-          busy.set(false);
-        }
-      },
-    },
-    label,
-  );
-}
-
-/** What a duel's sheet is called under its heading: who it's with, and its score. */
+/** Whose questions a duel's dialog goes over, under its heading: who it's with, and its score. */
 function sheetOf(d: DuelView): string {
   const them = d.opponent?.name ?? "";
   const whose = d.recorded ? `Срещу запис на ${them}` : `Дуел ${withWord(them)}`;
@@ -175,57 +128,26 @@ function sheetOf(d: DuelView): string {
     : whose;
 }
 
-/** A duel's questions on a sheet over Приятели („Въпросите“, on the day the player's own game ended): each question,
- * how it went for the two side by side, the right answer, and the answers as given and the fact a tap away
- * (results.ts, reviewed). Esc, „Затвори“ or a tap beside it puts it away. */
+/** A duel's questions in the game's one dialog for them („Въпросите“: results.ts, reviewSheet), on any day: each
+ * question, how it went for the two side by side, the answers and the fact. */
 function questions(d: DuelView): void {
-  const all = signal<Reviewed[] | null>(null);
-  const error = signal("");
-  api<{ questions: Reviewed[] }>("GET", `/api/runs/${d.runId}/review`).then(
-    (r) => all.set(r.questions),
-    (err) => error.set(errorText(err)),
-  );
-  const close = () => box.close();
-  const box = h(
-    "dialog",
-    { class: "sheet duel-sheet", "aria-labelledby": "duel-sheet-title" },
-    h(
-      "div",
-      { class: "sheet-panel" },
-      h(
-        "div",
-        { class: "sheet-head" },
-        h("h2", { id: "duel-sheet-title" }, "Въпросите"),
-        h("button", { class: "link", type: "button", onclick: close }, "Затвори"),
-      ),
-      h("p", { class: "muted duel-sheet-of" }, sheetOf(d)),
-      () => {
-        const list = all();
-        if (list)
-          return reviewed(list, null, {
-            mine: bare(d.you),
-            theirs: bare(d.opponent),
-            name: d.opponent?.name ?? "Съперникът",
-            // Nothing of a duel that ran out, nor of a player gone since: the player's own game alone.
-            marks: !ended(d) || d.opponent?.gone ? [] : (d.opponent?.marks ?? []),
-          });
-        return error() ? h("p", { class: "bad", role: "alert" }, error()) : h("p", { class: "muted" }, "…");
-      },
-    ),
-  ) as HTMLDialogElement;
-  // A tap beside the sheet puts it away, as Esc does; put away, it goes (the router closes it with the screen).
-  box.addEventListener("click", (e) => {
-    if (e.target === box) close();
+  reviewSheet({
+    load: () => api<{ questions: Reviewed[] }>("GET", `/api/runs/${d.runId}/review`).then((r) => r.questions),
+    of: sheetOf(d),
+    versus: {
+      mine: bare(d.you),
+      theirs: bare(d.opponent),
+      name: d.opponent?.name ?? "Съперникът",
+      // Nothing of a duel that ran out, nor of a player gone since: the player's own game alone.
+      marks: !ended(d) || d.opponent?.gone ? [] : (d.opponent?.marks ?? []),
+    },
   });
-  box.addEventListener("close", () => box.remove());
-  document.body.append(box);
-  box.showModal();
 }
 
 /** A duel as a card: its kind at the top („С приятел“, „Срещу запис“), then the two face to face, the player on the
  * left, with how it stands between them (cardMiddle), the duel question by question (marksRows), what more there is
- * to say on one quiet line (noteLine), and what it leads to: „Въпросите“ while they can be gone over, and another duel
- * (a rematch with a friend, another recording). A duel to play is one link to its game, the whole of it (`play`: the
+ * to say on one quiet line (noteLine), and the one thing it leads to: „Въпросите“, once the player's own game in it is
+ * played. A duel to play is one link to its game, the whole of it (`play`: the
  * first waiting for the player, with „Играй“, the page's one action, in it); any other is no link, and no name in it
  * is a way to a profile, so none looks like one. `lands`: its result as a moment, once. */
 function duelCard(d: DuelView, play = false, lands = false): Child {
@@ -255,20 +177,21 @@ function duelCard(d: DuelView, play = false, lands = false): Child {
         play ? h("span", { class: "btn primary duel-card-go" }, "Играй") : null,
       ),
     );
-  const no = signal(said.get(d.id) ?? "");
-  const acts = [
-    d.review && d.runId
-      ? h("button", { class: "btn inline", type: "button", onclick: () => questions(d) }, "Въпросите")
-      : null,
-    ended(d) && d.friend && d.them ? again(d, "Реванш", { friend: d.them }, no) : null,
-    d.state !== "theirs" && d.recorded ? again(d, "Още един срещу запис", { recording: true }, no) : null,
-  ].filter(Boolean);
   const card = h(
     "div",
     { class: cls, id: `duel-${d.id}` },
     body,
-    acts.length ? h("span", { class: "duel-card-acts" }, acts) : null,
-    () => (no() ? h("span", { class: "bad duel-card-no", role: "alert" }, no()) : null),
+    d.you?.done && d.runId
+      ? h(
+          "span",
+          { class: "duel-card-acts" },
+          h(
+            "button",
+            { class: "btn inline", type: "button", "aria-haspopup": "dialog", onclick: () => questions(d) },
+            "Въпросите",
+          ),
+        )
+      : null,
   ) as HTMLElement;
   if (lands) land(card, d);
   return h("li", null, card);
@@ -309,24 +232,7 @@ function land(card: HTMLElement, d: DuelView): void {
  * theirs to play (the first of them with the page's one action, „Играй“) and those waiting for a friend, each card
  * saying whose turn it is; then those played, the last ten, which the heading says once there are that many. */
 export function duelCards(kit: Kit, d: Duels, top: DuelView | null, under: Child = null): Child {
-  ({
-    api,
-    avatar,
-    errorText,
-    feelKit,
-    formatNumber,
-    go,
-    h,
-    hands,
-    leftWords,
-    mini,
-    nameWords,
-    play,
-    reviewed,
-    signal,
-    startDuel,
-    withWord,
-  } = kit);
+  ({ api, avatar, feelKit, formatNumber, h, hands, leftWords, mini, nameWords, play, reviewSheet, withWord } = kit);
   const rest = (v: DuelView) => v.id !== top?.id;
   const open = [...d.yours, ...d.theirs].filter(rest).map(shown);
   const played = d.played.filter(rest).map(shown);

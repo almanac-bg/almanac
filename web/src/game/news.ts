@@ -1,5 +1,6 @@
 // What a game brought, said once, at its end, quietly: the ink it wrote in the Алманах (play/ink.go), the whole of it
-// at a glance („+6 с мастило“) over the chapters it went to, each its tile and its „+1“; a right answer in the issue
+// at a glance („+6 с мастило“) over the chapters it went to, each its tile and its „+1“, a tap from those facts in
+// its chapter, marked there for a moment (/almanac/<chapter>?fact=<id>: screens/almanac.ts); a right answer in the issue
 // that stayed grey because the book had its fact already; and the ranks it raised (play/rank.go): several as one line
 // (one chapter's with its ladder of ranks), and a rise of the player's best rank as the result's one big moment, the
 // seal set large on its ladder. A game that ended without its result on screen has
@@ -17,12 +18,26 @@ import { chapterName, ladder, seal } from "../ui.ts";
 interface News {
   /** The facts the game wrote in the Алманах in ink (play.News.Ink). */
   ink?: number;
-  /** The same by chapter, in the order the game asked them (play.News.Chapters). */
-  chapters?: { chapter: string; ink: number }[];
+  /** The same by chapter, in the order the game asked them (play.News.Chapters), each with the facts written (their
+   * questions' ids). */
+  chapters?: ChapterInk[];
   /** Right answers in the issue to questions the book had already: their facts stay grey (play: „вече срещан“). */
   metBefore?: number;
   /** The ranks risen since last told, as one (play.Rose): Бележка never; `best`, the player's best rank rose. */
   rose?: { ranks: { chapter: string; name: string; to?: number; ink?: number }[]; best?: boolean };
+}
+
+interface ChapterInk {
+  chapter: string;
+  ink: number;
+  facts?: string[];
+}
+
+/** A chapter of the book at the facts a game wrote in it: they're in the address, and the chapter opens at them, marked
+ * (screens/almanac.ts). */
+function factsHref(c: ChapterInk): string {
+  const q = new URLSearchParams((c.facts ?? []).map((id) => ["fact", id]));
+  return `/almanac/${c.chapter}${q.size ? `?${q}` : ""}`;
 }
 
 /** What a game brought, asked for once the game (run) is kept (after `delay`: a duel is kept a moment after it ends).
@@ -77,8 +92,8 @@ export function news(
 
 /** The ink a game wrote, the whole of it at a glance and a tap from the book („+6 с мастило“), and under it the
  * chapters it went to in the order they were asked, each its tile (a right one's, as the score has it) and its „+1“,
- * a tap from its chapter (read aloud „История: +2“). */
-function inkLine(ink: number, chapters: { chapter: string; ink: number }[]): Child {
+ * a tap from those facts in its chapter (read aloud „История: +2“). */
+function inkLine(ink: number, chapters: ChapterInk[]): Child {
   return [
     h(
       "a",
@@ -99,7 +114,7 @@ function inkLine(ink: number, chapters: { chapter: string; ink: number }[]): Chi
                 "a",
                 {
                   class: `ink-chapter t-${c.chapter}`,
-                  href: `/almanac/${c.chapter}`,
+                  href: factsHref(c),
                   "aria-label": `${chapterName(c.chapter)}: +${c.ink}`,
                   title: chapterName(c.chapter),
                 },

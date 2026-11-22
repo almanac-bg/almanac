@@ -59,13 +59,8 @@ export interface DuelView {
   /** When an open duel lapses. */
   until?: number;
   lapsed?: "you" | "they";
-  /** The player's own game can still be gone over (play.DuelView.Review: on the day it ended). */
-  review?: boolean;
   /** Of one won on even right answers: what broke the tie (play.DuelView.TieBy), the number nearer. */
   tieBy?: "number";
-  /** The other is a friend now (`them`, their id): a rematch is a tap away. */
-  friend?: boolean;
-  them?: number;
 }
 
 /** Who a duel is with, to start one: a friend (by their id), or a recording (one kind: the game nearest to the

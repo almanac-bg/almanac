@@ -76,10 +76,14 @@ packages' doc comments; this file holds only what must not drift.
   - **Duels on one's own time:** a friend has 7 days; or a real recording, of one kind (2026-11-22, the owner: the
     choice between „равен“ and „по-силен“ is gone: one more thing to decide, for little; the recording is the game
     nearest to the player, „на играч, който знае горе-долу колкото теб“). A friend's record against you stays: the
-    one count kept between two players.
+    one count kept between two players. A friend's row says it and the day's issue as an icon and a number each
+    („7/10“, „3:1“), whole in the tooltip (2026-11-22, the owner: „днес още не“ and „дуели 3:1“ in words read as
+    neither).
   - **A duel has no result page** (2026-11-22, the owner): everything about a duel is on its card in Приятели's
-    „Дуели“: the two, the score, the two rows of marks, one quiet line, „Въпросите“ on a sheet on the day it was
-    played, „Реванш“ or „Още един срещу запис“. A duel's game ends on that tab, its card first, the score counting up
+    „Дуели“: the two, the score, the two rows of marks, one quiet line, and „Въпросите“, its questions in their
+    dialog, on any day (2026-11-22, the owner: the other side plays when they can, so a duel's result often comes
+    on another day, and its questions are what the two talk over). Nothing else on a card: „Реванш“ and „Още един
+    срещу запис“ are gone (2026-11-22, the owner), a new duel starts from „Нов дуел“, the one way. A duel's game ends on that tab, its card first, the score counting up
     once; `/duel/<id>` only starts and plays one, and an old link to a finished duel comes to its card. The played
     list is the last ten, and says so („Последните 10 изиграни“).
   - **Friends** are added by username or email, a request the other says yes to. The personal invite link was removed
@@ -91,7 +95,10 @@ packages' doc comments; this file holds only what must not drift.
   - **Sharing:** the score and its tiles, never the answers, unsigned, with a way into the same ten.
   - **A result has a budget:** the score and tiles, what the day wrote in the book (its ink by chapter, a rank risen:
     2026-11-22, no single question picked out of the ten), one action, tomorrow, the
-    day's board (Приятели · Всички); with a crowd, how Bulgaria did that day („средно 6,2“). Everything else under „Въпросите и фактите“. A
+    day's board (Приятели · Всички); with a crowd, how Bulgaria did that day („средно 6,2“). Everything else is in the
+    questions' dialog, off the page: one dialog for every game's questions (the day's, a chapter's game's, a
+    duel's), opened by „Прегледай въпросите“, by the score's card, and by a tile at its question (2026-11-22, the
+    owner: the list in the page made the result long, and a duel had a second kind of it). A
     wrong game is never celebrated; a best rank rising and a ten of ten are the only big moments.
   - **The player's nouns are a closed list:** Брой, близо, серия, Алманах (глави, факти, мастило), печат, игра на
     главата (всички глави, България), приятели, класация, дуел (запис), споделяне, профил, напомняне. Adding one is the owner's
@@ -122,7 +129,8 @@ packages' doc comments; this file holds only what must not drift.
   against someone (owner, 2026-11-19, undoing review S13's unnamed recordings). The other way, the recorded player is
   never told who played their games. The privacy page says so.
 - **Removed to keep the game simple** (owner, 2026-11-19; sharing and friends' duels came back with the redesign): past days'
-  questions (the archive of past issues, and going over a game after its day), winning a broken streak back, and the
+  questions (the archive of past issues, and going over a game after its day, except a duel's own questions, from
+  its card: 2026-11-22), winning a broken streak back, and the
   year's report; and on 20 Nov, Профил's chart of the days („Твоите броеве“), Начало's line of how yesterday ended,
   Класации' „Вчера“, the book's notes and profile totals (on the direction), Втори шанс (the questions got wrong, asked again days later), the weekly leagues, rooms
   (playing together with a code; the games played in them stay the players'), and blocking players (a request can

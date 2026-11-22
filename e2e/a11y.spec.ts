@@ -139,9 +139,6 @@ for (const scheme of ["light", "dark"] as const) {
       first: true,
       createdAt: Date.now(),
       endedAt: Date.now(),
-      review: true,
-      friend: true,
-      them: 2,
     };
     // One right for both, one that parted them.
     const asked = (n: number, right: boolean) => ({
@@ -175,12 +172,13 @@ for (const scheme of ["light", "dark"] as const) {
     const { violations } = await new AxeBuilder({ page }).analyze();
     expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
 
-    // Played today: its questions on a sheet, the first opened.
+    // Its questions in their dialog, each with how it went for the two, its answers and its fact.
     await card.getByRole("button", { name: "Въпросите" }).click();
-    const sheet = page.locator("dialog.duel-sheet");
-    await expect(sheet.locator(".duel-q")).toHaveCount(2);
-    await sheet.locator(".duel-q-more").first().click();
-    await expect(sheet.locator(".duel-q-body")).toBeVisible();
+    const sheet = page.locator("dialog.review-sheet");
+    await expect(sheet.locator(".reviewed")).toHaveCount(2);
+    await expect(sheet.locator(".duel-q-side")).toHaveCount(4);
+    await expect(sheet.locator(".fact")).toHaveCount(2);
+    await expect(sheet.getByRole("complementary", { name: "Знаеше ли? Въпрос 2" })).toBeVisible();
     await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"));
     const rows = await new AxeBuilder({ page }).analyze();
     expect(rows.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);

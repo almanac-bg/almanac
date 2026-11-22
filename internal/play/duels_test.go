@@ -145,7 +145,7 @@ func TestFriendDuel(t *testing.T) {
 		t.Fatal("no news for Ana of her duel's result")
 	}
 	d, err = w.g.DuelOf(ctx, ana, id)
-	if err != nil || d.State != DuelWon || !d.Review || !d.Friend || d.Record == nil ||
+	if err != nil || d.State != DuelWon || d.Record == nil ||
 		*d.Record != (Record{Won: 1}) || len(d.Opponent.Marks) != Length || d.You.Rights != Length {
 		t.Fatalf("Ana's result: %+v %v", d, err)
 	}
@@ -154,9 +154,9 @@ func TestFriendDuel(t *testing.T) {
 		t.Fatalf("Bo's played: %+v", db)
 	}
 	// The list has a played duel whole, as its card shows it (there's no other page of it): how each question went for
-	// the two, that its questions can be gone over today, and the friend to send a rematch to.
+	// the two.
 	if p := db.Played[0]; len(p.You.Marks) != Length || len(p.Opponent.Marks) != Length || p.You.Marks[0].Right ||
-		!p.Opponent.Marks[0].Right || !p.Review || !p.Friend || p.Them != ana {
+		!p.Opponent.Marks[0].Right || p.RunID == 0 {
 		t.Fatalf("Bo's played duel, as its card has it: %+v (%+v / %+v)", p, p.You, p.Opponent)
 	}
 	if _, err := w.g.PlayDuel(ctx, bo, id); !errors.Is(err, ErrDuelOver) {
@@ -179,10 +179,23 @@ func TestFriendDuel(t *testing.T) {
 	if list, _ := w.g.FriendsOf(ctx, ana); len(list) != 1 || list[0].Won != 1 || list[0].Lost != 1 {
 		t.Fatalf("Ana's friends: %+v", list)
 	}
-	// Its questions are gone over on the day a player's own game ended, as any game's (Review): not days later.
+	// A duel's questions are gone over on any day, by each side its own game (Review), never by anyone else; a
+	// chapter's game, played the same day, only on its day.
+	topic, err := w.g.StartTopic(ctx, ana, "history")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(ana, topic.ID, repeat(w.right, len(w.picks(topic.ID)))...)
 	w.wait(48 * time.Hour)
-	if d, _ := w.g.DuelOf(ctx, ana, re); d.Review {
-		t.Fatal("a duel's questions still to go over two days later")
+	d, _ = w.g.DuelOf(ctx, ana, re)
+	if r, err := w.g.Review(ctx, ana, d.RunID); err != nil || len(r) != Length || r[0].Right {
+		t.Fatalf("a duel's questions two days later: %d, %v", len(r), err)
+	}
+	if _, err := w.g.Review(ctx, cy, d.RunID); !errors.Is(err, ErrNoRun) {
+		t.Fatalf("Cy went over Ana's game: %v", err)
+	}
+	if _, err := w.g.Review(ctx, ana, topic.ID); !errors.Is(err, ErrReviewOver) {
+		t.Fatalf("a chapter's game two days later: %v", err)
 	}
 }
 

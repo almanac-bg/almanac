@@ -17,8 +17,29 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // The first result's action sits right under the score: keeping the game and being reminded (or, until that's there
   // to ask, sharing it). Topics are played from the Алманах, duels from Приятели.
   await expect(page.locator(".result-main > .result-score + .result-share.result-first")).toBeVisible();
-  await page.getByRole("button", { name: "Въпросите и фактите" }).click();
-  await expect(page.locator(".reviewed")).toHaveCount(10);
+  // The questions gone over, in their dialog: by the button, each question with its answers.
+  const review = page.getByRole("dialog", { name: "Въпросите" });
+  await page.getByRole("button", { name: "Прегледай въпросите" }).click();
+  await expect(review.locator(".reviewed")).toHaveCount(10);
+  await expect(review.locator(".review-of")).toHaveText(/^Брой\s\d+ · \d+ \S+ · \d+ от 10$/);
+  await expect(review.locator(".lit")).toHaveCount(0);
+  await review.getByRole("button", { name: "Затвори" }).click();
+  await expect(review).toHaveCount(0);
+  await expect(page.locator(".result .reviewed")).toHaveCount(0);
+  // By a tap on the score's card: the same dialog, from its top.
+  await page.locator(".result-score .score").click();
+  await expect(review.locator(".reviewed")).toHaveCount(10);
+  await expect(review.locator(".reviewed").first()).toBeInViewport();
+  await page.keyboard.press("Escape");
+  await expect(review).toHaveCount(0);
+  // By a tile: at its question, right under the dialog's head, marked for a moment.
+  await page.getByRole("button", { name: /^7\. / }).click();
+  const seventh = review.locator(".reviewed").nth(6);
+  await expect(seventh).toHaveClass(/\blit\b/);
+  await expect(seventh.locator(".kicker")).toHaveText(/^7 · /);
+  const [head, at] = [await review.locator(".sheet-head").boundingBox(), await seventh.boundingBox()];
+  expect(Math.abs((at?.y ?? 0) - ((head?.y ?? 0) + (head?.height ?? 0)))).toBeLessThan(32);
+  await page.keyboard.press("Escape");
   await page.reload();
   await expect(page.locator(".result")).toBeVisible();
   await expect(page.getByRole("button", { name: "Започни" })).toHaveCount(0);
@@ -64,14 +85,15 @@ test("a day with none right opens its questions and their facts under the score,
   // Right under the score: the first four, each with its fact, and the way to the rest.
   await expect(page.locator(".result-score + .missed-day .miss")).toHaveCount(4);
   await expect(page.locator(".missed-day .sect-note")).toHaveText("1–4 от 10");
-  // The rest in place, each with its right answer (an order's, a match's, a split's in lines): never the ten again
-  // under a second heading.
-  await page.getByRole("button", { name: "Още 6 въпроса" }).click();
-  await expect(page.locator(".missed-day .miss")).toHaveCount(10);
-  await expect(page.locator(".missed-day .miss .miss-a")).toHaveCount(10);
+  // Each with its right answer (an order's, a match's, a split's in lines); the ten whole in their dialog, by the one
+  // button under the four: never a second way to them beside it.
+  await expect(page.locator(".missed-day .miss .miss-a")).toHaveCount(4);
   await expect(page.locator(".reviewed")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Въпросите и фактите" })).toHaveCount(1);
-  await expect(page.getByRole("button", { name: "Въпросите и фактите" })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Въпросите", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Прегледай въпросите" })).toHaveCount(1);
+  await page.locator(".missed-day").getByRole("button", { name: "Прегледай въпросите" }).click();
+  await expect(page.getByRole("dialog", { name: "Въпросите" }).locator(".reviewed")).toHaveCount(10);
+  await page.keyboard.press("Escape");
   await expect(page.locator(".screen")).not.toContainText(/[Бб]раво|[Пп]оздрав|[Сс]упер|[Оо]тлично/);
 });
 
@@ -103,7 +125,7 @@ test("the day says how its other players did with each question: under the verdi
     await answer(page);
     await moveOn(page);
   }
-  await page.getByRole("button", { name: "Въпросите и фактите" }).click();
+  await page.getByRole("button", { name: "Прегледай въпросите" }).click();
   await expect(page.locator(".reviewed").first().locator(".crowd-says")).toHaveText(/от играчите днес\.$|^Днес /);
 });
 
@@ -124,6 +146,7 @@ test("a topic, ten questions, a question reported, and ten more", async ({ page 
   await page.getByLabel("Какво не е наред?").fill("Отговорът е остарял.");
   await page.getByRole("button", { name: "Прати" }).click();
   await expect(page.getByText("Благодарим ти! Ще го прегледаме.")).toBeVisible();
+  await page.keyboard.press("Escape");
   // One action; the other ways on are quiet links, the way back to its chapter among them.
   await expect(page.locator(".summary .actions .btn.primary")).toHaveCount(1);
   await expect(page.locator(".result-links").getByRole("link", { name: "Към главата" })).toHaveAttribute(

@@ -107,17 +107,11 @@ type DuelView struct {
 	Until int64 `json:"until,omitempty"`
 	// Lapsed is, of a duel that expired, who didn't play it in time: "you" or "they" (none: cut off, from before).
 	Lapsed string `json:"lapsed,omitempty"`
-	// Review says the player's own game in it can still be gone over (Review: on the day it ended), so its card opens
-	// the questions.
-	Review bool `json:"review,omitempty"`
 	// TieBy is, of a duel won on even right answers, what broke the tie (duelScore): TieNumber, the number nearer;
 	// "" for a draw, or a duel won on right answers.
 	TieBy string `json:"tieBy,omitempty"`
 	// Record is how the player's duels against this person went, this one with them (not a recording's).
 	Record *Record `json:"record,omitempty"`
-	// Friend says the other is the player's friend now, Them who they are: a rematch is a tap away.
-	Friend bool  `json:"friend,omitempty"`
-	Them   int64 `json:"them,omitempty"`
 
 	against, theirRun int64
 }
@@ -823,13 +817,13 @@ func (g *Game) DuelsOf(ctx context.Context, userID int64) (Duels, error) {
 		case DuelYours:
 			out.Yours = append(out.Yours, v)
 		case DuelTheirs:
-			if err := g.duelMore(ctx, userID, &v); err != nil {
+			if err := g.duelMore(ctx, &v); err != nil {
 				return out, err
 			}
 			out.Theirs = append(out.Theirs, v)
 		default:
 			if len(out.Played) < DuelsShown {
-				if err := g.duelMore(ctx, userID, &v); err != nil {
+				if err := g.duelMore(ctx, &v); err != nil {
 					return out, err
 				}
 				out.Played = append(out.Played, v)
@@ -987,7 +981,7 @@ func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, erro
 		return DuelView{}, ErrNoDuel
 	}
 	v := list[0]
-	if err := g.duelMore(ctx, userID, &v); err != nil {
+	if err := g.duelMore(ctx, &v); err != nil {
 		return v, err
 	}
 	if !v.Recorded && v.against != 0 {
@@ -1001,35 +995,19 @@ func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, erro
 }
 
 // duelMore adds to a duel (duelsOf) what its card shows of it: how each question went for each side (the player's
-// own; the other's once it has a result: DuelSide.Marks), whether the player's own game can still be gone over
-// (Review), and whether the other is their friend now (a rematch is a tap away).
-func (g *Game) duelMore(ctx context.Context, userID int64, v *DuelView) error {
+// own; the other's once it has a result: DuelSide.Marks). The player's own game, once played, can be gone over from the
+// card on any day (Review).
+func (g *Game) duelMore(ctx context.Context, v *DuelView) error {
 	var err error
 	if v.You != nil && v.RunID != 0 {
 		if v.You.Marks, err = g.duelMarks(ctx, v.RunID); err != nil {
 			return err
 		}
 	}
-	if v.You != nil && v.You.Done && v.RunID != 0 {
-		var ended int64
-		if err := g.DB.Read.QueryRowContext(ctx, `SELECT COALESCE(finished_at, 0) FROM runs WHERE id = ?`, v.RunID).Scan(&ended); err != nil {
-			return err
-		}
-		v.Review = ended != 0 && g.reviewOpen(ended)
-	}
 	result := v.State == DuelWon || v.State == DuelLost || v.State == DuelDraw
 	if v.Opponent != nil && v.theirRun != 0 && result {
 		if v.Opponent.Marks, err = g.duelMarks(ctx, v.theirRun); err != nil {
 			return err
-		}
-	}
-	if !v.Recorded && v.against != 0 {
-		if err := g.DB.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM friends WHERE user_id = ? AND friend_id = ?)`,
-			userID, v.against).Scan(&v.Friend); err != nil {
-			return err
-		}
-		if v.Friend {
-			v.Them = v.against
 		}
 	}
 	return nil
