@@ -1288,7 +1288,7 @@ func TestDayCrowd(t *testing.T) {
 		return rev.Crowd
 	}
 	// Every question asked as it is since before the day, whichever the day's second is (the sample's newer ones were
-	// added after it); and with a fact, as the day's entry names one: the sample has questions without, and the day's
+	// added after it); and with a fact: the sample has questions without, and the day's
 	// draw may deal two of them first (1 run in 30 failed so).
 	for _, q := range w.b.Live("", "") {
 		q.Extra().Added, q.Extra().Changed = "2026-11-01", ""
@@ -1377,19 +1377,6 @@ func TestDayCrowd(t *testing.T) {
 	if c := crowdOf(items[2].Reveal); c != nil {
 		t.Fatalf("the review's third, which no one else answered: %+v", c)
 	}
-	// The rarest right answer for the result shared: the second, which two in ten others got, and Bo: 3 in 11.
-	rare, err := w.g.EntryOfDay(ctx, bo, "2026-11-12")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if rare == nil || rare.N != 1 || !rare.Crowd || math.Abs(rare.Right-3.0/11) > 1e-9 || rare.Alone {
-		t.Fatalf("the rarest right answer: %+v", rare)
-	}
-	// None for a day not finished (ana left it after one question).
-	if rare, _ := w.g.EntryOfDay(ctx, ana, "2026-11-12"); rare != nil {
-		t.Fatalf("a rarest right answer in an unfinished day: %+v", rare)
-	}
-
 	// The browser tests show a crowd from the first answer (CrowdMin); answers from before a question last changed were
 	// to another question.
 	w.g.CrowdMin = 1

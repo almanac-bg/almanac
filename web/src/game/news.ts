@@ -1,36 +1,43 @@
-// What a game brought, said once, at its end, quietly: the ink it wrote in the Алманах (play/ink.go), a right answer
-// in the issue that stayed grey because the book had its fact already, and the chapter nearest its next rank (its
-// seal, how much ink is still to come, over its bar); or the ranks it raised (play/rank.go): several as
-// one line (one chapter's with its ladder of ranks), and a rise of the player's best rank as the result's one big
-// moment, the seal set large on its ladder. A game that ended without its result on screen has
+// What a game brought, said once, at its end, quietly: the ink it wrote in the Алманах (play/ink.go), the whole of it
+// at a glance („+6 с мастило“) over the chapters it went to, each its tile and its „+1“; a right answer in the issue
+// that stayed grey because the book had its fact already; and the ranks it raised (play/rank.go): several as one line
+// (one chapter's with its ladder of ranks), and a rise of the player's best rank as the result's one big moment, the
+// seal set large on its ladder. A game that ended without its result on screen has
 // its news told on Днес later (play/told.go): under its result, if it's the day's; else under a line that says whose it
 // is. A bad game is never celebrated: what's said is what's true of it.
 
+import { picture } from "../art/picture.ts";
 import { api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { formatNumber } from "../lib/words.ts";
 import { rankName, rankNames } from "../seal.ts";
 import { refreshSeal } from "../state.ts";
-import { chapterName, ladder, seal, standing } from "../ui.ts";
+import { chapterName, ladder, seal } from "../ui.ts";
 
 interface News {
   /** The facts the game wrote in the Алманах in ink (play.News.Ink). */
   ink?: number;
+  /** The same by chapter, in the order the game asked them (play.News.Chapters). */
+  chapters?: { chapter: string; ink: number }[];
   /** Right answers in the issue to questions the book had already: their facts stay grey (play: „вече срещан“). */
   metBefore?: number;
   /** The ranks risen since last told, as one (play.Rose): Бележка never; `best`, the player's best rank rose. */
   rose?: { ranks: { chapter: string; name: string; to?: number; ink?: number }[]; best?: boolean };
-  /** After a day's issue, the chapter nearest its next rank (play.Step), when none rose: its rank now (0: none yet), and
-   * the ink it starts at and the next one's. */
-  step?: { chapter: string; left: number; next: string; level: number; from: number; nextAt: number };
 }
 
 /** What a game brought, asked for once the game (run) is kept (after `delay`: a duel is kept a moment after it ends).
  * Told `late` (on Днес, of a game whose result was never on screen), it comes under a line that says whose it is
  * (`late.title`), if any. A best rank risen, the big moment, goes to `bestTo`, where given, not with the rest (the
- * day's result puts it first, under the score).
+ * day's result puts it first, under the score). `head`: the section's heading over it, while there's something to
+ * tell (the day's result: „Днес в Алманаха“).
  */
-export function news(run: number, delay = 0, late?: { title?: string }, bestTo?: (view: Child) => void): Child {
+export function news(
+  run: number,
+  delay = 0,
+  late?: { title?: string },
+  bestTo?: (view: Child) => void,
+  head?: string,
+): Child {
   const data = signal<News | null>(null);
   const t = setTimeout(
     () =>
@@ -51,13 +58,16 @@ export function news(run: number, delay = 0, late?: { title?: string }, bestTo?:
     if (!n) return null;
     const best = !!n.rose?.best && !!n.rose.ranks.length;
     const lines = [
-      n.ink ? inkLine(n.ink) : null,
+      n.ink ? inkLine(n.ink, n.chapters ?? []) : null,
       n.metBefore ? metLine(n.metBefore) : null,
-      n.rose && !best ? roseLine(n.rose) : n.step && !n.rose ? stepLine(n.step) : null,
+      n.rose && !best ? roseLine(n.rose) : null,
     ].filter(Boolean);
+    const card = lines.length ? h("div", { class: "inkline" }, lines) : null;
     const parts = [
       n.rose && best && !bestTo ? rankUp(n.rose) : null,
-      lines.length ? h("section", { class: "inkline", "aria-label": "Днес в Алманаха" }, lines) : null,
+      card && head
+        ? h("section", { class: "sect day-news" }, h("div", { class: "sect-head" }, h("h2", null, head)), card)
+        : card,
     ];
     if (!late?.title) return parts;
     // Late, on Днес: whose news it is, over it; nothing at all when there's nothing to tell.
@@ -65,15 +75,47 @@ export function news(run: number, delay = 0, late?: { title?: string }, bestTo?:
   };
 }
 
-/** The ink a game wrote, a tap from the book: „+6 с мастило“. */
-function inkLine(ink: number): Child {
-  return h(
-    "a",
-    { class: "news-facts ink-row", href: "/almanac" },
-    h("span", { class: "i i-nib", "aria-hidden": "true" }),
-    h("b", { class: "num" }, `+${ink}`),
-    h("span", null, " с\u00a0мастило"),
-  );
+/** The ink a game wrote, the whole of it at a glance and a tap from the book („+6 с мастило“), and under it the
+ * chapters it went to in the order they were asked, each its tile (a right one's, as the score has it) and its „+1“,
+ * a tap from its chapter (read aloud „История: +2“). */
+function inkLine(ink: number, chapters: { chapter: string; ink: number }[]): Child {
+  return [
+    h(
+      "a",
+      { class: "news-facts ink-row", href: "/almanac" },
+      h("span", { class: "i i-nib", "aria-hidden": "true" }),
+      h("b", { class: "num" }, `+${ink}`),
+      h("span", null, " с\u00a0мастило"),
+    ),
+    chapters.length
+      ? h(
+          "ul",
+          { class: "ink-chapters", "aria-label": "По глави" },
+          chapters.map((c) =>
+            h(
+              "li",
+              null,
+              h(
+                "a",
+                {
+                  class: `ink-chapter t-${c.chapter}`,
+                  href: `/almanac/${c.chapter}`,
+                  "aria-label": `${chapterName(c.chapter)}: +${c.ink}`,
+                  title: chapterName(c.chapter),
+                },
+                // As the score's tiles have a right answer: the glyph on its chapter's colour.
+                h(
+                  "span",
+                  { class: `tile right t-${c.chapter}`, "aria-hidden": "true" },
+                  h("span", { class: "tile-pic" }, picture(`topic-${c.chapter}`)),
+                ),
+                h("b", { class: "num" }, `+${c.ink}`),
+              ),
+            ),
+          ),
+        )
+      : null,
+  ];
 }
 
 /** Right answers whose facts the book had already, met before the issue: they stay grey. */
@@ -87,23 +129,6 @@ function metLine(n: number): Child {
   );
 }
 
-/** The chapter nearest its next rank: its seal, its name, and where it stands (ui.ts, standing): its bar, „Страница“
- * under its left end, „още 2 до „Тетрадка““ under its right. */
-function stepLine(s: NonNullable<News["step"]>): Child {
-  return h(
-    "p",
-    { class: "news-step" },
-    s.level > 0 ? h("span", { class: "step-seal" }, seal(s.chapter, s.level, 40)) : null,
-    h(
-      "span",
-      { class: "step-words" },
-      h("b", null, chapterName(s.chapter)),
-      // Its ink, as the step counted it (play.StepOf): what's left of the way to the next.
-      standing({ chapter: s.chapter, level: s.level, ink: s.nextAt - s.left, from: s.from, nextAt: s.nextAt }),
-    ),
-  );
-}
-
 /** Ranks risen, the best not among them (or beside a ten of ten): the seals risen, drawn, and one line for them all,
  * each chapter's name a tap from its page: „Нов печат: „Страница“ в История.“, „Нови печати: „Страница“ в География и
  * в Технологии и игри.“ */
@@ -111,7 +136,7 @@ function roseLine(r: NonNullable<News["rose"]>): Child {
   const one = r.ranks.length === 1 ? r.ranks[0] : undefined;
   return h(
     "div",
-    { class: "news-step news-rose" },
+    { class: "news-rose" },
     h(
       "span",
       { class: "rose-seals" },

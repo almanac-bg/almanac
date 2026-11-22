@@ -2,7 +2,6 @@ package play
 
 import (
 	"encoding/json"
-	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -266,7 +265,7 @@ func rightOf(t *testing.T, d bank.Dealt) json.RawMessage {
 
 // A day with a question void is a game of the nine that count wherever it's counted: nine of nine right is all right
 // (its bonus, a first ten of ten in the book), a row goes over it, a result is told out of nine (the boards, the
-// friends, the games played), the rarest right answer is never the void one, and an answer sent again just before the void one gets its reply again.
+// friends, the games played), and an answer sent again just before the void one gets its reply again.
 func TestVoidDayIsOfNine(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -283,14 +282,6 @@ func TestVoidDayIsOfNine(t *testing.T) {
 		}
 		return w.right
 	})
-	// The rarest is k, if it has a fact to show (TestEntryOfDayRarestWithAFact).
-	if rare, err := w.g.EntryOfDay(ctx, bo, sb.Day); err != nil || rare == nil || !rare.Crowd {
-		t.Fatalf("before the void, the rarest right answer: %+v %v", rare, err)
-	} else if q, _ := w.b.Get(w.picks(sb.ID)[k].ID); (q.Extra().Fact != "") != (rare.N == k) {
-		t.Fatalf("before the void, the rarest right answer: %+v", rare)
-	} else if q, _ := w.b.Get(w.picks(sb.ID)[rare.N].ID); rare.Fact.Fact != q.Extra().Fact || rare.Fact.Issue != Issue(sb.Day) {
-		t.Fatalf("the rarest right answer's fact, as the book has it: %+v", rare.Fact)
-	}
 	sc := w.dayAs(cy, k-1, allRight) // at k-1, not shown yet
 	target := w.picks(sb.ID)[k].ID
 	w.reload(editedSample(t, func(id string, q map[string]any) {
@@ -305,11 +296,6 @@ func TestVoidDayIsOfNine(t *testing.T) {
 	// ana missed only the void one: all right, as bo is.
 	if s := w.stateOf(ana, sa.ID); s.Rights != Length-1 {
 		t.Fatalf("ana: %+v", s)
-	}
-
-	// The rarest right answer is one that counts.
-	if rare, err := w.g.EntryOfDay(ctx, bo, sb.Day); err != nil || rare != nil && rare.N == k {
-		t.Fatalf("after the void, the rarest right answer: %+v %v", rare, err)
 	}
 
 	// Results are out of nine.
@@ -349,99 +335,5 @@ func TestVoidDayIsOfNine(t *testing.T) {
 	again, err := w.answer(cy, sc.ID, k-1, w.right(sc.ID, k-1))
 	if err != nil || !again.Right || again.Reveal == nil {
 		t.Fatalf("sent again: %+v %v", again, err)
-	}
-}
-
-// Without a crowd (fewer than DayCrowdFrom others played the day), a day's result still shows one entry its right
-// answers wrote in the Алманах: the hardest, the last right answer in the ten that has a fact, said plainly as no
-// crowd's, with nothing of others. A day with no right answer shows none.
-func TestEntryOfDayWithoutACrowd(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	w.reload(w.b)
-	ana, bo := w.user(), w.user()
-	s, err := w.g.StartDay(ctx, ana)
-	if err != nil {
-		t.Fatal(err)
-	}
-	picks := w.picks(s.ID)
-	// The last of the ten and the eighth lose their facts; ana misses the ninth.
-	w.reload(editedSample(t, func(id string, q map[string]any) {
-		if id == picks[Length-1].ID || id == picks[Length-3].ID {
-			delete(q, "fact")
-		}
-	}))
-	sa := w.dayAs(ana, -1, func(n int) func(int64, int) json.RawMessage {
-		if n == Length-2 {
-			return w.wrong
-		}
-		return w.right
-	})
-	want := -1
-	for n := range Length - 3 {
-		if q, _ := w.b.Get(picks[n].ID); q.Extra().Fact != "" {
-			want = n
-		}
-	}
-	if want < 0 {
-		t.Fatal("the sample's day has no fact in its first seven")
-	}
-	e, err := w.g.EntryOfDay(ctx, ana, sa.Day)
-	if err != nil || e == nil || e.N != want || e.Crowd || e.Right != 0 {
-		t.Fatalf("the entry without a crowd: %+v %v (want question %d)", e, err, want)
-	}
-	if q, _ := w.b.Get(picks[want].ID); e.Fact.Fact != q.Extra().Fact || e.Fact.Issue != Issue(sa.Day) {
-		t.Fatalf("its fact, as the book has it: %+v", e.Fact)
-	}
-
-	// No right answer: nothing to show, and nothing celebrated.
-	allWrong := func(int) func(int64, int) json.RawMessage { return w.wrong }
-	sb := w.dayAs(bo, -1, allWrong)
-	if e, err := w.g.EntryOfDay(ctx, bo, sb.Day); err != nil || e != nil {
-		t.Fatalf("the entry of a day with no right answer: %+v %v", e, err)
-	}
-}
-
-// With a crowd, the entry is the rarest right answer that has a fact: one rarer without a fact doesn't hide it.
-func TestEntryOfDayRarestWithAFact(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	w.reload(w.b)
-	w.g.CrowdMin = 1
-	ana, bo, cy := w.user(), w.user(), w.user()
-	s, err := w.g.StartDay(ctx, bo)
-	if err != nil {
-		t.Fatal(err)
-	}
-	picks := w.picks(s.ID)
-	// k, which no one else knows, has no fact; j, which half the others know, has one; the rest everyone knows.
-	k, j := Length-1, -1
-	for n := range Length - 1 {
-		if q, _ := w.b.Get(picks[n].ID); j < 0 && q.Extra().Fact != "" {
-			j = n
-		}
-	}
-	if j < 0 {
-		t.Fatal("the sample's day has no fact")
-	}
-	w.reload(editedSample(t, func(id string, q map[string]any) {
-		if id == picks[k].ID {
-			delete(q, "fact")
-		}
-	}))
-	missing := func(miss ...int) func(n int) func(int64, int) json.RawMessage {
-		return func(n int) func(int64, int) json.RawMessage {
-			if slices.Contains(miss, n) {
-				return w.wrong
-			}
-			return w.right
-		}
-	}
-	w.dayAs(ana, -1, missing(k, j))
-	w.dayAs(cy, -1, missing(k))
-	sb := w.dayAs(bo, -1, missing())
-	e, err := w.g.EntryOfDay(ctx, bo, sb.Day)
-	if err != nil || e == nil || e.N != j || !e.Crowd || math.Abs(e.Right-2.0/3) > 1e-9 || e.Fact.Fact == "" { // Bo among them
-		t.Fatalf("the rarest right answer with a fact: %+v %v (want question %d)", e, err, j)
 	}
 }

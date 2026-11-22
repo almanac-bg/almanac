@@ -206,13 +206,14 @@ func TestRanksToldOnce(t *testing.T) {
 	for _, r := range ranks {
 		some += r.Level
 	}
-	if some == 0 || n.Step == nil || n.Step.Left < 1 || n.Step.Next != "Страница" || n.Step.Level != 1 {
-		t.Fatalf("after a day: ranks %+v, step %+v", ranks, n.Step)
+	step, err := w.g.StepOf(ctx, ana)
+	if err != nil || some == 0 || step == nil || step.Left < 1 || step.Next != "Страница" || step.Level != 1 {
+		t.Fatalf("after a day: ranks %+v, step %+v %v", ranks, step, err)
 	}
-	// The step's rank and the way to the next are its chapter's, as kept: the seal and bar it's drawn with.
+	// The step's rank and the way to the next are its chapter's, as kept.
 	for _, r := range ranks {
-		if r.Chapter == n.Step.Chapter && (r.Level != n.Step.Level || r.From != n.Step.From || r.NextAt != n.Step.NextAt) {
-			t.Fatalf("the step %+v, its chapter %+v", n.Step, r)
+		if r.Chapter == step.Chapter && (r.Level != step.Level || max(1, r.NextAt-r.Ink) != step.Left) {
+			t.Fatalf("the step %+v, its chapter %+v", step, r)
 		}
 	}
 	// Five facts of geography in ink, and seven of history: two chapters at Страница, told as one.
@@ -458,8 +459,7 @@ func TestIssueLeftUnfinishedCountsOnceItsDayIsOver(t *testing.T) {
 	if err != nil || s == nil {
 		t.Fatalf("no step: %v", err)
 	}
-	if r := w.rankIn(ana, s.Chapter); s.Left != max(1, r.NextAt-r.Ink) || s.Level != r.Level || s.From != r.From ||
-		s.NextAt != r.NextAt {
+	if r := w.rankIn(ana, s.Chapter); s.Left != max(1, r.NextAt-r.Ink) || s.Level != r.Level {
 		t.Fatalf("the step %+v against its rank %+v", s, r)
 	}
 	// Профил says each chapter's ink as its Алманах card does: the book's.

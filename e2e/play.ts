@@ -274,13 +274,13 @@ export const chapters = [
 
 /** Makes the player (a guest, made now if there's none) one with a seal of `level` in every chapter (2 Страница, 3
  * Тетрадка …), its rank told, straight in the test server's database: Профил's seals, a long name („Изкуство и
- * литература“) among them. */
-export async function ranked(page: Page, level = 3): Promise<void> {
+ * литература“) among them. Each chapter's ink is its rank's first, or as `ink` gives it. */
+export async function ranked(page: Page, level = 3, ink: Record<string, number> = {}): Promise<void> {
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" }).format(new Date());
   await inDB(page, (db, id) => {
     const add = db.prepare(`INSERT OR REPLACE INTO ranks (user_id, chapter, level, quarter, ink, day, told)
       VALUES (?, ?, ?, 1, ?, ?, ?)`);
-    for (const c of chapters) add.run(id, c, level, [0, 1, 5, 15, 40][level] ?? 15, day, level);
+    for (const c of chapters) add.run(id, c, level, ink[c] ?? [0, 1, 5, 15, 40][level] ?? 15, day, level);
   });
 }
 

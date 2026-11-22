@@ -113,7 +113,7 @@ for (const scheme of ["light", "dark"] as const) {
         tab,
       ).toEqual([]);
     }
-    // The score's sheet and the day's entry (its question, „Невярно:“) in the sheet's ink.
+    // The score's sheet in the sheet's ink.
     expect(await greyOnSheets(page)).toEqual([]);
   });
 }

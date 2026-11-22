@@ -21,8 +21,7 @@ import (
 // people's: the answers of games played at a script's speed aren't in it (fair.go).
 //
 // The day's ten are the same for everyone, so a question of the day shows how that day's other players answered it
-// („… от играчите днес“), counted with each answer, once DayCrowdFrom of them have; until then everyone's. The share
-// of the day's players right is also what a day's result tells of its rarest right answer (EntryOfDay).
+// („… от играчите днес“), counted with each answer, once DayCrowdFrom of them have; until then everyone's.
 
 const (
 	// CrowdFrom is how many answers a question needs before its crowd is shown: fewer say little.
@@ -400,93 +399,4 @@ func (d *dayCrowdCache) drop(key string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	delete(d.by, key)
-}
-
-// DayEntry is the one entry a day's result shows of those its right answers wrote in the player's Алманах: its place
-// in the ten, and its fact as the book has it. With a crowd (Crowd: DayCrowdFrom of the day's other players have
-// answered it), it is the rarest right answer („Най-рядкото ти попадение“), and Right the share of them that got it,
-// the player among them, as the issue said it as it was answered (crowdLine: one number for a question everywhere),
-// and Alone that none of the others did; without one, nothing is said of others (Right is 0): it is the hardest, the
-// last in the ten, which go from easy to hard.
-type DayEntry struct {
-	N     int     `json:"n"`
-	Crowd bool    `json:"crowd"`
-	Right float64 `json:"right"`
-	Alone bool    `json:"alone,omitempty"`
-	Fact  Learned `json:"fact"`
-}
-
-// EntryOfDay is the entry of a player's day's ten, finished, that its result shows (DayEntry), of the right answers
-// that count (day.go) and have a fact that's so: the rarest of those with a crowd, else the hardest; nil for none.
-func (g *Game) EntryOfDay(ctx context.Context, userID int64, day string) (*DayEntry, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.n, a.question_id, r.id FROM runs r JOIN answers a ON a.run_id = r.id
-		WHERE r.user_id = ? AND r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND a.is_right
-			AND NOT `+voidAt+` ORDER BY a.n`,
-		userID, day)
-	if err != nil {
-		return nil, err
-	}
-	type right struct {
-		n   int
-		id  string
-		run int64
-	}
-	var rights []right
-	for rows.Next() {
-		var it right
-		if err := rows.Scan(&it.n, &it.id, &it.run); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		rights = append(rights, it)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	// Which of them the day wrote in ink (ink.go): the others, met before, are in pencil.
-	inked := map[string]bool{}
-	ink, err := g.DB.Read.QueryContext(ctx, `SELECT f.question_id FROM facts f JOIN runs r ON r.id = f.run_id
-		WHERE f.user_id = ? AND f.ink AND r.kind = 'day' AND r.day = ?`, userID, day)
-	if err != nil {
-		return nil, err
-	}
-	for ink.Next() {
-		var id string
-		if err := ink.Scan(&id); err != nil {
-			ink.Close()
-			return nil, err
-		}
-		inked[id] = true
-	}
-	ink.Close()
-	if err := ink.Err(); err != nil {
-		return nil, err
-	}
-	var rare, hardest *DayEntry
-	rareOthers := 0.0 // the rarest's share among the others
-	for _, it := range rights {
-		q, ok := g.Bank().Get(it.id)
-		if !ok || q.Extra().Fact == "" || q.Extra().Untrue() {
-			continue
-		}
-		e := []entry{{learnedAs(q, learnedAt{kind: "day", day: day}, inked[it.id]), q, it.run}}
-		if err := g.asDealt(ctx, e); err != nil {
-			return nil, err
-		}
-		hardest = &DayEntry{N: it.n, Fact: e[0].l}
-		c, err := g.dayCrowd(ctx, g.DB.Read, day, q, userID)
-		if err != nil {
-			return nil, err
-		}
-		if c != nil && (rare == nil || c.Right < rareOthers) {
-			rareOthers = c.Right
-			rare = &DayEntry{N: it.n, Crowd: true, Right: (c.Right*float64(c.Answers) + 1) / float64(c.Answers+1),
-				Alone: c.Right == 0, Fact: hardest.Fact}
-		}
-	}
-	if rare != nil {
-		return rare, nil
-	}
-	return hardest, nil
 }

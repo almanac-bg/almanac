@@ -3,8 +3,8 @@
 // shared day's link, the score shared over the same ten). A new visitor has the cover alone; a player has beside it
 // the streak and this week, the friends' day, and the way to their book. Once the day is played, the issue is its
 // result (as it lands, and on every later visit): the score and its shape, how it went among everyone, sharing it
-// (game/share.ts, in a sheet with its card and its text), one entry its right answers wrote in the book (the rarest,
-// once enough others played the day), tomorrow (when the next issue comes, the streak it makes, the reminder's ask),
+// (game/share.ts, in a sheet with its card and its text), what its right answers wrote in the book (its ink, by
+// chapter, and a rank risen: game/news.ts), tomorrow (when the next issue comes, the streak it makes, the reminder's ask),
 // and the day's board, among friends and of all България (dayBoard). A wrong game is
 // never celebrated. Topics are played from their chapter in the Алманах, duels from Приятели (a friend's duel waiting
 // is its dot, a friend's yes its line). Once, under the streak: what came of the days just missed. Once, over the day:
@@ -35,7 +35,6 @@ import { dateWords, issueOf, onDay, stakeHour, weekday } from "../lib/words.ts";
 import { cover, notice, player, playing, user } from "../state.ts";
 import {
   chapterName,
-  chip,
   failure,
   formatNumber,
   glyph,
@@ -48,18 +47,6 @@ import {
 } from "../ui.ts";
 import { app, coverExit, exitWay, handedIn, haveProfile, keepLine, keepStake, mailAsk, takeHand } from "./keep.ts";
 import { loadStats, type Stats } from "./stats.ts";
-
-/** The entry of the day played that its result shows (play.DayEntry): its place, its fact as the book has it, and
- * whether there's a crowd (enough of the day's others played it) to say how few got it (`right`, their share): then it
- * is the rarest right answer with a fact; without one, the hardest, and nothing is said of others. */
-interface DayEntry {
-  n: number;
-  crowd: boolean;
-  right: number;
-  /** None of the day's others got it: „само ти го позна“. */
-  alone?: boolean;
-  fact: { category: string; question?: string; answer: string; lines?: string[]; untrue?: boolean; fact: string };
-}
 
 export interface Today {
   day: string;
@@ -80,9 +67,6 @@ export interface Today {
   /** Whether today is the player's first day (no game finished before it): the same all day, whatever they play. */
   firstDay?: boolean;
   run: State | null;
-  /** The day played: the entry its right answers wrote in the book that the result shows (none for no right answer
-   * with a fact). */
-  entry?: DayEntry | null;
   board: Board;
   /** The day among the player and their friends, best first: once a friend has played it (null before). */
   friends?: Score[] | null;
@@ -186,7 +170,7 @@ export function today() {
     }
   };
   /** Днес for yesterday's issue (`t.yesterday`): its day, issue, chapters and run; nothing of today's (its board, its
-   * friends, its entry); and, once finished, the way on to today's. */
+   * friends); and, once finished, the way on to today's. */
   const lateView = (t: Today): Today | null => {
     clearTimeout(lateEnds);
     const y = t.yesterday;
@@ -215,7 +199,6 @@ export function today() {
       national: y.national,
       topics: y.topics,
       run: y.run,
-      entry: null,
       board: { day: y.day, players: 0, of: y.run.total - (y.run.void ?? 0), top: [] },
       friends: null,
       yesterday: undefined,
@@ -540,7 +523,7 @@ const outOf = (s: State) => s.total - (s.void ?? 0);
 /** The day played, as a page, in its budget's order (DESIGN.md, The result), the HTML's order too:
  *
  *   1. the score on its sheet, the tiles, how many knew the tenth, and how all of България did on average;
- *   2. the day's entry in the book and what the day wrote (its ink, the chapter nearest its next rank, or a rank risen);
+ *   2. what the day wrote in the book („Днес в Алманаха“: its ink, by chapter; a rank risen);
  *   3. the action: sharing it (on the first results, keeping the game and being reminded, or the way out of an app's
  *      browser, which come right under the score instead);
  *   4. tomorrow;
@@ -654,10 +637,9 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       best,
       zero ? missed(missedList) : null,
       first ? underScore : null,
-      // 2. The day's entry in the book, and what the day wrote.
-      () => entryOfDay(fresh().entry),
-      // Asked on every visit: the ink and the nearest step are counted again; a rank risen is told once (play.NewsOf).
-      news(run.id, 0, undefined, best.set),
+      // 2. What the day wrote in the book. Asked on every visit: the ink is counted again; a rank risen is told once
+      // (play.NewsOf).
+      news(run.id, 0, undefined, best.set, "Днес в Алманаха"),
     ),
     h(
       "div",
@@ -931,44 +913,6 @@ function spreadChart(b: Board, run: State): Child {
       "div",
       { class: "spread-ticks", "aria-hidden": "true" },
       spread.map((_, i) => h("span", { class: i === mine ? "me" : undefined }, String(i))),
-    ),
-  );
-}
-
-/** An entry the day's right answers wrote, as the book has it now: with a crowd, the rarest („Най-рядкото ти
- * попадение“, its chapter and how few knew it); without one, the hardest („Днес в Алманаха ти“, its chapter and its
- * place in the ten), nothing said of others. The answer as a headword, the question in italic, the fact with a drop
- * cap, and the chapter it's written into. A right answer's: it's in the book. */
-function entryOfDay(r?: DayEntry | null): Child {
-  if (!r) return null;
-  const f = r.fact;
-  const kicker = !r.crowd ? `въпрос ${r.n + 1}` : r.alone ? "само ти го позна" : `вярно отговарят ${percent(r.right)}`;
-  return h(
-    "section",
-    { class: "sect day-entry" },
-    h("div", { class: "sect-head" }, h("h2", null, r.crowd ? "Най-рядкото ти попадение" : "Днес в Алманаха")),
-    leaf(
-      f.category,
-      [
-        h("div", { class: "entry-tags" }, chip(f.category), h("span", { class: "entry-kicker" }, kicker)),
-        // An answer of parts (an order, a match, a split) a line each at the entry's size, never one headword of six
-        // lines.
-        f.lines?.length
-          ? h(
-              "ul",
-              { class: "entry-lines" },
-              f.lines.map((l) => h("li", null, textWords(l))),
-            )
-          : h(
-              "p",
-              { class: "entry-word" },
-              f.untrue ? h("span", { class: "entry-untrue" }, "Невярно: ") : null,
-              textWords(f.answer),
-            ),
-        f.question ? h("p", { class: "entry-q" }, textWords(f.question)) : null,
-        h("p", { class: "entry-fact" }, textWords(f.fact)),
-      ],
-      "entry-leaf",
     ),
   );
 }

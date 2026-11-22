@@ -1,11 +1,13 @@
 // Профил: who you are in the game, in its budget's order (DESIGN.md, Places): your avatar with the seal you wear on its
 // corner (a tap on it, its pencil on it, opens the animals on a sheet: screens/avatar.ts), your name and tag with the
-// streak as it is now by it; your seals, one list, a row a chapter with its rank, its progress to the next and its
-// ink (the one worn is the best: never chosen); and Настройки, last. One column, on a big screen too. A guest is asked
-// to keep their game, and the way in for a profile from elsewhere is apart from it (the sign-in page:
-// screens/signin.ts, signInPage). Nobody on this device yet: that page instead. No lifetime totals. No way to the page
-// as others see it (/players/<tag>): it is this one without what's one's own (the avatar's pencil, Настройки, the
-// week's forgiving on the streak).
+// streak as it is now by it, and the day you started playing under them, as another's page has it; your seals, one
+// list, a row a chapter with its rank, its progress to the next and its ink, the most ink first (the one worn is the
+// best: never chosen; the first row), the book's whole ink beside „Печати“; and Настройки, last. One column, on a big
+// screen too. A guest is asked to keep their game, and the way in for a profile from elsewhere is apart from it (the
+// sign-in page: screens/signin.ts, signInPage). Nobody on this device yet: that page instead. No lifetime totals but
+// the book's ink (DECISIONS.md: ink, summed, earned only by the day's issue). No way to the page
+// as others see it (/players/<tag>, which opens this page for one's own tag): it is this one without what's one's own
+// (the avatar's pencil, Настройки, the week's forgiving on the streak).
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -69,14 +71,19 @@ export function me(kit: Kit) {
       () => {
         const data = signal<Stats | null>(null);
         const ranks = signal<ChapterRank[] | null>(null);
+        const since = signal<string | undefined>(undefined);
         // Профил that couldn't load (no line): said, with the way to try again (the whole page, afresh).
         const failed = signal<unknown>(null);
         loadStats().then(data.set, failed.set);
-        // The ranks, as others see them on the player's page (not the book's: opening it is counted as opening the book).
+        // The ranks and the day they started, as others see them on the player's page (not the book's: opening it is
+        // counted as opening the book).
         const tag = user.peek()?.tag;
         if (tag)
-          api<{ ranks?: ChapterRank[] }>("GET", `/api/players/${encodeURIComponent(tag)}`).then(
-            (p) => ranks.set(p.ranks ?? []),
+          api<{ ranks?: ChapterRank[]; since?: string }>("GET", `/api/players/${encodeURIComponent(tag)}`).then(
+            (p) => {
+              since.set(p.since);
+              ranks.set(p.ranks ?? []);
+            },
             () => ranks.set([]),
           );
         else ranks.set([]);
@@ -88,7 +95,7 @@ export function me(kit: Kit) {
             "div",
             { class: "me-intro" },
             said ? h("p", { class: "muted", role: "status" }, said) : null,
-            head(data, pick),
+            head(data, since, pick),
             () => (failed() && !data() ? failure(failed(), () => go("/me", true)) : null),
             // A guest keeps their game with an email, or signs in to a profile they have elsewhere: one line of ways
             // (not loose ones before anything else). Either way in, Профил again, as the profile has it.
@@ -120,10 +127,10 @@ export function me(kit: Kit) {
 }
 
 /** Who you are: your avatar as you wear it, the seal you wear on its corner, and a pencil on it (a tap on the avatar
- * opens the animals: `pick`); your name and tag, the streak as it is now by it; a name still the one drawn
- * says so, with the way to change it. The same head as another's page (ui.ts, profileHead), but for what the week
- * forgives: yours, on the streak for a pointer resting on it. */
-function head(data: () => Stats | null, pick: () => void): Child {
+ * opens the animals: `pick`); your name and tag, the streak as it is now by it; the day you started (`since`); a name
+ * still the one drawn says so, with the way to change it. The same head as another's page (ui.ts, profileHead), but
+ * for what the week forgives: yours, on the streak for a pointer resting on it. */
+function head(data: () => Stats | null, since: () => string | undefined, pick: () => void): Child {
   return profileHead(
     // The avatar is the button: a pencil on its corner says so (on a big screen as the pointer comes over it, with the
     // tooltip; on a phone always), never a word beside it.
@@ -135,13 +142,19 @@ function head(data: () => Stats | null, pick: () => void): Child {
     ),
     () => nameWords(user()?.name ?? "Профил"),
     () => user()?.tag,
+    since,
+    () => data()?.streak,
+    () => forgives(data()),
     // The name is changed in Настройки, rarely: said here only while it's one drawn at random, which asks for it.
     () =>
       user()?.drawn
-        ? ["Това име е избрано наслуки. ", h("a", { class: "link", href: "/settings#name" }, "Смени го")]
+        ? h(
+            "p",
+            { class: "me-line" },
+            "Това име е избрано наслуки. ",
+            h("a", { class: "link", href: "/settings#name" }, "Смени го"),
+          )
         : null,
-    () => data()?.streak,
-    () => forgives(data()),
   );
 }
 
@@ -168,5 +181,6 @@ function seals(ranks: ChapterRank[] | null, s: Stats | null): Child {
         "Печат на глава получаваш с първия ѝ факт с мастило — при верен отговор в броя на деня.",
       ),
     ],
+    s?.seal?.chapter,
   );
 }

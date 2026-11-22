@@ -182,32 +182,47 @@ func countIn(by map[string]int, q bank.Question) {
 	by[q.Base().Category]++
 }
 
-// InkIn is how many facts a game (runID) wrote in a player's book in ink, and how many of its right answers were to
-// questions the book had in grey already, written by an earlier game (metBefore: „вече беше в твоя Алманах“; the news
-// says it of a day's issue only). A game that writes nothing (a script's), or writes grey by its own rule (the issue
-// played a second time: runs.pencil), met nothing before by that: its metBefore is 0.
-func (g *Game) InkIn(ctx context.Context, userID, runID int64) (ink, metBefore int, err error) {
+// ChapterInk is the ink a game wrote in one chapter of the book: in the news, the chapter's glyph and its „+2“.
+type ChapterInk struct {
+	Chapter string `json:"chapter"`
+	Ink     int    `json:"ink"`
+}
+
+// InkIn is the facts a game (runID) wrote in a player's book in ink, by chapter, in the order the game asked them (a
+// chapter once, where it first wrote), and how many of its right answers were to questions the book had in grey
+// already, written by an earlier game (metBefore: „вече беше в твоя Алманах“; the news says it of a day's issue only).
+// A game that writes nothing (a script's), or writes grey by its own rule (the issue played a second time:
+// runs.pencil), met nothing before by that: its metBefore is 0.
+func (g *Game) InkIn(ctx context.Context, userID, runID int64) (ink []ChapterInk, metBefore int, err error) {
 	b := g.Bank()
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT a.question_id, coalesce(f.ink, 0), coalesce(f.run_id = a.run_id, 0),
 			coalesce(f.run_id <> a.run_id AND f.at < a.at, 0) AND NOT r.pencil AND `+shadowWrites+`
 		FROM answers a JOIN runs r ON r.id = a.run_id
 		LEFT JOIN facts f ON f.user_id = r.user_id AND f.question_id = a.question_id
-		WHERE a.run_id = ?2 AND r.user_id = ?1 AND (a.is_right OR f.ink) AND NOT `+voidAt, userID, runID)
+		WHERE a.run_id = ?2 AND r.user_id = ?1 AND (a.is_right OR f.ink) AND NOT `+voidAt+` ORDER BY a.n`, userID, runID)
 	if err != nil {
-		return 0, 0, err
+		return nil, 0, err
 	}
 	defer rows.Close()
+	at := map[string]int{} // each chapter's place in ink
 	for rows.Next() {
 		var id string
 		var inked, here, before bool
 		if err := rows.Scan(&id, &inked, &here, &before); err != nil {
-			return 0, 0, err
+			return nil, 0, err
 		}
 		q, ok := b.Get(id)
 		switch {
 		case !ok || !writtenShows(q):
 		case inked && here:
-			ink++
+			c := q.Base().Category
+			i, seen := at[c]
+			if !seen {
+				i = len(ink)
+				at[c] = i
+				ink = append(ink, ChapterInk{Chapter: c})
+			}
+			ink[i].Ink++
 		case !inked && before:
 			metBefore++
 		}

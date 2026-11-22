@@ -524,13 +524,6 @@ func TestPlayingOverHTTP(t *testing.T) {
 	if today["run"].(map[string]any)["done"] != true || today["streak"] != float64(1) || today["firstDay"] != true {
 		t.Fatalf("today: %v", today)
 	}
-	// The day done, the entry its right answers wrote is asked for the result (none for no right answer with a fact);
-	// with nobody else playing it, it says plainly that there's no crowd, and nothing of others.
-	if entry, asked := today["entry"]; !asked {
-		t.Fatalf("today's entry not asked for: %v", today)
-	} else if e, ok := entry.(map[string]any); entry != nil && (!ok || e["crowd"] != false || e["right"] != float64(0) || e["fact"] == nil) {
-		t.Fatalf("today's entry, with nobody else: %v", entry)
-	}
 	// The day done, „Утре“ names the chapter of tomorrow's hard question, its last, once tomorrow is drawn (ahead.go;
 	// the sample bank is too small for days ahead, so tomorrow is today's ten turned round).
 	if _, today := p.call("GET", "/api/day", nil); today["tomorrowHard"] != nil {
