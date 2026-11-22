@@ -3635,6 +3635,39 @@
     box-shadow: inset 0 0 0 4px var(--ink);
   }
 
+  /* One friend's duels sent to the player, a pile: the card on top, the edges of one or two more under it, each a
+     little narrower, as sheets lie in a stack. The count is on the card's line. */
+  .duel-pile {
+    position: relative;
+    isolation: isolate;
+    padding-bottom: 8px;
+  }
+
+  .duel-pile[data-more="2"] {
+    padding-bottom: 16px;
+  }
+
+  .duel-pile::before,
+  .duel-pile[data-more="2"]::after {
+    position: absolute;
+    z-index: -1;
+    inset: 0 var(--space-3) 0;
+    border-radius: var(--r-3);
+    background: var(--surface);
+    box-shadow: inset 0 0 0 1px var(--line);
+    content: "";
+  }
+
+  .duel-pile[data-more="2"]::before {
+    bottom: 8px;
+  }
+
+  .duel-pile[data-more="2"]::after {
+    inset-inline: calc(var(--space-3) * 2);
+    z-index: -2;
+    opacity: 0.7;
+  }
+
   /* The duel waiting for the player first: ringed in ink, „Играй“ in it. */
   .duel-card.turn {
     gap: var(--space-3);

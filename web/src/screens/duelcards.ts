@@ -3,8 +3,9 @@
 // question went for each side (two rows of ten small squares, as the boards draw them), one quiet line where there's
 // more to say; and, once the player's own game is played, a tap anywhere on it opens its questions in their dialog
 // (results.ts, reviewSheet), on any day (play.Review). A new duel starts from „Нов дуел“ under the cards, never from a
-// card. The duel just played, or named by an old link to it, comes first (`top`), and its score counts up once as it lands
-// (feel.ts: duel), never again.
+// card. Several sent to the player by one friend are one card, a pile, the next to lapse on top. The duel just played,
+// or named by an old link to it (`top`), comes first in its own group (a result first of the played, one sent first of
+// those waiting for a friend), in sight, and its score counts up once as it lands (feel.ts: duel), never again.
 //
 // It's Приятели's, loaded with it, and is handed the app's pieces: it imports only types.
 
@@ -45,13 +46,14 @@ function tieWords(d: DuelView): string {
 }
 
 /** What a duel's card says on one quiet line under its two sides; "" for nothing to say. An open one: that the
- * player's own game is begun and not finished, or their score while the other has the same ten to play. A played one:
- * why one that ran out has no score (and the player's own, if they played), that a player is gone (their game went
- * with them), and what broke a tie on even right answers. The pair's record is said once, on the friend (Приятели),
- * not on each duel. */
-function noteLine(d: DuelView): string {
+ * player's own game is begun and not finished, how many more the same friend sent under it (a pile: `more`), or their
+ * score while the other has the same ten to play. A played one: why one that ran out has no score (and the player's
+ * own, if they played), that a player is gone (their game went with them), and what broke a tie on even right
+ * answers. The pair's record is said once, on the friend (Приятели), not on each duel. */
+function noteLine(d: DuelView, more: number): string {
   const them = d.opponent;
   const mine = `Ти: ${formatNumber(d.you?.rights ?? 0)} от ${total}`;
+  if (more) return more === 1 ? "Още един дуел чака." : `Още ${formatNumber(more)} дуела чакат.`;
   if (d.state === "yours") return d.first ? "Довърши своята игра." : "";
   if (d.state === "theirs") return mine;
   if (d.state === "expired") {
@@ -150,10 +152,12 @@ function questions(d: DuelView): void {
  * questions (their dialog), nothing on it to say so but its light under a pointer; a screen reader hears what it
  * opens first, then what it says. A duel to play is one link to its game, the whole of it (`play`: the first waiting
  * for the player, with „Играй“, the page's one action, in it); any other is neither, and no name in it is a way to a
- * profile, so none looks like one. `lands`: its result as a moment, once. */
-function duelCard(d: DuelView, play = false, lands = false): Child {
+ * profile, so none looks like one. `more`: how many more from the same friend lie under it, a pile (the sheets'
+ * edges under the card, the count on its line). `top`: the duel named in the address, shown in sight, its result
+ * landing as a moment, once. */
+function duelCard(d: DuelView, play = false, more = 0, top = false): Child {
   const them = d.opponent;
-  const note = noteLine(d);
+  const note = noteLine(d, more);
   const body = [
     h("span", { class: "duel-card-kind" }, d.recorded ? "Срещу запис" : "С приятел"),
     h(
@@ -166,17 +170,19 @@ function duelCard(d: DuelView, play = false, lands = false): Child {
     marksRows(d),
     note ? h("span", { class: "duel-card-note" }, note) : null,
   ];
-  const cls = `duel-card s-${d.state}${play ? " turn" : ""}`;
+  const cls = `duel-card s-${d.state}${play ? " turn" : ""}${top ? " landed" : ""}`;
+  const item = (card: HTMLElement) => {
+    if (top) shownNamed(card, d);
+    return h("li", more ? { class: "duel-pile", "data-more": Math.min(more, 2) } : null, card);
+  };
   if (d.state === "yours")
-    return h(
-      "li",
-      null,
+    return item(
       h(
         "a",
         { class: cls, href: `/duel/${d.id}`, id: `duel-${d.id}` },
         body,
         play ? h("span", { class: "btn primary duel-card-go" }, "Играй") : null,
-      ),
+      ) as HTMLElement,
     );
   // Named by its first words, for a screen reader alone, then by all it says: an aria-label in their place would hide
   // the duel itself, and say none of the words on the card (by which voice control calls a button).
@@ -197,8 +203,26 @@ function duelCard(d: DuelView, play = false, lands = false): Child {
         )
       : h("div", { class: cls, id: `duel-${d.id}` }, body)
   ) as HTMLElement;
-  if (lands) land(card, d);
-  return h("li", null, card);
+  return item(card);
+}
+
+/** Whether the duel named in the address was brought into sight on this visit to the page (duelCards' `sight`): once,
+ * as the page opens, never as the lists are drawn anew under the player. */
+let sighted: { done: boolean } = { done: true };
+
+/** The duel named in the address, as its card is drawn: brought into sight once (a result may be under those
+ * waiting, out of a phone's screen), then its result landing (land). */
+function shownNamed(card: HTMLElement, d: DuelView): void {
+  const sight = sighted;
+  requestAnimationFrame(() => {
+    if (!card.isConnected) return;
+    if (!sight.done) {
+      sight.done = true;
+      const r = card.getBoundingClientRect();
+      if (r.top < 0 || r.bottom > innerHeight * 0.8) card.scrollIntoView({ block: "center" });
+    }
+    land(card, d);
+  });
 }
 
 /** Where the results already landed are kept, on this device: a duel's lands once, never again on a reload or a visit
@@ -228,18 +252,59 @@ function land(card: HTMLElement, d: DuelView): void {
     return;
   }
   const rights = (s?: Side) => (s?.marks ?? []).map((m) => (m.right ? 1 : 0));
-  requestAnimationFrame(() => void feel.duel(card, { mine: rights(d.you), theirs: rights(d.opponent), end }, hands()));
+  void feel.duel(card, { mine: rights(d.you), theirs: rights(d.opponent), end }, hands());
 }
 
-/** The player's duels in Приятели. First the one named in the address (`top`: just played, or an old link to it),
- * alone at the head, landing once, and what its game brought under it (`under`: game/news.ts); then the open ones,
- * theirs to play (the first of them with the page's one action, „Играй“) and those waiting for a friend, each card
- * saying whose turn it is; then those played, the last ten, which the heading says once there are that many. */
-export function duelCards(kit: Kit, d: Duels, top: DuelView | null, under: Child = null): Child {
+/** Who sent a duel to the player, for a pile: one friend's challenges, the same card again and again, are one. None
+ * for any other (the player's own unfinished, one they sent, a recording, a player gone): each is a card of its own. */
+const sender = (d: DuelView): string | null =>
+  d.state === "yours" && !d.first && !d.recorded && d.opponent && !d.opponent.gone
+    ? `${d.opponent.tag ?? ""}\u0000${d.opponent.name}`
+    : null;
+
+/** Open duels as their cards lie: one friend's challenges in one pile, where its first one was, the rest each alone. */
+function piles(list: DuelView[]): [DuelView, ...DuelView[]][] {
+  const out: [DuelView, ...DuelView[]][] = [];
+  const by = new Map<string, DuelView[]>();
+  for (const d of list) {
+    const key = sender(d);
+    const pile = key ? by.get(key) : undefined;
+    if (pile) {
+      pile.push(d);
+      continue;
+    }
+    const fresh: [DuelView, ...DuelView[]] = [d];
+    if (key) by.set(key, fresh);
+    out.push(fresh);
+  }
+  return out;
+}
+
+/** The player's duels in Приятели, in two groups. The open ones („Чакащи“): first theirs to play (one friend's in a
+ * pile; the first with the page's one action, „Играй“), then those waiting for a friend, each card saying whose turn it
+ * is. Then those played, the last ten, which the heading says once there are that many. The one named in the address
+ * (`top`: just played, or an old link to it) is first in its own: a result first of the played, one sent first of
+ * those waiting for a friend, one to play on top of the open; what its game brought under it (`under`: game/news.ts),
+ * its result landing once, brought into sight once a visit (`sight`: one object for the visit, marked done). */
+export function duelCards(
+  kit: Kit,
+  d: Duels,
+  top: DuelView | null,
+  under: Child = null,
+  sight: { done: boolean } = { done: true },
+): Child {
   ({ api, avatar, feelKit, formatNumber, h, hands, leftWords, mini, nameWords, play, reviewSheet, withWord } = kit);
+  sighted = sight;
   const rest = (v: DuelView) => v.id !== top?.id;
-  const open = [...d.yours, ...d.theirs].filter(rest).map(shown);
-  const played = d.played.filter(rest).map(shown);
+  const named = top && shown(top);
+  const first = (state: (v: DuelView) => boolean, list: DuelView[]) =>
+    named && state(named) ? [named, ...list.filter(rest).map(shown)] : list.filter(rest).map(shown);
+  const open = piles([...first((v) => v.state === "yours", d.yours), ...first((v) => v.state === "theirs", d.theirs)]);
+  const played = first((v) => v.state !== "yours" && v.state !== "theirs", d.played);
+  const card = (v: DuelView, play = false, more = 0) => {
+    if (v.id !== named?.id) return duelCard(v, play, more);
+    return [duelCard(v, play, more, true), under ? h("li", { class: "duel-news" }, under) : null];
+  };
   // Each group under its kicker, the groups well apart: the open ones never run on into the played.
   const group = (heading: string, cards: Child[]) =>
     h(
@@ -251,24 +316,16 @@ export function duelCards(kit: Kit, d: Duels, top: DuelView | null, under: Child
   return h(
     "div",
     { class: "duel-groups" },
-    top
-      ? h(
-          "div",
-          { class: "stack" },
-          h("ul", { class: "duel-cards landed" }, duelCard(shown(top), top.state === "yours", true)),
-          under,
-        )
-      : null,
     open.length
       ? group(
           "Чакащи",
-          open.map((o, i) => duelCard(o, i === 0 && o.state === "yours" && top?.state !== "yours")),
+          open.map(([o, ...more], i) => card(o, i === 0 && o.state === "yours", more.length)),
         )
       : null,
     played.length
       ? group(
           d.played.length >= playedShown ? `Последните ${playedShown} изиграни` : "Изиграни",
-          played.map((p) => duelCard(p)),
+          played.map((p) => card(p)),
         )
       : null,
   );
