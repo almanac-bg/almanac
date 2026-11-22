@@ -322,10 +322,18 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   | `h2`, a section's heading            | 22px, 20px                   | 900                    |
   | An answer                            | 18px                         | 800                    |
   | Body (a fact)                        | 17px, line 1.45              | 500                    |
-  | Small and meta (`.small`)            | 14px                         | 600–700, `--ink-3`     |
+  | A note: a sentence under a thing     | 14px, line 1.4 (`--t-note`)  | 600                    |
+  | A label: a short meta line           | 14px, line 1.3 (`--t-label`) | 700, `--ink-3`         |
+  | A compact card's fine print          | 13px, line 1.3 (`--t-fine`)  | 600                    |
   | A kicker (`.kicker`)                 | 12px                         | 800, capitals, 0.12em  |
+  | „ти“ beside the player's own         | 12px                         | 800, capitals, 0.08em  |
   | The name in the bar                  | 15 / 17px                    | 900, capitals, 0.2em   |
-- **Case:** sentence case everywhere; capitals only through `.kicker` and the wordmark.
+- **Case:** sentence case everywhere; capitals only through `.kicker`, „ти“ and the wordmark.
+- **Under the body's size, a role, never a look of its own:** a note, a label or fine print (the tokens above); a
+  control's words (a tab, a chip, „Назад“) 15px 800; a number's unit beside its figure („от 10“) and a picture's tag
+  (12px) are the only others, and nothing is under 12px (`type.test.ts`). A link in a sentence takes the sentence's
+  size. Weight says the role, not emphasis: 500 reading, 600 a note, 700 a label, 800 a control, 900 a title or a
+  name. No italics; underline only on a link.
 
 ## Shape and space
 
@@ -338,6 +346,9 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
 - **Space** on a 4px base (`--space-1` … `--space-7`: 4 · 8 · 12 · 16 · 24 · 32 · 48); the page's gutter is 16px on a
   phone, 40px on a big screen; the page is up to 1260px (`/admin` too); a long read in it up to 45rem.
 - **Cards** (`.card`, `.rows`) are white surfaces on the page; rows have a hairline between them and are 48px or more.
+  What's on a surface starts 16px in from its side, on every card, list and box alike, so that cards one under
+  another share their edge: a card 16px all round, a small box (a notice, a request, a row to tap) 12px over and under
+  its words. The issue's sheet keeps its own.
 - **Depth:** the primary action is raised by a 4px shadow below (`--lift`); the answer's panel docked at a phone's
   foot casts a soft shadow up. Nothing else.
 - **Touch targets** are at least 44px; anything drawn smaller gets its room around it (`e2e/layout.spec.ts`).
@@ -400,7 +411,8 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   finger's height). Fields (`input`) are white boxes with a 2px `--line-2` frame, a button's height. `.segmented`: tabs
   or a setting's few choices on a well, the chosen one a raised surface, both fully round (pills), of one width unless
   a word needs more (never broken inside one); on a phone the well is the screen's width, its choices sharing it. A
-  switch is a 52 × 30 track. Never a native select, radio or checkbox.
+  switch is a 52 × 30 track, its knob white by day (on: the action's colours). Never a native select, radio or
+  checkbox.
 - **Sheets over the page** (`.sheet`, a `<dialog>`): a surface with round top corners over a scrim, from the foot on a
   phone, centred on a big screen (a name asked for, the share, a way out of a game, the avatars, an entry's picture,
   a game's questions gone over);

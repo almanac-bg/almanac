@@ -341,9 +341,9 @@ export type ChapterRank = Standing;
 /** A player's head, one look on Профил and on a player's page: the avatar with the seal worn on its corner (`face`:
  * on Профил a button with „Смени“ under it), the name, the @username with the streak as it is now by it (`streak`:
  * its days, nothing while there's none; never an ended one's, DECISIONS.md), the day they started playing under them
- * (`since`, the same on both: „Играе от 6 ноември 2026 г.“), and what's only Профил's under it (`more`: the way to
- * change a name drawn at random). `why`, Профил's only: what the week forgives, said when the pointer rests on the
- * streak (a phone has it where a day missed is forgiven). */
+ * (`since`: „Играе от 6 ноември 2026 г.“ on another's page, „Играеш от …“ on one's own, `own`), and what's only
+ * Профил's under it (`more`: the way to change a name drawn at random). `why`, Профил's only: what the week forgives,
+ * said when the pointer rests on the streak (a phone has it where a day missed is forgiven). */
 export function profileHead(
   face: Child,
   name: Child,
@@ -352,6 +352,7 @@ export function profileHead(
   streak: () => number | undefined,
   why?: () => string | undefined,
   more: Child = null,
+  own = false,
 ): HTMLElement {
   const at = (t: string | undefined) => (t ? h("span", { class: "me-tag" }, `@${t}`) : null);
   return h(
@@ -367,7 +368,7 @@ export function profileHead(
       ),
       () => {
         const day = since();
-        return day ? h("p", { class: "me-line" }, `Играе от ${fullDate(day)}`) : null;
+        return day ? h("p", { class: "me-line" }, `${own ? "Играеш" : "Играе"} от ${fullDate(day)}`) : null;
       },
       more,
     ),

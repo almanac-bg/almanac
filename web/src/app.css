@@ -83,6 +83,8 @@
     /* The one action: ink by day, the page's light by night. */
     --action: #16132b;
     --on-action: #ffffff;
+    /* A switch's knob when off: white by day, the page's light by night (on, it is --on-action on --action). */
+    --knob: #ffffff;
     /* Text on a chapter's colour: always the dark ink, in both themes. */
     --on-sheet: #16132b;
     /* Something gone wrong (a failed send, a field refused) and a step that can't be undone. */
@@ -147,6 +149,11 @@
     --radius-full: 999px;
     --font-sans: "Sofia Sans", "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
     --font-numeral: "Sofia Sans Extra Condensed", "Arial Narrow", "Sofia Sans", sans-serif;
+    /* Text under the body's size has three looks, each a role (DESIGN.md, Type; type.test.ts holds them): a sentence
+       that says something under a thing, a short label, and the fine print of a compact card. */
+    --t-note: 600 0.875rem / 1.4 var(--font-sans);
+    --t-label: 700 0.875rem / 1.3 var(--font-sans);
+    --t-fine: 600 0.8125rem / 1.3 var(--font-sans);
 
     /* Icons: 24px, round strokes, drawn as masks in the text colour. */
     --i-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E");
@@ -184,6 +191,7 @@
       --line-2: #7f7aa8;
       --action: #f5f3ff;
       --on-action: #16132b;
+      --knob: #cdc9e6;
       --danger: #ff8f80;
       --petal: #f5f3ff;
       --scrim: rgb(0 0 0 / 0.6);
@@ -238,6 +246,7 @@
     --line-2: #7f7aa8;
     --action: #f5f3ff;
     --on-action: #16132b;
+    --knob: #cdc9e6;
     --danger: #ff8f80;
     --petal: #f5f3ff;
     --scrim: rgb(0 0 0 / 0.6);
@@ -437,7 +446,7 @@
 
   .small {
     color: var(--ink-3);
-    font: 600 0.875rem / 1.4 var(--font-sans);
+    font: var(--t-note);
   }
 
   .num {
@@ -823,7 +832,7 @@
   .card {
     display: grid;
     gap: var(--space-4);
-    padding: 20px;
+    padding: var(--space-4);
     border-radius: var(--r-3);
     background: var(--surface);
   }
@@ -856,7 +865,7 @@
 
   .sect-note {
     color: var(--ink-3);
-    font: 700 0.875rem / 1.3 var(--font-sans);
+    font: var(--t-label);
   }
 
   a.sect-note,
@@ -1023,7 +1032,7 @@
 
   .field > span {
     color: var(--ink-2);
-    font: 700 0.875rem / 1.25 var(--font-sans);
+    font: var(--t-label);
   }
 
   .field small {
@@ -1529,7 +1538,7 @@
     justify-content: space-between;
     gap: 0 12px;
     color: var(--ink-3);
-    font: 700 0.8125rem / 1.3 var(--font-sans);
+    font: var(--t-fine);
   }
 
   .standing-words > * {
@@ -2073,8 +2082,11 @@
     mask: var(--i) center / contain no-repeat;
   }
 
-  /* „ти“ after the player's own wrong answer's words. */
-  .yours {
+  /* „ти“, one look wherever it marks the player: after their own wrong answer's words, their name on a board or a
+     duel's result. */
+  .yours,
+  .you,
+  .rank-you {
     color: var(--ink-3);
     font: 800 0.75rem / 1 var(--font-sans);
     letter-spacing: 0.08em;
@@ -2446,7 +2458,7 @@
     flex-wrap: wrap;
     gap: var(--space-1) var(--space-4);
     color: var(--ink-3);
-    font: 700 0.875rem / 1.2 var(--font-sans);
+    font: var(--t-label);
   }
 
   .near-key span {
@@ -2635,7 +2647,7 @@
   .crowd-says {
     margin: 0;
     color: var(--ink-3);
-    font: 700 0.9375rem / 1.375rem var(--font-sans);
+    font: var(--t-note);
   }
 
   /* Under the verdict, it belongs to it. */
@@ -2853,7 +2865,7 @@
   .clues-next {
     margin-top: calc(-1 * var(--space-1));
     color: var(--ink-3);
-    font: 700 0.875rem / 1.25 var(--font-sans);
+    font: var(--t-label);
   }
 
   /* ---- „Раздели“: the things one by one on a card, sent left or right; the two groups under them ---- */
@@ -3589,7 +3601,7 @@
     gap: 10px;
     width: 100%;
     margin: 0;
-    padding: 12px 14px 14px;
+    padding: var(--space-4);
     border: 0;
     border-radius: var(--r-3);
     background: var(--surface);
@@ -3626,13 +3638,13 @@
   /* The duel waiting for the player first: ringed in ink, „Играй“ in it. */
   .duel-card.turn {
     gap: var(--space-3);
-    padding: 14px 16px 16px;
+    padding: var(--space-4);
     box-shadow: inset 0 0 0 3px var(--ink);
   }
 
   .duel-card-kind {
     color: var(--ink-3);
-    font: 800 0.6875rem / 1.2 var(--font-sans);
+    font: 800 0.75rem / 1.2 var(--font-sans);
     letter-spacing: 0.12em;
     text-align: center;
     text-transform: uppercase;
@@ -3681,7 +3693,7 @@
 
   .duel-card-left {
     color: var(--ink-3);
-    font: 600 0.8125rem / 1.3 var(--font-sans);
+    font: var(--t-fine);
   }
 
   /* A played duel's score, a heavy numeral over its chip. */
@@ -3716,7 +3728,7 @@
   /* What more a card says (the player's score while they wait, why it ran out, what broke a tie): one quiet line. */
   .duel-card-note {
     color: var(--ink-3);
-    font: 600 0.8125rem / 1.35 var(--font-sans);
+    font: var(--t-fine);
     text-align: center;
   }
 
@@ -3860,7 +3872,7 @@
     gap: var(--space-3);
     width: 100%;
     min-height: 3.75rem;
-    padding: 12px 14px;
+    padding: var(--space-3) var(--space-4);
     border: 0;
     border-radius: var(--r-2);
     background: var(--surface);
@@ -3896,7 +3908,7 @@
 
   .duel-pick-record {
     color: var(--ink-3);
-    font: 600 0.8125rem / 1.3 var(--font-sans);
+    font: var(--t-fine);
   }
 
   .duel-pick-record b {
@@ -4006,15 +4018,6 @@
   .you {
     flex: none;
     margin-left: 6px;
-    padding: 2px 7px;
-    border-radius: var(--radius-full);
-    background: var(--ink);
-    color: var(--bg);
-    font-size: 0.6875rem;
-    line-height: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
   }
 
   .pts {
@@ -4698,7 +4701,7 @@
      way to change a name drawn at random. */
   .me-line {
     color: var(--ink-3);
-    font: 600 0.9375rem / 1.4 var(--font-sans);
+    font: var(--t-note);
   }
 
   /* How you stand with a player, on their page under the head, on a card: its kicker („Приятели“, or the request), as
@@ -4815,7 +4818,7 @@
   .seal-worn {
     margin-bottom: 10px;
     color: var(--ink-2);
-    font: 700 0.9375rem / 1.4 var(--font-sans);
+    font: var(--t-note);
   }
 
   /* A long name („Изкуство и литература“) wraps, and a word wider than its room breaks where Bulgarian breaks it. */
@@ -4844,7 +4847,7 @@
     align-items: center;
     gap: 14px;
     min-height: 64px;
-    padding: 10px 18px;
+    padding: var(--space-3) var(--space-4);
     border-radius: var(--r-2);
     background: var(--surface);
     color: var(--ink);
@@ -4868,7 +4871,7 @@
   }
 
   .me-settings-text .muted {
-    font: 600 0.8125rem / 1.3 var(--font-sans);
+    font: var(--t-fine);
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -5015,7 +5018,7 @@
     border: 0;
     background: transparent;
     color: var(--ink-3);
-    font: 500 0.8125rem / 1rem var(--font-sans);
+    font: var(--t-fine);
     cursor: pointer;
   }
 
@@ -5089,11 +5092,11 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2) var(--space-3);
-    padding: 10px 12px;
+    padding: var(--space-3) var(--space-4);
     border-radius: var(--r-2);
     background: var(--surface);
     color: var(--ink-2);
-    font: 600 0.9375rem / 1.35 var(--font-sans);
+    font: var(--t-note);
   }
 
   .book-left-words {
@@ -5119,7 +5122,7 @@
 
   .way-words small {
     color: var(--ink-3);
-    font: 600 0.8125rem / 1.2 var(--font-sans);
+    font: var(--t-fine);
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -5280,8 +5283,8 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 14px 16px;
-    padding: 14px;
-    border-radius: 20px;
+    padding: var(--space-4);
+    border-radius: var(--r-2);
     background: rgb(255 255 255 / 0.72);
     color: #16132b;
   }
@@ -5323,7 +5326,7 @@
   }
 
   .ch-next {
-    font: 700 0.9375rem / 1.3 var(--font-sans);
+    font: var(--t-note);
   }
 
   .chapter-play {
@@ -5358,7 +5361,7 @@
   /* What grey is, where it first shows. */
   .grey-note {
     color: var(--ink-3);
-    font: 700 0.875rem / 1.4 var(--font-sans);
+    font: var(--t-note);
   }
 
   /* The facts: ink a card with an ink edge, grey a thin solid outline and lighter words. An entry reads in the order
@@ -5420,13 +5423,13 @@
 
   .entry-q {
     color: var(--ink-2);
-    font: 600 0.9375rem / 1.35 var(--font-sans);
+    font: var(--t-note);
   }
 
   .entry .entry-q {
     margin-top: 2px;
     color: var(--ink-3);
-    font: 600 0.875rem / 1.35 var(--font-sans);
+    font: var(--t-note);
   }
 
   .entry-fact {
@@ -5550,7 +5553,7 @@
 
   .entries-none {
     color: var(--ink-3);
-    font: 600 0.9375rem / 1.4 var(--font-sans);
+    font: var(--t-note);
   }
 
   /* The chapter's pages: newer, the numbers, older. */
@@ -5666,7 +5669,7 @@
     border-radius: var(--r-2);
     background: var(--surface);
     color: var(--ink-2);
-    font: 700 0.9375rem / 1.4 var(--font-sans);
+    font: var(--t-note);
   }
 
   .streak-notice a {
@@ -5796,7 +5799,7 @@
   }
   .issue-meta {
     padding-right: 50px;
-    font: 700 0.875rem / 1.3 var(--font-sans);
+    font: var(--t-label);
   }
 
   .shared-score {
@@ -5863,7 +5866,7 @@
     display: flex;
     align-items: center;
     gap: 14px;
-    padding: 14px 18px;
+    padding: var(--space-4);
     border-radius: var(--r-3);
     background: var(--surface);
     color: var(--ink);
@@ -5899,7 +5902,7 @@
   .streak-note,
   .streak-chip .day-stake {
     color: var(--ink-3);
-    font: 600 0.9375rem / 1.3 var(--font-sans);
+    font: var(--t-note);
   }
 
   /* ---- The day's result, in its budget's order: the score on its sheet, what the day wrote in the book, the friends,
@@ -6072,7 +6075,7 @@
 
   .news-met {
     color: var(--ink-3);
-    font: 700 0.875rem / 1.35 var(--font-sans);
+    font: var(--t-note);
   }
 
   /* Ranks risen: their seals and one line, under a rule (none when they're the card's first). */
@@ -6150,7 +6153,7 @@
   }
 
   .rankup-more {
-    font: 700 0.9375rem / 1.35 var(--font-sans);
+    font: var(--t-note);
   }
 
   .rankup-more a {
@@ -6286,7 +6289,7 @@
 
   .tomorrow-words {
     color: var(--ink-2);
-    font: 700 0.9375rem / 1.35 var(--font-sans);
+    font: var(--t-note);
   }
 
   .tomorrow-words b {
@@ -6303,7 +6306,7 @@
   .missed {
     display: grid;
     margin: 0;
-    padding: 4px 18px;
+    padding: 4px 16px;
     list-style: none;
     border-radius: var(--r-3);
     background: var(--surface);
@@ -6340,7 +6343,7 @@
 
   .miss-q {
     color: var(--ink-2);
-    font: 600 0.9375rem / 1.35 var(--font-sans);
+    font: var(--t-note);
   }
 
   .miss-a {
@@ -6360,7 +6363,7 @@
 
   .miss-f {
     color: var(--ink-2);
-    font: 500 0.9375rem / 1.45 var(--font-sans);
+    font: 500 1rem / 1.45 var(--font-sans);
   }
 
   .tomorrow-head,
@@ -6699,13 +6702,6 @@
     text-align: center;
   }
 
-  .rank-you {
-    color: var(--ink-3);
-    font-size: 0.75rem;
-    font-weight: 900;
-    white-space: nowrap;
-  }
-
   /* A board's score, as wide on every row („9 от 10“ as „10 от 10“, 3.49rem here and up to 3.7rem as other systems
      draw the font): the squares after it start in one column. In rem, so that it grows with the text. */
   .rank-score {
@@ -6755,7 +6751,7 @@
 
   .sect-lead {
     color: var(--ink-2);
-    font: 600 0.875rem / 1.4 var(--font-sans);
+    font: var(--t-note);
   }
 
   .sect-foot {
@@ -6764,7 +6760,7 @@
 
   .board-note {
     color: var(--ink-3);
-    font: 700 0.875rem / 1.4 var(--font-sans);
+    font: var(--t-note);
   }
 
   .board-empty,
@@ -6824,7 +6820,7 @@
     grid-area: day;
     gap: 2px var(--space-3);
     color: var(--ink-3);
-    font: 700 0.875rem / 1.2 var(--font-sans);
+    font: var(--t-label);
   }
 
   /* One thing about a friend under their name (friends.ts, stat): an icon, then its number alone, in figures of one
@@ -6914,7 +6910,7 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2) var(--space-3);
-    padding: 14px;
+    padding: var(--space-4);
     border-radius: var(--r-2);
     background: var(--surface);
     box-shadow: inset 0 0 0 2px var(--line);
@@ -6933,7 +6929,7 @@
     margin: 0;
     padding-left: 38px;
     color: var(--ink-2);
-    font: 600 0.9375rem / 1.35 var(--font-sans);
+    font: var(--t-note);
   }
 
   .invitation-actions {
@@ -7123,17 +7119,18 @@
     width: 24px;
     height: 24px;
     border-radius: var(--radius-full);
-    background: var(--ink-3);
+    background: var(--knob);
+    box-shadow: 0 1px 3px rgb(22 19 43 / 0.3);
     transition: transform 160ms ease;
   }
 
   .switch[aria-checked="true"] {
-    background: var(--ink);
+    background: var(--action);
     box-shadow: none;
   }
 
   .switch[aria-checked="true"] .switch-knob {
-    background: var(--bg);
+    background: var(--on-action);
     transform: translateX(22px);
   }
 
