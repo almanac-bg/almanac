@@ -9,7 +9,6 @@ export interface Boot {
   /** The seal the player wears (play.SealOf), with the player once they have a rank. */
   seal?: { chapter: string; level: number };
   categories: import("../state.ts").Category[];
-  bulgaria?: boolean;
   version: string;
   push: string;
   /** The server's clock as it drew the page (lib/api.ts holds the page's clock to it until an answer comes). */

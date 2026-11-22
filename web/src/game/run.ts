@@ -290,7 +290,7 @@ export function startScreen(
   return h(
     "div",
     { class: chapter ? "screen get-ready start-screen start-chapter" : "screen get-ready start-screen" },
-    // A chapter's game (Микс, България too) on its sheet, with its glyph, as the chapter's page has it.
+    // A chapter's game on its sheet, with its glyph, as the chapter's page has it.
     chapter
       ? leaf(chapter, [glyph(chapter, 72), h("div", { class: "intro" }, words)], "start-leaf")
       : h("div", { class: "intro" }, words),
@@ -411,7 +411,7 @@ export function guardLeaving(
 /** The top of a question: the way out, what's played (the day's issue, or the topic: `aside`; in a duel, with whom:
  * `versus`), and which one of how many. A game has the whole screen, the header with it, so the
  * way out is here: a cross to the place the game is played from (`out`): Днес for the day's ten and a duel (on Днес
- * itself too: it opens afresh, the day waiting there), the Алманах for a chapter's game (Микс, България), where the
+ * itself too: it opens afresh, the day waiting there), the Алманах for a chapter's game, where the
  * game left shows with the way to go on. The way back (router.ts): back in the history where that place is the page
  * before. */
 export function questionHead(

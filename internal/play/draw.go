@@ -498,7 +498,7 @@ func matches(q bank.Question, s slot, typ, pictures bool) bool {
 	return !pictures || s.picture == eitherWay || has == (s.picture == withPicture)
 }
 
-// Draw draws ten questions of a topic (MixTopic for all topics, BulgariaTopic for Bulgaria's from every topic) for players
+// Draw draws ten questions of a topic (MixTopic for all topics: a duel's) for players
 // of an ability there (mastery.go; 0 for one who knows as much as most): questions none of them has seen before those
 // one has, and so on (seen: seenAmong); never one barred (the day's: DayQuestions). Choices come with a picture or without, whichever is drawn, and the number an estimate
 // where one is left (wishes). Every run goes from easy to hard, its special questions in places drawn within their

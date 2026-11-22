@@ -331,7 +331,7 @@ func TestOnThisDay(t *testing.T) {
 	}
 
 	// A topic's game, today: the question it deals is no day's.
-	topic, _ := w.g.StartTopic(ctx, u, MixTopic)
+	topic, _ := w.g.startTopic(ctx, u, MixTopic)
 	q, _ := w.b.Get(w.picks(topic.ID)[0].ID)
 	date(q, "11-12")
 	if on, res := answer(topic.ID, 0); on || dayOf(res.Reveal) != "" {
@@ -723,7 +723,7 @@ func TestTopics(t *testing.T) {
 	if fresh < min(unseen, Length) {
 		t.Fatalf("%d fresh questions of %d unseen", fresh, unseen)
 	}
-	mix, err := w.g.StartTopic(ctx, u, MixTopic)
+	mix, err := w.g.startTopic(ctx, u, MixTopic)
 	if err != nil || mix.Total != Length {
 		t.Fatalf("„Микс“: %+v %v", mix, err)
 	}
@@ -748,26 +748,25 @@ func TestTopicLeftHalfWay(t *testing.T) {
 	if m := back.Trail[3]; m.Right || m.Close {
 		t.Fatalf("the question left showing: %+v", m)
 	}
-	// Another topic is a run of its own, and so is „Микс“.
-	if other, _ := w.g.StartTopic(ctx, u, "science"); other.ID == first.ID {
+	// Another topic is a run of its own.
+	other, _ := w.g.StartTopic(ctx, u, "science")
+	if other.ID == first.ID {
 		t.Fatal("another topic went on with history's run")
 	}
-	mix, _ := w.g.StartTopic(ctx, u, MixTopic)
-	if mix.ID == first.ID {
-		t.Fatal("„Микс“ went on with history's run")
-	}
-	// The games left, to come back to: each topic's latest, the latest first; one with its question showing is open.
-	if _, err := w.g.Show(ctx, u, mix.ID); err != nil {
+	// A game of every topic, kept from before, is never one to come back to: no way plays it now.
+	mix, _ := w.g.startTopic(ctx, u, MixTopic)
+	if _, err := w.g.Show(ctx, u, other.ID); err != nil {
 		t.Fatal(err)
 	}
+	// The games left, to come back to: each topic's latest, the latest first; one with its question showing is open.
 	left, err := w.g.Left(ctx, u)
-	if err != nil || len(left) != 3 {
-		t.Fatalf("left: %+v %v", left, err)
+	if err != nil || len(left) != 2 {
+		t.Fatalf("left: %+v %v (a game of every topic: %d)", left, err, mix.ID)
 	}
-	if l := left[0]; l.ID != mix.ID || l.Category != MixTopic || l.At != 0 || l.Total != Length || !l.Open {
-		t.Errorf("„Микс“, left: %+v", l)
+	if l := left[0]; l.ID != other.ID || l.Category != "science" || l.At != 0 || l.Total != Length || !l.Open {
+		t.Errorf("science, left: %+v", l)
 	}
-	if l := left[2]; l.ID != first.ID || l.Category != "history" || l.At != 4 || l.Open {
+	if l := left[1]; l.ID != first.ID || l.Category != "history" || l.At != 4 || l.Open {
 		t.Errorf("history, left: %+v", l)
 	}
 	// Finished, the next is new.

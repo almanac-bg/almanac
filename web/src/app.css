@@ -108,7 +108,6 @@
     --t-literature: #ff77ae;
     --t-nature: #33cf7a;
     --t-mix: #c9c4de;
-    --t-bulgaria: #2ec4a0;
     --d-general: #8a5d00;
     --d-science: #00777a;
     --d-history: #c33a1c;
@@ -120,7 +119,6 @@
     --d-literature: #c42d6c;
     --d-nature: #0f8148;
     --d-mix: #4a4766;
-    --d-bulgaria: #0b7a60;
     --s-general: #ffc21a;
     --s-science: #22ccc4;
     --s-history: #ff6b4a;
@@ -132,7 +130,6 @@
     --s-literature: #ff77ae;
     --s-nature: #33cf7a;
     --s-mix: #c9c4de;
-    --s-bulgaria: #2ec4a0;
 
     --space-1: 4px;
     --space-2: 8px;
@@ -207,7 +204,6 @@
       --d-literature: #ff89b9;
       --d-nature: #33cf7a;
       --d-mix: #c9c4de;
-      --d-bulgaria: #2ec4a0;
       --s-general: #cc9b15;
       --s-science: #1ba39d;
       --s-history: #e05e41;
@@ -219,7 +215,6 @@
       --s-literature: #cc5f8b;
       --s-nature: #29a662;
       --s-mix: #a19db2;
-      --s-bulgaria: #259d80;
     }
   }
 
@@ -262,7 +257,6 @@
     --d-literature: #ff89b9;
     --d-nature: #33cf7a;
     --d-mix: #c9c4de;
-    --d-bulgaria: #2ec4a0;
     --s-general: #cc9b15;
     --s-science: #1ba39d;
     --s-history: #e05e41;
@@ -274,7 +268,6 @@
     --s-literature: #cc5f8b;
     --s-nature: #29a662;
     --s-mix: #a19db2;
-    --s-bulgaria: #259d80;
   }
 
   /* A chapter's colours, on whatever is of its topic (.t-<topic>): --tv vivid, --td deep, --ts its sheet. Its art
@@ -333,11 +326,6 @@
     --tv: var(--t-mix);
     --td: var(--d-mix);
     --ts: var(--s-mix);
-  }
-  .t-bulgaria {
-    --tv: var(--t-bulgaria);
-    --td: var(--d-bulgaria);
-    --ts: var(--s-bulgaria);
   }
 
   /* ---- Base ---- */
@@ -4299,8 +4287,6 @@
 
   /* Every row as tall as its tallest tile, so one with more to say doesn't make its row stand out. */
 
-  /* „Микс“ and „България“ lead the topics (`.topic-lead`), two tiles like theirs; „Микс“ alone takes the row across. */
-
   .mastery {
     display: inline-flex;
     align-items: center;
@@ -5216,27 +5202,6 @@
     gap: var(--space-3);
   }
 
-  /* Микс and България: two ways to play at the book's head. */
-  .ways {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    margin-top: var(--space-1);
-  }
-
-  .way {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 64px;
-    padding: 8px 14px;
-    border: 2px solid var(--line);
-    border-radius: var(--r-2);
-    background: var(--surface);
-    color: var(--ink);
-    text-decoration: none;
-  }
-
   /* A chapter's game left half-way today: its glyph, where it stopped, „Продължи“. */
   .book-left {
     display: flex;
@@ -5259,27 +5224,6 @@
     display: block;
     color: var(--ink);
     font-weight: 900;
-  }
-
-  .way-words {
-    display: grid;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .way-words b {
-    font: 900 1.0625rem / 1.1 var(--font-sans);
-  }
-
-  .way-words small {
-    color: var(--ink-3);
-    font: var(--t-fine);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .way:hover {
-      border-color: var(--line-2);
-    }
   }
 
   /* The chapters: two to a row on a phone, five on a big screen, each a page of the book in its colour, its corner
@@ -5378,15 +5322,6 @@
 
     .card-ink .num {
       font-size: 2.125rem;
-    }
-
-    /* Микс and България: closer to the edge, the name whole. */
-    .way {
-      padding-inline: 8px;
-    }
-
-    .way-words b {
-      font-size: 1rem;
     }
   }
 
@@ -5752,10 +5687,6 @@
   }
 
   @media (min-width: 56.25rem) {
-    .ways {
-      max-width: 36rem;
-    }
-
     /* The book on a big screen: the page's whole width, its chapters five across; its head a reading width. */
     #main:has(.screen.book) {
       max-width: calc(var(--page) + 2 * var(--gutter));
@@ -7447,14 +7378,6 @@
       scroll-padding-bottom: 0;
     }
 
-    /* „Микс“ and „България“ first, a row of their own, half of it each (all of it for one alone), short tiles with
-       the picture beside the name. Then ten topics, five to a row (no topic alone in a row), the picture over the
-       name, each tile as tall as what's in it. */
-
-    /* The picture at the top, the name under it, and what the player knows of the topic under that. */
-
-    /* A way to play has room for its picture beside the name, like a topic. */
-
     /* A tablet: the column a little wider than a phone's. */
     #main {
       max-width: 48rem;
@@ -8284,9 +8207,8 @@
     margin-top: 0;
   }
 
-  /* The Алманах's chapters one to a row once a chapter's longest word no longer fits half the column; the ways to play
-     (Микс, България) too, each its glyph beside its name. */
-  .tight :is(.ways, .chapters) {
+  /* The Алманах's chapters one to a row once a chapter's longest word no longer fits half the column. */
+  .tight .chapters {
     grid-template-columns: minmax(0, 1fr);
   }
 

@@ -248,7 +248,7 @@ func TestGoneMidDuel(t *testing.T) {
 
 	// The player of the recording Ed plays goes.
 	gus, ed := w.user(), w.user()
-	s, _ := w.g.StartTopic(ctx, gus, MixTopic)
+	s, _ := w.g.startTopic(ctx, gus, MixTopic)
 	w.play(gus, s.ID, append(repeat(w.right, 6), repeat(w.wrong, Length-6)...)...) // a newcomer's even: Ed's to play
 	rec, err := w.g.DuelRecording(ctx, ed)
 	if err != nil {

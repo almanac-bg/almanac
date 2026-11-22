@@ -29,7 +29,7 @@ func TestProfileShowsSealAndRanks(t *testing.T) {
 		t.Fatalf("after a day: %+v %v", p, err)
 	}
 	// A topic's game, under way: nothing of it shows.
-	s, err := w.g.StartTopic(ctx, ana, MixTopic)
+	s, err := w.g.startTopic(ctx, ana, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestRecordingsNamed(t *testing.T) {
 		owner); err != nil {
 		t.Fatal(err)
 	}
-	s, err := w.g.StartTopic(ctx, owner, MixTopic)
+	s, err := w.g.startTopic(ctx, owner, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}

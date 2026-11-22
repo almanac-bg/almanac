@@ -1,6 +1,6 @@
 // Алманах, one of the three places: the player's book (DESIGN.md, Places). Its head — whose book it is, what ink and
-// grey mean, and Микс and България as two ways to play — then its chapters, each a card in its colour with its seal as
-// the badge and its ink („22 с мастило“), in their numbers' order. A chapter (/almanac/<topic>) is its head
+// grey mean — then its chapters, each a card in its colour with its seal as the badge and its ink („22 с мастило“),
+// in their numbers' order. A chapter (/almanac/<topic>) is its head
 // on its sheet (the seal, its ink, the rank and the way to the next), „Игра на главата“, and its facts, ink and grey, the
 // latest first, a page at a time, found by their words. How well a player knows a chapter (mastery) is the game's own,
 // never shown.
@@ -14,7 +14,6 @@ import type { Child } from "../lib/dom.ts";
 let {
   api,
   back,
-  bulgaria,
   chapterName,
   failure,
   formatNumber,
@@ -94,7 +93,6 @@ function setKit(kit: Kit) {
   ({
     api,
     back,
-    bulgaria,
     chapterName,
     failure,
     formatNumber,
@@ -117,15 +115,14 @@ function setKit(kit: Kit) {
   } = kit);
 }
 
-/** A chapter's game (or Микс's, България's) left unfinished today (play.Left): where it stopped. */
+/** A chapter's game left unfinished today (play.Left): where it stopped. */
 interface Left {
   category: string;
   at: number;
   total: number;
 }
 
-/** The book's chapters, in its order: the bank's topics. „Микс“ and „България“ are two ways to play at its head, not
- * chapters: no page of their own, where every fact would be one list (DECISIONS.md). */
+/** The book's chapters, in its order: the bank's topics. */
 const chapters = () => categories.map((t) => t.id);
 const nameOf = (id: string) => chapterName(id) || id;
 
@@ -178,12 +175,6 @@ function book(p: Page, left: () => Left[] = () => []): Child {
           ? "С мастило са фактите от верните ти отговори в броя на деня. Всички други, които срещнеш, са в сиво."
           : "Всеки верен отговор в броя на деня вписва един факт с мастило в твоя Алманах.",
       ),
-      h(
-        "div",
-        { class: "ways" },
-        way("mix", "Играй от всички глави", "10 въпроса, по един от всяка"),
-        bulgaria.open ? way("bulgaria", "Играй за България", "10 въпроса от всички глави") : null,
-      ),
       () =>
         left().map((l) =>
           h(
@@ -205,15 +196,6 @@ function book(p: Page, left: () => Left[] = () => []): Child {
       { class: "chapters", "aria-label": "Главите" },
       order.map((id) => h("li", null, card(id, p.ink[id] ?? 0, rankOf(id)))),
     ),
-  );
-}
-
-/** One of the ways to play at the book's head: „Микс“ or „България“, its glyph, a word of what it is. */
-function way(id: string, name: string, note: string): Child {
-  return h(
-    "a",
-    { class: `way t-${id}`, href: `/play/${id}` },
-    h("span", { class: "way-words" }, h("b", null, name), h("small", null, note)),
   );
 }
 
