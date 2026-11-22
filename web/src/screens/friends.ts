@@ -4,8 +4,8 @@
 // them, the last ten played, each a card that holds all there is of its duel (screens/duelcards.ts), and a new one;
 // it carries a dot while one waits for the player, and opens first then („Приятели“ has a dot while someone asks to
 // be friends). The tab chosen is in the address (`?tab=duels`): back and a reload keep it; a duel named there too
-// (`&duel=<id>`: one just played, or an old link to it: screens/duel.ts) is first under „Дуели“. The day's board is on
-// Днес's result (today.ts, dayBoard).
+// (`&duel=<id>`: one just played, or an old link to it: screens/duel.ts) is first in its group under „Дуели“. The
+// day's board is on Днес's result (today.ts, dayBoard).
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -130,6 +130,8 @@ function tabs(kit: Kit): Child {
   const named = Number(asked.get("duel")) || 0;
   const top = signal<DuelView | null>(null);
   let brought: Child = null;
+  // Brought into sight once this visit, as the page opens (duelcards.ts).
+  const sight = { done: false };
   const opens = signal<Tab | null>(user.peek() ? null : "friends");
   const tab = () => chosen() ?? opens();
   const choose = (to: Tab) => {
@@ -267,7 +269,11 @@ function tabs(kit: Kit): Child {
       h("p", { class: "sect-lead" }, "Едни и същи десет въпроса. Всеки ги играе, когато може."),
       () => {
         const d = duels();
-        return d ? duelCards(kit, d, top(), brought) : failed() ? failure(failed(), () => void load(), null) : null;
+        return d
+          ? duelCards(kit, d, top(), brought, sight)
+          : failed()
+            ? failure(failed(), () => void load(), null)
+            : null;
       },
       h("a", { class: "btn", href: "/duel/new" }, "Нов дуел"),
       h("p", { class: "small sect-foot" }, "С приятел или срещу запис на истинска игра."),
