@@ -33,7 +33,7 @@ test("the browser's back in a topic asks, its address kept while it does; „И�
   page,
 }) => {
   await page.goto("/almanac/history");
-  await page.getByRole("link", { name: "Игра на главата" }).click();
+  await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
   await page.getByRole("button", { name: "Започни сега" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10");
   // Back once, then again while it asks: the game's address stays, the question with it.
@@ -54,7 +54,7 @@ test("a topic counts in only after a tap; a reload goes back to its question, an
 }) => {
   test.setTimeout(120_000);
   await page.goto("/almanac/history");
-  await page.getByRole("link", { name: "Игра на главата" }).click();
+  await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   // A reload in the count starts nothing: the topic waits for „Започни“.
   await page.reload();
@@ -201,7 +201,7 @@ test("a game's page left before it's ready holds nothing over the page come to",
     await route.continue();
   });
   await page.goto("/almanac/history");
-  await page.getByRole("link", { name: "Игра на главата" }).click();
+  await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
   await expect(page).toHaveURL(/\/play\/history$/);
   await page.goBack();
   await expect(page).toHaveURL(/\/almanac\/history$/);

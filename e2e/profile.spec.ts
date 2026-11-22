@@ -76,7 +76,7 @@ test("a player's profile: asked to be friends from it, and friends there", async
 
   // Ana plays a topic.
   await a.goto("/almanac/history");
-  await a.getByRole("link", { name: "Игра на главата" }).click();
+  await a.getByRole("link", { name: "Играй 10 въпроса" }).click();
   await playRun(a);
   const ana = await a.evaluate(
     async () => (await (await fetch("/api/me")).json()).user as { name: string; tag: string },

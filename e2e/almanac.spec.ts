@@ -30,7 +30,7 @@ test("the book's contents: a chapter a row with its ink, and no count of it all"
   await expect(movies).toContainText(/7\s*с\sмастило/);
   // A counter at zero is hidden: the book's head says how ink is written.
   await expect(cards.filter({ hasText: "География" })).not.toContainText("с мастило");
-  await expect(page.locator(".way")).toHaveText([/Микс/, /България/]);
+  await expect(page.locator(".way")).toHaveText([/всички глави/, /България/]);
   // The chapters in their numbers' order, whatever their ink: a book's contents.
   await expect(cards.first()).toContainText("Обща култура");
   await expect(cards.nth(4)).toContainText("Кино и телевизия");
@@ -39,7 +39,7 @@ test("the book's contents: a chapter a row with its ink, and no count of it all"
   await expect(page.getByRole("heading", { level: 1, name: "Кино и телевизия" })).toBeVisible();
   await expect(page.locator(".entry")).toHaveCount(7);
   // Its game, a tap away.
-  await expect(page.getByRole("link", { name: "Игра на главата" })).toHaveAttribute("href", "/play/movies");
+  await expect(page.getByRole("link", { name: "Играй 10 въпроса" })).toHaveAttribute("href", "/play/movies");
 });
 
 test("a chapter comes a page at a time, by its numbers", async ({ page }) => {

@@ -69,7 +69,7 @@ test("each screen asks the server for each thing once a visit, and a deploy load
   // A chapter, its game's count backed out of: back on the chapter.
   await once(page, "a chapter", () => page.goto("/almanac/history"));
   await once(page, "a topic", async () => {
-    await page.getByRole("link", { name: "Игра на главата" }).click();
+    await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
     await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   });
   await once(page, "a chapter, the count backed out of", async () => {
