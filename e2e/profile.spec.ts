@@ -129,7 +129,7 @@ test("a player's profile: asked to be friends from it, and friends there", async
     "player-actions",
     "sect",
   ]);
-  await expect(b.locator(".me-head .me-ids .me-streak")).toHaveText("3 дни в серията");
+  await expect(b.locator(".me-head .me-ids .me-streak")).toHaveText("3 дни без прекъсване");
   await expect(b.locator(".me-streak")).not.toHaveAttribute("title");
   await expect(b.locator(".screen")).not.toContainText(/простен|пропуснат/);
   await expect(b.getByRole("button", { name: /^Дуел (с|със) / })).toBeVisible();
@@ -149,10 +149,10 @@ test("a player's profile: asked to be friends from it, and friends there", async
 
   // Профил has no way to the page as others see it: her own, opened by its tag, is simply that page.
   await a.goto("/me");
-  await expect(a.locator(".me-head .me-streak")).toHaveText("3 дни в серията");
+  await expect(a.locator(".me-head .me-streak")).toHaveText("3 дни без прекъсване");
   await expect(a.getByText(/Как (те|ме) виждат другите/)).toHaveCount(0);
   await a.goto(`/players/${ana.tag}`);
-  await expect(a.locator(".me-head .me-streak")).toHaveText("3 дни в серията");
+  await expect(a.locator(".me-head .me-streak")).toHaveText("3 дни без прекъсване");
   await expect(a.locator(".player-actions")).toHaveCount(0);
   await expect(a.locator(".screen")).not.toContainText(/виждат другите|Към твоя профил/);
   await a.goto("/players/nosuchplayer");

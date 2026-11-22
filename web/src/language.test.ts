@@ -60,7 +60,7 @@ test("everything a player may read is in Bulgarian letters and words, not loanwo
  */
 const retired: [RegExp, string][] = [
   [/въпроси(те)? на деня|днешните въпроси/iu, "„днешният брой“ or „броят на деня“"],
-  [/изиграни дни|дни поред/iu, "„дни в серията“ (the streak forgives missed days: not „поред“, not a total)"],
+  [/изиграни дни|дни поред/iu, "„дни без прекъсване“ (the streak forgives missed days: not „поред“, not a total)"],
   [/игри на главите/iu, "what the game is: „игра на главата“ reads as a head's to one who hasn't played"],
 ];
 

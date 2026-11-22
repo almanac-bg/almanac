@@ -5613,7 +5613,7 @@
     font: 800 0.8125rem / 1.2 var(--font-sans);
   }
 
-  /* The streak: the flame, the number, „дни в серията“ and a quiet line under them; unlit while the day's ten wait. */
+  /* The streak: the flame, the number, „дни без прекъсване“ and a quiet line under them; unlit while the day's ten wait. */
   .streak-chip {
     display: flex;
     align-items: center;
