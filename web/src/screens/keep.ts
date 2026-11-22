@@ -1,5 +1,5 @@
 // Keeping a guest's game: a guest's game lives in the one browser it began in, until an email keeps it everywhere.
-// Asked in one quiet line in the day's „Утре“ card, from the second day played. In an app's own browser (Messenger,
+// Asked in one quiet line under the day's result (`.asks`), from the second day played. In an app's own browser (Messenger,
 // Instagram …: lib/embedded.ts) the day's result's action is the way out to the phone's browser, with the game
 // (exitWay: account.Handoff, its token in Днес's address while it's offered, taken there by takeHand), and the cover
 // has one small line for a game kept there already (coverExit); a game brought there lands on the day's result, whose
@@ -38,7 +38,7 @@ export function keepStake(days: () => number, streak: () => number): () => strin
   };
 }
 
-/** The line in „Утре“ that asks a guest to keep their game (keepStake), with the form a tap away; none in an app's
+/** The line under the day's result that asks a guest to keep their game (keepStake), with the form a tap away; none in an app's
  * browser, where the way out is the result's action (exitWay). Quiet while the reminder by mail asks for the email
  * (`quiet`). Kept, it says so in its place. */
 export function keepLine(stake: () => string | null, quiet: () => boolean): Child {

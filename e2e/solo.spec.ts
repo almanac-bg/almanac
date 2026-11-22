@@ -44,8 +44,8 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.locator(".result")).toBeVisible();
   await expect(page.getByRole("button", { name: "Започни" })).toHaveCount(0);
   await expect(page.locator(".places-foot")).toBeVisible();
-  // The result tells the streak tomorrow makes.
-  await expect(page.locator(".tomorrow")).toContainText("С него серията ти става 2.");
+  // The result says nothing of tomorrow.
+  await expect(page.locator(".summary")).not.toContainText("Утре");
   // The day's board on the result: of friends (none yet), and of all България, where it opens, the player on it.
   await expect(page.locator(".day-board").getByRole("tab")).toHaveText(["Всички", "Приятели"]);
   await expect(page.locator(".day-board").getByRole("tab", { name: "Всички" })).toHaveAttribute(
@@ -347,7 +347,7 @@ test.describe("on a computer", () => {
     await playRun(page);
     await expect(page.locator(".summary")).toBeVisible();
     // Just played, the result is a spread (it's drawn where the game was), as it is after a reload.
-    await expect(page.locator(".tomorrow")).toContainText("С него серията ти става 2.");
+    await expect(page.locator(".summary .score-n")).toBeVisible();
     // (Few have played in a test: the right page, България's, is empty, and the score has the left one.)
     const box = async () => (await page.locator(".result-main").boundingBox())?.width ?? -1;
     const just = await box();

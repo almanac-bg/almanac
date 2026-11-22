@@ -35,10 +35,9 @@ import (
 // questions) warns RunwayWarn days before a place runs out: Ahead of them before the stop, and 60 more to write the
 // batch. Of the questions that fit, those nobody has answered come first. A day ahead whose question has left the
 // bank, or is due for review by its day (overdue), has that question replaced in its own place, the rest kept as drawn
-// (mendDay), so that what was said of it stays true (tomorrow's hard question's chapter, on Днес); drawn again only if
-// a place has no question that fits it so. All the days after tomorrow are drawn again when the draw's rules change
-// (DayRules) or the bank's days and Bulgarian questions do (bank.Tail.On, BG): a day drawn ahead is drawn by today's
-// rules, never an older version's.
+// (mendDay); drawn again only if a place has no question that fits it so. All the days after tomorrow are drawn again
+// when the draw's rules change (DayRules) or the bank's days and Bulgarian questions do (bank.Tail.On, BG): a day
+// drawn ahead is drawn by today's rules, never an older version's.
 //
 // Past the days drawn, the day and the other games keep apart by what they prefer, not by a bar: of the questions
 // that fit, the day takes one nobody has answered, and a chapter's game or a duel one somebody has (Draw), each while

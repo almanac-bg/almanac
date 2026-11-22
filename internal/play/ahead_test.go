@@ -18,7 +18,7 @@ import (
 
 // The days ahead are drawn as far as each place has a question that fits it just so, never a question twice; none of
 // their questions reaches another game; and a day ahead whose question leaves the bank has it replaced in its place,
-// the rest of the day kept: what Днес said of tomorrow („Трудният въпрос е от История“) stays true.
+// the rest of the day kept.
 func TestDaysAhead(t *testing.T) {
 	w := setup(t)
 	w.use(biggerSample(t, 20))

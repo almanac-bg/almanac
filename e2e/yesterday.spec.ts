@@ -49,6 +49,7 @@ test("yesterday's issue finished: the way on to today's asks for the day again",
   await expect(on).toContainText("вече излезе.");
   await page.unrouteAll();
   await on.getByRole("button", { name: "Към днешния брой" }).click();
-  // Today's, as the server has it now: the run played is today's here, so its result, with tomorrow.
-  await expect(page.locator(".tomorrow h2")).toHaveText("Утре");
+  // Today's, as the server has it now: the run played is today's here, so its result, and no way on any more.
+  await expect(page.locator(".summary .score-n")).toBeVisible();
+  await expect(page.locator(".tomorrow")).toHaveCount(0);
 });

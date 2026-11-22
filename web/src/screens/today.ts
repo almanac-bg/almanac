@@ -73,8 +73,6 @@ export interface Today {
   friends?: Score[] | null;
   /** While no friend has played: whether the player has any friends at all. */
   befriended?: boolean;
-  /** The day played: the chapter of tomorrow's last question, the hard one (its result's „Утре“). */
-  tomorrowHard?: string;
   /** A game that ended without its result on screen (the day's last question let run out, a game left at its end):
    * its news, told here once (play/told.go). */
   untold?: number;
@@ -300,8 +298,8 @@ export function today() {
       // Come from the streak's mail to a browser signed out: the way in comes first, open.
       fromMail && !user.peek()?.email ? haveProfile(load) : null,
     ];
-    // What came of the days just missed, once: under the streak, before the day is played. The result says the streak
-    // in „Утре“, so there it's only kept as told. On an evening the streak ends at midnight without the day, the
+    // What came of the days just missed, once: under the streak, before the day is played. The result says nothing of
+    // the streak, so there it's only kept as told. On an evening the streak ends at midnight without the day, the
     // streak's line says that, and what came of the days missed waits, untold, for another visit.
     const streakSaid = !run?.done && t.streak >= 3 && endsTonight(t) ? null : streakNotice(t);
     if (run?.done) return result(t, run, just, notices);
@@ -570,8 +568,8 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   // The streak with today's, the game's stake, and the reminder's ask. A guest in an app's own browser has the way out
   // for the action; a guest on the first day, or one whose game was just brought here, the ask to keep it and be
   // reminded (while it's there to ask), right under the score; everyone else, sharing the day, and the reminder's ask
-  // in „Утре“ (a guest's by mail keeps the game too), never a second action: at most three times, once a day
-  // (remindAsk). None for yesterday's issue finished late: „Утре“ isn't there.
+  // under the result, in `.asks` (a guest's by mail keeps the game too), never a second action: at most three times,
+  // once a day (remindAsk). None for yesterday's issue finished late: the way on to today's is in their place.
   const streak = () => (just && fresh() === t ? 0 : fresh().streak);
   const stake = keepStake(
     () => (streak() >= 2 ? 2 : 1),
@@ -648,8 +646,8 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       news(run.id, 0, undefined, best.set, "Днес в Алманаха"),
       // 3. The action, once the first results are past.
       first ? null : action,
-      // 4. Tomorrow.
-      t.late ? onToToday(t, t.late.today) : tomorrow(t, fresh, streak, stake, first ? null : ask),
+      // 4. Yesterday's issue finished after midnight: on to today's. Otherwise the asks, if any.
+      t.late ? onToToday(t, t.late.today) : asks(stake, first ? null : ask),
     ),
     h(
       "div",
@@ -1026,8 +1024,8 @@ function shareSheet(run: State, t: Today, streak: number): void {
   sheet.showModal();
 }
 
-/** Yesterday's issue finished after midnight (`t.late`): in tomorrow's place, today's issue, out already, and the way to
- * it. */
+/** Yesterday's issue finished after midnight (`t.late`): in the asks' place, today's issue, out already, and the way
+ * to it. */
 function onToToday(t: Today, today: () => void): Child {
   const next = new Date(`${t.day}T12:00:00Z`);
   next.setUTCDate(next.getUTCDate() + 1);
@@ -1051,59 +1049,12 @@ function onToToday(t: Today, today: () => void): Child {
   );
 }
 
-/** Tomorrow: the next issue's date set large, „Утре, неделя · Брой 32“, the chapter of its hard question with its
- * glyph (as the day says it once the game just played is in, `now`: the day fetched before it hasn't it), and what
- * it makes of the streak (`streak`: with today's); a guest's ask to keep the game (keep.ts: what it risks till then, `stake`); and, where it isn't on yet, the reminder's ask (`ask`;
- * null where the result's action is the ask, or the way out of an app's browser). */
-function tomorrow(
-  t: Today,
-  now: () => Today,
-  streak: () => number,
-  stake: () => string | null,
-  ask: { view: Child; mailing: () => boolean } | null,
-): Child {
-  const next = new Date(`${t.day}T12:00:00Z`);
-  next.setUTCDate(next.getUTCDate() + 1);
-  const day = next.toISOString().slice(0, 10);
-  return h(
-    "section",
-    { class: "sect tomorrow" },
-    h("div", { class: "sect-head" }, h("h2", null, "Утре")),
-    h(
-      "div",
-      { class: "tomorrow-row" },
-      h("b", { class: "tomorrow-n" }, day.slice(8).replace(/^0/, "")),
-      h(
-        "p",
-        { class: "tomorrow-words" },
-        // Its two parts a line each where they don't fit one (large text): no line starts or ends with the dot.
-        h(
-          "b",
-          { class: "tomorrow-head" },
-          h("span", null, `Утре, ${weekday(day).toLowerCase()}`),
-          h("span", { class: "tomorrow-sep" }, " · "),
-          h("span", null, `Брой\u00a0${issueOf(day)}`),
-        ),
-        () => {
-          const hard = now().tomorrowHard;
-          return hard
-            ? h(
-                "span",
-                { class: "tomorrow-hard" },
-                "Трудният въпрос е от ",
-                h("span", { class: "nowrap" }, glyph(hard, 22), ` ${chapterName(hard)}`),
-              )
-            : null;
-        },
-        () => {
-          const n = streak();
-          return n > 0 ? h("span", { class: "tomorrow-streak" }, `С него серията ти става\u00a0${n + 1}.`) : null;
-        },
-      ),
-    ),
-    // The ask by mail asks a guest for the email itself: the line to keep the game steps aside for it.
-    ask ? [keepLine(stake, ask.mailing), ask.view] : null,
-  );
+/** Under the result, the asks that come with it: a guest's to keep the game (keep.ts: what it risks till then,
+ * `stake`) and, where it isn't on yet, the reminder's (`ask`; null where the result's action is the ask, or the way
+ * out of an app's browser): nothing else, and nothing at all when neither is asked (`.asks:empty`). */
+function asks(stake: () => string | null, ask: { view: Child; mailing: () => boolean } | null): Child {
+  // The ask by mail asks a guest for the email itself: the line to keep the game steps aside for it.
+  return ask ? h("section", { class: "sect asks" }, keepLine(stake, ask.mailing), ask.view) : null;
 }
 
 /** The news of a game whose result was never on screen (`t.untold`; of `run` only, if given: the day's, under its

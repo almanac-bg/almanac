@@ -6309,7 +6309,7 @@
     gap: var(--space-3);
   }
 
-  /* Tomorrow: the next issue's date set big, its words beside it, and the asks that come with it. */
+  /* Yesterday's issue finished after midnight: today's date set big, its words beside it, the way on to it. */
   .tomorrow {
     display: grid;
     align-content: start;
@@ -6340,6 +6340,11 @@
   .tomorrow-words b {
     color: var(--ink);
     font-weight: 900;
+  }
+
+  /* The result's asks (keeping the game, the reminder): none asked, no card. */
+  .asks:empty {
+    display: none;
   }
 
   /* None right: the questions missed, each its tile, the question, the answer and the fact (today.ts, missed). */
@@ -6409,21 +6414,6 @@
   .miss-f {
     color: var(--ink-2);
     font: 500 1rem / 1.45 var(--font-sans);
-  }
-
-  .tomorrow-head,
-  .tomorrow-hard,
-  .tomorrow-streak {
-    display: block;
-  }
-
-  .tomorrow-hard .glyph {
-    vertical-align: middle;
-  }
-
-  /* The chapter's glyph stays with its name. */
-  .tomorrow-hard .nowrap {
-    white-space: nowrap;
   }
 
   /* „Прегледай въпросите“: the rest of the day, a tap away in its dialog. */
@@ -7364,8 +7354,6 @@
       max-width: 22rem;
     }
 
-    /* Начало's cards (tomorrow and its reminder, keeping the game): their buttons a hand's width too. */
-
     /* In a game: the question and its answers bigger, read from further away; a choice's answers two by two. A
        list stays one column: things put in order (dragged up and down), and the rows of pairs and groups shown. */
     .playing .ask {
@@ -8094,20 +8082,11 @@
     justify-content: start;
   }
 
-  /* Tomorrow: its date over its words, which have the column's width; the issue's name and its number a line each,
-     no dot between them. */
+  /* Today's issue out: its date over its words, which have the column's width. */
   .tight .tomorrow-row {
     flex-direction: column;
     align-items: flex-start;
     gap: var(--space-2);
-  }
-
-  .tight .tomorrow-head > span {
-    display: block;
-  }
-
-  .tight .tomorrow-head > .tomorrow-sep {
-    display: none;
   }
 
   /* The issue's cover with large text: its display type held near its usual size (the date by the screen's height,

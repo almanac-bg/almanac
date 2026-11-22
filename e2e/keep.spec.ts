@@ -1,4 +1,4 @@
-// Keeping a guest's game: asked in the day's „Утре“ card from the second day, at once in an app's own browser (with
+// Keeping a guest's game: asked under the day's result from the second day, at once in an app's own browser (with
 // the way out to the phone's browser, the game with it); where no notification can come (as in these tests: the
 // test server has no keys for them), by the reminder by mail, which asks for the email from the first day; on
 // Профил from the first game; and the way in for a player with a profile elsewhere.
@@ -15,30 +15,30 @@ test("from the second day, where no notification comes, the reminder by mail ask
   await page.reload();
   await startDay(page);
   await playRun(page);
-  const tomorrow = page.locator(".tomorrow");
-  await expect(tomorrow).toContainText("Серията ти от 2 дни е само на това устройство.");
-  await expect(tomorrow).toContainText("Да ти пишем, ако броят още те чака?");
+  const asks = page.locator(".asks");
+  await expect(asks).toContainText("Серията ти от 2 дни е само на това устройство.");
+  await expect(asks).toContainText("Да ти пишем, ако броят още те чака?");
   // One ask for the email, not two.
-  await expect(tomorrow.getByRole("button", { name: "Запази я с имейл" })).toHaveCount(0);
-  await tomorrow.getByLabel("Имейл").fill(email);
-  await tomorrow.getByRole("button", { name: "Напомняй ми по имейл" }).click();
+  await expect(asks.getByRole("button", { name: "Запази я с имейл" })).toHaveCount(0);
+  await asks.getByLabel("Имейл").fill(email);
+  await asks.getByRole("button", { name: "Напомняй ми по имейл" }).click();
   await expect.poll(() => mailedCode(email)).not.toBe("");
-  await tomorrow.getByLabel("Код").fill(mailedCode(email));
-  await tomorrow.getByRole("button", { name: "Потвърди" }).click();
-  await expect(tomorrow.getByRole("status")).toHaveText(
+  await asks.getByLabel("Код").fill(mailedCode(email));
+  await asks.getByRole("button", { name: "Потвърди" }).click();
+  await expect(asks.getByRole("status")).toHaveText(
     `Готово. Играта ти е запазена с имейла ${email}. Влизай с него на всяко устройство. Ще ти напомняме по имейл, ако броят още те чака.`,
   );
-  await expect(tomorrow).not.toContainText("само на това устройство");
+  await expect(asks).not.toContainText("само на това устройство");
   // Asked and on: not asked again.
   await page.reload();
-  await expect(page.locator(".tomorrow")).toBeVisible();
+  await expect(page.locator(".summary .score-n")).toBeVisible();
   await expect(page.locator(".summary")).not.toContainText("Да ти пишем");
   // Настройки has it on, the player's to switch off.
   await page.goto("/settings");
   await expect(page.getByRole("switch", { name: "Напомняне по имейл" })).toHaveAttribute("aria-checked", "true");
 });
 
-test("a player with a profile is asked in „Утре“ to be reminded while it's off, never as a second action", async ({
+test("a player with a profile is asked under the result to be reminded while it's off, never as a second action", async ({
   page,
 }, info) => {
   test.setTimeout(90_000);
@@ -56,16 +56,16 @@ test("a player with a profile is asked in „Утре“ to be reminded while it
   await page.goto("/");
   await startDay(page);
   await playRun(page);
-  const tomorrow = page.locator(".tomorrow");
-  await expect(tomorrow).toContainText(`Да ти пишем на ${email}, ако броят още те чака?`);
-  // The result's one action is „Сподели“; the ask is a plain button under „Утре“.
+  const asks = page.locator(".asks");
+  await expect(asks).toContainText(`Да ти пишем на ${email}, ако броят още те чака?`);
+  // The result's one action is „Сподели“; the ask is a plain button under the result.
   await expect(page.locator(".result-first")).toHaveCount(0);
-  await expect(tomorrow.getByRole("button", { name: "Напомняй ми по имейл" })).not.toHaveClass(/primary/);
-  await tomorrow.getByRole("button", { name: "Не сега" }).click();
+  await expect(asks.getByRole("button", { name: "Напомняй ми по имейл" })).not.toHaveClass(/primary/);
+  await asks.getByRole("button", { name: "Не сега" }).click();
   await expect(page.locator(".summary")).not.toContainText("Да ти пишем");
   // Once a day: not again today.
   await page.reload();
-  await expect(page.locator(".tomorrow")).toBeVisible();
+  await expect(page.locator(".summary .score-n")).toBeVisible();
   await expect(page.locator(".summary")).not.toContainText("Да ти пишем");
 });
 
@@ -85,7 +85,7 @@ test("a first day asks for the reminder only, not yet to keep the game; „Не 
   await ask.getByRole("button", { name: "Не сега" }).click();
   await expect(page.locator(".summary")).not.toContainText("Да ти пишем");
   await page.reload();
-  await expect(page.locator(".tomorrow")).toBeVisible();
+  await expect(page.locator(".summary .score-n")).toBeVisible();
   await expect(page.locator(".summary")).not.toContainText("Да ти пишем");
 });
 
@@ -98,14 +98,14 @@ test("„Не сега“ to the reminder by mail is one to the email: the line 
   await page.reload();
   await startDay(page);
   await playRun(page);
-  const tomorrow = page.locator(".tomorrow");
-  await expect(tomorrow).toContainText("Да ти пишем, ако броят още те чака?");
-  await tomorrow.getByRole("button", { name: "Не сега" }).click();
-  await expect(tomorrow).not.toContainText("Да ти пишем");
-  await expect(tomorrow.getByRole("button", { name: "Запази я с имейл" })).toHaveCount(0);
+  const asks = page.locator(".asks");
+  await expect(asks).toContainText("Да ти пишем, ако броят още те чака?");
+  await asks.getByRole("button", { name: "Не сега" }).click();
+  await expect(asks).not.toContainText("Да ти пишем");
+  await expect(asks.getByRole("button", { name: "Запази я с имейл" })).toHaveCount(0);
   await page.reload();
-  await expect(page.locator(".tomorrow")).toBeVisible();
-  await expect(page.locator(".tomorrow").getByRole("button", { name: "Запази я с имейл" })).toHaveCount(0);
+  await expect(page.locator(".summary .score-n")).toBeVisible();
+  await expect(page.locator(".summary").getByRole("button", { name: "Запази я с имейл" })).toHaveCount(0);
 });
 
 test("the reminder by mail turned on from Настройки says the game is kept, and its switch is on", async ({

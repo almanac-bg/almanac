@@ -100,12 +100,10 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      single question picked out of the ten (the day's ten are all a tap away, in their dialog), and no one chapter's
      bar beside the day's whole ink: next to it, either reads as the day's ink.
   4. The action, past the first results: „Сподели“.
-  5. Tomorrow: the next issue's date set big (over its words with large text), „Утре, неделя · Брой 32“ (a line each
-     with large text, no dot), the chapter of its hard question with its
-     glyph („Трудният въпрос е от История“, once tomorrow is drawn), what it makes of the streak; past the first results, the
-     reminder's ask under it while reminders are off, a player with a profile's too (a plain button, never a second
-     action; three times at most, once a day). Yesterday's issue finished after midnight has today's in its place
-     („Вече излезе.“, „Към днешния брой“).
+  5. Nothing of tomorrow (no „Утре“ card: the result is the day's). Past the first results, a guest's ask to keep the
+     game and the reminder's ask while reminders are off, a player with a profile's too (a plain button, never a second
+     action; three times at most, once a day), in a card of their own with no heading, none when neither is asked.
+     Yesterday's issue finished after midnight has today's in their place („Вече излезе.“, „Към днешния брой“).
   6. The day's board (`.day-board`, `dayBoard()`): one card, „Класация“ and two tabs, Всички and Приятели (in that order; the first not „България“, which names the questions about Bulgaria; among
      friends once the player has any; with none, on all България). It's there once the day as it stands with the game
      played has come (before, the board names nobody to the player and shows no squares), never for yesterday's issue
@@ -608,7 +606,7 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
   in the Алманах itself („Глава 1“ over a topic's name), never out of the book (`language.test.ts`). A rank's six names are the
   seal's states; „звание“ is not a word the game uses.
 - **A topic's name is in quotes only right after the word „тема“ (or „глава“ in the book):** „тема „История““,
-  „Носиш печата на тема „Наука““. Standing alone it's bare: „Трудният въпрос е от История“, „Печат: История“, „Печатът на История“
+  „Носиш печата на тема „Наука““. Standing alone it's bare: „Печат: История“, „Печатът на История“
   (`language.test.ts`).
 - **Copy promises nothing the game doesn't do:** ink is „вярно отговорени“ in the issue, never „знаеш“; a counter at
   zero is hidden; an ended streak's number is never named.
@@ -629,7 +627,7 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
   nothing names any more goes, with its rules.
 - **Test hooks** the browser tests depend on: `.question-head`, `.options .option`, `.keypad`, `.sortable-list`,
   `.verdict`, `.right-said`, `.after`, `.up-next-go`; `.issue`, `.issue-go`, `.today-side`, `.result`, `.result-main`, `.score-n`,
-  `.tiles .tile`, `.tomorrow`, `.result-share`, `.share-sheet`, `.streak-chip`, `.streak-notice`, `.day-news`, `.missed-day`;
+  `.tiles .tile`, `.tomorrow`, `.asks`, `.result-share`, `.share-sheet`, `.streak-chip`, `.streak-notice`, `.day-news`, `.missed-day`;
   `.summary`, `.reviewed`, `.news-facts`; `.toc-row`, `.entry`; `.day-board`, `.rank-row`, `.friend`, `.invitation`,
   `.accepted-notice`, `.duels`, `.duel-cards`, `.duel-card` (`.turn`, `.landed`, `.s-<state>`), `.duel-card-mid`, `.duel-card-go`, `.duel-card-open`, `.duel-pile`, `.duel-stack`, `.duel-chip`, `.duel-card-marks`, `.review-sheet`, `.review-of`, `.duel-q-side`, `.friends-on`, `.friends-row`, `.friends-faces`, `.friends-list`, `.friends-chip`, `.tile-tap`, `.lit`, `.friend-record`, `.friend-full`, `.their-line`; `.me-ladder`, `.ladder`.
 
