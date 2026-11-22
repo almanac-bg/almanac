@@ -76,7 +76,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   - Nothing over the issue but what came of the player's own step (a profile signed in to, a game brought here).
     Others' news is Приятели's: its dot for a request, a duel or a duel's result since the last look, its line for a
     friend's yes.
-- **The day's result** (Днес once the day is played):
+- **The day's result** (Днес once the day is played). On a big screen the player's own day (1–5) is the left page and
+  the day's board (6) the right one, the room to itself:
   1. The score on a sheet of the issue's first chapter: „Брой 9 · 20 ноември“, the score as the hero numeral „7 от
      10“, the tiles, „На десетия въпрос вярно отговарят 14 %“ (nothing before a crowd: the tenth is
      always the hardest), and with a crowd „България днес: средно 6,2“ (the average always to one decimal: „6,0“). Ten of ten:
@@ -91,7 +92,6 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      under the score — keeping the game and being reminded, or the way out to the phone's browser (a button: on Android
      it opens the phone's browser, elsewhere it copies the link for it; the app's menu named under it, „Или от менюто
      на приложението: ··· → Отвори в Safari“); sharing then stays a quiet link beside the tiles („Сподели резултата“).
-     On a big screen that action heads the right page (moved there, never drawn twice), the two pages of a height.
   3. What the day wrote in the book, „Днес в Алманаха“ (`game/news.ts`), on a card: the whole of its ink at a glance,
      „+6 с мастило“ (a tap from the Алманах), and under it the chapters it went to, in the order the issue asked them,
      a row of their tiles (a right answer's, as the score has them), each with its „+1“ (or „+2“; a tap from those facts in its chapter, marked there for a moment: `/almanac/<chapter>?fact=<id>`); „Един от въпросите вече беше в твоя

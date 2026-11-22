@@ -6591,8 +6591,8 @@
       display: grid;
     }
 
-    /* The result: the score and what the day wrote on the left page, the action, tomorrow and the day's board on the
-       right. */
+    /* The result: the player's own day on the left page (the score, what the day wrote, the action, tomorrow), the
+       day's board on the right, the room to itself. */
     .result.spread > .result-main {
       grid-column: 1 / span 7;
     }
@@ -6699,10 +6699,10 @@
     white-space: nowrap;
   }
 
-  /* A board's score, as wide on every row („9 от 10“ as „10 от 10“, which is 3.49rem): the squares after it start in
-     one column. In rem, so that it grows with the text. */
+  /* A board's score, as wide on every row („9 от 10“ as „10 от 10“, 3.49rem here and up to 3.7rem as other systems
+     draw the font): the squares after it start in one column. In rem, so that it grows with the text. */
   .rank-score {
-    min-width: 3.5rem;
+    min-width: 4rem;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
