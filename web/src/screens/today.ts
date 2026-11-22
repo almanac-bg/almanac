@@ -623,10 +623,8 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
         : null,
     first ? null : shareButton(run, t, streak, known),
   );
-  // The first results' action: right under the score on a phone; on a big screen at the top of the right page, so the
-  // two pages are of a height (the left one has the score and the questions). Moved, never drawn twice.
-  const underScore = document.createTextNode("");
-  const sideTop = document.createTextNode("");
+  // The left page is the player's own day: the score, what it wrote in the book, the action, tomorrow; the right page
+  // is everyone's, the day's board, with the room to itself. On a phone, one column in that order.
   const page = h(
     "section",
     { class: "screen result summary spread" },
@@ -637,19 +635,19 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       hero,
       best,
       zero ? missed(missedList, () => openReview()) : null,
-      first ? underScore : null,
+      // The first results' action, right under the score.
+      first ? action : null,
       // 2. What the day wrote in the book. Asked on every visit: the ink is counted again; a rank risen is told once
       // (play.NewsOf).
       news(run.id, 0, undefined, best.set, "Днес в Алманаха"),
-    ),
-    h(
-      "div",
-      { class: "result-side page-2" },
-      first ? sideTop : null,
       // 3. The action, once the first results are past.
       first ? null : action,
       // 4. Tomorrow.
       t.late ? onToToday(t, t.late.today) : tomorrow(t, fresh, streak, stake, first ? null : ask),
+    ),
+    h(
+      "div",
+      { class: "result-side page-2" },
       // 5. The day's board (none for yesterday's issue finished late: Днес hasn't its board).
       t.late ? null : () => dayBoard(fresh(), run, among),
       // None right: the first questions are open under the score already, with the way to them all there (once they
@@ -657,13 +655,6 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       () => (missedList()?.length ? null : reviewButton(() => openReview())),
     ),
   );
-  if (first) {
-    const wide = matchMedia("(min-width: 56.25rem)");
-    const place = () => (wide.matches ? sideTop : underScore).after(action);
-    place();
-    wide.addEventListener("change", place);
-    onCleanup(() => wide.removeEventListener("change", place));
-  }
   return page;
 }
 

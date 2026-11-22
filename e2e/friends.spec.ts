@@ -102,12 +102,15 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   const field = b.getByLabel("Потребителско име или имейл на приятел");
   for (const width of [320, 390, 430, 1366]) {
     await b.setViewportSize({ width, height: 800 });
-    const room = await field.evaluate((el: HTMLInputElement) => {
+    const room = await field.evaluate(async (el: HTMLInputElement) => {
       const s = getComputedStyle(el);
       const hint = getComputedStyle(el, "::placeholder");
       const ctx = document.createElement("canvas").getContext("2d");
       if (!ctx) return 0;
-      ctx.font = `${hint.fontWeight} ${hint.fontSize} ${hint.fontFamily}`;
+      // Measured in the hint's own font: a canvas draws in a fallback (wider on Linux) until that font has loaded.
+      const font = `${hint.fontWeight} ${hint.fontSize} ${hint.fontFamily}`;
+      await document.fonts.load(font, el.placeholder);
+      ctx.font = font;
       const inner = el.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight);
       return inner - ctx.measureText(el.placeholder).width;
     });
