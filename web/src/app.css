@@ -3513,8 +3513,8 @@
     color: var(--on-sheet);
   }
 
-  /* Tabs that switch what a screen shows: a well, the chosen one a raised surface; a setting's few choices the same,
-     as radios. */
+  /* Tabs that switch what a screen shows: a well, the chosen one a raised surface, both pills; a setting's few choices
+     the same, as radios. */
   /* Its choices of one width, unless one's longest word needs more („Като устройството“): that one wider, its words
      whole, never broken inside one. */
   .segmented {
@@ -3524,8 +3524,17 @@
     justify-self: start;
     gap: 4px;
     padding: 4px;
-    border-radius: 14px;
+    border-radius: var(--radius-full);
     background: var(--surface-2);
+  }
+
+  /* On a phone a switch is the screen's width, its choices sharing it: a target the thumb finds, not a pill on the
+     left. */
+  @media (max-width: 47.99rem) {
+    .segmented {
+      display: grid;
+      justify-self: stretch;
+    }
   }
 
   .segmented button {
@@ -3534,7 +3543,7 @@
     min-height: 2.5rem;
     padding: 0 16px;
     border: 0;
-    border-radius: 10px;
+    border-radius: var(--radius-full);
     background: none;
     color: var(--ink-3);
     font: 800 0.9375rem / 1.1 var(--font-sans);
