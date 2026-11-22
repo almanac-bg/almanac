@@ -110,9 +110,12 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await expect(result.locator(".duel-card-row")).toHaveCount(2);
   await expect(result.locator(".mini > i")).toHaveCount(20);
   await expect(b.locator(".duel-card")).toHaveCount(1);
-  // „Въпросите“ opens the ten in their dialog, each with how it went for the two side by side, its answers and its
-  // fact.
-  await result.getByRole("button", { name: "Въпросите" }).click();
+  // The card is the button to its questions, the whole of it, with no button on it: a tap anywhere on it (here on its
+  // marks) opens the ten in their dialog, each with how it went for the two side by side, its answers and its fact.
+  await expect(result).toHaveRole("button");
+  await expect(result).toHaveAccessibleName(/^Въпросите от дуела с Ана\. С приятел .*Ти.*Ана/);
+  await expect(result.locator("button, a")).toHaveCount(0);
+  await result.locator(".duel-card-marks").click();
   const sheet = b.locator("dialog.review-sheet");
   await expect(sheet.getByRole("heading", { name: "Въпросите" })).toBeVisible();
   await expect(sheet.locator(".review-of")).toHaveText(/^Дуел с Ана · \d+:\d+$/);
@@ -129,8 +132,14 @@ test("a duel with a friend: played first and sent, played back when they can, it
   const played = new URL(b.url()).searchParams.get("duel");
   await b.goto(`/duel/${played}`);
   await expect(b).toHaveURL(new RegExp(`/friends\\?tab=duels&duel=${played}$`));
-  // The card leads to its questions and nothing else: a new duel starts from „Нов дуел“, under the cards.
-  await expect(result.getByRole("button")).toHaveText(["Въпросите"]);
+  // The card leads to its questions and nothing else: a new duel starts from „Нов дуел“, under the cards. From the
+  // keyboard too: Enter opens them, as Space does.
+  await expect(result.locator("button, a")).toHaveCount(0);
+  await result.focus();
+  await b.keyboard.press("Enter");
+  await expect(sheet.locator(".reviewed")).toHaveCount(10);
+  await sheet.getByRole("button", { name: "Затвори" }).click();
+  await expect(sheet).toHaveCount(0);
   await expect(b.locator(".duels").getByRole("link", { name: "Нов дуел" })).toHaveAttribute("href", "/duel/new");
 
   // Ana: his result is news, a dot on Приятели; it goes as she opens it, and she sees it there, played.
@@ -153,6 +162,13 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await expect(chip).toHaveText({ won: "✓ Победа", lost: "Загуба", draw: "Равенство" }[end ?? ""] ?? "");
   const fill = await chip.evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(fill === "rgba(0, 0, 0, 0)", `${end}'s chip filled: ${fill}`).toBe(end !== "won");
+  // On a big screen too, the cards one a row, as on a phone.
+  await a.setViewportSize({ width: 1366, height: 800 });
+  const across = await a
+    .locator(".duels .duel-cards")
+    .last()
+    .evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(" ").length);
+  expect(across).toBe(1);
   await lookedFor(a, () => a.goto("/"));
   await expect(aDot).not.toHaveClass(/news/);
 
@@ -171,7 +187,7 @@ test("a duel with a friend: played first and sent, played back when they can, it
   // Days later the duel is still on its card, and its questions still open from it (a duel's alone: play.Review).
   await endedBefore(b, 3);
   await b.reload();
-  await b.locator(".duel-card").first().getByRole("button", { name: "Въпросите" }).click();
+  await b.getByRole("button", { name: "Въпросите от дуела с Ана" }).press(" ");
   await expect(sheet.locator(".reviewed")).toHaveCount(10);
   await expect(sheet.getByRole("alert")).toHaveCount(0);
 });
@@ -219,7 +235,10 @@ test("against a recording: a real game's ten, its player named, its answers as t
   await expect(card.locator(".duel-card-kind")).toHaveText("Срещу запис");
   await expect(card.locator(".duel-card-name").last()).toContainText(owner);
   await expect(card.locator(".duel-card-row")).toHaveCount(2);
-  await expect(card.getByRole("button")).toHaveText(["Въпросите"]);
+  await expect(card).toHaveRole("button");
+  await expect(card).toHaveAccessibleName(
+    new RegExp(`^Въпросите от дуела срещу запис на ${owner.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\. Срещу запис`),
+  );
 });
 
 test("a duel left before its first question isn't „Твой ред“; one begun goes on with its own run from „Играй“", async ({

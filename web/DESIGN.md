@@ -187,7 +187,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   under „Последните 10 изиграни“ („Изиграни“ while there are fewer: the list is the last ten and says so), „Нов дуел“
   always (against a recording it needs no friend). The card is all there is of a duel: there is no page of its result
   (DECISIONS.md). A duel is a card, never a person's row
-  (`.duel-card`, two a row on a big screen): its kind at the top as a small label, „С приятел“ or „Срещу запис“; then
+  (`.duel-card`, one a row on a big screen too, as on a phone): its kind at the top as a small label, „С приятел“ or „Срещу запис“; then
   the two face to face, the player's avatar with its seal and „Ти“ on the left, the other's with their name on the
   right, and between them how it stands: „Твой ред“ or „Чакаш“ (quiet) over „още 6 дни“; a played one's score, a
   heavy numeral („8:6“), over its end as a chip, told apart at a glance by fill and line, never red or green
@@ -198,17 +198,19 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   more). Under the two, of a game played to its end, the duel question by question: the player's row of marks over
   the other's (`.duel-card-marks`: a 20px avatar, then ten small squares in ink as the boards draw them, `mini()`:
   right filled, близо half, wrong hollow; the player's alone while the friend still has theirs to play); then the
-  quiet line; then, at the card's foot, the one thing it leads to, a small outlined button (`.duel-card-acts`):
-  „Въпросите“, once the player's own game in it is played, on any day. No „Реванш“ and no „Още един срещу запис“: a
-  new duel starts from „Нов дуел“ under the cards, the one way. A duel
-  to play is one link to its game, the whole card (under a pointer its line lights); any other card is no link, and
-  no name in a card is underlined (none is a way to a profile). The first „Твой ред“ is ringed in ink with „Играй“ in
+  quiet line. Once the player's own game in it is played, the card is a button, the whole of it, to its questions'
+  dialog, on any day, with no button on it to say so (one drew the eye from the duel): a tap or a click anywhere on
+  it, or Enter and Space, opens it; under a pointer, or reached by the keyboard, its line lights; a screen reader
+  hears „Въпросите от дуела с Иво“ („… срещу запис на Иво“), then what the card says. No „Реванш“ and no „Още един
+  срещу запис“: a new duel starts from „Нов дуел“ under the cards, the one way. A duel to play is one link to its
+  game, the whole card (under a pointer its line lights); any other card is neither, and no name in a card is
+  underlined (none is a way to a profile). The first „Твой ред“ is ringed in ink with „Играй“ in
   it, the page's action. A duel named in the address (`?tab=duels&duel=<id>`: its game just ended, or an old link to
   its page) is first, alone at the head, and its result lands there once (`feel.duel`: the marks fill pair by pair,
   the score counts up, the chip lands with the end's sound), never again. At large text (`.tight`) the two are under
   each other, each a row. The record between two is the friend's row's and „Нов дуел“'s, never a card's). Friends are added in one field, „име или имейл“; a
   friend's yes to a request is one line over the friends, told once; requests sent wait under „Изпратени покани“.
-  Only two friends of one name show their @username. „Въпросите“ opens the questions' dialog (above), under its
+  Only two friends of one name show their @username. A played card opens the questions' dialog (above), under its
   head whose duel it is and its score, each question with how it went for the two; the card's two
   rows of marks always. Nothing ringed, no time on any of them: time never counts.
   **„Нов дуел“** (`/duel/new`): the way back reads „Дуели“ (to `?tab=duels`); the lead „Десет въпроса. С приятел — той

@@ -1,9 +1,9 @@
 // A duel as a card, and the cards as Приятели's „Дуели“ lists them (friends.ts). The card is all there is of a duel
 // (DECISIONS.md: no page of its result): its kind, the two face to face with how it stands between them, how each
 // question went for each side (two rows of ten small squares, as the boards draw them), one quiet line where there's
-// more to say, and one thing it leads to: its questions in their dialog (results.ts, reviewSheet), once the player's
-// own game is played, on any day (play.Review). A new duel starts from „Нов дуел“ under the cards, never from a card.
-// The duel just played, or named by an old link to it, comes first (`top`), and its score counts up once as it lands
+// more to say; and, once the player's own game is played, a tap anywhere on it opens its questions in their dialog
+// (results.ts, reviewSheet), on any day (play.Review). A new duel starts from „Нов дуел“ under the cards, never from a
+// card. The duel just played, or named by an old link to it, comes first (`top`), and its score counts up once as it lands
 // (feel.ts: duel), never again.
 //
 // It's Приятели's, loaded with it, and is handed the app's pieces: it imports only types.
@@ -145,11 +145,12 @@ function questions(d: DuelView): void {
 }
 
 /** A duel as a card: its kind at the top („С приятел“, „Срещу запис“), then the two face to face, the player on the
- * left, with how it stands between them (cardMiddle), the duel question by question (marksRows), what more there is
- * to say on one quiet line (noteLine), and the one thing it leads to: „Въпросите“, once the player's own game in it is
- * played. A duel to play is one link to its game, the whole of it (`play`: the
- * first waiting for the player, with „Играй“, the page's one action, in it); any other is no link, and no name in it
- * is a way to a profile, so none looks like one. `lands`: its result as a moment, once. */
+ * left, with how it stands between them (cardMiddle), the duel question by question (marksRows), and what more there
+ * is to say on one quiet line (noteLine). Once the player's own game in it is played, the whole card is a button to its
+ * questions (their dialog), nothing on it to say so but its light under a pointer; a screen reader hears what it
+ * opens first, then what it says. A duel to play is one link to its game, the whole of it (`play`: the first waiting
+ * for the player, with „Играй“, the page's one action, in it); any other is neither, and no name in it is a way to a
+ * profile, so none looks like one. `lands`: its result as a moment, once. */
 function duelCard(d: DuelView, play = false, lands = false): Child {
   const them = d.opponent;
   const note = noteLine(d);
@@ -177,21 +178,24 @@ function duelCard(d: DuelView, play = false, lands = false): Child {
         play ? h("span", { class: "btn primary duel-card-go" }, "Играй") : null,
       ),
     );
-  const card = h(
-    "div",
-    { class: cls, id: `duel-${d.id}` },
-    body,
+  // Named by its first words, for a screen reader alone, then by all it says: an aria-label in their place would hide
+  // the duel itself, and say none of the words on the card (by which voice control calls a button).
+  const whose = d.recorded ? `срещу запис на ${them?.name ?? ""}` : withWord(them?.name ?? "");
+  const card = (
     d.you?.done && d.runId
       ? h(
-          "span",
-          { class: "duel-card-acts" },
-          h(
-            "button",
-            { class: "btn inline", type: "button", "aria-haspopup": "dialog", onclick: () => questions(d) },
-            "Въпросите",
-          ),
+          "button",
+          {
+            class: cls,
+            id: `duel-${d.id}`,
+            type: "button",
+            "aria-haspopup": "dialog",
+            onclick: () => questions(d),
+          },
+          h("span", { class: "sr" }, `Въпросите от дуела ${whose}. `),
+          body,
         )
-      : null,
+      : h("div", { class: cls, id: `duel-${d.id}` }, body)
   ) as HTMLElement;
   if (lands) land(card, d);
   return h("li", null, card);
