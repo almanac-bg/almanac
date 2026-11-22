@@ -13,8 +13,8 @@ import (
 )
 
 // today is the day screen's state: the day and its issue (play.Issue), on a national day its name (bank.NationalName),
-// the viewer's streak and run (if any), whether they've finished a game yet, the hard question's chapter in tomorrow's
-// issue, how many have played the day (and how well on average), and their friends' day.
+// the viewer's streak and run (if any), whether they've finished a game yet, how many have played the day (and how
+// well on average), and their friends' day.
 func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.user(r)
 	if err != nil {
@@ -111,16 +111,6 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 			}
 			out["run"] = st
 			done = st.Done
-			if st.Done { // tomorrow, as the result says it: the chapter of its last question, the hard one
-				next, _ := time.Parse(time.DateOnly, day)
-				later, err := s.game.IssueTopics(ctx, next.AddDate(0, 0, 1).Format(time.DateOnly))
-				if err != nil {
-					return nil, err
-				}
-				if n := len(later); n > 0 {
-					out["tomorrowHard"] = later[n-1]
-				}
-			}
 		}
 	}
 	board, err := s.game.BoardOf(ctx, day, viewer)

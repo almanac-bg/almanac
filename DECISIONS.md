@@ -106,8 +106,8 @@ packages' doc comments; this file holds only what must not drift.
     a result never lit it. A duel to play stays first in Приятели until it's played; the ping is for news arriving.
   - **Sharing:** the score and its tiles, never the answers, unsigned, with a way into the same ten.
   - **A result has a budget:** the score and tiles, what the day wrote in the book (its ink by chapter, a rank risen:
-    2026-11-22, no single question picked out of the ten), one action, tomorrow, the
-    day's board (Всички · Приятели); with a crowd, how Bulgaria did that day („средно 6,2“). Everything else is in the
+    2026-11-22, no single question picked out of the ten), one action, the
+    day's board (no „Утре“ card, nothing of tomorrow's issue: 2026-11-22, the owner: superfluous) (Всички · Приятели); with a crowd, how Bulgaria did that day („средно 6,2“). Everything else is in the
     questions' dialog, off the page: one dialog for every game's questions (the day's, a chapter's game's, a
     duel's), opened by „Прегледай въпросите“, by the score's card, and by a tile at its question (2026-11-22, the
     owner: the list in the page made the result long, and a duel had a second kind of it). A

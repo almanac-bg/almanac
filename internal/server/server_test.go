@@ -526,24 +526,6 @@ func TestPlayingOverHTTP(t *testing.T) {
 	if today["run"].(map[string]any)["done"] != true || today["streak"] != float64(1) || today["firstDay"] != true {
 		t.Fatalf("today: %v", today)
 	}
-	// The day done, „Утре“ names the chapter of tomorrow's hard question, its last, once tomorrow is drawn (ahead.go;
-	// the sample bank is too small for days ahead, so tomorrow is today's ten turned round).
-	if _, today := p.call("GET", "/api/day", nil); today["tomorrowHard"] != nil {
-		t.Fatalf("tomorrow's hard question, before it's drawn: %v", today["tomorrowHard"])
-	}
-	day, _ := time.Parse(time.DateOnly, g.srv.game.Today())
-	tomorrow := day.AddDate(0, 0, 1).Format(time.DateOnly)
-	if _, err := g.db.Write.Exec(`INSERT INTO days (day, questions) SELECT ?, (SELECT json_group_array(json(value))
-		FROM (SELECT value FROM json_each(questions) ORDER BY key DESC)) FROM days WHERE day = ?`, tomorrow, day.Format(time.DateOnly)); err != nil {
-		t.Fatal(err)
-	}
-	next, err := g.srv.game.IssueTopics(context.Background(), tomorrow)
-	if err != nil || len(next) != 10 {
-		t.Fatalf("tomorrow's issue: %v %v", next, err)
-	}
-	if _, today := p.call("GET", "/api/day", nil); today["tomorrowHard"] != next[9] {
-		t.Fatalf("tomorrow's hard question: %v, want %s", today["tomorrowHard"], next[9])
-	}
 	// Nothing adds up but the book and the streak: Начало has no level.
 	if lv, ok := today["level"]; ok {
 		t.Fatalf("today's level: %v", lv)

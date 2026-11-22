@@ -125,7 +125,7 @@ test("no „си“ with a man's or a woman's participle", () => {
 
 /**
  * A topic's name is in quotes only right after the word „тема“ or „глава“ („тема „История““); standing alone it's
- * bare („Трудният въпрос е от История“, „Печат: История“): web/DESIGN.md, Copy.
+ * bare („Печат: История“, „Печатът на История“): web/DESIGN.md, Copy.
  */
 test("a topic's name is quoted after „тема“ or „глава“ and only there", () => {
   const name = String.raw`\$\{(?:chapterName|nameOf|topicName)\(`;

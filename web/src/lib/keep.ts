@@ -26,7 +26,7 @@ export function keptWords(before: Who | null | undefined, after: Who): string {
   return `Влезе като ${after.name}.`;
 }
 
-/** What a device keeps of the day's reminder's asks in Начало's „Утре“ card (screens/today.ts, remindAsk): asked by
+/** What a device keeps of the day's reminder's asks under the day's result (screens/today.ts, remindAsk): asked by
  * notification or, where none can come, by mail (which asks a guest for the email that keeps the game too). */
 export interface RemindAsks {
   /** How many were said no to: three end the asking (a yes counts as three). */

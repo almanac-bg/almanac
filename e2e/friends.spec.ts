@@ -31,7 +31,7 @@ test("friends on the day: who has played it, and how each went", async ({ browse
   // places, each with their score and squares, his own row marked.
   await startDay(b);
   await playRun(b);
-  await expect(b.locator(".tomorrow")).toBeVisible();
+  await expect(b.locator(".summary .score-n")).toBeVisible();
   await expect(b.locator(".summary .btn.primary")).toHaveCount(1);
   const friends = b.locator(".day-board");
   await expect(friends.getByRole("heading", { name: "Класация" })).toBeVisible();

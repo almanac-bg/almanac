@@ -55,10 +55,9 @@ test("a streak at stake: unlit till the day lights it, pointed to from a topic, 
   await day.click();
   await startDay(page);
   await playRun(page);
-  // Played: tomorrow under the result says what it makes of the streak.
-  const tomorrow = page.locator(".summary .tomorrow");
-  await expect(tomorrow).toContainText("Утре");
-  await expect(tomorrow).toContainText("С него серията ти става 5.");
+  // Played: nothing of tomorrow under the result.
+  await expect(page.locator(".summary .score-n")).toBeVisible();
+  await expect(page.locator(".summary")).not.toContainText("Утре");
   // The day played: a topic's result has „Още десет“ for its action, and says where its facts went, with no number.
   await openGame(page, "/play/history");
   await playRun(page);
@@ -67,9 +66,7 @@ test("a streak at stake: unlit till the day lights it, pointed to from a topic, 
   await expect(page.locator(".summary")).toContainText("Фактите от играта са в твоя Алманах, в сиво.");
 });
 
-test("a week's streak on Днес, and the day played makes it one more: no sheet over the result, no note of it", async ({
-  page,
-}) => {
+test("a week's streak on Днес, and the day played: no sheet over the result, no note of it", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto("/");
   // Six days: the seventh makes it seven; nothing is noted (DECISIONS.md, „The direction“: no notes as rewards).
@@ -78,7 +75,7 @@ test("a week's streak on Днес, and the day played makes it one more: no shee
   await expect(page.locator(".streak-chip.unlit")).toContainText("6дни без прекъсване");
   await startDay(page);
   await playRun(page);
-  await expect(page.locator(".summary .tomorrow")).toContainText("С него серията ти става 8.");
+  await expect(page.locator(".summary .score-n")).toBeVisible();
   await expect(page.locator(".summary")).not.toContainText("Отбелязано");
   // Never a sheet over the result, whatever the game was.
   await page.waitForTimeout(1500);
