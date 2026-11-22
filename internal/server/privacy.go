@@ -23,15 +23,20 @@ var plainPage = template.Must(template.New("page").Parse(`<!doctype html>
 </head>
 <body>
 <div id="app">
-<header class="frame"><div class="bar"><a class="brand" href="/"><svg class="rosette" viewBox="5 5 54 54" aria-hidden="true"><path class="petal gold" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(-45 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(45 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(135 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(225 32 32)"/></svg>АЛМАНАХ</a><nav class="places" aria-label="Основна навигация"><a href="/">Днес</a><a href="/almanac">Алманах</a><a href="/friends">Приятели</a></nav></div></header>
+<header class="frame"><div class="bar"><a class="brand" href="/"><svg class="rosette" viewBox="5 5 54 54" aria-hidden="true"><path class="petal gold" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(-45 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(45 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(135 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(225 32 32)"/></svg>АЛМАНАХ</a><nav class="places" aria-label="Основна навигация">{{template "places"}}</nav></div></header>
 <main id="main" class="screen prose">
-<h1>{{.Title}}</h1>
+<div class="intro">{{with .Back}}<a class="back" href="{{.Href}}"><span class="i i-left back-i" aria-hidden="true"></span>{{.Label}}</a>{{end}}<h1>{{.Title}}</h1></div>
 {{.Body}}
 </main>
+<nav class="places-foot" aria-label="Основна навигация">{{template "places"}}</nav>
 </div>
 </body>
 </html>
-`))
+{{define "places"}}<a href="/"><span class="i i-today" aria-hidden="true"></span>Днес</a><a href="/almanac"><span class="i i-book" aria-hidden="true"></span>Алманах</a><a href="/friends"><span class="i i-friends" aria-hidden="true"></span>Приятели</a>{{end}}`))
+
+// back is the way back a page of the server's own shows over its title: to where it's reached from in the game. On
+// a phone with the game put on its screen there is no browser's own back (the manifest's standalone).
+type back struct{ Href, Label string }
 
 var privacyBody = template.Must(template.New("privacy").Parse(`
 <p>АЛМАНАХ е безплатна игра с въпроси. Пазим само каквото е нужно, за да работи играта, и нищо не продаваме: няма
@@ -164,13 +169,15 @@ func (s *Server) privacy(w http.ResponseWriter, r *http.Request) {
 	_ = privacyBody.Execute(&body, map[string]any{
 		"Operator": s.cfg.Operator, "Contact": s.cfg.Contact, "ContactParts": emailParts(s.cfg.Contact),
 	})
-	s.plain(w, "Какво пазим и защо", template.HTML(body.String()))
+	s.plain(w, "Какво пазим и защо", &back{"/settings", "Настройки"}, template.HTML(body.String()))
 }
 
-func (s *Server) plain(w http.ResponseWriter, title string, body template.HTML) {
+// plain draws a page of the server's own in the game's frame: the mark, the three places (in the bar on a big screen,
+// at the foot on a phone) and the way back, if it has one.
+func (s *Server) plain(w http.ResponseWriter, title string, way *back, body template.HTML) {
 	var out bytes.Buffer
 	if err := plainPage.Execute(&out, map[string]any{
-		"Title": title, "Body": body, "CSS": assets.Manifest(s.client)["app.css"],
+		"Title": title, "Back": way, "Body": body, "CSS": assets.Manifest(s.client)["app.css"],
 	}); err != nil {
 		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return

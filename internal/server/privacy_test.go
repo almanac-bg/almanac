@@ -101,6 +101,28 @@ func TestPagesPrivate(t *testing.T) {
 	}
 }
 
+// A page of the server's own is in the game's frame: the places at a phone's foot, and on the privacy notice the way
+// back to Настройки, where it's opened from. A game put on a phone's screen has no browser's back to leave it by.
+func TestPlainPagesFramed(t *testing.T) {
+	g := start(t)
+	for path, want := range map[string][]string{
+		"/privacy":     {`class="places-foot"`, `href="/friends"`, `<a class="back" href="/settings">`},
+		"/mail/off?t=": {`class="places-foot"`, `href="/friends"`, `<script src="/scheme.js">`},
+	} {
+		res, err := http.Get(g.url + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		page, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		for _, w := range want {
+			if !strings.Contains(string(page), w) {
+				t.Errorf("%s: no %s", path, w)
+			}
+		}
+	}
+}
+
 // Profiles are anyone's to see, but not to walk: past a network's misses (tags nobody has) in an hour, no tag is
 // looked up for it, the real ones neither; other networks go on (review 2026-11-18, S12).
 func TestProfileMisses(t *testing.T) {
