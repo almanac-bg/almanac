@@ -105,7 +105,7 @@ function inkLine(ink: number, chapters: ChapterInk[]): Child {
     chapters.length
       ? h(
           "ul",
-          { class: "ink-chapters", "aria-label": "По глави" },
+          { class: "ink-chapters", "aria-label": "По теми" },
           chapters.map((c) =>
             h(
               "li",

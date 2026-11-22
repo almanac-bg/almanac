@@ -39,7 +39,7 @@ var (
 // playerErrors are the errors a player may cause, as the API answers them.
 var playerErrors = map[error]*apiError{
 	play.ErrNoRun:       {http.StatusNotFound, "no_run", "Няма такава игра."},
-	play.ErrNoTopic:     {http.StatusNotFound, "no_topic", "Няма такава глава."},
+	play.ErrNoTopic:     {http.StatusNotFound, "no_topic", "Няма такава тема."},
 	play.ErrOutOfStep:   {http.StatusConflict, "out_of_step", "Играта е продължила другаде. Зареждаме я наново."},
 	play.ErrBadAnswer:   {http.StatusBadRequest, "bad_answer", "Този отговор не е за този въпрос."},
 	play.ErrNoQuestion:  {http.StatusServiceUnavailable, "no_questions", "В момента няма въпроси за игра."},
@@ -54,7 +54,6 @@ var playerErrors = map[error]*apiError{
 	play.ErrNoPlayer:    {http.StatusNotFound, "no_player", "Няма играч с такова потребителско име."},
 	play.ErrNoDuel:      {http.StatusNotFound, "no_duel", "Този дуел не е в този профил."},
 	play.ErrDuelGone:    {http.StatusNotFound, "duel_gone", "Този дуел вече го няма."},
-	play.ErrNobody:      {http.StatusConflict, "nobody", "Още няма запис на игра, срещу който да играеш. Опитай по-късно."},
 	play.ErrDuelOver:    {http.StatusGone, "duel_over", "Този дуел вече свърши."},
 	play.ErrDuelsToOne: {http.StatusConflict, "duels_to_one",
 		"Три твои дуела с този приятел вече чакат. Изчакай да бъде изигран някой от тях."},

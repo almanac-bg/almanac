@@ -23,7 +23,7 @@ func quickPace(n int) func(int) time.Duration {
 // game plays a topic's ten at a pace, all right, and says which run it was.
 func (w *world) game(user int64, pace func(int) time.Duration, answers ...func(int64, int) json.RawMessage) int64 {
 	w.t.Helper()
-	s, err := w.g.StartTopic(w.t.Context(), user, MixTopic)
+	s, err := w.g.startTopic(w.t.Context(), user, MixTopic)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestScriptedRunsAreMarked(t *testing.T) {
 	}
 	// Marked as it's played: a run left half-way, three quick answers in, is a script's already.
 	user := w.user()
-	s, err := w.g.StartTopic(t.Context(), user, MixTopic)
+	s, err := w.g.startTopic(t.Context(), user, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,16 +143,7 @@ func TestScriptedDayIsTheirsAlone(t *testing.T) {
 		b.Mine.Rights != Length {
 		t.Fatalf("the day as the script's player sees it: %+v %v", b, err)
 	}
-	// Friends: the script's day is in no friend's list nor board, and in its player's own.
-	friends, err := w.g.FriendsOf(ctx, cy)
-	if err != nil || len(friends) != 2 {
-		t.Fatalf("Cy's friends: %+v %v", friends, err)
-	}
-	for _, f := range friends {
-		if (f.ID == bot) != (f.Today == nil) {
-			t.Fatalf("Cy's friend %d's day: %+v", f.ID, f.Today)
-		}
-	}
+	// Friends: the script's day is in no friend's board, and in its player's own.
 	if fb, _ := w.g.FriendsBoard(ctx, today, cy); len(fb) != 2 || slices.ContainsFunc(fb, func(s Score) bool { return s.Name == "Бот" }) {
 		t.Fatalf("the day among Cy's friends: %+v", fb)
 	}
@@ -202,7 +193,7 @@ func (w *world) dayGame(user int64, pace func(int) time.Duration, answers ...fun
 	return s.ID
 }
 
-// Recordings and the questions' calibration are people's too.
+// The questions' calibration is people's too.
 func TestScriptedOutOfStatistics(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -211,14 +202,6 @@ func TestScriptedOutOfStatistics(t *testing.T) {
 		w.game(ana, nil, repeat(w.wrong, Length)...)
 		w.game(bot, scriptPace)
 	}
-	// A recording: Ana's, never the script's (the latest, all right).
-	duel, err := w.g.DuelRecording(ctx, w.user())
-	var recording int64
-	_ = w.db.Read.QueryRow(`SELECT recording_run FROM duels WHERE id = ?`, duel).Scan(&recording)
-	if err != nil || w.scripted(recording) {
-		t.Fatalf("a recording of a script's game: %d %v", recording, err)
-	}
-
 	// Calibration counts CalibrateFrom answers of people.
 	id := w.b.Live("", "choice")[0].Base().ID
 	for i := range CalibrateFrom {

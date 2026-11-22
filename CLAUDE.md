@@ -14,8 +14,8 @@ Every day ten questions; each one a player gets right in the issue writes its fa
 rank in a chapter says how much of it the book holds in ink; played alone, with friends, beside all of Bulgaria. Three
 places: Днес (the day's issue, the same ten for everyone, asked once, its result shared without the answers, and on it the
 day's board), Алманах (the player's book: a chapter per topic, ink from the issues, every other fact met in grey, a seal
-per chapter named for the book), Приятели (friends, duels on one's own time against a friend or a real recorded
-game). The streak is the habit and forgives two missed days a week. The score is the number right; nothing
+per chapter named for the book), Приятели (friends, and duels with them on one's own time, on one
+page). The streak is the habit and forgives two missed days a week. The score is the number right; nothing
 else adds up but ink and the streak. DECISIONS.md, „The direction“, is final: it lists the player's nouns and the rule
 every later change passes.
 
@@ -32,7 +32,7 @@ most). A change is judged by whether players come back: the retention numbers in
 | --- | --- |
 | `cmd/almanac` | The program: `serve`, `bank check/fmt`, `backup now/list/restore/verify/keys` |
 | `cmd/build` | Builds the client into `internal/assets/dist` (esbuild; precompressed; the first screen's budget, and ceilings against accidents) |
-| `internal/play` | The game's rules and data: runs and their scores (`play.go`, `board.go`), the streak (`runs.go`), the Алманах, its ink and seals (`almanac.go`, `ink.go`, `rank.go`), duels on one's own time (`duels.go`: a friend's, a recording's), friends |
+| `internal/play` | The game's rules and data: runs and their scores (`play.go`, `board.go`), the streak (`runs.go`), the Алманах, its ink and seals (`almanac.go`, `ink.go`, `rank.go`), duels on one's own time (`duels.go`: a friend's, challenged directly), friends |
 | `internal/server` | HTTP: the API (`api.go` maps errors to Bulgarian messages), routes (`server.go`), pages (`pages.go`: the paths it sends the app for, the client's router's list again; a test holds them equal) |
 | `internal/store` | SQLite; migrations in `internal/store/migrations`, applied once each by name |
 | `internal/bank` | Question types, the bank on disk, its checks |

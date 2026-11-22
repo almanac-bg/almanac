@@ -168,7 +168,7 @@ function relation(p: Profile, reload: () => Promise<unknown>): Child {
           "Дуел",
           "primary",
           async () => {
-            const d = await startDuel({ friend: id });
+            const d = await startDuel(id);
             if (d) go(`/duel/${d.id}`);
           },
           `Дуел ${withWord(p.name)}`,

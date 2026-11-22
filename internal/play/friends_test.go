@@ -195,26 +195,6 @@ func TestFriendsNews(t *testing.T) {
 		}
 	})
 
-	t.Run("against a recording", func(t *testing.T) {
-		w := setup(t)
-		ana, bo := w.user(), w.user()
-		s, err := w.g.StartTopic(t.Context(), ana, "history")
-		if err != nil {
-			t.Fatal(err)
-		}
-		w.play(ana, s.ID, repeat(w.right, Length)...)
-		w.wait(time.Minute)
-		looks(w, ana)
-		looks(w, bo)
-		id, err := w.g.DuelRecording(t.Context(), bo)
-		if err != nil {
-			t.Fatal(err)
-		}
-		w.playSide(bo, id, repeat(w.right, Length))
-		if news(w, bo) || news(w, ana) {
-			t.Fatal("news of a duel against a recording")
-		}
-	})
 }
 
 // Beside each of the day's questions gone over, how the player's friends did with it (FriendsOn): every friend who

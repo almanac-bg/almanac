@@ -44,7 +44,6 @@ import { noEmail, noEmailLine, signIn } from "./screens/signin.ts";
 import { loadStats } from "./screens/stats.ts";
 import { rankName, rankNames } from "./seal.ts";
 import {
-  bulgaria,
   categories,
   checkNews,
   look,
@@ -85,7 +84,6 @@ import {
   segmented,
   shapeNames,
   standing,
-  tabDot,
   textWords,
   tiles,
   toneOf,
@@ -106,7 +104,6 @@ export const kit = {
   back,
   board,
   boardRow,
-  bulgaria,
   byTap,
   chapterName,
   chip,
@@ -184,7 +181,6 @@ export const kit = {
   seal,
   sealsSection,
   segmented,
-  tabDot,
   setPushPref,
   setSound,
   setTick,

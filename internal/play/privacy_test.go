@@ -29,7 +29,7 @@ func TestProfileShowsSealAndRanks(t *testing.T) {
 		t.Fatalf("after a day: %+v %v", p, err)
 	}
 	// A topic's game, under way: nothing of it shows.
-	s, err := w.g.StartTopic(ctx, ana, MixTopic)
+	s, err := w.g.startTopic(ctx, ana, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,52 +93,6 @@ func TestProfileShowsTheStreakNow(t *testing.T) {
 	}
 	if out, _ := json.Marshal(p); strings.Contains(string(out), `"streak"`) {
 		t.Fatalf("a profile with no streak names one: %s", out)
-	}
-}
-
-// A recording shows who played it, as anyone shows anywhere in the game: their name, tag and look, during the duel
-// and after it, labelled a recording (owner, 2026-11-19).
-func TestRecordingsNamed(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	owner, gal := w.user(), w.user()
-	if _, err := w.db.Write.Exec(`UPDATE users SET name = 'Мария', avatar = 'lynx' WHERE id = ?`,
-		owner); err != nil {
-		t.Fatal(err)
-	}
-	s, err := w.g.StartTopic(ctx, owner, MixTopic)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(owner, s.ID, repeat(w.right, Length)...)
-	duel, err := w.g.DuelRecording(ctx, gal)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.playSide(gal, duel, repeat(w.wrong, Length))
-	w.wait(time.Minute)
-
-	look, err := w.g.LookOf(ctx, owner)
-	if err != nil || look.Avatar != "lynx" {
-		t.Fatalf("the owner's look: %+v %v", look, err)
-	}
-	var ownerTag string
-	if err := w.db.Read.QueryRow(`SELECT tag FROM users WHERE id = ?`, owner).Scan(&ownerTag); err != nil {
-		t.Fatal(err)
-	}
-	duels, err := w.g.DuelsOf(ctx, gal)
-	if err != nil || len(duels.Played) != 1 {
-		t.Fatalf("Gal's duels: %+v %v", duels, err)
-	}
-	d := duels.Played[0]
-	if !d.Recorded || d.Opponent == nil || d.Opponent.Name != "Мария" || d.Opponent.Tag != ownerTag ||
-		d.Opponent.Look == nil || *d.Opponent.Look != look {
-		t.Fatalf("the recording, as Gal's duels show it: %+v %+v", d, d.Opponent)
-	}
-	one, err := w.g.DuelOf(ctx, gal, d.ID)
-	if err != nil || !one.Recorded || one.Opponent.Name != "Мария" || one.Opponent.Tag != ownerTag ||
-		*one.Opponent.Look != look || one.Record != nil {
-		t.Fatalf("the duel's result: %+v %v", one, err)
 	}
 }
 

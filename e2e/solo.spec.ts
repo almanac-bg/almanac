@@ -47,7 +47,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // The result tells the streak tomorrow makes.
   await expect(page.locator(".tomorrow")).toContainText("С него серията ти става 2.");
   // The day's board on the result: of friends (none yet), and of all България, where it opens, the player on it.
-  await expect(page.locator(".day-board").getByRole("tab")).toHaveText(["Приятели", "Всички"]);
+  await expect(page.locator(".day-board").getByRole("tab")).toHaveText(["Всички", "Приятели"]);
   await expect(page.locator(".day-board").getByRole("tab", { name: "Всички" })).toHaveAttribute(
     "aria-selected",
     "true",
@@ -151,7 +151,7 @@ test("a topic, ten questions, a question reported, and ten more", async ({ page 
   await page.keyboard.press("Escape");
   // One action; the other ways on are quiet links, the way back to its chapter among them.
   await expect(page.locator(".summary .actions .btn.primary")).toHaveCount(1);
-  await expect(page.locator(".result-links").getByRole("link", { name: "Към главата" })).toHaveAttribute(
+  await expect(page.locator(".result-links").getByRole("link", { name: "Към темата" })).toHaveAttribute(
     "href",
     "/almanac/history",
   );
@@ -159,51 +159,6 @@ test("a topic, ten questions, a question reported, and ten more", async ({ page 
   await page.getByRole("button", { name: "Още десет въпроса" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10");
 });
-
-test("„България“: the questions about Bulgaria from every topic, a topic of its own", async ({ page }) => {
-  test.setTimeout(120_000);
-  await page.goto("/almanac");
-  // One of the two ways to play at the book's head, straight to its game.
-  const way = page.locator(".way").last();
-  await expect(way).toContainText("България");
-  await way.click();
-  await expect(page).toHaveURL(/\/play\/bulgaria$/);
-  await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
-  await playRun(page);
-  await expect(page.locator(".score-leaf .chip")).toHaveText("България");
-  // Its ten come from more than one topic, each named in the review by its own.
-  await page.getByRole("button", { name: "Прегледай въпросите" }).click();
-  await expect(page.locator(".reviewed")).toHaveCount(10);
-  const topics = new Set(
-    (await page.locator(".reviewed-head .kicker").allTextContents()).map((k) => k.split(" · ")[1]),
-  );
-  expect(topics.size).toBeGreaterThan(1);
-  expect(topics.has("")).toBe(false);
-  await expect(page.getByRole("button", { name: "Още десет въпроса" })).toBeVisible();
-});
-
-test("„Микс“: every topic at once, the first way to play at the book's head, with „България“ after it", async ({
-  page,
-}) => {
-  test.setTimeout(120_000);
-  await page.goto("/almanac");
-  const ways = page.locator(".way");
-  await expect(ways.first()).toContainText("Играй от всички глави");
-  await expect(ways.last()).toContainText("България");
-  await ways.first().click();
-  await expect(page).toHaveURL(/\/play\/mix$/);
-  await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
-  await playRun(page);
-  await expect(page.locator(".score-leaf .chip")).toHaveText("Всички глави");
-  // Its ten come from more than one topic, each named in the review by its own.
-  await page.getByRole("button", { name: "Прегледай въпросите" }).click();
-  await expect(page.locator(".reviewed")).toHaveCount(10);
-  const topics = new Set(
-    (await page.locator(".reviewed-head .kicker").allTextContents()).map((k) => k.split(" · ")[1]),
-  );
-  expect(topics.size).toBeGreaterThan(1);
-});
-
 test("a topic's count can be backed out of, or cut short", async ({ page }) => {
   await page.goto("/almanac/history");
   await page.getByRole("link", { name: "Играй 10 въпроса" }).click();

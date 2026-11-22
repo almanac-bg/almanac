@@ -3,7 +3,6 @@ package play
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -23,10 +22,9 @@ import (
 // of them), each with the game below that holds it to the rule (TestNothingPlayedAgain), or why it's a repeat by
 // design. A new way fails the test until it's here.
 var freshFor = map[string]string{
-	"StartTopic":    "a topic",
-	"Draw":          "a topic",
-	"DuelFriend":    "a friend's duel",
-	"DuelRecording": "a recording",
+	"startTopic": "a topic",
+	"Draw":       "a topic",
+	"DuelFriend": "a friend's duel",
 	// By design:
 	"StartDay": "by design: the day's ten are the same for everyone",
 	"drawDay":  "by design: the day's ten are the same for everyone",
@@ -35,11 +33,10 @@ var freshFor = map[string]string{
 
 // TestNothingPlayedAgain holds the rule across every way a game starts: a player who has just played a game, starting
 // any other kind (or the same again: a rematch), is dealt questions they haven't seen while the bank has them. A
-// friend's duel is drawn for both its players: none of them has seen a question dealt while some are left
-// that none has. A recording is a whole game, someone else's: one with at most RecordingSeen of its questions seen
-// while there's such a game. The player has played most of the bank before (all but three topics), so that a draw
-// that didn't prefer what they haven't seen would deal it again almost surely. The repeats by design (freshFor) are the
-// day (the same for everyone), and a duel's second side (the same ten as the first).
+// friend's duel is drawn for both its players: none of them has seen a question dealt while some are left that none
+// has. The player has played most of the bank before (all but three topics), so that a draw that didn't prefer what
+// they haven't seen would deal it again almost surely. The repeats by design (freshFor) are the day (the same for
+// everyone), and a duel's second side (the same ten as the first).
 func TestNothingPlayedAgain(t *testing.T) {
 	t.Run("every way is here", func(t *testing.T) {
 		ways := choosers(t)
@@ -66,7 +63,7 @@ func TestNothingPlayedAgain(t *testing.T) {
 			f.w.play(f.ana, s.ID, repeat(f.w.right, Length)...)
 		}},
 		{"a topic", func(f *fresh) {
-			s, err := f.w.g.StartTopic(f.ctx(), f.ana, MixTopic)
+			s, err := f.w.g.startTopic(f.ctx(), f.ana, MixTopic)
 			f.must(err)
 			f.w.play(f.ana, s.ID, repeat(f.w.right, Length)...)
 		}},
@@ -76,22 +73,17 @@ func TestNothingPlayedAgain(t *testing.T) {
 			f.w.playSide(f.ana, id, repeat(f.w.right, Length))
 			f.w.playSide(f.bo, id, repeat(f.w.wrong, Length))
 		}},
-		{"a recording", func(f *fresh) {
-			id, err := f.w.g.DuelRecording(f.ctx(), f.ana)
-			f.must(err)
-			f.w.playSide(f.ana, id, repeat(f.w.right, Length))
-		}},
 	}
 
 	// The games held to the rule: what each deals the player, of which questions (pool), drawn for whom (players).
-	// After a friend's duel, a friend's duel again is a rematch. A recording is checked apart.
+	// After a friend's duel, a friend's duel again is a rematch.
 	type next struct {
 		name string
 		deal func(f *fresh) (picks []Pick, pool func(bank.Question) bool, players []int64)
 	}
 	nexts := []next{
 		{"a topic", func(f *fresh) ([]Pick, func(bank.Question) bool, []int64) {
-			s, err := f.w.g.StartTopic(f.ctx(), f.ana, MixTopic)
+			s, err := f.w.g.startTopic(f.ctx(), f.ana, MixTopic)
 			f.must(err)
 			return f.w.picks(s.ID), anyQuestion, []int64{f.ana}
 		}},
@@ -105,7 +97,6 @@ func TestNothingPlayedAgain(t *testing.T) {
 			f.must(err)
 			return f.w.picks(f.w.playSide(f.ana, id, nil)), anyQuestion, []int64{f.ana, f.bo}
 		}},
-		{"a recording", nil},
 	}
 	for name, game := range freshFor {
 		if !strings.HasPrefix(game, "by design") && !slices.ContainsFunc(nexts, func(n next) bool { return n.name == game }) {
@@ -122,17 +113,6 @@ func TestNothingPlayedAgain(t *testing.T) {
 				f.w.wait(time.Minute)
 				barred, err := f.w.g.DayQuestions(f.ctx())
 				f.must(err)
-				if next.deal == nil { // a recording: whole games, someone else's
-					seenNow := f.seen(f.ana)
-					best := f.recordingsSeen(seenNow, barred)
-					id, err := f.w.g.DuelRecording(f.ctx(), f.ana)
-					f.must(err)
-					n := count(f.w.picks(f.w.playSide(f.ana, id, nil)), seenNow)
-					if best <= RecordingSeen && n > RecordingSeen {
-						t.Fatalf("a recording with %d of its questions played already, while one with %d is there", n, best)
-					}
-					return
-				}
 				f.seen(f.ana)
 				f.seen(f.bo)
 				picks, pool, players := next.deal(f)
@@ -169,8 +149,7 @@ var freshTopics = []string{"geography", "history", "science"}
 func anyQuestion(bank.Question) bool { return true }
 
 // fresh is a world for TestNothingPlayedAgain, the day after the first issue (neither Ана nor Бо played it): Ана, who
-// has played every question but those of freshTopics (some wrong, days ago), and her friend Бо; two others' games of one topic each, in two of freshTopics, to play against as
-// recordings.
+// has played every question but those of freshTopics (some wrong, days ago), and her friend Бо.
 type fresh struct {
 	t       *testing.T
 	w       *world
@@ -186,13 +165,6 @@ func newFresh(t *testing.T) *fresh {
 		t.Fatal(err)
 	}
 	w.wait(25 * time.Hour)
-	for _, topic := range freshTopics[1:] {
-		u := w.user()
-		s, err := w.g.StartTopic(f.ctx(), u, topic)
-		f.must(err)
-		w.play(u, s.ID, append(repeat(w.right, 6), repeat(w.wrong, Length-6)...)...)
-		w.wait(time.Minute)
-	}
 	// Ана's past: every question but those of freshTopics, a third of them wrong, four days ago, in one long game.
 	var picks []Pick
 	for _, q := range w.b.Live("", "") {
@@ -246,40 +218,6 @@ func (f *fresh) seen(u int64) map[string]bool {
 	}
 	f.seenBy[u] = out
 	return out
-}
-
-// recordingsSeen is, of the games others have finished that a recording may be (none with a question barred now, none
-// still played against), the fewest questions of one the player has seen.
-func (f *fresh) recordingsSeen(seen, barred map[string]bool) int {
-	rows, err := f.w.db.Read.Query(`SELECT r.questions FROM runs r WHERE r.kind IN ('topic', 'duel')
-		AND r.finished_at IS NOT NULL AND r.user_id <> ? AND json_array_length(r.questions) = ?
-		AND NOT EXISTS (SELECT 1 FROM duels d WHERE d.ended_at IS NULL
-			AND (d.a_run = r.id OR d.b_run = r.id))`, f.ana, Length)
-	f.must(err)
-	defer rows.Close()
-	best := Length + 1
-	for rows.Next() {
-		var raw string
-		f.must(rows.Scan(&raw))
-		var picks []Pick
-		f.must(json.Unmarshal([]byte(raw), &picks))
-		if slices.ContainsFunc(picks, func(p Pick) bool { return barred[p.ID] }) {
-			continue
-		}
-		best = min(best, count(picks, seen))
-	}
-	f.must(rows.Err())
-	return best
-}
-
-func count(picks []Pick, seen map[string]bool) int {
-	n := 0
-	for _, p := range picks {
-		if seen[p.ID] {
-			n++
-		}
-	}
-	return n
 }
 
 // choosers are the functions of this package (but its tests) that choose a game's questions: those that make a run

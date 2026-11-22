@@ -132,8 +132,8 @@ const GoneName = "Изтрит играч"
 // before), as it was without them: a duel's result stays the other's, without the player's name or game (the schema
 // sets the player to none there, ON DELETE SET NULL); what was theirs alone, or nobody's once they're gone, goes.
 //
-//   - A duel not over yet goes, theirs or another's against their recording: nothing of it is played by both.
-//   - A duel only they had (against a recording, or the other gone before) goes.
+//   - A duel not over yet goes: nothing of it is played by both.
+//   - A duel only they had (the other gone before) goes.
 //   - Friend requests to their address go.
 //   - The days they played on (active_days, which has no reference to users: the retention counts keep a player who
 //     went, or those who never came back would drop out and make them look better) are kept as a tombstone, the id
@@ -145,8 +145,7 @@ func Forget(tx *sql.Tx, id int64) error {
 		return err
 	}
 	for _, q := range []string{
-		`DELETE FROM duels WHERE ended_at IS NULL AND (a_id = ?1 OR b_id = ?1
-			OR recording_run IN (SELECT id FROM runs WHERE user_id = ?1))`,
+		`DELETE FROM duels WHERE ended_at IS NULL AND (a_id = ?1 OR b_id = ?1)`,
 		`DELETE FROM duels WHERE a_id = ?1 AND b_id IS NULL`,
 		`DELETE FROM duels WHERE b_id = ?1 AND a_id IS NULL`,
 		`DELETE FROM friend_requests WHERE to_email = (SELECT email FROM users WHERE id = ?1)`,

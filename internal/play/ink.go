@@ -13,7 +13,7 @@ import (
 // fact in their Алманах once, and how says where. A right answer in the day's issue, the first time the player meets
 // that question, writes it in ink („мастило“, the one word for it): the one mark of the day's ten, the same that
 // counts in its score. Every other fact met is in the book in grey, as met: a miss in the issue, any answer (right or
-// not, or let run out) in a chapter's game, a duel, a recording, and a right answer in the issue to a question met
+// not, or let run out) in a chapter's game, a duel, and a right answer in the issue to a question met
 // before. Grey is never counted and never turns to ink: nothing is ink twice, and nothing played before is ink at
 // all. A game played at a script's speed (ShadowScript, fair.go) writes nothing. The other shadows are a person's own
 // game (fair.go: their own numbers are theirs): a guest's day brought to an account (ShadowGuest) is written by the
@@ -159,8 +159,8 @@ func writtenIn(ctx context.Context, db querier, b *bank.Bank, userID int64, asOf
 // writtenShows is whether the book shows a question's fact: it has one, and it's so (one retired as untrue isn't).
 func writtenShows(q bank.Question) bool { return q.Extra().Fact != "" && !q.Extra().Untrue() }
 
-// InkOf is how many facts a player's book has in ink in each chapter: the bank's topics (a chapter is a topic; „Микс“
-// and „България“, games across topics, have no chapter of their own).
+// InkOf is how many facts a player's book has in ink in each chapter: the bank's topics (a chapter is a topic; a game
+// across topics has no chapter of its own).
 func (g *Game) InkOf(ctx context.Context, userID int64) (map[string]int, error) {
 	return inkIn(ctx, g.DB.Read, g.Bank(), userID, time.Time{})
 }

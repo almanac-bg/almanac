@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -44,16 +43,6 @@ func (w *world) playSide(user, duelID int64, answers []func(int64, int) json.Raw
 	}
 	if len(answers) > 0 {
 		w.play(user, run, answers...)
-	}
-	return run
-}
-
-// recordingOf is the recorded game a duel is played against.
-func (w *world) recordingOf(duel int64) int64 {
-	w.t.Helper()
-	var run int64
-	if err := w.db.Read.QueryRow(`SELECT recording_run FROM duels WHERE id = ?`, duel).Scan(&run); err != nil {
-		w.t.Fatal(err)
 	}
 	return run
 }
@@ -218,12 +207,27 @@ func TestDuelLimits(t *testing.T) {
 	if _, err := w.g.DuelFriend(ctx, ana, bo); !errors.Is(err, ErrDuelsToOne) {
 		t.Fatalf("one more with Bo: %v", err)
 	}
+	// Her list says so: no new duel with Bo until he plays one.
+	full := func(who, friend int64) bool {
+		list, err := w.g.FriendsOf(ctx, who)
+		if err != nil {
+			t.Fatal(err)
+		}
+		i := slices.IndexFunc(list, func(f Friend) bool { return f.ID == friend })
+		return i >= 0 && list[i].Full
+	}
+	if !full(ana, bo) || full(ana, cy) || full(bo, ana) {
+		t.Fatalf("full: Ana to Bo %v, to Cy %v; Bo to Ana %v", full(ana, bo), full(ana, cy), full(bo, ana))
+	}
 	// Bo sending Ana one is his: the other way round has its own.
 	if _, err := w.g.DuelFriend(ctx, bo, ana); err != nil {
 		t.Fatalf("Bo to Ana: %v", err)
 	}
 	// One played back, there's room for another.
 	w.playSide(bo, ids[0], repeat(w.wrong, Length))
+	if full(ana, bo) {
+		t.Fatal("full after Bo played one")
+	}
 	if _, err := w.g.DuelFriend(ctx, ana, bo); err != nil {
 		t.Fatalf("after Bo played one: %v", err)
 	}
@@ -231,8 +235,8 @@ func TestDuelLimits(t *testing.T) {
 	// The day's: counted by the duels started today, whatever came of them.
 	now := store.Ms(w.now)
 	for range DuelsADay {
-		if _, err := w.db.Write.Exec(`INSERT INTO duels (kind, questions, a_id, b_id, created_at, expires_at, ended_at,
-			outcome) VALUES ('person', '[]', ?, ?, ?, ?, ?, 'expired')`, ana, cy, now, now, now); err != nil {
+		if _, err := w.db.Write.Exec(`INSERT INTO duels (questions, a_id, b_id, created_at, expires_at, ended_at, outcome)
+			VALUES ('[]', ?, ?, ?, ?, ?, 'expired')`, ana, cy, now, now, now); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -368,69 +372,6 @@ func TestUnbegunDuelGoes(t *testing.T) {
 	}
 }
 
-// A duel against a recording: a real game's ten, its marks for the screen as it's played (their score at the end),
-// shown by its player, and no record against them.
-func TestRecordingDuel(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	owner, gal := w.user(), w.user()
-	if ready, err := w.g.RecordingReady(ctx, gal); ready || err != nil {
-		t.Fatalf("a recording offered out of nothing: %v %v", ready, err)
-	}
-	if _, err := w.g.DuelRecording(ctx, gal); !errors.Is(err, ErrNobody) {
-		t.Fatalf("a recording out of nothing: %v", err)
-	}
-	s, err := w.g.StartTopic(ctx, owner, "history")
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(owner, s.ID, repeat(w.right, Length)...)
-	w.wait(time.Minute)
-	// One to play now, to anyone but its player; a visitor too.
-	for who, want := range map[int64]bool{gal: true, 0: true, owner: false} {
-		if ready, err := w.g.RecordingReady(ctx, who); ready != want || err != nil {
-			t.Fatalf("a recording for %d: %v %v, want %v", who, ready, err, want)
-		}
-	}
-
-	id, err := w.g.DuelRecording(ctx, gal)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if again, _ := w.g.DuelRecording(ctx, gal); again != id {
-		t.Fatalf("started again: %d, want %d", again, id)
-	}
-	// The one left unfinished is there to go on with, its recording in a duel under way.
-	if ready, err := w.g.RecordingReady(ctx, gal); !ready || err != nil {
-		t.Fatalf("an unfinished duel against a recording: %v %v", ready, err)
-	}
-	d, err := w.g.DuelOf(ctx, gal, id)
-	if err != nil || !d.Recorded || d.Topic != "history" || d.State != DuelYours || d.Opponent.ID != owner ||
-		len(d.Opponent.Marks) != 0 || d.You.Started {
-		t.Fatalf("against a recording: %+v %v", d, err)
-	}
-	// Its first question shown (its time then run out, say): begun, though nothing is answered.
-	run := w.playSide(gal, id, nil)
-	if _, err := w.g.Show(ctx, gal, run); err != nil {
-		t.Fatal(err)
-	}
-	if d, _ = w.g.DuelOf(ctx, gal, id); !d.You.Started {
-		t.Fatalf("its first question shown, not begun: %+v", d.You)
-	}
-	run = w.playSide(gal, id, repeat(w.wrong, Length))
-	if !slices.Equal(w.picks(run), w.picks(s.ID)) {
-		t.Fatal("not the recording's ten")
-	}
-	d, _ = w.g.DuelOf(ctx, gal, id)
-	if d.State != DuelLost || d.Record != nil || !d.Opponent.Marks[0].Right || d.Opponent.Rights != Length || !d.You.Started {
-		t.Fatalf("its result: %+v", d)
-	}
-	// Nothing of it is the recorded player's to see.
-	if _, err := w.g.DuelOf(ctx, owner, id); !errors.Is(err, ErrNoDuel) {
-		t.Fatalf("the recorded player sees the duel: %v", err)
-	}
-}
-
 // Played second, the other side's answers come with the run as far as the player has come, and no further: nothing
 // of the question shown, not even when they answered it (a duel isn't a race); how it went for them, once the
 // player's own answer is in; their score, at the end. The one who plays first hears nothing of the other's (there's
@@ -557,65 +498,6 @@ func TestDuelEvenIsADraw(t *testing.T) {
 	}
 	if d := duel(100); d.State != DuelLost || d.TieBy != TieNumber {
 		t.Fatalf("Ana's number nearer: %+v", d)
-	}
-}
-
-// A recording is chosen by the player's hidden mastery: the game whose right answers are nearest to what they'd get
-// on its ten. There's one kind of recording, so a duel keeps nothing of how it was chosen.
-func TestRecordingNearest(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	weak, strong, gal := w.user(), w.user(), w.user()
-	rights := func(n int) []func(int64, int) json.RawMessage {
-		return append(repeat(w.right, n), repeat(w.wrong, Length-n)...)
-	}
-	weakRun := w.game(weak, nil, rights(5)...)
-	strongRun := w.game(strong, nil, rights(10)...)
-	w.wait(time.Minute)
-	fit, err := w.g.recordingFit(ctx, gal)
-	if err != nil {
-		t.Fatal(err)
-	}
-	h, _ := w.g.hardness(ctx)
-	for _, run := range []int64{weakRun, strongRun} {
-		if e := expectedRights(w.b, h, 0, w.picks(run)); e < 5.5 || e > 8 {
-			t.Fatalf("a new player's expected right answers on game %d: %.1f", run, e)
-		}
-	}
-	if fit(w.b, w.picks(weakRun), 5) >= fit(w.b, w.picks(strongRun), 10) {
-		t.Fatal("five right isn't nearer a new player's level than ten")
-	}
-	got := func() int64 {
-		t.Helper()
-		id, err := w.g.DuelRecording(ctx, gal)
-		if err != nil {
-			t.Fatal(err)
-		}
-		var recording int64
-		if err := w.db.Read.QueryRow(`SELECT recording_run FROM duels WHERE id = ?`, id).Scan(&recording); err != nil {
-			t.Fatal(err)
-		}
-		d, err := w.g.DuelOf(ctx, gal, id)
-		if err != nil || !d.Recorded {
-			t.Fatalf("the duel: %+v %v", d, err)
-		}
-		if data, _ := json.Marshal(d); strings.Contains(string(data), `"level"`) {
-			t.Fatalf("a duel says a level: %s", data)
-		}
-		if _, err := w.db.Write.Exec(`DELETE FROM duels WHERE id = ?`, id); err != nil { // chosen again, fresh
-			t.Fatal(err)
-		}
-		return recording
-	}
-	if g := got(); g != weakRun {
-		t.Fatalf("game %d, want the nearest, %d", g, weakRun)
-	}
-	// Without it, the nearest there is.
-	if _, err := w.db.Write.Exec(`UPDATE runs SET shadow = ? WHERE id = ?`, ShadowScript, weakRun); err != nil {
-		t.Fatal(err)
-	}
-	if g := got(); g != strongRun {
-		t.Fatalf("with one game left: game %d, want %d", g, strongRun)
 	}
 }
 

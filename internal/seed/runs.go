@@ -172,12 +172,13 @@ func (w *world) dayRun(p *player) error {
 	return nil
 }
 
-// topicRun is a game of a topic („Микс“ now and then), maybe left half-way; it says the run.
+// topicRun is a game of a chapter, maybe left half-way; it says the run.
 func (w *world) topicRun(p *player) (play.State, error) {
-	topic := play.MixTopic
-	if cats := w.b.Categories; len(cats) > 0 && w.chance(0.8) {
-		topic = cats[w.r.IntN(len(cats))].ID
+	cats := w.b.Categories
+	if len(cats) == 0 {
+		return play.State{}, nil
 	}
+	topic := cats[w.r.IntN(len(cats))].ID
 	s, err := w.g.StartTopic(w.as(p), p.id, topic)
 	if errors.Is(err, play.ErrNoQuestion) {
 		return s, nil
@@ -201,18 +202,6 @@ func (w *world) topicRun(p *player) (play.State, error) {
 func (w *world) friendDuel(p, o *player) error {
 	id, err := w.g.DuelFriend(w.as(p), p.id, o.id)
 	if errors.Is(err, play.ErrDuelsToOne) || errors.Is(err, play.ErrDuelsADay) || errors.Is(err, play.ErrNoQuestion) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("duel: %w", err)
-	}
-	return w.playDuel(p, id)
-}
-
-// recordingDuel is a duel against a recording of another player's game (play.Game.DuelRecording), if there's one.
-func (w *world) recordingDuel(p *player) error {
-	id, err := w.g.DuelRecording(w.as(p), p.id)
-	if errors.Is(err, play.ErrNobody) || errors.Is(err, play.ErrNoQuestion) {
 		return nil
 	}
 	if err != nil {

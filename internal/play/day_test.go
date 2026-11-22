@@ -314,13 +314,6 @@ func TestVoidDayIsOfNine(t *testing.T) {
 	if len(friends) != 2 || slices.ContainsFunc(friends, func(s Score) bool { return s.Of != Length-1 }) {
 		t.Fatalf("the friends' board: %+v", friends)
 	}
-	list, err := w.g.FriendsOf(ctx, ana)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(list) != 1 || list[0].Today == nil || list[0].Today.Of != Length-1 {
-		t.Fatalf("the friends: %+v", list)
-	}
 
 	// cy answers the question before the void one, and the reply is lost: sent again, it gets it again.
 	w.show(cy, sc.ID)

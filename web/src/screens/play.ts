@@ -1,9 +1,7 @@
 // A chapter's game: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays
-// the same game. It's started from its chapter in the Алманах („Играй главата“: a topic, „Микс“ — every topic at once —
-// or „България“ — the questions about Bulgaria from every topic, while the bank has them); a run of one is
-// /play/<topic>, whose result has one action (the day's ten while they wait, else ten more at once) and the rest as
-// quiet links: ten more, its questions gone over, the way back to its chapter (to the Алманах for Микс and България,
-// which aren't chapters).
+// the same game. It's started from its chapter in the Алманах („Играй 10 въпроса“); a run of one is /play/<topic>, whose
+// result has one action (the day's ten while they wait, else ten more at once) and the rest as quiet links: ten more,
+// its questions gone over, the way back to its chapter.
 
 import { news } from "../game/news.ts";
 import { summary } from "../game/results.ts";
@@ -12,19 +10,12 @@ import type { State } from "../game/types.ts";
 import { api, errorText } from "../lib/api.ts";
 import { type Child, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { backOut, byTap, entry, hold, mark, title } from "../lib/router.ts";
-import { bulgaria, categories, mix, player, user } from "../state.ts";
+import { categories, player, user } from "../state.ts";
 import { stakeLine } from "../ui.ts";
 import { missing } from "./missing.ts";
 
 export function topic([category = ""]: string[]) {
-  const name =
-    category === mix.id
-      ? mix.name
-      : category === bulgaria.id
-        ? bulgaria.open
-          ? bulgaria.name
-          : undefined
-        : categories.find((c) => c.id === category)?.name;
+  const name = categories.find((c) => c.id === category)?.name;
   // A topic the game doesn't have (an old link, a topic renamed): said so, with the way to the day's ten.
   if (name === undefined) return missing();
   title(name);
@@ -41,13 +32,8 @@ export function topic([category = ""]: string[]) {
   return run({
     name,
     chapter: category,
-    home: isChapter(category) ? `/almanac/${category}` : "/almanac",
-    lead:
-      category === mix.id
-        ? "Десет въпроса от всички глави, от лесен към труден."
-        : category === bulgaria.id
-          ? "Десет въпроса за България от всички глави, от лесен към труден."
-          : "Десет въпроса от главата, от лесен към труден.",
+    home: `/almanac/${category}`,
+    lead: "Десет въпроса от темата, от лесен към труден.",
     begin: async () => {
       const s = await api<State>("POST", "/api/topic", { category });
       ask();
@@ -80,21 +66,15 @@ export function topic([category = ""]: string[]) {
 
 /** A chapter game's result's ways on. While the day's ten wait, the way to them is the one action (the habit comes
  * first), the streak at stake under it, and „Още десет въпроса“ a quiet link beside the way back; once the day is
- * played, „Още десет въпроса“ is the action. The way back is to the chapter, or to the Алманах from Микс and
- * България (two ways to play at its head, not chapters). */
+ * played, „Още десет въпроса“ is the action, and the way back is to the chapter. */
 function nextOf(d: DayWaits | null, again: () => void, chapter: string): { main: Child; also: Child[] } {
-  const book = isChapter(chapter)
-    ? h("a", { class: "link tap", href: `/almanac/${chapter}` }, "Към главата")
-    : h("a", { class: "link tap", href: "/almanac" }, "Към Алманаха");
+  const book = h("a", { class: "link tap", href: `/almanac/${chapter}` }, "Към темата");
   if (!d) return { main: h("button", { class: "btn primary big", onclick: again }, "Още десет въпроса"), also: [book] };
   return {
     main: [h("a", { class: "btn primary big", href: "/" }, "Към днешния брой"), stakeLine(d.streak, d.spare)],
     also: [h("button", { class: "link tap", onclick: again }, "Още десет въпроса"), book],
   };
 }
-
-/** Whether a game's topic is a chapter of the book (not Микс or България). */
-const isChapter = (id: string) => categories.some((c) => c.id === id);
 
 /** The day's ten, while they wait for the player: the streak (to yesterday) and whether the week would forgive a day
  * missed. */

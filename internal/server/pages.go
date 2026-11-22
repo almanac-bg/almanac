@@ -14,7 +14,6 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -35,7 +34,7 @@ var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/almanac/[a-z]+$`),
 	regexp.MustCompile(`^/(me|friends|settings|almanac)$`),
 	regexp.MustCompile(`^/signin$`),
-	regexp.MustCompile(`^/duel/([0-9]{1,12}|new)$`),
+	regexp.MustCompile(`^/duel/[0-9]{1,12}$`),
 	regexp.MustCompile(`^/players/[A-Za-z0-9_.]{3,20}$`),
 	sharePath, // a shared day (share.go)
 }
@@ -197,7 +196,6 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	start := map[string]any{
 		"user":       u,
 		"categories": b.Categories,
-		"bulgaria":   s.game.BulgariaOpen(), // the topic „България“ (play/bulgaria.go): a tile while it has a game's worth
 		"version":    s.cfg.Version,
 		"push":       s.pushKey(),
 		"now":        time.Now().UnixMilli(), // the clock the page keeps until the API's first answer (lib/api.ts)
@@ -264,11 +262,9 @@ func (s *Server) there(r *http.Request) bool {
 	case strings.HasPrefix(p, "/play/"):
 		return s.game.IsTopic(strings.TrimPrefix(p, "/play/"))
 	case strings.HasPrefix(p, "/almanac/"):
-		// A chapter of the book: one of the bank's topics. „Микс“ and „България“ are ways to play, not chapters: no page
-		// of their own, which would list every fact as one (DECISIONS.md).
-		t := strings.TrimPrefix(p, "/almanac/")
-		return slices.ContainsFunc(s.game.Bank().Categories, func(c bank.Category) bool { return c.ID == t })
-	case strings.HasPrefix(p, "/duel/") && p != "/duel/new":
+		// A chapter of the book: one of the bank's topics.
+		return s.game.IsTopic(strings.TrimPrefix(p, "/almanac/"))
+	case strings.HasPrefix(p, "/duel/"):
 		id, _ := strconv.ParseInt(strings.TrimPrefix(p, "/duel/"), 10, 64)
 		yes, err = s.game.DuelExists(ctx, id)
 	case strings.HasPrefix(p, "/players/"):

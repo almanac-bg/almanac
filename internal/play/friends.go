@@ -273,9 +273,9 @@ func (g *Game) FriendsNews(ctx context.Context, userID int64) (bool, error) {
 		EXISTS (SELECT 1 FROM friend_requests r WHERE (r.to_id = u.id OR r.to_email = u.email) AND NOT r.declined
 			AND r.at > u.friends_seen_at)
 		OR EXISTS (SELECT 1 FROM duels d WHERE d.a_id = u.id AND d.created_at > u.friends_seen_at - ?2
-			AND d.kind = 'person' AND d.ended_at > u.friends_seen_at)
+			AND d.ended_at > u.friends_seen_at)
 		OR EXISTS (SELECT 1 FROM duels d WHERE d.b_id = u.id AND d.created_at > u.friends_seen_at - ?2
-			AND d.kind = 'person' AND (d.sent_at > u.friends_seen_at AND d.b_run IS NULL
+			AND (d.sent_at > u.friends_seen_at AND d.b_run IS NULL
 				OR d.ended_at > u.friends_seen_at AND d.ended_at >= d.expires_at))
 		FROM users u WHERE u.id = ?1`, userID, newsReach.Milliseconds()).Scan(&news)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -309,7 +309,7 @@ func (g *Game) Unfriend(ctx context.Context, userID, friendID int64) error {
 			OR (user_id = ?2 AND friend_id = ?1)`, userID, friendID); err != nil {
 			return err
 		}
-		_, err := tx.Exec(`UPDATE duels SET expires_at = min(expires_at, ?3) WHERE kind = 'person' AND ended_at IS NULL
+		_, err := tx.Exec(`UPDATE duels SET expires_at = min(expires_at, ?3) WHERE ended_at IS NULL
 			AND ((a_id = ?1 AND b_id = ?2) OR (a_id = ?2 AND b_id = ?1))`, userID, friendID, store.Ms(g.Now()))
 		return err
 	})
@@ -330,29 +330,29 @@ func (g *Game) Friend(ctx context.Context, userID, friendID int64) (string, erro
 	return name, err
 }
 
-// Friend is a friend as the player's list shows them: how they did today, and the duels between the two.
+// Friend is a friend as the player's list shows them: who they are, and the duels between the two (owner, 2026-11-22:
+// not their day, which is the day's board's).
 type Friend struct {
 	ID    int64  `json:"id"`
 	Name  string `json:"name"`
 	Tag   string `json:"tag"`
 	Since int64  `json:"since"`
 	Look
-	Today *Score `json:"today,omitempty"` // their day's questions, once finished
 	// The duels between the two, from the player's side.
 	Won   int `json:"won"`
 	Lost  int `json:"lost"`
 	Drawn int `json:"drawn"`
+	// Full is that DuelsToOne duels the player sent wait for this friend to play them: no new one until they play one
+	// (DuelFriend: ErrDuelsToOne). Not while one of them is the player's own to finish: „Дуел“ goes on with it.
+	Full bool `json:"full,omitempty"`
 }
 
-// FriendsOf lists a player's friends by name (the day's ranking is the board's). A friend's
-// day played at a script's speed is theirs alone to see (fair.go).
+// FriendsOf lists a player's friends by name (how each did today is the day's board's: FriendsBoard).
 func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	db := g.DB.Read
-	rows, err := db.QueryContext(ctx, `SELECT u.id, u.name, u.tag, f.since, r.rights, r.closeness,
-			`+countedOf("r.questions")+`, `+lookColumns+`
+	rows, err := db.QueryContext(ctx, `SELECT u.id, u.name, u.tag, f.since, `+lookColumns+`
 		FROM friends f JOIN users u ON u.id = f.friend_id
-		LEFT JOIN runs r ON r.user_id = u.id AND r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND NOT r.shadow AND NOT r.pencil
-		WHERE f.user_id = ?`, g.Today(), userID)
+		WHERE f.user_id = ?`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -360,17 +360,12 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	at := map[int64]int{}
 	for rows.Next() {
 		var f Friend
-		var rights, closeness, of sql.NullInt64
 		var avatar string
-		if err := rows.Scan(&f.ID, &f.Name, &f.Tag, &f.Since, &rights, &closeness, &of, &avatar); err != nil {
+		if err := rows.Scan(&f.ID, &f.Name, &f.Tag, &f.Since, &avatar); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		f.Look = g.lookOf(f.ID, avatar)
-		if rights.Valid {
-			f.Today = &Score{Name: f.Name, Rights: int(rights.Int64), Of: int(of.Int64),
-				tie: tiebreak{closeness: int(closeness.Int64)}}
-		}
 		at[f.ID] = len(list)
 		list = append(list, f)
 	}
@@ -403,6 +398,28 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 		default:
 			list[i].Drawn = n
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	rows, err = db.QueryContext(ctx, `SELECT b_id FROM duels WHERE a_id = ? AND b_id IS NOT NULL AND ended_at IS NULL
+		GROUP BY b_id HAVING count(*) >= ? AND count(*) FILTER (WHERE sent_at IS NULL) = 0`, userID, DuelsToOne)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		if i, ok := at[id]; ok {
+			list[i].Full = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	// By name, as a list of people is read (the day's ranking is the board's): Latin before Cyrillic, each in its
 	// alphabet's order, which lower case in Unicode keeps for Bulgarian.
@@ -481,7 +498,8 @@ func (g *Game) friendsBoard(ctx context.Context, day string, userID int64, trail
 // how each of the ten went for them.
 type FriendDay struct {
 	Name string `json:"name"`
-	Look
+	// Avatar is their face alone, without the seal: beside a question it's small, and the seal covered it.
+	Avatar string `json:"avatar"`
 	// Marks are the ten in the issue's order, as a share says them (Share.Shape): '1' right, '2' close (not right),
 	// '0' wrong or not answered, '3' a question that counts for nobody.
 	Marks string `json:"marks"`
@@ -519,7 +537,7 @@ func (g *Game) FriendsOn(ctx context.Context, userID, runID int64) ([]FriendDay,
 	out := []FriendDay{}
 	for _, s := range board {
 		if !s.Me {
-			out = append(out, FriendDay{Name: s.Name, Look: s.Look, Marks: shapeOf(s.Trail)})
+			out = append(out, FriendDay{Name: s.Name, Avatar: s.Avatar, Marks: shapeOf(s.Trail)})
 		}
 	}
 	return out, nil

@@ -458,9 +458,6 @@ func TestSecondPlayOffOthersBoards(t *testing.T) {
 	if f, _ := w.g.FriendsBoard(ctx, today, bo); len(f) != 0 {
 		t.Fatalf("Bo's friends' board: %+v", f)
 	}
-	if list, _ := w.g.FriendsOf(ctx, bo); len(list) != 1 || list[0].Today != nil {
-		t.Fatalf("Bo's friends: %+v", list)
-	}
 }
 
 // The friends list is by name, as a list of people is read, whoever played today: the day's ranking is the board's.

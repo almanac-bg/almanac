@@ -42,8 +42,7 @@ export function verdict(kind: VerdictKind, words = verdictWords[kind]): Child {
   );
 }
 
-/** A segmented switch of a few choices: tabs that switch what a screen shows, or (`radio`) a setting to choose. A
- * choice's words may carry more after them (Приятели's „Дуели“: a dot while one waits, `tabDot`). */
+/** A segmented switch of a few choices: tabs that switch what a screen shows, or (`radio`) a setting to choose. */
 export function segmented<T>(
   label: string,
   options: [T, Child][],
@@ -69,12 +68,6 @@ export function segmented<T>(
     ),
   );
 }
-
-/** A dot after a tab's word while something waits under it, said in words to a screen reader. */
-export const tabDot = (said: string): Child => [
-  h("span", { class: "tab-dot", "aria-hidden": "true" }),
-  h("span", { class: "sr" }, ` (${said})`),
-];
 
 /** How the game looks on this device (prefs.ts: scheme): as the device is set, or Night or Day whatever it says. Not
  * „Тема“: in the game that's what questions are about. */
@@ -109,7 +102,7 @@ export function filed(topic: string): Child {
     "p",
     { class: "filed" },
     h("span", { class: "i i-nib", "aria-hidden": "true" }),
-    `Записано с мастило · глава „${chapterName(topic)}“`,
+    `Записано с мастило · тема „${chapterName(topic)}“`,
   );
 }
 
@@ -118,7 +111,7 @@ export function toneOf(category: string): string {
   return `t-${category}`;
 }
 
-/** A chapter's name, as players read it ("history" → „История“; „Микс“, „България“). */
+/** A chapter's name, as players read it ("history" → „История“; "mix" → „Всички теми“). */
 export const chapterName = (topic: string): string => topics.find((c) => c.id === topic)?.name ?? "";
 
 /** A chapter's glyph: its art on a white disc, `size` across (for the eye: its name is said beside it). */

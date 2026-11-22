@@ -12,12 +12,13 @@ async function slowName(page: Page, ms: number): Promise<void> {
   });
 }
 
-/** Two friends, as Приятели makes them (play.ts), and the first one's duel with the other a tap away: /duel/new. */
+/** Two friends, as Приятели makes them (play.ts), and the first one's duel with the other a tap away there: „Дуел“ on
+ * the friend's row. */
 async function friends(browser: Browser): Promise<Page> {
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
   await befriend(a, b);
-  await a.goto("/duel/new");
+  await a.goto("/friends");
   return a;
 }
 
@@ -34,7 +35,7 @@ test("before a first duel sent to a friend: a slow save is waited for, a refused
   await field.fill("ana.bg");
   await sheet.getByRole("button", { name: "Готово" }).click();
   await expect(sheet.getByRole("alert")).toHaveText(/След точка в името трябва да има интервал/, { timeout: 5_000 });
-  await expect(page).toHaveURL(/\/duel\/new$/);
+  await expect(page).toHaveURL(/\/friends$/);
   // A good one, as slow: the duel starts once it's saved, the name the player's.
   await field.fill("Ана Слаба");
   await sheet.getByRole("button", { name: "Готово" }).click();

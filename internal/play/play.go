@@ -1,4 +1,4 @@
-// Package play is the game: runs through a set of questions (the day's, a topic's, „България“'s: bulgaria.go), one
+// Package play is the game: runs through a set of questions (the day's, a chapter's: topics.go, a duel's), one
 // question at a time, against the server's clock; duels, kept as runs; friends.
 //
 // A question's time runs only while it's shown: Show starts it, Answer stops it. How long it is is the server's
@@ -18,9 +18,9 @@
 // (StartTopic). A game played quicker than a person plays counts for its player alone (fair.go).
 //
 // No game deals a player again what they've played, in any game, while the bank has questions they haven't: a topic's,
-// a duel's are drawn for all their players, those none of them has seen first,
-// then those the fewest have (choose, seenAmong); a recording is a game with few of its questions seen. One repeats by
-// design: the day (the same ten for everyone). TestNothingPlayedAgain holds it, for every way a game starts.
+// a duel's are drawn for all their players, those none of them has seen first, then those the fewest have (choose,
+// seenAmong). One repeats by design: the day (the same ten for everyone). TestNothingPlayedAgain holds it, for every
+// way a game starts.
 //
 // A guest who signs in to their account brings everything along (Merge), and a player who goes leaves others'
 // history whole (Forget): merge.go, checked against the schema so that no table of a player's is left out.
@@ -248,7 +248,7 @@ type State struct {
 	// Question is the one shown now, if one is.
 	Question *Shown `json:"question,omitempty"`
 	Done     bool   `json:"done"`
-	// Against is, in a duel played second (the other side finished: a friend's, a recording), how the other side's
+	// Against is, in a duel played second (the friend's side finished), how the other side's
 	// answers went as far as the player has come, and no further (duelAgainst): each question the player has answered,
 	// nothing of the one shown. How it went for them waits for the player's own answer, and when they answered is
 	// never said: a duel isn't a race.

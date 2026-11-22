@@ -169,12 +169,10 @@ func (w *world) visit(s session) error {
 		if err != nil {
 			return err
 		}
-		if o != nil && w.chance(0.7) {
-			err = w.friendDuel(p, o)
-		} else {
-			err = w.recordingDuel(p)
+		if o == nil {
+			break
 		}
-		if err != nil {
+		if err := w.friendDuel(p, o); err != nil {
 			return err
 		}
 	}
