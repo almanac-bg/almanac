@@ -155,7 +155,7 @@ for (const scheme of ["light", "dark"] as const) {
       r.fulfill({ json: { questions: [asked(0, true), asked(1, false)] } }),
     );
     await page.goto("/friends?duel=1");
-    const card = page.locator(".duel-row.landed");
+    const card = page.locator(".duel-card.landed");
     await expect(card.locator(".duel-chip")).toHaveText("✓ Победа");
     // Whatever moves, at its end. Waited for, not cut short by a key: a key would be the page's first touch, which
     // starts the audio (lib/sound.ts) just as axe reads the page, and Firefox on CI's Linux crashed under that now and

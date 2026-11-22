@@ -87,11 +87,11 @@ packages' doc comments; this file holds only what must not drift.
     (2026-11-22, the owner).
   - **A duel has no result page** (2026-11-22, the owner): everything about a duel is in Приятели: the two, the
     score, the two rows of marks, one quiet line, and „Въпросите“, its questions in their dialog, on any day (2026-11-22, the owner: the other side plays when they can, so a duel's result often comes
-    on another day, and its questions are what the two talk over). Every duel is a compact
-    row, „Чакащи дуели“ and „Изиграни дуели“ (2026-11-22, the owner: cards were too long): one the player's to play
-    acts only by its „Играй“; one friend's several sent to the player are one row, a pile, the earliest on top,
-    unfolded to choose which to play (2026-11-22, the owner); one whose side they've played opens its questions; the other's name is a way to their
-    profile, as a name is everywhere. Nothing else: „Реванш“ is
+    on another day, and its questions are what the two talk over). Every duel is a card,
+    „Чакащи дуели“ and „Изиграни дуели“ (2026-11-22, the owner: the cards read better than compact rows): one the
+    player's to play acts only by its „Играй“; every duel they have to play is in one stack, whoever sent it, the first
+    challenged on top, opened in a dialog in that order to choose which to play (2026-11-22, the owner); one whose side
+    they've played opens its questions; the names are ways to the profiles, as a name is everywhere. Nothing else: „Реванш“ is
     gone (2026-11-22, the owner), a new duel starts from the friend's row or profile. A duel's game ends on Приятели,
     first in its group, the score counting up once; `/duel/<id>` only starts and plays one, and an old link to a
     finished duel comes to it there. The played list is the last ten, and says so („Последните 10 изиграни дуела“).

@@ -40,9 +40,9 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await expect(a).toHaveURL(/\/duel\/\d+$/);
   await countIn(a);
   await playRun(a);
-  // Sent: she lands on Приятели, the duel first there: waiting for him, her score and her row of marks under his name.
+  // Sent: she lands on Приятели, the duel's card first there: waiting for him, her score and her row of marks on it.
   await expect(a).toHaveURL(/\/friends\?duel=\d+$/);
-  const landed = a.locator(".duel-row.landed");
+  const landed = a.locator(".duel-card.landed");
   await expect(landed).toHaveClass(/s-theirs/);
   await expect(landed.locator(".duel-card-row")).toHaveCount(1);
   await expect(landed.locator(".mini > i")).toHaveCount(10);
@@ -58,19 +58,21 @@ test("a duel with a friend: played first and sent, played back when they can, it
     .locator(".duels-open, .sect.friends")
     .evaluateAll((els) => els.map((el) => (el.classList.contains("friends") ? "friends" : "duels")));
   expect(order).toEqual(["duels", "friends"]);
-  // Her row: „Чакаш“ and how long he has under his name, her score under that.
-  const sent = a.locator(".duels-open .duel-row.s-theirs");
-  await expect(sent.locator(".duel-row-state")).toHaveText("Чакаш · още 7 дни");
+  // Her card: the two face to face, „Чакаш“ and how long he has between them, her score under.
+  const sent = a.locator(".duels-open .duel-card.s-theirs");
+  await expect(sent.locator(".duel-card-side")).toHaveCount(2);
+  await expect(sent.locator(".duel-card-mid")).toHaveText(/Чакаш\s*още 7\sдни/);
   await expect(sent.locator(".duel-card-note")).toHaveText(/Ти: \d+ от 10/);
-  // Nothing of hers to do there: no „Играй“; his name leads to his profile, the rest of the row to her questions. Its
-  // old page comes to it.
+  // Nothing of hers to do there: no „Играй“; the two names lead to their profiles (hers to Профил), the rest of the card
+  // to her questions. Its old page comes to it.
   await expect(sent.locator(".duel-card-go")).toHaveCount(0);
-  await expect(sent.locator("a.friend-name")).toHaveAttribute("href", /^\/players\//);
-  await expect(sent.locator(".duel-row-open")).toHaveAccessibleName(/^Въпросите от дуела с /);
+  await expect(sent.locator("a.duel-card-side").first()).toHaveAttribute("href", "/me");
+  await expect(sent.locator("a.duel-card-side").last()).toHaveAttribute("href", /^\/players\//);
+  await expect(sent.locator(".duel-card-open")).toHaveAccessibleName(/^Въпросите от дуела с /);
   const sentId = ((await sent.getAttribute("id")) ?? "").replace("duel-", "");
   await a.goto(`/duel/${sentId}`);
   await expect(a).toHaveURL(new RegExp(`/friends\\?duel=${sentId}$`));
-  await expect(a.locator(".duel-row.landed")).toHaveClass(/s-theirs/);
+  await expect(a.locator(".duel-card.landed")).toHaveClass(/s-theirs/);
 
   // Bo: a dot on Приятели (nothing over the day: Днес is the issue and the streak), the duel his to play there, a tap
   // away. Opened, Приятели has no dot: it's news since the last look, not what waits; the duel stays his to play.
@@ -81,39 +83,41 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await bDot.click();
   await expect(b).toHaveURL(/\/friends$/);
   await expect(bDot).not.toHaveClass(/news/);
-  // A duel waits for him, first on the page: his turn in its row with „Играй“, his friends under it. Only „Играй“
-  // leads to the game (nothing laid over the row), and Ana's name leads to her profile.
-  const turn = b.locator(".duel-row.turn");
-  await expect(turn.locator(".duel-row-state")).toHaveText("Твой ред · още 7 дни");
-  await expect(turn.locator(".duel-row-open")).toHaveCount(0);
+  // A duel waits for him, first on the page: his turn in its card with „Играй“, his friends under it. Only „Играй“
+  // leads to the game (nothing laid over the card), and Ana's name leads to her profile. One duel: no stack.
+  const turn = b.locator(".duel-card.turn");
+  await expect(turn.locator(".duel-card-mid")).toHaveText(/Твой ред\s*още 7\sдни/);
+  await expect(turn.locator(".duel-card-open")).toHaveCount(0);
+  await expect(turn.locator(".duel-stack-open")).toHaveCount(0);
   await expect(turn.getByRole("link", { name: /^Играй/ })).toHaveAttribute("href", /^\/duel\/\d+$/);
   await expect(turn.getByRole("link", { name: "Ана", exact: true })).toHaveAttribute("href", /^\/players\//);
   await expect(b.locator(".friend")).toHaveCount(1);
   await lookedFor(b, () => b.goto("/"));
   await expect(bDot).not.toHaveClass(/news/);
   await b.goto("/friends");
-  await b.locator(".duel-row.turn .duel-card-go").click();
+  await b.locator(".duel-card.turn .duel-card-go").click();
   await countIn(b);
   await playSecond(b, "Ана");
 
-  // The end lands on Приятели, the duel first of the played, a compact row, never a page of its own: the score counts
-  // up once, and the two rows of marks are on it, his and hers.
+  // The end lands on Приятели, the duel's card first of the played, never a page of its own: the score counts up once,
+  // and the two rows of marks are on it, his and hers.
   await expect(b).toHaveURL(/\/friends\?duel=\d+$/, { timeout: 10_000 });
-  const result = b.locator(".duel-row.landed");
+  const result = b.locator(".duel-card.landed");
   await expect(result).toHaveClass(/s-(won|lost|draw)/);
   await b.keyboard.press("Shift"); // the moment, to its end
   await expect(result.locator(".duel-card-score")).toHaveText(/^\d+:\d+$/);
   await expect(result.locator(".duel-card-row")).toHaveCount(2);
   await expect(result.locator(".mini > i")).toHaveCount(20);
   await expect(b.locator(".duels-open")).toHaveCount(0);
-  await expect(b.locator(".duel-row")).toHaveCount(1);
-  // The row opens its questions, the whole of it but her name (a way to her profile), with no button on it to say so:
-  // a tap on it opens the ten in their dialog, each with how it went for the two side by side, its answers and its fact.
-  const open = result.locator(".duel-row-open");
+  await expect(b.locator(".duel-card")).toHaveCount(1);
+  // The card opens its questions, the whole of it but the names (ways to profiles), with no button on it to say so: a
+  // tap on it (here on its marks) opens the ten in their dialog, each with how it went for the two side by side, its
+  // answers and its fact.
+  const open = result.locator(".duel-card-open");
   await expect(open).toHaveAccessibleName("Въпросите от дуела с Ана");
   await expect(result.getByRole("link", { name: "Ана", exact: true })).toHaveAttribute("href", /^\/players\//);
   const box = await result.boundingBox();
-  await b.mouse.click((box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + (box?.height ?? 0) - 6);
+  await b.mouse.click((box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + (box?.height ?? 0) - 20);
   const sheet = b.locator("dialog.review-sheet");
   await expect(sheet.getByRole("heading", { name: "Въпросите" })).toBeVisible();
   await expect(sheet.locator(".review-of")).toHaveText(/^Дуел с Ана · \d+:\d+$/);
@@ -150,7 +154,7 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await expect(aDot).not.toHaveClass(/news/);
   await expect(a.locator(".duels-played h2")).toHaveText("Изиграни дуели");
   await expect(a.locator(".duels-open")).toHaveCount(0);
-  const done = a.locator(".duels-played .duel-row").first();
+  const done = a.locator(".duels-played .duel-card").first();
   await expect(done).toHaveClass(/s-(won|lost|draw)/);
   // Its score between the two, a heavy numeral, and its end a chip, told apart at a glance: a win filled in ink with
   // its ✓, a loss and a draw outlined.
@@ -180,71 +184,76 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await expect(sheet.getByRole("alert")).toHaveCount(0);
 });
 
-test("one friend's duels sent are one pile, the earliest on top, unfolded to choose one; played back, first of the played", async ({
+test("every duel to play is in one stack, the first challenged on top, chosen from in a dialog; played back, first of the played", async ({
   browser,
 }) => {
-  test.setTimeout(360_000);
+  test.setTimeout(420_000);
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
+  const c = await (await browser.newContext()).newPage();
   await befriend(a, b);
-  // Ana sends him three, as many as may wait with one friend (play.DuelsToOne).
+  await befriend(c, b);
+  // Ana sends him three, as many as may wait with one friend (play.DuelsToOne); then Cy one.
   const sentIds: string[] = [];
-  for (let n = 0; n < 3; n++) {
-    await a.goto("/friends");
-    await a.locator(".friend").getByRole("button", { name: /^Дуел/ }).click();
-    if (n === 0) await meetAs(a, "Ана");
-    await countIn(a);
-    await playRun(a);
-    await expect(a).toHaveURL(/\/friends\?duel=\d+$/);
-    sentIds.push(new URL(a.url()).searchParams.get("duel") ?? "");
-  }
-  // Hers wait each on its own row: each has her own score on it. Three wait for him: no fourth until he plays one,
-  // and his row says so, „Дуел“ off.
-  await expect(a.locator(".duels-open .duel-row.s-theirs")).toHaveCount(3);
+  const send = async (p: Page, name: string, n: number) => {
+    await p.goto("/friends");
+    await p.locator(".friend").getByRole("button", { name: /^Дуел/ }).click();
+    if (n === 0) await meetAs(p, name);
+    await countIn(p);
+    await playRun(p);
+    await expect(p).toHaveURL(/\/friends\?duel=\d+$/);
+    sentIds.push(new URL(p.url()).searchParams.get("duel") ?? "");
+  };
+  for (let n = 0; n < 3; n++) await send(a, "Ана", n);
+  // Hers wait each on its own card. Three wait for him: no fourth until he plays one, and his row says so, „Дуел“ off.
+  await expect(a.locator(".duels-open .duel-card.s-theirs")).toHaveCount(3);
   await expect(a.locator(".friend .friend-full")).toHaveText("Три дуела чакат. Нов — щом изиграе някой.");
   await expect(a.locator(".friend").getByRole("button", { name: /^Дуел/ })).toBeDisabled();
   await expect(a.locator(".duel-pile")).toHaveCount(0);
+  await send(c, "Цвети", 0);
 
-  // Bo: the three are one row, a pile, the earliest on top with „Играй“, the count said on its line and in the heading.
+  // Bo: all four in one stack, whoever sent them, the first challenged on top with „Играй“, the edges of more under it.
   await b.goto("/friends");
-  const pile = b.locator(".duel-pile");
-  const rows = b.locator(".duels-open .duel-row");
+  const pile = b.locator(".duels-open .duel-pile");
   await expect(pile).toHaveCount(1);
   await expect(pile).toHaveAttribute("data-more", "2");
-  await expect(pile).toHaveAttribute("id", `duel-${sentIds[0]}`);
-  await expect(rows).toHaveCount(1);
-  await expect(b.locator(".duels-open h2")).toHaveText("Чакащи дуели (3)");
-  await expect(pile).toHaveClass(/\bturn\b/);
+  await expect(b.locator(".duels-open .duel-card")).toHaveCount(1);
+  await expect(pile.locator(".duel-card")).toHaveAttribute("id", `duel-${sentIds[0]}`);
+  await expect(b.locator(".duels-open h2")).toHaveText("Чакащи дуели (4)");
+  await expect(pile.locator(".duel-card")).toHaveClass(/\bturn\b/);
   await expect(pile.locator(".duel-card-go")).toHaveText("Играй");
-  // Unfolded: all three, earliest first, each with its own „Играй“; folded again, one.
-  const fold = pile.getByRole("button", { name: "Още 2 дуела чакат" });
-  await expect(fold).toHaveAttribute("aria-expanded", "false");
-  await fold.click();
-  await expect(rows).toHaveCount(3);
-  expect(await rows.evaluateAll((els) => els.map((el) => el.id))).toEqual(sentIds.map((id) => `duel-${id}`));
-  await expect(b.locator(".duels-open .duel-card-go")).toHaveCount(3);
-  await expect(pile.getByRole("button", { name: "Скрий другите" })).toHaveAttribute("aria-expanded", "true");
-  await pile.getByRole("button", { name: "Скрий другите" }).click();
-  await expect(rows).toHaveCount(1);
-  // He chooses the last one sent.
-  await pile.getByRole("button", { name: "Още 2 дуела чакат" }).click();
-  await rows.last().locator(".duel-card-go").click();
-  await expect(b).toHaveURL(new RegExp(`/duel/${sentIds[2]}$`));
+  // „Избери дуел“ opens them all in a dialog, in the stack's order, each with who sent it and its own „Играй“.
+  await pile.getByRole("button", { name: "Избери дуел (4)" }).click();
+  const choose = b.getByRole("dialog", { name: "Чакат те 4 дуела" });
+  const rows = choose.locator(".duel-stack-row");
+  await expect(rows).toHaveCount(4);
+  expect(await rows.locator(".duel-card-go").evaluateAll((els) => els.map((el) => el.getAttribute("href")))).toEqual(
+    sentIds.map((id) => `/duel/${id}`),
+  );
+  await expect(rows.locator(".who-name")).toHaveText(["Ана", "Ана", "Ана", "Цвети"]);
+  await choose.getByRole("button", { name: "Затвори" }).click();
+  await expect(choose).toHaveCount(0);
+  // He chooses Cy's, the last.
+  await pile.getByRole("button", { name: "Избери дуел (4)" }).click();
+  await rows
+    .last()
+    .getByRole("link", { name: /^Играй/ })
+    .click();
+  await expect(b).toHaveURL(new RegExp(`/duel/${sentIds[3]}$`));
   await countIn(b);
-  await playSecond(b, "Ана");
+  await playSecond(b, "Цвети");
 
-  // Its end: first of the played, at the page's foot, under the two still waiting (one row, a pile)
-  // and the friends, and brought into sight.
+  // Its end: first of the played, at the page's foot, under the three still waiting (the stack) and the friends, and
+  // brought into sight.
   await expect(b).toHaveURL(/\/friends\?duel=\d+$/, { timeout: 10_000 });
   const waiting = b.locator(".duels-open");
   const playedOnes = b.locator(".duels-played");
-  await expect(waiting.getByRole("heading")).toHaveText("Чакащи дуели (2)");
-  await expect(waiting.locator(".duel-pile")).toHaveAttribute("data-more", "1");
-  await expect(waiting.locator(".duel-pile")).toHaveAttribute("id", `duel-${sentIds[0]}`);
-  await expect(waiting.getByRole("button", { name: "Още един дуел чака" })).toBeVisible();
+  await expect(waiting.getByRole("heading")).toHaveText("Чакащи дуели (3)");
+  await expect(waiting.locator(".duel-pile .duel-card")).toHaveAttribute("id", `duel-${sentIds[0]}`);
+  await expect(waiting.getByRole("button", { name: "Избери дуел (3)" })).toBeVisible();
   await expect(playedOnes.getByRole("heading")).toHaveText("Изиграни дуели");
-  const landed = playedOnes.locator(".duel-row").first();
-  await expect(landed).toHaveAttribute("id", `duel-${sentIds[2]}`);
+  const landed = playedOnes.locator(".duel-card").first();
+  await expect(landed).toHaveAttribute("id", `duel-${sentIds[3]}`);
   await expect(landed).toHaveClass(/\blanded\b/);
   await expect(landed).toHaveClass(/s-(won|lost|draw)/);
   await expect(landed).toBeInViewport();
@@ -274,7 +283,7 @@ test("a duel left before its first question isn't „Твой ред“; one beg
   await a.getByRole("button", { name: "Отказ" }).click();
   await expect(a).toHaveURL(/\/friends$/);
   await expect(a.locator(".friend")).toHaveCount(1);
-  await expect(a.locator(".duel-row")).toHaveCount(0);
+  await expect(a.locator(".duel-card")).toHaveCount(0);
 
   // Tapped again: the same duel. Its first question answered, then away.
   await a.locator(".friend").getByRole("button", { name: /^Дуел/ }).click();
@@ -286,8 +295,8 @@ test("a duel left before its first question isn't „Твой ред“; one beg
   await a.goto("/friends");
 
   // „Твой ред“, and „Играй“ goes on with the duel's own run, where it was left.
-  await expect(a.locator(".duel-row.turn")).toContainText("Довърши своята игра");
-  await a.locator(".duel-row.turn .duel-card-go").click();
+  await expect(a.locator(".duel-card.turn")).toContainText("Довърши своята игра");
+  await a.locator(".duel-card.turn .duel-card-go").click();
   await expect(a).toHaveURL(duel);
   await a.getByRole("button", { name: "Продължи" }).click();
   await expect(a.locator(".question-head")).toContainText("2 от 10", { timeout: 10_000 });
