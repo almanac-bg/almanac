@@ -34,6 +34,7 @@ for (const scheme of ["light", "dark"] as const) {
       "/duel/new",
       "/me",
       "/friends",
+      "/friends?tab=duels",
       "/settings",
       "/almanac",
       "/almanac/history",

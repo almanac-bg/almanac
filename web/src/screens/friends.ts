@@ -1,7 +1,9 @@
-// Приятели, one of the three places, in its budget's order (DESIGN.md, Places): the friends (who asks to be friends,
-// each friend with their day, the duels between you and a duel a tap away, and the one way to make more: by
-// потребителско име or email); and the duels (a friend's waiting for you, yours waiting for them, those played:
-// screens/duel.ts) and a new one. The day's board is on Днес's result (today.ts, dayBoard).
+// Приятели, one of the three places (DESIGN.md, Places): two tabs at its top, of one weight, as the day's board has
+// them. „Приятели“: who asks to be friends, each friend with their day, the duels between you and a duel a tap away,
+// and the one way to make more (by потребителско име or email). „Дуели“: a friend's waiting for you, yours waiting for
+// them, those played (screens/duel.ts), and a new one; it carries a dot while one waits for the player, and opens
+// first then („Приятели“ has a dot while someone asks to be friends). The tab chosen is in the address (`?tab=duels`): back and a reload keep it. The day's board is on Днес's
+// result (today.ts, dayBoard).
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -35,6 +37,9 @@ let {
   who,
   inSight,
   playerRow,
+  segmented,
+  tabDot,
+  rename,
 } = {} as Kit;
 
 interface Friend {
@@ -59,6 +64,9 @@ interface Request {
   look?: Look;
   email?: string;
 }
+
+/** Приятели's two tabs. */
+type Tab = "friends" | "duels";
 
 interface Friends {
   friends: Friend[];
@@ -93,23 +101,31 @@ export function friends(kit: Kit): Child {
     who,
     inSight,
     playerRow,
+    segmented,
+    tabDot,
+    rename,
   } = kit);
   title("Приятели");
   // Opened: what has come here is seen, on every device, and the dot on Приятели goes.
   if (user.peek()) sawFriends();
-  // Whether the player has finished the day: a duel against a recording needs no friend, only the day played.
-  const played = signal(false);
-  if (user.peek())
-    api<{ run?: { done: boolean } | null }>("GET", "/api/day").then(
-      (d) => played.set(!!d.run?.done),
-      () => {},
-    );
-  return h("section", { class: "screen friends-page spread" }, h("h1", null, "Приятели"), friendsCard(played));
+  // The page's heading is the tabs': its own is a screen reader's only, so that nothing is headed twice.
+  return h("section", { class: "screen friends-page" }, h("h1", { class: "sr" }, "Приятели"), tabs());
 }
 
-/** The friends: who asks to be friends, each friend with their day and the duels between you (and, while changing
- * the list, removing them), the one field to add more, and the requests that wait for an answer. */
-function friendsCard(played: () => boolean): Child {
+/** The two tabs and what the chosen one shows. Приятели: who asks to be friends, each friend with their day and the
+ * duels between you (and, while changing the list, removing them), the one field to add more, and the requests that
+ * wait for an answer. Дуели: the player's duels, and a new one. */
+function tabs(): Child {
+  // The tab chosen, kept in the address; none chosen: Дуели while a duel waits for the player as the page opens (a
+  // duel that comes later lights the tab's dot, and never moves the page under the player), else Приятели.
+  const at = new URLSearchParams(location.search).get("tab");
+  const chosen = signal<Tab | null>(at === "duels" || at === "friends" ? at : null);
+  const opens = signal<Tab | null>(user.peek() ? null : "friends");
+  const tab = () => chosen() ?? opens();
+  const choose = (to: Tab) => {
+    chosen.set(to);
+    rename(`/friends?tab=${to}`);
+  };
   const data = signal<Friends | null>(null);
   const duels = signal<Duels | null>(null);
   const error = signal("");
@@ -126,10 +142,12 @@ function friendsCard(played: () => boolean): Child {
       failed.set(null);
       data.set(f);
       duels.set(d);
+      if (!opens.peek()) opens.set(d.yours.length ? "duels" : "friends");
       if (f.accepted && !yes.peek()) yes.set(acceptedLine(f.accepted));
     } catch (err) {
       // A look again that failed, with the list on the screen, waits for the next one quietly.
       if (!data.peek()) failed.set(err);
+      if (!opens.peek()) opens.set("friends");
     }
   };
   load();
@@ -198,30 +216,41 @@ function friendsCard(played: () => boolean): Child {
   const adder = addFriend(load);
 
   return [
-    friendsList(),
-    // The duels: theirs to play first; a new one a tap away once there are friends to play, or the day is played (a
-    // recording of a real game is there to play without a friend).
-    () => {
-      const d = duels();
-      const any = d && d.yours.length + d.theirs.length + d.played.length > 0;
-      if (!d || (!any && !data()?.friends.length && !played())) return null;
-      return h(
-        "section",
-        { class: "sect duels page-2" },
-        h("div", { class: "sect-head" }, h("h2", null, "Дуели")),
-        h("p", { class: "sect-lead" }, "Едни и същи десет въпроса. Всеки ги играе, когато може."),
-        any ? duelLists(d) : null,
-        h("a", { class: "btn", href: "/duel/new" }, "Нов дуел"),
-        h("p", { class: "small sect-foot" }, "С приятел или срещу запис на истинска игра."),
-      );
-    },
+    segmented<Tab | null>(
+      "Приятели и дуели",
+      [
+        // Someone asks to be friends while the duels are open (a duel waits too): a dot here, or it would go unseen.
+        ["friends", ["Приятели", () => (data()?.requests.in.length ? tabDot("покана за приятелство") : null)]],
+        ["duels", ["Дуели", () => (duels()?.yours.length ? tabDot("твой ред") : null)]],
+      ],
+      tab,
+      (to) => to && choose(to),
+    ),
+    () => (tab() === "duels" ? duelsList() : tab() === "friends" ? friendsList() : null),
   ];
+
+  /** The duels: theirs to play first, and a new one a tap away (with a friend, or against a recording of a real
+   * game: /duel/new says what each needs). */
+  function duelsList(): Child {
+    return h(
+      "section",
+      { class: "sect duels" },
+      h("h2", { class: "sr" }, "Дуели"),
+      h("p", { class: "sect-lead" }, "Едни и същи десет въпроса. Всеки ги играе, когато може."),
+      () => {
+        const d = duels();
+        return d ? duelLists(d) : failed() ? failure(failed(), () => void load(), null) : null;
+      },
+      h("a", { class: "btn", href: "/duel/new" }, "Нов дуел"),
+      h("p", { class: "small sect-foot" }, "С приятел или срещу запис на истинска игра."),
+    );
+  }
 
   function friendsList(): Child {
     return h(
       "section",
-      { class: "sect friends page-1" },
-      // Its heading for a screen reader only: right under the page's own „Приятели“ it would say it twice.
+      { class: "sect friends" },
+      // Its heading for a screen reader only: the tab over it says it.
       h("div", { class: "sect-head friends-head" }, h("h2", { class: "sr" }, "Приятели"), () => {
         const n = data()?.friends.length ?? 0;
         return n

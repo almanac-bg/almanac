@@ -42,10 +42,11 @@ export function verdict(kind: VerdictKind, words = verdictWords[kind]): Child {
   );
 }
 
-/** A segmented switch of a few choices: tabs that switch what a screen shows, or (`radio`) a setting to choose. */
+/** A segmented switch of a few choices: tabs that switch what a screen shows, or (`radio`) a setting to choose. A
+ * choice's words may carry more after them (Приятели's „Дуели“: a dot while one waits, `tabDot`). */
 export function segmented<T>(
   label: string,
-  options: [T, string][],
+  options: [T, Child][],
   now: () => T,
   choose: (v: T) => void,
   small = false,
@@ -68,6 +69,12 @@ export function segmented<T>(
     ),
   );
 }
+
+/** A dot after a tab's word while something waits under it, said in words to a screen reader. */
+export const tabDot = (said: string): Child => [
+  h("span", { class: "tab-dot", "aria-hidden": "true" }),
+  h("span", { class: "sr" }, ` (${said})`),
+];
 
 /** How the game looks on this device (prefs.ts: scheme): as the device is set, or Night or Day whatever it says. Not
  * „Тема“: in the game that's what questions are about. */
