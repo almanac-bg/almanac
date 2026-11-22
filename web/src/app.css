@@ -865,10 +865,11 @@
     font-weight: 800;
   }
 
-  /* Rows on a card, a hairline between them: a player, a friend, an entry of a list. */
+  /* Rows on a card, a hairline between them: a player, a friend, an entry of a list. Its 8px over the first row and
+     under the last are a row's well's inset at the sides too (.rank-row.me). */
   .rows {
     margin: 0;
-    padding: 6px 16px;
+    padding: 8px 16px;
     border-radius: var(--r-3);
     background: var(--surface);
     list-style: none;
@@ -1952,8 +1953,12 @@
     gap: var(--space-3);
     width: 100%;
     min-width: 0;
-    min-height: 3.75rem;
-    padding: 10px 14px;
+    /* The row's height (--row) sets its padding: its letter (32px) as far from its top, bottom and left edge, on
+       every screen and in every state. A row that changes its height changes --row, never min-height or padding. */
+    --row: 3.75rem;
+    --inset: min(calc((var(--row) - 32px) / 2), 22px);
+    min-height: var(--row);
+    padding: calc(var(--inset) - 2px);
     overflow: hidden;
     border: 2px solid var(--line-2);
     border-radius: var(--r-2);
@@ -2198,9 +2203,8 @@
 
   /* The reviewed questions of a finished run sit still, their answers a step under the question, closer set. */
   .reviewed .option {
+    --row: 3rem;
     gap: var(--space-2);
-    min-height: 3rem;
-    padding: 6px 12px;
     font-size: 1rem;
     line-height: 1.375rem;
     animation: none;
@@ -2481,8 +2485,7 @@
   }
 
   .sortable-list > .option {
-    min-height: 3rem;
-    padding-block: 6px;
+    --row: 3rem;
   }
 
   .option.sortable {
@@ -2516,14 +2519,15 @@
     color: var(--bg);
   }
 
-  /* The grip: drawn at 20px, a thumb's room (44px) to take hold of. */
+  /* The grip: drawn at 20px, a thumb's room (44px) to take hold of, at the row's end: as far in from its right edge
+     as the row's number is from its left. */
   .grip {
     flex: none;
     display: grid;
-    place-items: center;
+    place-items: center end;
     width: 44px;
     height: 44px;
-    margin: -12px -12px -12px auto;
+    margin: -12px 0 -12px auto;
     touch-action: none;
     cursor: grab;
   }
@@ -2545,10 +2549,10 @@
   }
 
   .option.tf {
+    --row: 5.5rem;
     flex-flow: row wrap;
     place-content: center;
     gap: var(--space-1) var(--space-2);
-    min-height: 5.5rem;
     padding: var(--space-3);
     font-size: 1.25rem;
     font-weight: 900;
@@ -3055,7 +3059,7 @@
   }
 
   .option.match-item {
-    min-height: 3.25rem;
+    --row: 3.25rem;
     padding: 6px 10px;
     overflow: visible;
     font-size: 1rem;
@@ -4768,7 +4772,7 @@
      as wide as the row beside the seal. */
   .seal-list {
     margin: 0;
-    padding: 2px 16px;
+    padding: 4px 16px;
     border-radius: var(--r-3);
     background: var(--surface);
     list-style: none;
@@ -4778,7 +4782,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 12px 0 14px;
+    padding: 12px 0;
   }
 
   .seal-row + .seal-row {
@@ -5153,7 +5157,7 @@
     --fold: 34px;
     height: 100%;
     gap: 8px;
-    padding: 14px 14px 16px;
+    padding: 14px;
   }
 
   .card-leaf:has(.card-ink) {
@@ -5218,7 +5222,7 @@
     }
 
     .card-leaf {
-      padding: 12px 10px 14px;
+      padding: 12px;
     }
 
     .card-ink .num {
@@ -6729,11 +6733,12 @@
     font: 700 0.8125rem / 1 var(--font-sans);
   }
 
-  /* The player's own row: on a well. */
+  /* The player's own row: on a well, 8px in from the card's sides (and its top or foot, first or last: .rows), its
+     corners the card's drawn 8px in (24 − 8). */
   .rank-row.me {
     margin: 0 -8px;
     padding-inline: 8px;
-    border-radius: 14px;
+    border-radius: var(--r-2);
     background: var(--surface-2);
   }
 
@@ -6912,7 +6917,7 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2) var(--space-3);
-    padding: 12px 14px;
+    padding: 14px;
     border-radius: var(--r-2);
     background: var(--surface);
     box-shadow: inset 0 0 0 2px var(--line);
@@ -7358,14 +7363,14 @@
     }
 
     .playing .option {
-      min-height: 4.5rem;
+      --row: 4.5rem;
       font-size: 1.25rem;
       line-height: 1.75rem;
     }
 
     /* Rows of a list (things put in order, pairs, groups) stay a phone's height: all of them and „Готово“ in sight. */
     .playing :is(.sortable-list, .match, .match-result, .split-result) .option {
-      min-height: 3.5rem;
+      --row: 3.5rem;
       font-size: 1.125rem;
       line-height: 1.5rem;
     }
@@ -7396,8 +7401,7 @@
     /* Rows of a list too (more specific from 48rem, above). */
     .playing .option,
     .playing :is(.sortable-list, .match, .match-result, .split-result) .option {
-      min-height: 3rem;
-      padding-block: 6px;
+      --row: 3rem;
       font-size: 1.0625rem;
       line-height: 1.5rem;
     }
@@ -7527,7 +7531,7 @@
     }
 
     .playing .option {
-      min-height: 4.75rem;
+      --row: 4.75rem;
       font-size: 1.375rem;
     }
 
@@ -7556,7 +7560,7 @@
     }
 
     .playing .option {
-      min-height: 4rem;
+      --row: 4rem;
     }
 
     /* A choice of pictures four across, one row: two rows of them would go below the screen. */
@@ -7566,8 +7570,8 @@
 
     /* Answered, the player's row and the right one a little lower, so the answer under them (a long fact, a day's
        line) shows whole with them. */
-    .run-question.answered .choices > .option:not(.dim) {
-      min-height: 3.25rem;
+    .run-question.answered .choices > .option {
+      --row: 3.25rem;
     }
   }
 
@@ -7584,9 +7588,11 @@
     gap: 6px;
   }
 
+  /* A 36px line: its letter without its well, in the letter's column of the rows above and below (the same inset from
+     the left), so that nothing boxed sits closer to the top than to the side. */
   .run-question.answered .choices > .option.dim {
     min-height: 2.25rem;
-    padding-block: 4px;
+    padding: 4px calc(var(--inset) - 1.5px);
     border-width: 1.5px;
     font-size: 0.9375rem;
     line-height: 1.2;
@@ -7606,9 +7612,8 @@
   }
 
   .run-question.answered .choices > .option.dim .letter {
-    width: 24px;
     height: 24px;
-    border-radius: 7px;
+    background: none;
     font-size: 0.8125rem;
   }
 
@@ -7703,7 +7708,7 @@
     }
 
     .run-question .option {
-      min-height: 3.25rem;
+      --row: 3.25rem;
     }
 
     .run-question .number {
@@ -7727,12 +7732,12 @@
     }
 
     .run-question .option.tf {
-      min-height: 4.5rem;
+      --row: 4.5rem;
     }
 
     /* „Свържи“: its cells 44px, the right column's five and „Готово“ under the question. */
     .run-question .option.match-item {
-      min-height: 2.75rem;
+      --row: 2.75rem;
       padding-block: 3px;
       font-size: 0.9375rem;
       line-height: 1.125rem;
@@ -7770,7 +7775,7 @@
     }
 
     .run-question .option {
-      min-height: 3.25rem;
+      --row: 3.25rem;
       font-size: 1.0625rem;
     }
 
@@ -7848,8 +7853,7 @@
     }
 
     .run-question .sortable-list > .option {
-      min-height: 2.75rem;
-      padding-block: 3px;
+      --row: 2.75rem;
       font-size: 0.9375rem;
       line-height: 1.2;
     }
@@ -7866,7 +7870,7 @@
     }
 
     .run-question .option.match-item {
-      min-height: 2.75rem;
+      --row: 2.75rem;
       padding: 3px 8px;
       font-size: 0.875rem;
       line-height: 1.0625rem;
@@ -7903,8 +7907,7 @@
     }
 
     .playing .choices > .option {
-      min-height: 3rem;
-      padding-block: 6px;
+      --row: 3rem;
     }
   }
 
@@ -8173,7 +8176,9 @@
     gap: var(--space-2);
   }
 
+  /* (Its words, taller than its letter here, set its height; the row keeps its width.) */
   .tight .option {
+    --inset: 14px;
     min-height: 0;
     padding-block: 6px;
     line-height: 1.375rem;
@@ -8201,9 +8206,11 @@
     border-radius: var(--r-1);
   }
 
+  /* Its choices' corners its own drawn 4px in (10 − 4). */
   .tight .segmented button {
     flex: 1 1 auto;
     padding-inline: var(--space-3);
+    border-radius: 6px;
   }
 
   /* Профил's head: what's beside the name goes under it („Настройки“ a row of its own). */
@@ -8314,14 +8321,14 @@
   }
 
   .tight .choices > .option:is(.right, .wrong) {
-    padding-bottom: calc(10px + max(30px, 1.5rem) + var(--space-1));
+    padding-bottom: calc(var(--inset) + max(30px, 1.5rem) + var(--space-1));
   }
 
   .tight .choices > .option:is(.right, .wrong) > .row-end {
     position: absolute;
-    right: 14px;
-    bottom: 10px;
-    left: 14px;
+    right: var(--inset);
+    bottom: var(--inset);
+    left: var(--inset);
     justify-content: flex-end;
   }
 

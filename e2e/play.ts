@@ -482,6 +482,19 @@ export async function cutOrOverlapping(page: Page): Promise<string[]> {
       if (ring && column && (ring.left - 5.5 < column.left - 0.5 || ring.right + 5.5 > column.right + 0.5))
         out.push("the reached seal's ring past its column");
     }
+    // The player's own row on its well, first or last on its card: as far in from the card's top or foot as from its
+    // sides, its corners the card's drawn that far in.
+    for (const row of document.querySelectorAll(".rows > .me:is(:first-child, :last-child)")) {
+      const card = row.parentElement as Element;
+      const [a, b] = [card.getBoundingClientRect(), row.getBoundingClientRect()];
+      const side = b.left - a.left;
+      const ends = [row.matches(":first-child") && b.top - a.top, row.matches(":last-child") && a.bottom - b.bottom];
+      if (Math.abs(a.right - b.right - side) > 1 || ends.some((end) => end !== false && Math.abs(end - side) > 1))
+        out.push(`the player's row not as far in from its card's ends as from its sides: ${say(row)}`);
+      const radius = (e: Element) => Number.parseFloat(getComputedStyle(e).borderTopLeftRadius);
+      if (Math.abs(radius(card) - side - radius(row)) > 1)
+        out.push(`the player's row's corners not its card's drawn ${side}px in: ${say(row)}`);
+    }
     return out;
   });
 }

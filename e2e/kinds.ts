@@ -220,6 +220,26 @@ export async function flaws(page: Page): Promise<string[]> {
         out.push(`on a line of its own: ${name(mark)} in ${name(mark.closest(".option") ?? mark)}`);
     }
 
+    // A row's letter on its well as far from the row's top and foot as from its left edge, wherever the row is one
+    // line no taller than the letter (a taller row centres it). A letter without its well is only a column.
+    for (const letter of document.querySelectorAll(".option:not(.match-item, .pic-option) > .letter")) {
+      const row = letter.parentElement as Element;
+      if (!shown(letter) || getComputedStyle(letter).backgroundColor === "rgba(0, 0, 0, 0)") continue;
+      const [a, b] = [row.getBoundingClientRect(), letter.getBoundingClientRect()];
+      const parts = [...row.children].filter(
+        (e) => e !== letter && shown(e) && getComputedStyle(e).position !== "absolute",
+      );
+      if (
+        parts.some(
+          (e) => e.getBoundingClientRect().height > b.height + 0.5 || e.getBoundingClientRect().top >= b.bottom,
+        )
+      )
+        continue;
+      const side = b.left - a.left;
+      if (Math.abs(b.top - a.top - side) > 1 || Math.abs(a.bottom - b.bottom - side) > 1)
+        out.push(`a letter closer to its row's top or foot than to its side: ${name(row)}`);
+    }
+
     // A punctuation mark never starts a line: it goes with the word before it („революционер?“, never „?“ alone).
     const texts = ".ask, .option, .clue, .split-card.top, .right-said, .match-pair, .split-pair";
     for (const box of document.querySelectorAll(texts)) {
