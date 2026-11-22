@@ -7,7 +7,7 @@ import (
 )
 
 // A duel with a friend over HTTP: started, played as any run, sent (the friend told by a push and a dot in
-// Приятели), played back (the first told the result); only theirs to see and play. Against a recording, too.
+// Приятели), played back (the first told the result); only theirs to see and play.
 func TestADuelOverHTTP(t *testing.T) {
 	s, g, fake, subscribe := pushWorld(t)
 	ana, anaID := g.guest()
@@ -79,7 +79,7 @@ func TestADuelOverHTTP(t *testing.T) {
 	if status, out := guest.call("GET", fmt.Sprintf("/api/duels/%d", id+1000), nil); status != 404 || out["error"] != "duel_gone" {
 		t.Errorf("a duel not there, signed in: %d %v", status, out)
 	}
-	for at, want := range map[string]int{fmt.Sprint(id): 200, fmt.Sprint(id + 1000): 404, "new": 200} {
+	for at, want := range map[string]int{fmt.Sprint(id): 200, fmt.Sprint(id + 1000): 404, "new": 404} {
 		res, err := http.Get(g.url + "/duel/" + at)
 		if err != nil {
 			t.Fatal(err)
@@ -108,11 +108,5 @@ func TestADuelOverHTTP(t *testing.T) {
 	}
 	if status, out := bo.call("POST", fmt.Sprintf("/api/duels/%d/play", id), map[string]any{}); status != 410 {
 		t.Fatalf("played again: %d %v", status, out)
-	}
-
-	// Cy against a recording: Ana's game, or Bo's.
-	status, out = cy.call("POST", "/api/duels", map[string]any{"recording": true})
-	if duel, _ = out["duel"].(map[string]any); status != 200 || duel["recorded"] != true || duel["opponent"] == nil {
-		t.Fatalf("against a recording: %d %v", status, out)
 	}
 }

@@ -10,10 +10,9 @@ import (
 )
 
 // Mastery is how well a player knows a topic: the game's own, never shown (DECISIONS.md, „The direction“: a player
-// sees their ink and their ranks). It shapes their chapter games (topicSlots: aimRight of them right) and their duels,
-// and chooses the recording they play against, the nearest to them (recordingFit). It's worked out from every
-// answer they've given, each weighed by how hard its question is, so that harder questions drawn as a player gets
-// better don't hold them back, and a lucky guess counts for little.
+// sees their ink and their ranks). It shapes their chapter games (topicSlots: aimRight of them right) and their duels.
+// It's worked out from every answer they've given, each weighed by how hard its question is, so that harder questions
+// drawn as a player gets better don't hold them back, and a lucky guess counts for little.
 //
 // The model: in each topic a player has an ability, and each question a hardness, on one scale. A player knows a
 // question with the chance σ(ability − hardness), and gets it right with that chance and, of what's left, the luck of
@@ -266,41 +265,6 @@ func (g *Game) ability(ctx context.Context, db querier, userID int64, category s
 		a = newAbility()
 	}
 	return a.mean, err
-}
-
-// recordingFit is how far a recording (its picks, its right answers) is from a player: lower fits better
-// (recordedRun).
-type recordingFit func(b *bank.Bank, picks []Pick, rights int) (off float64)
-
-// expectedRights is how many of these questions a player of an ability over all topics would get right: each known
-// with the chance σ(ability − hardness), and, of the rest, guessed right as often as a guess of its kind is.
-func expectedRights(b *bank.Bank, h *hardnesses, ability float64, picks []Pick) float64 {
-	sum := 0.0
-	for _, p := range picks {
-		q, ok := b.Get(p.ID)
-		if !ok {
-			continue
-		}
-		luck := rightChance[q.Base().Type]
-		sum += luck + (1-luck)*sigmoid(ability-h.of(q))
-	}
-	return sum
-}
-
-// recordingFit is the fit of a recording to a player, by their hidden ability over all topics: how far its right
-// answers are from what the player would get on its ten.
-func (g *Game) recordingFit(ctx context.Context, userID int64) (recordingFit, error) {
-	h, err := g.hardness(ctx)
-	if err != nil {
-		return nil, err
-	}
-	ability, err := g.ability(ctx, g.DB.Read, userID, "")
-	if err != nil {
-		return nil, err
-	}
-	return func(b *bank.Bank, picks []Pick, rights int) float64 {
-		return math.Abs(float64(rights) - expectedRights(b, h, ability, picks))
-	}, nil
 }
 
 // topicSlots is a topic run's shape for a player's ability there: as many easy, medium and hard questions as make

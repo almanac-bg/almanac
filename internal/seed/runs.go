@@ -210,18 +210,6 @@ func (w *world) friendDuel(p, o *player) error {
 	return w.playDuel(p, id)
 }
 
-// recordingDuel is a duel against a recording of another player's game (play.Game.DuelRecording), if there's one.
-func (w *world) recordingDuel(p *player) error {
-	id, err := w.g.DuelRecording(w.as(p), p.id)
-	if errors.Is(err, play.ErrNobody) || errors.Is(err, play.ErrNoQuestion) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("duel: %w", err)
-	}
-	return w.playDuel(p, id)
-}
-
 // playDuel plays the player's side of a duel to its end.
 func (w *world) playDuel(p *player, id int64) error {
 	run, err := w.g.PlayDuel(w.ctx, p.id, id)

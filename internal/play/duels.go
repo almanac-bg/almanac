@@ -10,7 +10,6 @@ import (
 	"slices"
 	"time"
 
-	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
@@ -20,32 +19,25 @@ import (
 // (duelScore): time never counts (DECISIONS.md, „The direction“). Nothing moves but the record between two people:
 // there's no rating (owner, 2026-11-20, DECISIONS.md „The redesign“).
 //
-// A duel with a friend (DuelFriend): the player picks a friend and plays ten questions drawn for the two of them
-// (drawFor: „Микс“, at their pair's level, questions neither has seen first). Once their side is played, the duel is
-// sent: the friend is told (DuelNews: a push through the server's notifyFrom, and a dot and a row in Приятели)
-// and has DuelFor to play the same ten, as the first player was shown them (their versions: the same ten exactly);
-// past it, the duel lapses, and says so. Whoever plays second sees both at the end; the first sees the result when
-// it comes, told too. Each pair keeps its record („общо 5 на 3“: recordAgainst). A rematch is a new duel the other
-// way round. A player may have DuelsToOne duels open with one friend at once, and start DuelsADay a day.
-//
-// A duel against a recording (DuelRecording): the same ten as a real player's finished game (recordedRun: a real
-// one, played at a person's speed, none of its questions the player has seen first), of one kind (owner, 2026-11-22:
-// a choice between „равен“ and „по-силен“ was one more thing to decide, for little): the game whose right answers are
-// nearest to what the player would get on its ten, by their hidden mastery (mastery.go: expectedRights), played
-// against it as it went: its marks come with the player's run, each as far as the player has come. It's shown by who
-// played it, as anyone is seen anywhere in the game (owner, 2026-11-19): their name and avatar, during the duel and
-// on its card, always labelled a recording, never taken for a person here now. The recorded player is never told who
-// played it.
+// A duel is with a friend (DuelFriend), challenged directly: from their row in Приятели or their profile (owner,
+// 2026-11-22: the duel against a recording of another's game is gone, and „Нов дуел“ with it). The player plays ten
+// questions drawn for the two of them (drawFor: „Микс“, at their pair's level, questions neither has seen first). Once
+// their side is played, the duel is sent: the friend is told (DuelNews: a push through the server's notifyFrom, and a
+// dot and a row in Приятели) and has DuelFor to play the same ten, as the first player was shown them (their versions:
+// the same ten exactly); past it, the duel lapses, and says so. Whoever plays second sees both at the end; the first
+// sees the result when it comes, told too. Each pair keeps its record („общо 5 на 3“: recordAgainst). A rematch is a
+// new duel the other way round. A player may have DuelsToOne duels open with one friend at once, and start DuelsADay
+// a day.
 //
 // A duel has no page of its own but the one it's played on (owner, 2026-11-22): everything about it is on its card
-// in Приятели's „Дуели“ (DuelsOf): the two, the score, how each question went for each side, and, on the day the
+// in Приятели (DuelsOf): the two, the score, how each question went for each side, and, on the day the
 // player's own game ended, its questions gone over (Review).
 //
-// A duel the player started and left unfinished is gone on with when they start one the same way again (with the same
-// friend, or against a recording); one never finished goes at its time, as if never started (SettleDue). One left
-// before its first question showed (a tap, then „Отказ“ or away) isn't a duel yet: it isn't listed, and goes with its
-// run DuelUnbegun after it was made (SettleDue), so that nothing lingers as „Твой ред“ that nobody played. A friend's
-// side left half-way counts as it stood when the time runs out.
+// A duel the player started and left unfinished is gone on with when they start one with the same friend again; one
+// never finished goes at its time, as if never started (SettleDue). One left before its first question showed (a tap,
+// then „Отказ“ or away) isn't a duel yet: it isn't listed, and goes with its run DuelUnbegun after it was made
+// (SettleDue), so that nothing lingers as „Твой ред“ that nobody played. A friend's side left half-way counts as it
+// stood when the time runs out.
 
 const (
 	// DuelFor is how long a friend has to play a duel sent to them, a week from when it was sent (DECISIONS.md, „The
@@ -68,8 +60,6 @@ var (
 	// two apart: one may be the player's in another profile, the other is nobody's.
 	ErrNoDuel   = errors.New("not the player's duel")
 	ErrDuelGone = errors.New("no such duel")
-	// ErrNobody is that there's no recording to play against yet.
-	ErrNobody = errors.New("nobody to play")
 	// ErrDuelsToOne is a duel past DuelsToOne open with one friend; ErrDuelsADay one past DuelsADay today.
 	ErrDuelsToOne = errors.New("too many duels open with this friend")
 	ErrDuelsADay  = errors.New("too many duels today")
@@ -91,12 +81,9 @@ const (
 type DuelView struct {
 	ID    int64  `json:"id"`
 	State string `json:"state"`
-	// Opponent is the other player, or the recorded one it's played against.
+	// Opponent is the other player.
 	Opponent *DuelSide `json:"opponent,omitempty"`
 	You      *DuelSide `json:"you,omitempty"`
-	Recorded bool      `json:"recorded,omitempty"`
-	// Topic is, against a recording of a topic's game, its topic (none: a game over all of them, „Микс“).
-	Topic string `json:"topic,omitempty"`
 	// First says the player played first (sent it).
 	First bool `json:"first,omitempty"`
 	// RunID is the player's run in it, to play or go over: none until they start it.
@@ -110,7 +97,7 @@ type DuelView struct {
 	// TieBy is, of a duel won on even right answers, what broke the tie (duelScore): TieNumber, the number nearer;
 	// "" for a draw, or a duel won on right answers.
 	TieBy string `json:"tieBy,omitempty"`
-	// Record is how the player's duels against this person went, this one with them (not a recording's).
+	// Record is how the player's duels against this person went, this one with them.
 	Record *Record `json:"record,omitempty"`
 
 	against, theirRun int64
@@ -182,14 +169,14 @@ func (g *Game) DuelFriend(ctx context.Context, userID, friendID int64) (int64, e
 			return ErrNotFriends
 		}
 		err := tx.QueryRow(`SELECT d.id FROM duels d JOIN runs r ON r.id = d.a_run
-			WHERE d.kind = 'person' AND d.a_id = ? AND d.b_id = ? AND d.ended_at IS NULL AND r.finished_at IS NULL
+			WHERE d.a_id = ? AND d.b_id = ? AND d.ended_at IS NULL AND r.finished_at IS NULL
 			ORDER BY d.id DESC LIMIT 1`, userID, friendID).Scan(&id)
 		if err == nil || !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
 		var open, today int
 		if err := tx.QueryRow(`SELECT count(*) FILTER (WHERE b_id = ?2 AND ended_at IS NULL), count(*) FILTER (WHERE created_at >= ?3)
-			FROM duels WHERE kind = 'person' AND a_id = ?1`, userID, friendID, store.Ms(g.midnight())).
+			FROM duels WHERE a_id = ?1`, userID, friendID, store.Ms(g.midnight())).
 			Scan(&open, &today); err != nil {
 			return err
 		}
@@ -209,80 +196,8 @@ func (g *Game) DuelFriend(ctx context.Context, userID, friendID int64) (int64, e
 		}
 		data, _ := json.Marshal(picks)
 		now := g.Now()
-		res, err := tx.Exec(`INSERT INTO duels (kind, questions, a_id, a_run, b_id, created_at, expires_at)
-			VALUES ('person', ?, ?, ?, ?, ?, ?)`, string(data), userID, r.id, friendID, store.Ms(now), store.Ms(now.Add(DuelFor)))
-		if err != nil {
-			return err
-		}
-		id, _ = res.LastInsertId()
-		return nil
-	})
-	return id, err
-}
-
-// RecordingReady is whether a duel against a recording can be played now (DuelRecording): one the player left
-// unfinished, or a recording to draw. Nothing is made: the way to one is offered only while there is one (userID 0: a
-// visitor, any recording).
-func (g *Game) RecordingReady(ctx context.Context, userID int64) (bool, error) {
-	seen := map[string]bool{}
-	if err := seenBy(ctx, g.DB.Read, userID, seen); err != nil {
-		return false, err
-	}
-	// The days drawn, as a recording is judged by them (recordedRun): drawn once a day, so that this only reads.
-	if err := g.EnsureDays(ctx); err != nil {
-		return false, err
-	}
-	var ready bool
-	err := g.read(ctx, func(tx *sql.Tx) error {
-		if err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM duels d JOIN runs r ON r.id = d.a_run
-			WHERE d.kind = 'recording' AND d.a_id = ? AND d.ended_at IS NULL AND r.finished_at IS NULL)`, userID).
-			Scan(&ready); err != nil || ready {
-			return err
-		}
-		rec, err := g.recordedRun(tx, userID, seen, nil)
-		ready = rec != nil
-		return err
-	})
-	return ready, err
-}
-
-// DuelRecording starts a duel against a recording: another player's finished game, the one with the fewest questions
-// the player has seen that is nearest to them (recordedRun, recordingFit: about as many right as they'd get on its
-// ten, by their hidden mastery), and the player's run of its ten. One the player started and left unfinished is gone
-// on with instead. ErrNobody if there's none yet. It says the duel's id.
-func (g *Game) DuelRecording(ctx context.Context, userID int64) (int64, error) {
-	seen := map[string]bool{}
-	if err := seenBy(ctx, g.DB.Read, userID, seen); err != nil {
-		return 0, err
-	}
-	fit, err := g.recordingFit(ctx, userID)
-	if err != nil {
-		return 0, err
-	}
-	var id int64
-	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		err := tx.QueryRow(`SELECT d.id FROM duels d JOIN runs r ON r.id = d.a_run
-			WHERE d.kind = 'recording' AND d.a_id = ? AND d.ended_at IS NULL AND r.finished_at IS NULL
-			ORDER BY d.id DESC LIMIT 1`, userID).Scan(&id)
-		if err == nil || !errors.Is(err, sql.ErrNoRows) {
-			return err
-		}
-		rec, err := g.recordedRun(tx, userID, seen, fit)
-		if err != nil {
-			return err
-		}
-		if rec == nil {
-			return ErrNobody
-		}
-		r, err := g.insertRun(ctx, tx, userID, "duel", nil, nil, rec.picks)
-		if err != nil {
-			return err
-		}
-		data, _ := json.Marshal(rec.picks)
-		now := g.Now()
-		res, err := tx.Exec(`INSERT INTO duels (kind, questions, a_id, a_run, recording_run, created_at, expires_at)
-			VALUES ('recording', ?, ?, ?, ?, ?, ?)`, string(data), userID, r.id, rec.id,
-			store.Ms(now), store.Ms(now.Add(DuelFor)))
+		res, err := tx.Exec(`INSERT INTO duels (questions, a_id, a_run, b_id, created_at, expires_at)
+			VALUES (?, ?, ?, ?, ?, ?)`, string(data), userID, r.id, friendID, store.Ms(now), store.Ms(now.Add(DuelFor)))
 		if err != nil {
 			return err
 		}
@@ -414,145 +329,21 @@ func (g *Game) seenAmong(ctx context.Context, players []int64) (map[string]int, 
 	return stale, nil
 }
 
-type recorded struct {
-	id    int64
-	picks []Pick
-	// topic is the one topic the recorded game was in (a topic's game), "" for all of them (a duel's, „Микс“).
-	topic string
-}
-
-// RecordingRights is how many right answers make a game worth playing against, RecordingMissed how many not answered
-// at most (one left halfway, the tab closed, isn't a game), and RecordingSeen how many of its questions the player may
-// have seen before it counts as mostly seen.
-const (
-	RecordingRights = 3
-	RecordingMissed = 2
-	RecordingSeen   = 3
-)
-
-// recordedRun is another player's finished run of ten questions, every one answered or let run out (none still played
-// in a duel), all still in play as it played them (asPlayed: none retired, none changed since), none of today's and
-// none due for review (dayBars.now; a day's run never), played at a person's speed (not marked a script's: fair.go),
-// to play against: a real game (RecordingRights right or more, RecordingMissed not answered at most), the one with the
-// fewest questions the player has seen (seen, read before the write) or a day ahead holds (ahead.go: a game played
-// before those days were drawn may have them), the latest first. Short of a real game, any game. At each of these, a
-// game over all the topics (a duel's, „Микс“) comes before one in a single topic, which the duel's player didn't
-// choose. Above all of it, a game with more than RecordingSeen of its questions seen by the player comes after every
-// game with more than RecordingSeen of its questions seen by the player comes after every game with fewer: the same ten
-// again (a duel the player has just played, then the other's game in it as a recording) is no duel. Of those as few
-// seen, the one nearest to the player (fit, if given: the lower the better). Nil if there's none.
-func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool, fit recordingFit) (*recorded, error) {
-	days, err := g.days(tx)
-	if err != nil {
-		return nil, err
-	}
-	// A script's game is left out before the limit, so that a script's many games can't push the people's out of it.
-	rows, err := tx.Query(`SELECT r.id, r.questions, r.rights, r.finished_at,
-			CASE WHEN r.kind = 'topic' AND r.category <> ?3 THEN r.category ELSE '' END,
-			(SELECT count(*) FROM answers a WHERE a.run_id = r.id AND a.given IS NULL)
-		FROM runs r
-		WHERE r.kind IN ('topic', 'duel') AND r.finished_at IS NOT NULL AND NOT r.shadow AND r.user_id <> ?1
-			AND json_array_length(r.questions) = ?2 AND r.at = ?2
-			AND NOT EXISTS (SELECT 1 FROM duels d WHERE d.ended_at IS NULL
-				AND (d.a_run = r.id OR d.b_run = r.id))
-		ORDER BY r.finished_at DESC LIMIT 200`, userID, Length, MixTopic)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	b := g.Bank()
-	// The best of each kind: real (0, 1), any (2, 3), each over all the topics first, then in one; each the fewest
-	// seen, the latest first. Those with more than RecordingSeen seen: the same four after all of them (4–7).
-	var best [8]*recorded
-	var fewest [8]int
-	var fits [8]float64
-	for i := range fewest {
-		fewest[i] = Length + 1
-	}
-	for rows.Next() {
-		var id, finished int64
-		var raw string
-		var rights, missed int
-		var topic string
-		if err := rows.Scan(&id, &raw, &rights, &finished, &topic, &missed); err != nil {
-			return nil, err
-		}
-		var picks []Pick
-		if json.Unmarshal([]byte(raw), &picks) != nil {
-			continue
-		}
-		n, whole := 0, true
-		for _, p := range picks {
-			if !asPlayed(b, p, finished) || days.now[p.ID] {
-				whole = false
-			}
-			if seen[p.ID] || days.all[p.ID] {
-				n++
-			}
-		}
-		if !whole {
-			continue
-		}
-		kind := 0
-		if topic != "" {
-			kind = 1 // a single topic's game: after the games over all of them
-		}
-		if n > RecordingSeen {
-			kind += 4 // mostly seen: after every game the player hasn't
-		}
-		real := rights >= RecordingRights && missed <= RecordingMissed
-		off := 0.0
-		if fit != nil {
-			off = fit(b, picks, rights)
-		}
-		for level, ok := range [2]bool{real, true} {
-			if k := 2*level + kind; ok && (n < fewest[k] || n == fewest[k] && off < fits[k]) {
-				best[k], fewest[k], fits[k] = &recorded{id: id, picks: picks, topic: topic}, n, off
-			}
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	for _, r := range best {
-		if r != nil {
-			return r, nil
-		}
-	}
-	return nil, nil
-}
-
-// asPlayed says whether a finished run's question is still in play as the run played it (by finished, ms): not
-// retired, and the version it showed (one from before versions were kept: not changed since). A recording replays
-// its answers against it, and a run's answers to another version say nothing of this one.
-func asPlayed(b *bank.Bank, p Pick, finished int64) bool {
-	q, ok := b.Get(p.ID)
-	switch {
-	case !ok || q.Extra().Retired:
-		return false
-	case p.V != "":
-		return bank.Version(q) == p.V
-	}
-	return changedMs(q) <= finished
-}
-
 // settleRun does what a just-finished run's duel needs: the first side of a friend's duel played, it's sent (the
-// friend's time runs from now, and they're told); the second (or the player's, against a recording), the duel's
-// result.
+// friend's time runs from now, and they're told); the second, the duel's result.
 func (g *Game) settleRun(ctx context.Context, runID int64) error {
 	var duelID int64
-	var kind string
 	var first, sent bool
 	var a, b sql.NullInt64
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT id, kind, a_run = ?1, sent_at IS NOT NULL, a_id, b_id FROM duels
-		WHERE (a_run = ?1 OR b_run = ?1) AND ended_at IS NULL`, runID).Scan(&duelID, &kind, &first, &sent, &a, &b)
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT id, a_run = ?1, sent_at IS NOT NULL, a_id, b_id FROM duels
+		WHERE (a_run = ?1 OR b_run = ?1) AND ended_at IS NULL`, runID).Scan(&duelID, &first, &sent, &a, &b)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	if kind == "recording" || !first {
+	if !first {
 		return g.settleDuel(ctx, duelID, runID)
 	}
 	if sent || !b.Valid {
@@ -577,8 +368,7 @@ func (g *Game) duelNews(ctx context.Context, n DuelNews) {
 	}
 }
 
-// settleDuel ends a duel both sides of which are played (against a recording, the player's), with its result
-// (duelScore). A duel ended already (both sides
+// settleDuel ends a duel both sides of which are played, with its result (duelScore). A duel ended already (both sides
 // finished at once, and the other settled it) is left as it is. finished is the run that has just ended it, whose own
 // follow-up this is (after.go); the other side's is due again, with the result.
 func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
@@ -588,7 +378,6 @@ func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 		done, present bool
 	}
 	var a, b side
-	var kind string
 	settled := false
 	var followed []side
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
@@ -596,13 +385,13 @@ func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 		var bID, bRun sql.NullInt64
 		var bRights, bClose sql.NullInt64
 		var bDone sql.NullBool
-		err := tx.QueryRow(`SELECT d.kind, d.a_id, ra.id, ra.rights, ra.closeness,
+		err := tx.QueryRow(`SELECT d.a_id, ra.id, ra.rights, ra.closeness,
 				ra.finished_at IS NOT NULL,
 				rb.user_id, rb.id, rb.rights, rb.closeness, rb.finished_at IS NOT NULL
 			FROM duels d JOIN users ua ON ua.id = d.a_id JOIN runs ra ON ra.id = d.a_run
-			LEFT JOIN runs rb ON rb.id = CASE d.kind WHEN 'recording' THEN d.recording_run ELSE d.b_run END
+			LEFT JOIN runs rb ON rb.id = d.b_run
 			WHERE d.id = ? AND d.ended_at IS NULL`, duelID).
-			Scan(&kind, &a.id, &a.run, &a.score.rights, &a.score.tie.closeness,
+			Scan(&a.id, &a.run, &a.score.rights, &a.score.tie.closeness,
 				&a.done, &bID, &bRun, &bRights, &bClose, &bDone)
 		if errors.Is(err, sql.ErrNoRows) {
 			settled = true // the other side's last answer settled it a moment ago: it's done
@@ -617,7 +406,6 @@ func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 			settled = true // not played to its end yet: nothing to settle
 			return nil
 		}
-		recording := kind == "recording"
 		score := 0.5
 		switch a.score.against(b.score) {
 		case -1:
@@ -626,10 +414,7 @@ func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 			score = 0
 		}
 		// The result is the duel's (duels.outcome): a run keeps nothing of whom it was against.
-		followed = append(followed, a)
-		if !recording {
-			followed = append(followed, b)
-		}
+		followed = append(followed, a, b)
 		for _, s := range followed {
 			if s.run != finished {
 				if err := g.afterDue(tx, s.run); err != nil {
@@ -654,9 +439,7 @@ func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 			slog.Error("after a duel", "duel", duelID, "run", s.run, "err", err)
 		}
 	}
-	if kind == "person" {
-		g.duelNews(ctx, DuelNews{DuelID: duelID, From: b.id, To: a.id, Played: true})
-	}
+	g.duelNews(ctx, DuelNews{DuelID: duelID, From: b.id, To: a.id, Played: true})
 	return nil
 }
 
@@ -668,23 +451,20 @@ func (g *Game) SettleDue(ctx context.Context) error {
 	if err := g.dropUnbegun(ctx); err != nil {
 		return err
 	}
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, d.kind, d.sent_at IS NOT NULL, coalesce(d.b_run, 0),
-			coalesce((SELECT finished_at IS NOT NULL FROM runs WHERE id = d.a_run), 0)
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, d.sent_at IS NOT NULL, coalesce(d.b_run, 0)
 		FROM duels d WHERE d.ended_at IS NULL AND d.expires_at <= ?`, store.Ms(g.Now()))
 	if err != nil {
 		return err
 	}
 	type due struct {
-		id         int64
-		kind       string
-		sent       bool
-		bRun       int64
-		firstPlays bool
+		id   int64
+		sent bool
+		bRun int64
 	}
 	var list []due
 	for rows.Next() {
 		var d due
-		if err := rows.Scan(&d.id, &d.kind, &d.sent, &d.bRun, &d.firstPlays); err != nil {
+		if err := rows.Scan(&d.id, &d.sent, &d.bRun); err != nil {
 			rows.Close()
 			return err
 		}
@@ -696,9 +476,9 @@ func (g *Game) SettleDue(ctx context.Context) error {
 	}
 	for _, d := range list {
 		switch {
-		case d.kind == "recording" && d.firstPlays, d.kind == "person" && d.bRun != 0:
+		case d.bRun != 0:
 			err = g.endDue(ctx, d.id, d.bRun)
-		case d.kind == "person" && d.sent:
+		case d.sent:
 			_, err = g.DB.Write.ExecContext(ctx, `UPDATE duels SET ended_at = ?, outcome = 'expired' WHERE id = ?
 				AND ended_at IS NULL`, store.Ms(g.Now()), d.id)
 		default:
@@ -810,7 +590,7 @@ func (g *Game) DuelsOf(ctx context.Context, userID int64) (Duels, error) {
 		return out, err
 	}
 	for _, v := range list {
-		if r, ok := records[v.against]; ok && !v.Recorded && v.against != 0 {
+		if r, ok := records[v.against]; ok && v.against != 0 {
 			v.Record = &r
 		}
 		switch v.State {
@@ -836,23 +616,21 @@ func (g *Game) DuelsOf(ctx context.Context, userID int64) (Duels, error) {
 // duelsOf are the player's duels (or only that one), as they see them: the open ones first (the oldest first: the
 // first to lapse), then those ended, the latest first. A friend's duel shows to the one it's sent to once it's sent.
 func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, d.kind, d.mine, d.created_at, coalesce(d.ended_at, 0),
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, d.mine, d.created_at, coalesce(d.ended_at, 0),
 			d.expires_at, d.sent_at IS NOT NULL, coalesce(d.outcome, ''),
 			coalesce(CASE WHEN d.mine THEN d.a_run ELSE d.b_run END, 0),
-			coalesce(CASE WHEN NOT d.mine THEN d.a_run WHEN d.kind = 'recording' THEN d.recording_run ELSE d.b_run END, 0),
-			coalesce(CASE WHEN NOT d.mine THEN d.a_id WHEN d.kind = 'recording'
-				THEN (SELECT user_id FROM runs WHERE id = d.recording_run) ELSE d.b_id END, 0),
-			coalesce((SELECT category FROM runs WHERE id = d.recording_run AND kind = 'topic' AND category <> ?3), '')
+			coalesce(CASE WHEN d.mine THEN d.b_run ELSE d.a_run END, 0),
+			coalesce(CASE WHEN d.mine THEN d.b_id ELSE d.a_id END, 0)
 		FROM (SELECT *, coalesce(a_id = ?1, 0) AS mine FROM duels
 			WHERE (a_id = ?1 OR (b_id = ?1 AND sent_at IS NOT NULL)) AND (?2 = 0 OR id = ?2)) d
 		ORDER BY d.ended_at IS NOT NULL, CASE WHEN d.ended_at IS NULL THEN d.expires_at ELSE -d.ended_at END
-		LIMIT 200`, userID, only, MixTopic)
+		LIMIT 200`, userID, only)
 	if err != nil {
 		return nil, err
 	}
 	type row struct {
 		v                       DuelView
-		kind, outcome           string
+		outcome                 string
 		sent                    bool
 		myRun, theirRun, theirs int64
 		expires                 int64
@@ -860,8 +638,8 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 	var list []row
 	for rows.Next() {
 		var r row
-		if err := rows.Scan(&r.v.ID, &r.kind, &r.v.First, &r.v.CreatedAt, &r.v.EndedAt, &r.expires, &r.sent,
-			&r.outcome, &r.myRun, &r.theirRun, &r.theirs, &r.v.Topic); err != nil {
+		if err := rows.Scan(&r.v.ID, &r.v.First, &r.v.CreatedAt, &r.v.EndedAt, &r.expires, &r.sent,
+			&r.outcome, &r.myRun, &r.theirRun, &r.theirs); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -874,7 +652,6 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 	out := make([]DuelView, 0, len(list))
 	for _, r := range list {
 		v := r.v
-		v.Recorded = r.kind == "recording"
 		v.RunID, v.against, v.theirRun = r.myRun, r.theirs, r.theirRun
 		var err error
 		if v.You, err = g.duelSide(ctx, userID, r.myRun); err != nil {
@@ -886,7 +663,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 			}
 		}
 		if v.Opponent == nil {
-			// Every duel has another side (a player, or a recording's): none is one who's gone.
+			// Every duel has another side: none is one who's gone.
 			v.Opponent = &DuelSide{Name: GoneName, Done: true, Gone: true}
 		}
 		mine := v.First
@@ -909,7 +686,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 			v.State = DuelLost
 		default:
 			v.State = DuelExpired
-			if r.kind == "person" && r.sent {
+			if r.sent {
 				// Lapsed: the friend never played it (or it's from before, cut off live: both had played some).
 				switch {
 				case mine && r.theirRun == 0:
@@ -984,7 +761,7 @@ func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, erro
 	if err := g.duelMore(ctx, &v); err != nil {
 		return v, err
 	}
-	if !v.Recorded && v.against != 0 {
+	if v.against != 0 {
 		r, err := g.recordAgainst(ctx, userID, v.against)
 		if err != nil {
 			return v, err
@@ -1040,8 +817,7 @@ func (g *Game) duelMarks(ctx context.Context, runID int64) ([]DuelMark, error) {
 func duelAgainst(tx *sql.Tx, runID int64, at int) ([]DuelMark, error) {
 	var other int64
 	err := tx.QueryRow(`SELECT o.id FROM duels d
-		JOIN runs o ON o.id = CASE WHEN d.a_run = ?1 THEN CASE WHEN d.kind = 'recording' THEN d.recording_run ELSE d.b_run END
-			ELSE d.a_run END
+		JOIN runs o ON o.id = CASE WHEN d.a_run = ?1 THEN d.b_run ELSE d.a_run END
 		WHERE (d.a_run = ?1 OR d.b_run = ?1) AND o.finished_at IS NOT NULL`, runID).Scan(&other)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -1097,14 +873,14 @@ func (s duelScore) tieBy(o duelScore) string {
 }
 
 // duelResults is, in a query whose ?1 is a player, every duel they've played to a result, one row each: the other
-// (a person; null against a recording, or one gone since), how it went for the player (won, lost, draw) and when it
+// (null: one gone since), how it went for the player (won, lost, draw) and when it
 // ended.
-const duelResults = `(SELECT d.id, CASE d.kind WHEN 'person' THEN d.b_id END AS other,
+const duelResults = `(SELECT d.id, d.b_id AS other,
 		CASE d.outcome WHEN 'a' THEN 'won' WHEN 'b' THEN 'lost' ELSE 'draw' END AS outcome, d.ended_at
 	FROM duels d WHERE d.a_id = ?1 AND d.outcome IN ('a', 'b', 'draw')
 	UNION ALL
 	SELECT d.id, d.a_id, CASE d.outcome WHEN 'b' THEN 'won' WHEN 'a' THEN 'lost' ELSE 'draw' END, d.ended_at
-	FROM duels d WHERE d.b_id = ?1 AND d.kind = 'person' AND d.outcome IN ('a', 'b', 'draw'))`
+	FROM duels d WHERE d.b_id = ?1 AND d.outcome IN ('a', 'b', 'draw'))`
 
 // recordAgainst is how a player's duels against another went: won, lost, drawn.
 func (g *Game) recordAgainst(ctx context.Context, userID, other int64) (Record, error) {

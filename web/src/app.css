@@ -3552,20 +3552,8 @@
     inset: -2px 0;
   }
 
-  /* A tab's dot while something waits under it (Приятели's „Дуели“: a duel to play): after the word, which stays in
-     the tab's middle. */
-  .tab-dot {
-    display: inline-block;
-    width: 7px;
-    height: 7px;
-    margin: 0 -13px 0 6px;
-    border-radius: var(--radius-full);
-    background: var(--ink);
-    vertical-align: 0.45em;
-  }
-
-  /* Duels as cards (Приятели's „Дуели“, screens/duelcards.ts), each all there is of its duel, told from a friend's
-     row at a glance: its kind at the top, the two face to face, how it stands between them, the duel question by
+  /* Duels as cards (Приятели, screens/duelcards.ts), each all there is of its duel, told from a friend's
+     row at a glance: the two face to face, how it stands between them, the duel question by
      question, and what it leads to. One to play is a link to its game, the whole of it; one whose game the player has
      played is a button to its questions, the whole of it; any other is neither. One a row, on a phone and a big
      screen alike. */
@@ -3575,13 +3563,6 @@
     margin: 0;
     padding: 0;
     list-style: none;
-  }
-
-  /* The duel just played, the open ones („Чакащи“), the played: each group well apart from the next. */
-  .duel-groups {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-5);
   }
 
   .duel-card {
@@ -3661,14 +3642,6 @@
     gap: var(--space-3);
     padding: var(--space-4);
     box-shadow: inset 0 0 0 3px var(--ink);
-  }
-
-  .duel-card-kind {
-    color: var(--ink-3);
-    font: 800 0.75rem / 1.2 var(--font-sans);
-    letter-spacing: 0.12em;
-    text-align: center;
-    text-transform: uppercase;
   }
 
   /* The two sides of one width, whatever their names: what stands between them is in the card's middle. */
@@ -3992,68 +3965,6 @@
       text-decoration: underline;
       text-underline-offset: 3px;
     }
-  }
-
-  /* A friend to start a duel with (/duel/new): a row, the whole of it a button (never a way to a profile: under a
-     pointer the row lights by its line, and no name is underlined): the avatar, the name with the duels between the
-     two under it, „Дуел“ at its end. */
-  .duel-picks {
-    display: grid;
-    gap: var(--space-2);
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .duel-pick {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    width: 100%;
-    min-height: 3.75rem;
-    padding: var(--space-3) var(--space-4);
-    border: 0;
-    border-radius: var(--r-2);
-    background: var(--surface);
-    color: var(--ink);
-    font: inherit;
-    text-align: start;
-    cursor: pointer;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .duel-pick:hover:not(:disabled) {
-      box-shadow: inset 0 0 0 2px var(--line-2);
-    }
-  }
-
-  .duel-pick > .avatar {
-    flex: none;
-  }
-
-  /* The name, whole, and the duels between the two under it: they have the row but for the avatar. */
-  .duel-pick-text {
-    display: grid;
-    flex: 1 1 40%;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  /* As heavy as a friend's name in Приятели (.friend-name). */
-  .duel-pick-name {
-    font-weight: 800;
-    overflow-wrap: break-word;
-  }
-
-  .duel-pick-record {
-    color: var(--ink-3);
-    font: var(--t-fine);
-  }
-
-  .duel-pick-record b {
-    color: var(--ink);
-    font-weight: 800;
-    font-variant-numeric: tabular-nums;
   }
 
   /* ---- Results ---- */
@@ -4499,7 +4410,7 @@
   }
 
   /* What's around a seal on a card: the card's surface; on the player's own row, its well. */
-  :is(.card, .rows, .invitation, .duel-card, .duel-pick) {
+  :is(.card, .rows, .invitation, .duel-card) {
     --ring: var(--surface);
   }
 
@@ -6827,19 +6738,6 @@
     margin-top: var(--space-3);
   }
 
-  .friends-page {
-    gap: var(--space-4);
-  }
-
-  .sect-lead {
-    color: var(--ink-2);
-    font: var(--t-note);
-  }
-
-  .sect-foot {
-    text-align: center;
-  }
-
   .board-note {
     color: var(--ink-3);
     font: var(--t-note);
@@ -6850,11 +6748,6 @@
     padding: var(--space-2) 0;
     color: var(--ink-2);
     font: 600 1rem / 1.45 var(--font-sans);
-  }
-
-  /* The friends' head: its heading for a screen reader only (the page's own says it), „Премахни приятел“ at the right. */
-  .friends-head {
-    justify-content: flex-end;
   }
 
   /* A friend's way to a duel (or „Премахни“), at the row's end. */
@@ -8139,21 +8032,12 @@
     text-align: left;
   }
 
-  .tight :is(.duel-card-kind, .duel-card-note) {
+  .tight .duel-card-note {
     text-align: left;
   }
 
   .tight .duel-card-marks {
     justify-content: start;
-  }
-
-  /* A friend to pick for a duel: „Дуел“ under the name, whose words stay whole. */
-  .tight .duel-pick {
-    flex-wrap: wrap;
-  }
-
-  .tight .duel-pick-text {
-    flex-basis: 60%;
   }
 
   /* Tomorrow: its date over its words, which have the column's width; the issue's name and its number a line each,

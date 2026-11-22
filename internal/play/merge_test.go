@@ -204,8 +204,7 @@ func TestForgetKeepsOthersHistory(t *testing.T) {
 }
 
 // One who goes (deletes their account) takes the duels not over yet that they're in: a friend's sent to them, theirs
-// waiting for a friend, one against a recording of their game. Nothing of those is played by both; the other's game
-// stays theirs, a game like any other.
+// waiting for a friend. Nothing of those is played by both; the other's game stays theirs, a game like any other.
 func TestGoneMidDuel(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -246,19 +245,6 @@ func TestGoneMidDuel(t *testing.T) {
 		t.Fatal("the duel of one gone is still there")
 	}
 
-	// The player of the recording Ed plays goes.
-	gus, ed := w.user(), w.user()
-	s, _ := w.g.startTopic(ctx, gus, MixTopic)
-	w.play(gus, s.ID, append(repeat(w.right, 6), repeat(w.wrong, Length-6)...)...) // a newcomer's even: Ed's to play
-	rec, err := w.g.DuelRecording(ctx, ed)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.playSide(ed, rec, repeat(w.wrong, 4))
-	gone(gus)
-	if there(rec) {
-		t.Fatal("the duel against a recording of one gone is still there")
-	}
 }
 
 // holding are the table.column where some row holds s.

@@ -34,7 +34,7 @@ var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/almanac/[a-z]+$`),
 	regexp.MustCompile(`^/(me|friends|settings|almanac)$`),
 	regexp.MustCompile(`^/signin$`),
-	regexp.MustCompile(`^/duel/([0-9]{1,12}|new)$`),
+	regexp.MustCompile(`^/duel/[0-9]{1,12}$`),
 	regexp.MustCompile(`^/players/[A-Za-z0-9_.]{3,20}$`),
 	sharePath, // a shared day (share.go)
 }
@@ -264,7 +264,7 @@ func (s *Server) there(r *http.Request) bool {
 	case strings.HasPrefix(p, "/almanac/"):
 		// A chapter of the book: one of the bank's topics.
 		return s.game.IsTopic(strings.TrimPrefix(p, "/almanac/"))
-	case strings.HasPrefix(p, "/duel/") && p != "/duel/new":
+	case strings.HasPrefix(p, "/duel/"):
 		id, _ := strconv.ParseInt(strings.TrimPrefix(p, "/duel/"), 10, 64)
 		yes, err = s.game.DuelExists(ctx, id)
 	case strings.HasPrefix(p, "/players/"):

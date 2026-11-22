@@ -202,7 +202,7 @@ func (w *world) dayGame(user int64, pace func(int) time.Duration, answers ...fun
 	return s.ID
 }
 
-// Recordings and the questions' calibration are people's too.
+// The questions' calibration is people's too.
 func TestScriptedOutOfStatistics(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -211,14 +211,6 @@ func TestScriptedOutOfStatistics(t *testing.T) {
 		w.game(ana, nil, repeat(w.wrong, Length)...)
 		w.game(bot, scriptPace)
 	}
-	// A recording: Ana's, never the script's (the latest, all right).
-	duel, err := w.g.DuelRecording(ctx, w.user())
-	var recording int64
-	_ = w.db.Read.QueryRow(`SELECT recording_run FROM duels WHERE id = ?`, duel).Scan(&recording)
-	if err != nil || w.scripted(recording) {
-		t.Fatalf("a recording of a script's game: %d %v", recording, err)
-	}
-
 	// Calibration counts CalibrateFrom answers of people.
 	id := w.b.Live("", "choice")[0].Base().ID
 	for i := range CalibrateFrom {
