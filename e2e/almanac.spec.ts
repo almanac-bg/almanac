@@ -170,6 +170,35 @@ test("a chapter's entries: the latest first, each with its dateline; a statement
     .toBe("Невярно: Дунав се влива в Черно море на българска земя.");
 });
 
+test("a chapter opened at facts shows them marked for a moment, and its address is the chapter's own", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 700 });
+  await page.goto("/");
+  const day = 24 * 3600 * 1000;
+  // The day's two, in ink, under a chapter's game played since (grey): they're down the page.
+  await knows(page, ["his-002", "his-960"], Date.now() - day, true);
+  await knows(
+    page,
+    sampleFacts("history").filter((id) => id !== "his-002" && id !== "his-960"),
+  );
+  await page.goto("/almanac/history?fact=his-002&fact=his-960");
+  const lit = page.locator(".entry.lit");
+  await expect(lit).toHaveCount(2);
+  expect(await lit.evaluateAll((all) => all.map((e) => (e as HTMLElement).dataset.fact).sort())).toEqual([
+    "his-002",
+    "his-960",
+  ]);
+  // The first of them in sight, though it's far down the chapter; the tint is the chapter's colour, fading.
+  await expect(lit.first()).toBeInViewport();
+  expect(await lit.first().evaluate((e) => getComputedStyle(e, "::after").animationName)).toBe("lit");
+  // Read once: the address is the chapter's own, so a reload, or coming back, marks nothing.
+  await expect(page).toHaveURL(/\/almanac\/history$/);
+  await page.reload();
+  await expect(page.locator(".entry").first()).toBeVisible();
+  await expect(page.locator(".entry.lit")).toHaveCount(0);
+});
+
 test("a picture question's entry shows its picture, credited; a choice of pictures shows its answer's", async ({
   page,
 }) => {

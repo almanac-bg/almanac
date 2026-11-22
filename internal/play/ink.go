@@ -182,10 +182,12 @@ func countIn(by map[string]int, q bank.Question) {
 	by[q.Base().Category]++
 }
 
-// ChapterInk is the ink a game wrote in one chapter of the book: in the news, the chapter's glyph and its „+2“.
+// ChapterInk is the ink a game wrote in one chapter of the book: in the news, the chapter's glyph and its „+2“, a tap
+// from those facts in the chapter (Facts: their questions' ids, in the order the game asked them).
 type ChapterInk struct {
-	Chapter string `json:"chapter"`
-	Ink     int    `json:"ink"`
+	Chapter string   `json:"chapter"`
+	Ink     int      `json:"ink"`
+	Facts   []string `json:"facts"`
 }
 
 // InkIn is the facts a game (runID) wrote in a player's book in ink, by chapter, in the order the game asked them (a
@@ -223,6 +225,7 @@ func (g *Game) InkIn(ctx context.Context, userID, runID int64) (ink []ChapterInk
 				ink = append(ink, ChapterInk{Chapter: c})
 			}
 			ink[i].Ink++
+			ink[i].Facts = append(ink[i].Facts, id)
 		case !inked && before:
 			metBefore++
 		}

@@ -180,6 +180,7 @@ export function tiles(
   topicsOf: string[],
   total = 10,
   label = "Как мина денят",
+  open?: (n: number) => void,
 ): HTMLElement {
   return h(
     "ol",
@@ -187,10 +188,14 @@ export function tiles(
     Array.from({ length: total }, (_, i) => {
       const topic = topicsOf[i] ?? "mix";
       const state = tileOf(marks[i]);
+      const says = `${i + 1}. ${chapterName(topic)}: ${tileWords[state]}`;
+      // A way to its question gone over (a result's): the whole tile a button, which says what the tile does.
+      const tap = open && marks[i];
       return h(
         "li",
-        { class: `tile ${state} t-${topic}`, "aria-label": `${i + 1}. ${chapterName(topic)}: ${tileWords[state]}` },
+        { class: `tile ${state} t-${topic}`, "aria-label": tap ? undefined : says },
         h("span", { class: "tile-pic" }, picture(`topic-${topic}`)),
+        tap ? h("button", { class: "tile-tap", type: "button", "aria-label": says, onclick: () => open(i) }) : null,
       );
     }),
   );

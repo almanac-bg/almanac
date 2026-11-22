@@ -1,8 +1,8 @@
 // Duels on one's own time (play/duels.go): a friend's, played first and sent, played back when the friend can, its
-// end on its card in Приятели's „Дуели“ (there is no page of a duel's result), with its questions on a sheet and a
-// rematch; and one against a recording of a real game.
+// end on its card in Приятели's „Дуели“ (there is no page of a duel's result), with its questions in their dialog, on
+// any day; and one against a recording of a real game.
 import { expect, type Page, test } from "@playwright/test";
-import { answer, befriend, meetAs, moveOn, playedFair, playRun } from "./play.ts";
+import { answer, befriend, endedBefore, meetAs, moveOn, playedFair, playRun } from "./play.ts";
 
 /** A game opened by a tap: its count, cut short. */
 async function countIn(page: Page): Promise<void> {
@@ -25,7 +25,7 @@ async function playSecond(page: Page, other: string): Promise<void> {
   }
 }
 
-test("a duel with a friend: played first and sent, played back when they can, its card, a rematch", async ({
+test("a duel with a friend: played first and sent, played back when they can, its card, its questions days later", async ({
   browser,
 }) => {
   test.setTimeout(300_000);
@@ -110,19 +110,17 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await expect(result.locator(".duel-card-row")).toHaveCount(2);
   await expect(result.locator(".mini > i")).toHaveCount(20);
   await expect(b.locator(".duel-card")).toHaveCount(1);
-  // Played today: „Въпросите“ opens the ten on a sheet, each with how it went for the two side by side, its answers
-  // and its fact a tap away.
+  // „Въпросите“ opens the ten in their dialog, each with how it went for the two side by side, its answers and its
+  // fact.
   await result.getByRole("button", { name: "Въпросите" }).click();
-  const sheet = b.locator("dialog.duel-sheet");
+  const sheet = b.locator("dialog.review-sheet");
   await expect(sheet.getByRole("heading", { name: "Въпросите" })).toBeVisible();
-  await expect(sheet.locator(".duel-q")).toHaveCount(10);
+  await expect(sheet.locator(".review-of")).toHaveText(/^Дуел с Ана · \d+:\d+$/);
+  await expect(sheet.locator(".reviewed")).toHaveCount(10);
   await expect(sheet.locator(".duel-q-side")).toHaveCount(20);
-  await expect(sheet.locator(".duel-q-body")).toHaveCount(0);
-  const row = sheet.locator(".duel-q").first();
-  await row.getByRole("button", { name: "Отговорите и фактът" }).click();
-  await expect(row.locator(".duel-q-body")).toBeVisible();
-  await row.getByRole("button", { name: "Скрий" }).click();
-  await expect(sheet.locator(".duel-q-body")).toHaveCount(0);
+  await expect(
+    sheet.locator(".reviewed").first().locator(".options, .tf-options, .number-out, ol, ul").first(),
+  ).toBeVisible();
   await sheet.getByRole("button", { name: "Затвори" }).click();
   await expect(sheet).toHaveCount(0);
   // A reload: the card as it is, landed already. Its old page comes here too.
@@ -131,7 +129,9 @@ test("a duel with a friend: played first and sent, played back when they can, it
   const played = new URL(b.url()).searchParams.get("duel");
   await b.goto(`/duel/${played}`);
   await expect(b).toHaveURL(new RegExp(`/friends\\?tab=duels&duel=${played}$`));
-  await expect(result.getByRole("button", { name: "Реванш" })).toBeVisible();
+  // The card leads to its questions and nothing else: a new duel starts from „Нов дуел“, under the cards.
+  await expect(result.getByRole("button")).toHaveText(["Въпросите"]);
+  await expect(b.locator(".duels").getByRole("link", { name: "Нов дуел" })).toHaveAttribute("href", "/duel/new");
 
   // Ana: his result is news, a dot on Приятели; it goes as she opens it, and she sees it there, played.
   const aDot = a.locator("nav.places-foot a[href='/friends']");
@@ -156,15 +156,24 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await lookedFor(a, () => a.goto("/"));
   await expect(aDot).not.toHaveClass(/news/);
 
-  // His rematch, from the card, played and sent: news for her again.
-  await result.getByRole("button", { name: "Реванш" }).click();
-  await meetAs(b);
-  await countIn(b);
-  await expect(b.locator(".question-head .versus")).toHaveText("Дуел с Ана");
-  await playRun(b);
-  await expect(b.locator(".duel-cards.landed .duel-card")).toHaveClass(/s-theirs/);
-  await a.reload();
-  await expect(aDot).toHaveClass(/news/);
+  // Her friend's row: the day's issue (not played: a dash) and the duels between the two, each an icon and its number,
+  // said whole by its tooltip and to a screen reader.
+  await a.goto("/friends?tab=friends");
+  const stats = a.locator(".friend .friend-stat");
+  await expect(stats).toHaveCount(2);
+  await expect(stats.first()).toHaveText("—");
+  await expect(stats.first()).toHaveAttribute("title", "Днешният брой: още не е изигран");
+  await expect(stats.first()).toHaveAccessibleName("Днешният брой: още не е изигран");
+  await expect(stats.last()).toHaveText(/^\d:\d$/);
+  await expect(stats.last()).toHaveAttribute("title", /^Дуели помежду ви: \d (победа|победи), \d (загуба|загуби)/);
+  expect(await stats.last().getAttribute("aria-label")).toBe(await stats.last().getAttribute("title"));
+
+  // Days later the duel is still on its card, and its questions still open from it (a duel's alone: play.Review).
+  await endedBefore(b, 3);
+  await b.reload();
+  await b.locator(".duel-card").first().getByRole("button", { name: "Въпросите" }).click();
+  await expect(sheet.locator(".reviewed")).toHaveCount(10);
+  await expect(sheet.getByRole("alert")).toHaveCount(0);
 });
 
 test("against a recording: a real game's ten, its player named, its answers as they came", async ({ browser }) => {
@@ -202,7 +211,7 @@ test("against a recording: a real game's ten, its player named, its answers as t
   await expect(c.locator(".question-head .versus")).toContainText(owner);
   await expect(c.locator(".question-head .versus")).toContainText(`Запис · ${owner}`);
   await playSecond(c, owner);
-  // Its end, on its card: against a recording, whose it was, the two rows of marks, and another a tap away.
+  // Its end, on its card: against a recording, whose it was, the two rows of marks, and its questions.
   await expect(c).toHaveURL(/\/friends\?tab=duels&duel=\d+$/, { timeout: 10_000 });
   const card = c.locator(".duel-cards.landed .duel-card");
   await expect(card).toHaveClass(/s-(won|lost|draw)/);
@@ -210,10 +219,7 @@ test("against a recording: a real game's ten, its player named, its answers as t
   await expect(card.locator(".duel-card-kind")).toHaveText("Срещу запис");
   await expect(card.locator(".duel-card-name").last()).toContainText(owner);
   await expect(card.locator(".duel-card-row")).toHaveCount(2);
-  await expect(card.getByRole("button", { name: "Въпросите" })).toBeVisible();
-  const again = c.waitForRequest((r) => r.method() === "POST" && new URL(r.url()).pathname === "/api/duels");
-  await card.getByRole("button", { name: "Още един срещу запис" }).click();
-  expect((await again).postDataJSON()).toEqual({ recording: true });
+  await expect(card.getByRole("button")).toHaveText(["Въпросите"]);
 });
 
 test("a duel left before its first question isn't „Твой ред“; one begun goes on with its own run from „Играй“", async ({

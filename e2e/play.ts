@@ -213,6 +213,17 @@ export async function dealt(page: Page, category: string, ids: string[]): Promis
   });
 }
 
+/** Makes the player's finished games ones that ended `days` days ago, straight in the test server's database: games
+ * of another day, as a duel's card still lists them. */
+export async function endedBefore(page: Page, days: number): Promise<void> {
+  await inDB(page, (db, id) => {
+    db.prepare(
+      `UPDATE runs SET started_at = started_at - ?1, finished_at = finished_at - ?1
+        WHERE user_id = ?2 AND finished_at IS NOT NULL`,
+    ).run(days * 86_400_000, id);
+  });
+}
+
 /** Makes the player's games count as a person's for the others (a test plays quicker than a person: play/fair.go),
  * so that their friends see their day, and their book has what they got right (play/ink.go: a script's game writes
  * nothing). */

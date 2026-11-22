@@ -80,9 +80,10 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   1. The score on a sheet of the issue's first chapter: „Брой 9 · 20 ноември“, the score as the hero numeral „7 от
      10“, the tiles, „На десетия въпрос вярно отговарят 14 %“ (nothing before a crowd: the tenth is
      always the hardest), and with a crowd „България днес: средно 6,2“ (the average always to one decimal: „6,0“). Ten of ten:
-     „Всички верни“ and the mark drawn over it. None right: right under the score, „Въпросите и фактите“ open
+     „Всички верни“ and the mark drawn over it. The card opens the day's questions (below): a tap anywhere on it,
+     and each tile at its own question. None right: right under the score, „Въпросите“ open
      (`.missed-day`): the first four, each its dashed tile, the question, the right answer (an order, a match, a split
-     in lines) and its fact, and „Още 6 въпроса“, which shows the rest in place; no word of praise. A best rank risen, the big moment, right
+     in lines) and its fact, and „Прегледай въпросите“ under them; no word of praise. A best rank risen, the big moment, right
      under the score, on its chapter's sheet: „Нов печат“, the seal set large, the rank's name, what made it („40
      факта от Кино и телевизия са с мастило в твоя Алманах.“), the ladder from Бележка to Летопис (`ladder()`), the
      art it brings, and other ranks risen with it in a line.
@@ -93,10 +94,10 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      On a big screen that action heads the right page (moved there, never drawn twice), the two pages of a height.
   3. What the day wrote in the book, „Днес в Алманаха“ (`game/news.ts`), on a card: the whole of its ink at a glance,
      „+6 с мастило“ (a tap from the Алманах), and under it the chapters it went to, in the order the issue asked them,
-     a row of their tiles (a right answer's, as the score has them), each with its „+1“ (or „+2“; a tap from its chapter); „Един от въпросите вече беше в твоя
+     a row of their tiles (a right answer's, as the score has them), each with its „+1“ (or „+2“; a tap from those facts in its chapter, marked there for a moment: `/almanac/<chapter>?fact=<id>`); „Един от въпросите вече беше в твоя
      Алманах и остава в сиво.“; ranks risen, their seals and one line, each rank once with its chapters, their names the
      links („Нови печати: „Страница“ в География и в Технологии и игри.“; one chapter's: its ladder under it). No
-     single question picked out of the ten (the day's ten are all under „Въпросите и фактите“), and no one chapter's
+     single question picked out of the ten (the day's ten are all a tap away, in their dialog), and no one chapter's
      bar beside the day's whole ink: next to it, either reads as the day's ink.
   4. The action, past the first results: „Сподели“.
   5. Tomorrow: the next issue's date set big (over its words with large text), „Утре, неделя · Брой 32“ (a line each
@@ -123,8 +124,22 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      in large text, as a friend's day, the line runs under the place and the avatar too). The tab chosen stays while
      the result is open. Nothing else of a board's: no page of its own, no link to one.
 
-  Everything else is under „Въпросите и фактите“ (`.more`): each question with its fact (its verdict never a
-  true-or-not's answer: „Точно“, „Грешно“).
+  Everything else is in the questions' dialog, opened by „Прегледай въпросите“ (`.more`), by a tap on the score's
+  card, and by a tile, at its question.
+- **The questions gone over** (`reviewSheet()`, `.review-sheet`): one dialog for every game (the day's issue, a
+  chapter's game, a duel), on the game's sheet: „Въпросите“ and „Затвори“ at its head, which stays as the questions
+  scroll under it; under it whose they are („Брой 11 · 22 ноември · 7 от 10“, „История · 6 от 10“, „Дуел с Иво ·
+  8:6“); then a card a question: its number and chapter, how it went (never a true-or-not's answer: „Точно“,
+  „Грешно“, „Близо“, „Без отговор“), the question, the answers as given with the right one, how others answered, the
+  fact, and „Нещо не е наред с въпроса?“. In a duel, in place of the one word, how it went for the two side by side
+  under the question, each half the row (the small avatar, „✓ Точно“ in ink, „✕ Грешно“, „◩ Близо“, „– Без отговор“
+  quieter: a question that parted them shows at a glance). On a phone it never takes the whole height: the page shows
+  over it, and a tap there puts it away. Never a list in the page.
+- **What a tap led to is marked for a moment** (`.lit`): the question a tile opened the dialog at, the facts the
+  day's ink opened a chapter at. A soft tint of its chapter's colour over it, held a moment and faded out in about a
+  second and a half; nothing moves. With less motion it shows as long and goes at once, with no fade. A chapter reads
+  the facts from its address once (`?fact=<id>`, one for each), opens on the page that holds them, the first of them
+  in sight, and the address becomes the chapter's own: a reload or the way back marks nothing.
 - **Алманах:** its head (two ways to play, „Играй от всички глави“ and „Играй за България“, „10 въпроса …“ under each, words only, no glyph: theirs would sit apart from the chapters'; no lifetime totals), then the chapters, each a folded
   card in its colour with its seal as the badge (40px), its ink („180 с мастило“), its rank over its bar and what's left to
   the next under it („Тетрадка“, the bar, „още 15 до „Книга““: a card has no room for both under the bar); a counter at zero is hidden, and the head says once how ink is written; a
@@ -152,7 +167,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   action, the streak's stake under it; once it's played, „Още десет въпроса“ the action. The other ways on are quiet
   links in a line: „Още десет въпроса“, „Прегледай въпросите“, „Към главата“ (from Микс and България, which aren't
   chapters, „Към Алманаха“). On a big screen the result is a spread, as the day's: the sheet on the left page, the
-  action, the ways on and that line on the right, „Прегледай въпросите“ under both in a reading column. Its start
+  action, the ways on and that line on the right. „Прегледай въпросите“, the sheet and each tile open the questions'
+  dialog, as the day's do. Its start
   (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name.
 - **Приятели:** the people and the duels (the day's board is Днес's), two tabs at the page's top, „Приятели“ and
   „Дуели“, the day's board's own (`segmented`), of one weight: no heading over them (the page's „Приятели“ is a screen
@@ -160,7 +176,12 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   waits for the player (`tabDot`), and opens first then, else „Приятели“ (which has the dot while someone asks to be friends); a duel that comes later lights the dot and
   never moves the page. The tab chosen is in the address (`?tab=duels`): back and a reload keep it. Under „Приятели“:
   „Премахни приятел“ at the right; a row each: avatar with its seal,
-  the name across the row, never cut, today's score and the duels between you „дуели 3 : 1“ under it; a friend removed only after a sheet asks „Премахваш ли Иво от приятелите си?“, „Премахни“ in red and
+  the name across the row, never cut, and under it two things, each an icon and its number alone, in figures of one
+  width so the rows line up (`.friend-stat`): the day's issue (the calendar of Днес, „7/10“; „—“, quieter, while it
+  isn't played) and the duels between the two (two swords crossed, `--i-duel`, „3:1“, the viewer's wins first; left
+  out before the first duel). Each says itself whole as its tooltip on a big screen and to a screen reader
+  („Днешният брой: 7 от 10“, „Днешният брой: още не е изигран“, „Дуели помежду ви: 3 победи, 1 загуба“, with
+  „равенства“ if any): never a bare „днес още не“, which says neither what nor whose; a friend removed only after a sheet asks „Премахваш ли Иво от приятелите си?“, „Премахни“ in red and
   „Отказ“, then at once, the duels open between them ending as if their time were up; then adding and the requests.
   Under „Дуели“: what a duel is in a line, the open ones (theirs to play first, then those waiting), those played
   under „Последните 10 изиграни“ („Изиграни“ while there are fewer: the list is the last ten and says so), „Нов дуел“
@@ -177,8 +198,9 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   more). Under the two, of a game played to its end, the duel question by question: the player's row of marks over
   the other's (`.duel-card-marks`: a 20px avatar, then ten small squares in ink as the boards draw them, `mini()`:
   right filled, близо half, wrong hollow; the player's alone while the friend still has theirs to play); then the
-  quiet line; then, at the card's foot, what it leads to as small outlined buttons (`.duel-card-acts`): „Въпросите“
-  on the day the player's own game ended, „Реванш“ with a friend, „Още един срещу запис“ after a recording. A duel
+  quiet line; then, at the card's foot, the one thing it leads to, a small outlined button (`.duel-card-acts`):
+  „Въпросите“, once the player's own game in it is played, on any day. No „Реванш“ and no „Още един срещу запис“: a
+  new duel starts from „Нов дуел“ under the cards, the one way. A duel
   to play is one link to its game, the whole card (under a pointer its line lights); any other card is no link, and
   no name in a card is underlined (none is a way to a profile). The first „Твой ред“ is ringed in ink with „Играй“ in
   it, the page's action. A duel named in the address (`?tab=duels&duel=<id>`: its game just ended, or an old link to
@@ -186,13 +208,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   the score counts up, the chip lands with the end's sound), never again. At large text (`.tight`) the two are under
   each other, each a row. The record between two is the friend's row's and „Нов дуел“'s, never a card's). Friends are added in one field, „име или имейл“; a
   friend's yes to a request is one line over the friends, told once; requests sent wait under „Изпратени покани“.
-  Only two friends of one name show their @username. „Въпросите“ opens a sheet (`.duel-sheet`, the game's sheet:
-  „Въпросите“ and „Затвори“ at its head, whose duel it is and its score under them), then `reviewed()` with the two
-  sides: each question a short tinted card: its number and chapter, the question,
-  how it went for the two side by side, each half the row (the small avatar, „✓ Точно“ in ink, „✕ Грешно“, „◩
-  Близо“, „– Без отговор“ quieter: a question that parted them shows at a glance), „Верният отговор: …“ where a few
-  words hold it, and „Отговорите и фактът“, which opens in place what the day's review shows (the answers as given,
-  how others answered, the fact). The questions are there on the day the player's own game ended; the card's two
+  Only two friends of one name show their @username. „Въпросите“ opens the questions' dialog (above), under its
+  head whose duel it is and its score, each question with how it went for the two; the card's two
   rows of marks always. Nothing ringed, no time on any of them: time never counts.
   **„Нов дуел“** (`/duel/new`): the way back reads „Дуели“ (to `?tab=duels`); the lead „Десет въпроса. С приятел — той
   ги играе, когато може. Срещу запис — веднага.“; under „С приятел“ a row a friend (`.duel-pick`), the whole row a
@@ -314,7 +331,7 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   sheet). Avatars and glyphs are rounded tiles, their corners 28% of their size (a card's corner, small); seals are
   round (a seal is round).
 - **Space** on a 4px base (`--space-1` … `--space-7`: 4 · 8 · 12 · 16 · 24 · 32 · 48); the page's gutter is 16px on a
-  phone, 40px on a big screen; the page is up to 1260px (`/admin` too); a long read in it („Въпросите и фактите“) up to 45rem.
+  phone, 40px on a big screen; the page is up to 1260px (`/admin` too); a long read in it up to 45rem.
 - **Cards** (`.card`, `.rows`) are white surfaces on the page; rows have a hairline between them and are 48px or more.
 - **Depth:** the primary action is raised by a 4px shadow below (`--lift`); the answer's panel docked at a phone's
   foot casts a soft shadow up. Nothing else.
@@ -377,7 +394,8 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   or a setting's few choices on a well, the chosen one a raised surface, of one width unless a word needs more (never broken inside one). A switch is a 52 × 30 track. Never a native
   select, radio or checkbox.
 - **Sheets over the page** (`.sheet`, a `<dialog>`): a surface with round top corners over a scrim, from the foot on a
-  phone, centred on a big screen (a name asked for, the share, a way out of a game, the avatars, an entry's picture);
+  phone, centred on a big screen (a name asked for, the share, a way out of a game, the avatars, an entry's picture,
+  a game's questions gone over);
   its title's words whole,
   „Затвори“ under it where they don't fit beside it.
 - **Names** (`nameWords()`): a name breaks between its words first; a single word wider than its line, and only
@@ -590,7 +608,7 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
   `.verdict`, `.right-said`, `.after`, `.up-next-go`; `.issue`, `.issue-go`, `.today-side`, `.result`, `.result-main`, `.score-n`,
   `.tiles .tile`, `.tomorrow`, `.result-share`, `.share-sheet`, `.streak-chip`, `.streak-notice`, `.day-news`, `.missed-day`;
   `.summary`, `.reviewed`, `.news-facts`; `.toc-row`, `.entry`; `.day-board`, `.rank-row`, `.friend`, `.invitation`,
-  `.accepted-notice`, `.duels`, `.duel-cards` (`.landed`), `.duel-card` (`.turn`, `.s-<state>`), `.duel-card-mid`, `.duel-card-go`, `.duel-chip`, `.duel-card-marks`, `.duel-card-acts`, `.duel-sheet`, `.tab-dot`, `.duel-pick`, `.duel-invite`, `.their-line`; `.me-ladder`, `.ladder`.
+  `.accepted-notice`, `.duels`, `.duel-cards` (`.landed`), `.duel-card` (`.turn`, `.s-<state>`), `.duel-card-mid`, `.duel-card-go`, `.duel-chip`, `.duel-card-marks`, `.duel-card-acts`, `.review-sheet`, `.review-of`, `.duel-q-side`, `.tile-tap`, `.lit`, `.friend-stat`, `.tab-dot`, `.duel-pick`, `.duel-invite`, `.their-line`; `.me-ladder`, `.ladder`.
 
 ## Before a UI change ships
 

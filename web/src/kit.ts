@@ -13,7 +13,7 @@ import { answering } from "./game/answering.ts";
 import { news } from "./game/news.ts";
 import { count } from "./game/numbers.ts";
 import { answered, crowdLine, picture } from "./game/questions.ts";
-import { board, boardRow, hands, reviewed, scoreCard, summary } from "./game/results.ts";
+import { board, boardRow, hands, reviewSheet, scoreCard, summary } from "./game/results.ts";
 import { guardLeaving, questionHead, readyClock, startScreen, timer, trail, upNext } from "./game/run.ts";
 import { ApiError, api, errorText } from "./lib/api.ts";
 import { dayInBulgaria } from "./lib/day.ts";
@@ -78,7 +78,6 @@ import {
   profileHref,
   questions,
   record,
-  rightsOf,
   schemeSwitch,
   scoreRow,
   seal,
@@ -177,10 +176,9 @@ export const kit = {
   rankName,
   rankNames,
   record,
-  rightsOf,
   rename,
   reportProblem,
-  reviewed,
+  reviewSheet,
   schemeSwitch,
   scoreCard,
   seal,

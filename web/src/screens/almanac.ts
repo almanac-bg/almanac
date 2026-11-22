@@ -75,6 +75,8 @@ interface Learned {
  * book began. */
 interface Page {
   facts: Learned[];
+  /** Which page this is, from 0: the one asked for, or the one that holds the fact asked for. */
+  page?: number;
   found: number;
   ink: Record<string, number>;
   ranks?: Rank[];
@@ -255,7 +257,9 @@ function shortDate(day: string): string {
 
 /** A chapter of the book (/almanac/<topic>): its head on its sheet, „Игра на главата“, and its facts as entries, the
  * latest first, a page at a time, found by their words. Its page and search are in the address (?page=2&q=…), so back
- * to it, or a reload, opens the same. */
+ * to it, or a reload, opens the same. Opened at facts (?fact=<id>, one for each: the day's result's, of the facts the
+ * day wrote), it opens on the page that holds them, the first of them in sight, each tinted in the chapter's colour
+ * for a moment (app.css, .lit); they're read from the address once, and it becomes the page's own. */
 export function chapter(kit: Kit, [id = ""]: string[]): Child {
   setKit(kit);
   // A chapter the book doesn't have: the page that isn't there, not an empty chapter by that name.
@@ -266,6 +270,8 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
   turned = false;
   title(name);
   const at = new URLSearchParams(location.search);
+  // The facts to open at, and mark: the latest of them (the last named) is the highest on its page.
+  let marked = at.getAll("fact");
   const page = signal(Math.max(0, (Number(at.get("page")) || 1) - 1));
   const query = signal(at.get("q") ?? "");
   const data = signal<Page | null>(null);
@@ -276,9 +282,29 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
   let asked = "";
   // The words the page shown was found by, marked in its entries (none unsearched).
   let find: string[] = [];
+  /** The chapter's first page, which has its rank: asked for apart when the chapter opens on another. */
+  const loadFirst = () =>
+    api<Page>("GET", `/api/almanac?${new URLSearchParams({ topic: id })}`).then(
+      (p) => {
+        first.set(p);
+        total.set(p.found);
+      },
+      () => {},
+    );
+  /** The address as the chapter shows now: its page and its search, so that back to it opens it as it was. */
+  const named = () => {
+    const shown = new URLSearchParams();
+    if (page.peek()) shown.set("page", String(page.peek() + 1));
+    if (query.peek().trim()) shown.set("q", query.peek().trim());
+    rename(`/almanac/${id}${shown.size ? `?${shown}` : ""}`);
+  };
   const load = () => {
     const q = new URLSearchParams({ topic: id, page: String(page.peek()) });
     if (query.peek().trim()) q.set("q", query.peek().trim());
+    // Opened at facts: the page that holds the latest of them, whichever it is (play.AlmanacQuery.Fact).
+    const mark = marked;
+    marked = [];
+    if (mark.length) q.set("fact", mark.at(-1) ?? "");
     const ask = q.toString();
     asked = ask;
     failed.set(null);
@@ -293,32 +319,35 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
           return;
         }
         find = searchWords(q.get("q") ?? "");
+        if (mark.length && p.page) {
+          page.set(p.page);
+          named();
+          void loadFirst();
+        }
         data.set(p);
         if (p.ranks) first.set(p);
         if (!ask.includes("q=")) total.set(p.found);
         if (toFacts) requestAnimationFrame(() => document.querySelector(".chapter-facts")?.scrollIntoView());
         toFacts = false;
+        // The facts asked for, once they're drawn: marked, the first of them in sight.
+        if (mark.length)
+          requestAnimationFrame(() => {
+            const lit = [...document.querySelectorAll<HTMLElement>(".entry[data-fact]")].filter((e) =>
+              mark.includes(e.dataset.fact ?? ""),
+            );
+            for (const e of lit) e.classList.add("lit");
+            lit[0]?.scrollIntoView({ block: "center" });
+          });
       },
       (err) => {
         if (asked === ask) failed.set(err);
       },
     );
-    // The page and the search in the address: back to the chapter opens it as it was.
-    const shown = new URLSearchParams();
-    if (page.peek()) shown.set("page", String(page.peek() + 1));
-    if (query.peek().trim()) shown.set("q", query.peek().trim());
-    rename(`/almanac/${id}${shown.size ? `?${shown}` : ""}`);
+    named();
   };
   if (user.peek()) {
     // The first page has the chapter's rank: asked for once, apart, when the chapter opens on another page.
-    if (page.peek() || query.peek())
-      api<Page>("GET", `/api/almanac?${new URLSearchParams({ topic: id })}`).then(
-        (p) => {
-          first.set(p);
-          total.set(p.found);
-        },
-        () => {},
-      );
+    if (page.peek() || query.peek()) void loadFirst();
     load();
   }
   // The chapter's game left half-way today: it goes on from where it stopped (play.Left).
@@ -522,7 +551,7 @@ function entry(f: Learned, find: string[]): Child {
   ];
   return h(
     "li",
-    { class: `entry ${f.ink ? "ink" : "met"} t-${f.category}` },
+    { class: `entry ${f.ink ? "ink" : "met"} t-${f.category}`, "data-fact": f.id },
     im
       ? h(
           "div",

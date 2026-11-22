@@ -113,8 +113,14 @@ func TestInkAndGrey(t *testing.T) {
 	// The day's ink by chapter, each once, in the order the issue asked them: the book's own, as it was empty before.
 	byChapter, order := map[string]int{}, []string{}
 	for _, c := range news.Chapters {
-		if _, twice := byChapter[c.Chapter]; twice || c.Ink < 1 {
+		if _, twice := byChapter[c.Chapter]; twice || c.Ink < 1 || len(c.Facts) != c.Ink {
 			t.Errorf("the news's chapters: %+v", news.Chapters)
+		}
+		// Each chapter's facts written, by their ids: the chapter's own, and in ink in the book.
+		for _, id := range c.Facts {
+			if q, ok := w.b.Get(id); !ok || q.Base().Category != c.Chapter || !w.book(ana)[id] {
+				t.Errorf("the news's fact %s of %s: not that chapter's in ink", id, c.Chapter)
+			}
 		}
 		byChapter[c.Chapter] = c.Ink
 		order = append(order, c.Chapter)

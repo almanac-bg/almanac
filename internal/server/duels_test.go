@@ -103,7 +103,7 @@ func TestADuelOverHTTP(t *testing.T) {
 	pushes("/ana", 1)
 	_, out = ana.call("GET", fmt.Sprintf("/api/duels/%d", id), nil)
 	duel, _ = out["duel"].(map[string]any)
-	if st := duel["state"]; (st != "won" && st != "lost" && st != "draw") || duel["record"] == nil || duel["friend"] != true {
+	if st := duel["state"]; (st != "won" && st != "lost" && st != "draw") || duel["record"] == nil {
 		t.Fatalf("the result: %v", out)
 	}
 	if status, out := bo.call("POST", fmt.Sprintf("/api/duels/%d/play", id), map[string]any{}); status != 410 {

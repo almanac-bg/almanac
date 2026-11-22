@@ -160,7 +160,7 @@ func (s *Server) almanac(w http.ResponseWriter, r *http.Request) error {
 	q := r.URL.Query()
 	page, _ := strconv.Atoi(q.Get("page"))
 	a, err := s.game.AlmanacOf(r.Context(), u.ID, play.AlmanacQuery{Topic: q.Get("topic"), From: q.Get("from"),
-		Search: q.Get("q"), Page: min(max(page, 0), 10_000), Limit: play.AlmanacPage})
+		Search: q.Get("q"), Fact: q.Get("fact"), Page: min(max(page, 0), 10_000), Limit: play.AlmanacPage})
 	if err != nil {
 		return err
 	}

@@ -61,6 +61,9 @@ type Almanac struct {
 	Found int            `json:"found"`
 	Ink   map[string]int `json:"ink"`
 	Next  string         `json:"next,omitempty"`
+	// Page is which page of the chapter this is, from 0: the one asked for, or the one that holds the fact asked for
+	// (AlmanacQuery.Fact).
+	Page int `json:"page,omitempty"`
 	// Ranks are each of the bank's chapters' seals, as kept (rank.go); Seal the one the player wears. The first page
 	// only.
 	Ranks []ChapterRank `json:"ranks,omitempty"`
@@ -71,10 +74,12 @@ type Almanac struct {
 
 // AlmanacQuery is what a page of the book is asked for: a chapter ("": all of it), where the page before ended (its
 // Next; "": from the latest) or which page it is (Page, from 0: a chapter's pages are numbered), words to find in its
-// facts (their question, answer or fact), and how many to a page.
+// facts (their question, answer or fact), and how many to a page. Fact asks for the page that holds one fact (its
+// question's id), whichever it is, in Page's place (the first, if the chapter hasn't it): the day's result links to
+// the facts the day wrote, which a few games since may have moved off the first page.
 type AlmanacQuery struct {
-	Topic, From, Search string
-	Page, Limit         int
+	Topic, From, Search, Fact string
+	Page, Limit               int
 }
 
 // inChapter says whether a question's fact belongs to a chapter (its topic; "", the book as a whole: what its head
@@ -200,6 +205,10 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, aq AlmanacQuery) (Al
 	// The latest first: learned in that order, read backwards.
 	slices.Reverse(found)
 	out.Found = len(found)
+	if aq.Fact != "" && !paged && aq.Limit > 0 {
+		aq.Page = max(0, slices.IndexFunc(found, func(e entry) bool { return e.l.ID == aq.Fact })) / aq.Limit
+	}
+	out.Page = max(aq.Page, 0)
 	if !paged {
 		found = found[min(len(found), max(aq.Page, 0)*aq.Limit):]
 	}

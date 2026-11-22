@@ -17,7 +17,7 @@ import { picture } from "../art/picture.ts";
 import { news } from "../game/news.ts";
 import { closeLine, count, percent, withOwn } from "../game/numbers.ts";
 import { answerWords } from "../game/questions.ts";
-import { land, reviewed } from "../game/results.ts";
+import { land, opensReview, reviewSheet } from "../game/results.ts";
 import { getReady, playRun, shownHere, starting } from "../game/run.ts";
 import { cardFile, cardPath, type SharedDay, shareCard, shareDay, shareText } from "../game/share.ts";
 import type { Board, Mark, Reviewed, Score, State } from "../game/types.ts";
@@ -108,7 +108,8 @@ export function sharedDay(): Child {
   return null;
 }
 
-/** Each day played's questions gone over (its review), asked for once: the hardest of the day and the list „Прегледай въпросите“ opens all read the one answer. */
+/** Each day played's questions gone over (its review), asked for once: the tenth's line and the dialog „Прегледай
+ * въпросите“ opens all read the one answer. */
 const reviews = new Map<number, Promise<Reviewed[]>>();
 const reviewOf = (run: number): Promise<Reviewed[]> => {
   let r = reviews.get(run);
@@ -529,7 +530,8 @@ const outOf = (s: State) => s.total - (s.void ?? 0);
  *   4. tomorrow;
  *   5. the day's board, Приятели · България (dayBoard).
  *
- * Everything else (the questions and their facts) is under „Въпросите и фактите“. As it's
+ * Everything else (the questions and their facts) is in the questions' dialog (results.ts, reviewSheet), opened by
+ * „Прегледай въпросите“, by a tap on the score's card, and by a tile, at its question. As it's
  * played (`just`), it lands (feel.ts) and what it brought is told; on a later visit it is as it is. A wrong game is
  * never celebrated; ten of ten is a big moment. */
 function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
@@ -544,22 +546,20 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   // None right: the questions missed and their facts, open right under the score, the rest a tap away.
   const zero = of > 0 && run.rights === 0;
   const review = reviewOf(run.id);
-  const reviewList = signal<Reviewed[] | null>(null);
   // None right: the questions missed, under the score, once they're here (none, while the review hasn't come: the
-  // button to „Въпросите и фактите“ stays, to ask for them again).
+  // button „Прегледай въпросите“ stays, to ask for them again).
   const missedList = signal<Reviewed[] | null>(null);
   if (zero) review.then(missedList.set, () => {});
-  let reviewHead: HTMLElement | null = null;
   // The day's board's tab, as the player chose it (none yet: dayBoard opens it).
   const among = signal<Among | null>(null);
-  // The review asked again if it failed (reviewOf keeps only one that came).
-  const openReview = async () => {
-    reviewList.set(await reviewOf(run.id).catch(() => null));
-    requestAnimationFrame(() => {
-      reviewHead?.focus({ preventScroll: true });
-      reviewHead?.scrollIntoView({ block: "start" });
+  // The day's questions in their dialog, at one of them (`at`: a tile's); asked again if they failed (reviewOf keeps
+  // only a review that came).
+  const openReview = (at?: number) =>
+    reviewSheet({
+      load: () => reviewOf(run.id),
+      of: `Брой\u00a0${t.issue ?? issueOf(t.day)} · ${dateWords(t.day)} · ${run.rights} от ${of}`,
+      at,
     });
-  };
   const order = t.topics ?? [];
   // The streak with today's, the game's stake, and the reminder's ask. A guest in an app's own browser has the way out
   // for the action; a guest on the first day, or one whose game was just brought here, the ask to keep it and be
@@ -597,7 +597,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
         h("span", { class: "score-of" }, `от ${of}`),
         closeLine(run.trail) ? h("span", { class: "score-close" }, closeLine(run.trail)) : null,
       ),
-      tiles(run.trail, order, run.total),
+      tiles(run.trail, order, run.total, undefined, openReview),
       shareQuiet,
       tenthLine(review),
       () => {
@@ -607,6 +607,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
     ],
     "result-score score-leaf",
   );
+  opensReview(hero, () => openReview());
   if (just) land(hero, run.id, perfect, true);
   // A best rank risen, the result's one big moment: first, right under the score.
   const best = signal<Child>(null);
@@ -635,7 +636,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       { class: "result-main page-1" },
       hero,
       best,
-      zero ? missed(missedList) : null,
+      zero ? missed(missedList, () => openReview()) : null,
       first ? underScore : null,
       // 2. What the day wrote in the book. Asked on every visit: the ink is counted again; a rank risen is told once
       // (play.NewsOf).
@@ -651,23 +652,10 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       t.late ? onToToday(t, t.late.today) : tomorrow(t, fresh, streak, stake, first ? null : ask),
       // 5. The day's board (none for yesterday's issue finished late: Днес hasn't its board).
       t.late ? null : () => dayBoard(fresh(), run, among),
-      // None right: the questions are open under the score already, with the way to the rest there (once they came).
-      () =>
-        missedList()?.length
-          ? null
-          : h(
-              "button",
-              { class: "more", type: "button", "aria-expanded": () => !!reviewList(), onclick: openReview },
-              "Въпросите и фактите",
-              h("span", { class: "i i-right", "aria-hidden": "true" }),
-            ),
+      // None right: the first questions are open under the score already, with the way to them all there (once they
+      // came).
+      () => (missedList()?.length ? null : reviewButton(() => openReview())),
     ),
-    () => {
-      const all = reviewList();
-      if (!all) return null;
-      reviewHead = h("h2", { class: "section-title review-head", tabindex: -1 }, "Въпросите и фактите");
-      return h("div", { class: "result-review" }, reviewHead, reviewed(all, null));
-    },
   );
   if (first) {
     const wide = matchMedia("(min-width: 56.25rem)");
@@ -679,26 +667,34 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   return page;
 }
 
+/** „Прегледай въпросите“: the day's questions and their facts, a tap away in their dialog. */
+const reviewButton = (open: () => void): Child =>
+  h(
+    "button",
+    { class: "more", type: "button", "aria-haspopup": "dialog", onclick: open },
+    "Прегледай въпросите",
+    h("span", { class: "i i-right", "aria-hidden": "true" }),
+  );
+
 /** How many of the questions missed a result with none right shows at once. */
 const missedShown = 4;
 
 /** None right: the first questions, each its chapter's tile, the question, the right answer and the fact, right under
- * the score; „Още 6 въпроса“ shows the rest in place. Never a word of praise: only what the questions were. */
-function missed(all: () => Reviewed[] | null): Child {
-  const open = signal(false);
+ * the score; „Прегледай въпросите“ under them opens them all in their dialog (`open`). Never a word of praise: only
+ * what the questions were. */
+function missed(all: () => Reviewed[] | null, open: () => void): Child {
   return () => {
     const list = all();
     if (!list?.length) return null;
-    const shown = open() ? list : list.slice(0, missedShown);
-    const left = list.length - shown.length;
+    const shown = list.slice(0, missedShown);
     return h(
       "section",
       { class: "sect missed-day" },
       h(
         "div",
         { class: "sect-head" },
-        h("h2", null, "Въпросите и фактите"),
-        left ? h("span", { class: "sect-note" }, `1–${shown.length} от ${list.length}`) : null,
+        h("h2", null, "Въпросите"),
+        list.length > shown.length ? h("span", { class: "sect-note" }, `1–${shown.length} от ${list.length}`) : null,
       ),
       h(
         "ol",
@@ -722,14 +718,7 @@ function missed(all: () => Reviewed[] | null): Child {
           ),
         ),
       ),
-      left > 0
-        ? h(
-            "button",
-            { class: "more", type: "button", "aria-expanded": "false", onclick: () => open.set(true) },
-            left === 1 ? "Още един въпрос" : `Още ${left} въпроса`,
-            h("span", { class: "i i-right", "aria-hidden": "true" }),
-          )
-        : null,
+      reviewButton(open),
     );
   };
 }

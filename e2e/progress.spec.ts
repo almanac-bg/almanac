@@ -59,8 +59,8 @@ test("just played, the day's ink is told whole, by its chapters", async ({ page 
       json: {
         ink: 3,
         chapters: [
-          { chapter: "history", ink: 2 },
-          { chapter: "geography", ink: 1 },
+          { chapter: "history", ink: 2, facts: ["his-002", "his-960"] },
+          { chapter: "geography", ink: 1, facts: ["geo-961"] },
         ],
         metBefore: 1,
       },
@@ -73,8 +73,15 @@ test("just played, the day's ink is told whole, by its chapters", async ({ page 
   await expect(news.locator("h2")).toHaveText("Днес в Алманаха");
   await expect(news.locator(".ink-row")).toHaveText("+3 с\u00a0мастило");
   await expect(news.locator(".ink-chapters a")).toHaveCount(2);
-  await expect(news.getByRole("link", { name: "История: +2" })).toHaveAttribute("href", "/almanac/history");
-  await expect(news.getByRole("link", { name: "География: +1" })).toHaveAttribute("href", "/almanac/geography");
+  // Each chapter a tap from the facts the day wrote in it, named in the address.
+  await expect(news.getByRole("link", { name: "История: +2" })).toHaveAttribute(
+    "href",
+    "/almanac/history?fact=his-002&fact=his-960",
+  );
+  await expect(news.getByRole("link", { name: "География: +1" })).toHaveAttribute(
+    "href",
+    "/almanac/geography?fact=geo-961",
+  );
   await expect(news.locator(".news-met")).toHaveText("Един от въпросите вече беше в твоя Алманах и остава в сиво.");
   await expect(page.locator(".summary .day-entry, .summary .entry-q, .summary .standing")).toHaveCount(0);
   await expect(page.locator(".summary .btn.primary")).toHaveCount(1);

@@ -99,7 +99,7 @@ var (
 	ErrNoQuestion = errors.New("no questions to play")
 	// ErrDayOver is a run of the day's questions played on after its day (dayOver).
 	ErrDayOver = errors.New("the run's day is over")
-	// ErrReviewOver is a game gone over after its day (Review).
+	// ErrReviewOver is a game gone over after its day (Review: never a duel).
 	ErrReviewOver = errors.New("the game's review is over")
 )
 
@@ -712,9 +712,11 @@ func (g *Game) reviewOpen(ended int64) bool {
 	return store.Ms(g.Now()) < max(dayEnd, ended+DayGrace.Milliseconds())
 }
 
-// Review goes over a finished run, question by question (an unfinished one would give answers away), on its own day
-// only (ErrReviewOver after): a game is gone over right after it, not looked up again days later (the owner's call,
-// 19 Nov 2026: past days' questions aren't kept to go back to).
+// Review goes over a finished run, question by question (an unfinished one would give answers away). The day's issue
+// and a chapter's game on their own day only (ErrReviewOver after): such a game is gone over right after it, not
+// looked up again days later (the owner's call, 19 Nov 2026: past days' questions aren't kept to go back to). A duel's
+// own questions on any day (the owner's, 22 Nov 2026): its card stays in Приятели with its score, and the other side
+// plays it when they can, often on another day, so its questions are there to go over when its result comes.
 func (g *Game) Review(ctx context.Context, userID, runID int64) ([]Reviewed, error) {
 	r, err := scanRun(g.DB.Read.QueryRowContext(ctx, `SELECT `+runColumns+` FROM runs WHERE id = ? AND user_id = ?`, runID, userID))
 	if err != nil {
@@ -727,7 +729,7 @@ func (g *Game) Review(ctx context.Context, userID, runID int64) ([]Reviewed, err
 	if err := g.DB.Read.QueryRowContext(ctx, `SELECT finished_at FROM runs WHERE id = ?`, r.id).Scan(&ended); err != nil {
 		return nil, err
 	}
-	if !g.reviewOpen(ended) {
+	if r.kind != "duel" && !g.reviewOpen(ended) {
 		return nil, ErrReviewOver
 	}
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT n, shown, score, is_right FROM answers WHERE run_id = ? ORDER BY n`, r.id)
