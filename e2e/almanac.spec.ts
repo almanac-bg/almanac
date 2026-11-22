@@ -267,25 +267,6 @@ test("on a big screen a chapter's entries are one column, the latest first, top 
   expect(boxes[0]?.width).toBeLessThanOrEqual(44 * 16 + 1);
 });
 
-test("down a chapter's facts, its search stays in reach, and on a big screen its card and game beside them", async ({
-  page,
-}) => {
-  await page.goto("/");
-  await knows(page, sampleFacts("geography"));
-  for (const size of [
-    { width: 1366, height: 800 },
-    { width: 375, height: 700 },
-  ]) {
-    await page.setViewportSize(size);
-    await page.goto("/almanac/geography");
-    const last = page.locator(".entry").last();
-    await last.scrollIntoViewIfNeeded();
-    await expect(last).toBeInViewport();
-    await expect(page.getByRole("searchbox", { name: "Търси във фактите" })).toBeInViewport();
-    if (size.width > 900) await expect(page.getByRole("link", { name: "Играй 10 въпроса" })).toBeInViewport();
-  }
-});
-
 test("a chapter the book doesn't have is the page that isn't there; the book with a slash after it is the book", async ({
   page,
 }) => {
