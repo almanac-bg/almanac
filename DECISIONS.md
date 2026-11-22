@@ -90,8 +90,8 @@ packages' doc comments; this file holds only what must not drift.
     „Чакащи дуели“ and „Изиграни дуели“ (2026-11-22, the owner: the cards read better than compact rows): one the
     player's to play acts only by its „Играй“; every duel they have to play is in one stack, whoever sent it, the first
     challenged on top, opened in a dialog in that order to choose which to play (2026-11-22, the owner); one whose side
-    they've played opens its questions; on a duel still open the names are ways to the profiles, as a name is
-    everywhere, and on a played one they aren't: the card is its questions, whole (2026-11-22, the owner). Nothing else: „Реванш“ is
+    they've played opens its questions; no name on a duel is a link to a profile, which opens from the friends'
+    list (2026-11-22, the owner). Nothing else: „Реванш“ is
     gone (2026-11-22, the owner), a new duel starts from the friend's row or profile. A duel's game ends on Приятели,
     first in its group, the score counting up once; `/duel/<id>` only starts and plays one, and an old link to a
     finished duel comes to it there. The played list is the last ten, and says so („Последните 10 изиграни дуела“); all

@@ -50,11 +50,10 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await expect(sent.locator(".duel-card-side")).toHaveCount(2);
   await expect(sent.locator(".duel-card-mid")).toHaveText(/Чакаш\s*още 7\sдни/);
   await expect(sent.locator(".duel-card-note")).toHaveText(/Ти: \d+ от 10/);
-  // Nothing of hers to do there: no „Играй“; the two names lead to their profiles (hers to Профил), the rest of the card
-  // to her questions.
+  // Nothing of hers to do there: no „Играй“, no name a link (a profile is the friends' list's); the card is her
+  // questions.
   await expect(sent.locator(".duel-card-go")).toHaveCount(0);
-  await expect(sent.locator("a.duel-card-side").first()).toHaveAttribute("href", "/me");
-  await expect(sent.locator("a.duel-card-side").last()).toHaveAttribute("href", /^\/players\//);
+  await expect(sent.getByRole("link")).toHaveCount(0);
   await expect(sent.locator(".duel-card-open")).toHaveAccessibleName(/^Въпросите от дуела (с|със) /);
   const sentId = ((await sent.getAttribute("id")) ?? "").replace("duel-", "");
   // Приятели is one page, no tabs; a duel she sent is his to play, not hers: not listed (only as it lands). Her
@@ -80,13 +79,13 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await expect(b).toHaveURL(/\/friends$/);
   await expect(bDot).not.toHaveClass(/news/);
   // A duel waits for him, first on the page: his turn in its card with „Играй“, his friends under it. Only „Играй“
-  // leads to the game (nothing laid over the card), and Ana's name leads to her profile. One duel: no stack.
+  // leads to the game (nothing laid over the card), the one link on it: no name is one. One duel: no stack.
   const turn = b.locator(".duel-card.turn");
   await expect(turn.locator(".duel-card-mid")).toHaveText(/Твой ред\s*още 7\sдни/);
   await expect(turn.locator(".duel-card-open")).toHaveCount(0);
   await expect(turn.locator(".duel-stack-open")).toHaveCount(0);
   await expect(turn.getByRole("link", { name: /^Играй/ })).toHaveAttribute("href", /^\/duel\/\d+$/);
-  await expect(turn.getByRole("link", { name: "Ана", exact: true })).toHaveAttribute("href", /^\/players\//);
+  await expect(turn.getByRole("link")).toHaveCount(1);
   await expect(b.locator(".friend")).toHaveCount(1);
   await lookedFor(b, () => b.goto("/"));
   await expect(bDot).not.toHaveClass(/news/);
@@ -228,6 +227,7 @@ test("every duel to play is in one stack, the first challenged on top, chosen fr
     sentIds.map((id) => `/duel/${id}`),
   );
   await expect(rows.locator(".friend-name")).toHaveText(["Ана", "Ана", "Ана", "Цвети"]);
+  await expect(rows.locator("a.friend-name")).toHaveCount(0);
   await choose.locator(".sheet-head").getByRole("button", { name: "Затвори" }).click();
   await expect(choose).toHaveCount(0);
   // He chooses Cy's, the last.
