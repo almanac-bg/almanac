@@ -26,7 +26,7 @@ export interface Category {
 export const user = signal<User | null>(boot.user ?? null);
 export const categories: Category[] = boot.categories ?? [];
 /** „Микс“: the questions of every topic at once, a topic of its own (play.MixTopic). */
-export const mix: Category = { id: "mix", name: "Микс" };
+export const mix: Category = { id: "mix", name: "Всички глави" };
 /** „България“: the questions about Bulgaria from every topic, a topic of its own (play/bulgaria.go). Its tile shows
  * while the bank has a game's worth of them (open); its games keep its name after. */
 export const bulgaria = { id: "bulgaria", name: "България", open: boot.bulgaria === true };

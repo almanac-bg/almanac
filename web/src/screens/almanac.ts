@@ -179,8 +179,8 @@ function book(p: Page, left: () => Left[] = () => []): Child {
       h(
         "div",
         { class: "ways" },
-        way("mix", "Микс", "всички глави"),
-        bulgaria.open ? way("bulgaria", "България", "въпроси за България") : null,
+        way("mix", "Играй от всички глави", "10 въпроса, по един от всяка"),
+        bulgaria.open ? way("bulgaria", "Играй за България", "10 въпроса от всички глави") : null,
       ),
       () =>
         left().map((l) =>
@@ -396,7 +396,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
       h(
         "div",
         { class: "chapter-play" },
-        h("a", { class: "btn primary", href: `/play/${id}` }, () => (left() ? "Продължи играта" : "Игра на главата")),
+        h("a", { class: "btn primary", href: `/play/${id}` }, () => (left() ? "Продължи играта" : "Играй 10 въпроса")),
         () => {
           const l = left();
           return l ? h("p", { class: "small" }, `Следва въпрос ${l.at + 1}\u00a0от\u00a0${l.total}.`) : null;

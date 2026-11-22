@@ -84,7 +84,7 @@ packages' doc comments; this file holds only what must not drift.
     day's board (Приятели · Всички); with a crowd, how Bulgaria did that day („средно 6,2“). Everything else under „Въпросите и фактите“. A
     wrong game is never celebrated; a best rank rising and a ten of ten are the only big moments.
   - **The player's nouns are a closed list:** Брой, близо, серия, Алманах (глави, факти, мастило), печат, игра на
-    главата (Микс, България), приятели, класация, дуел (запис), споделяне, профил, напомняне. Adding one is the owner's
+    главата (всички глави, България), приятели, класация, дуел (запис), споделяне, профил, напомняне. Adding one is the owner's
     call.
   - **The rule for later.** A change is made only if it makes the issue better or names the measure it moves and what
     it removes; adds no noun; keeps every place's budget; is good at zero (first player, first day, 0 right, no

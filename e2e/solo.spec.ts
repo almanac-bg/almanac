@@ -110,7 +110,7 @@ test("the day says how its other players did with each question: under the verdi
 test("a topic, ten questions, a question reported, and ten more", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto("/almanac/history");
-  await page.getByRole("link", { name: "Игра на главата" }).click();
+  await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
   // A short count first, then the game starts by itself.
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await expect(page.getByRole("timer")).toHaveAccessibleName(/Започва след [1-3] с/);
@@ -163,14 +163,13 @@ test("„Микс“: every topic at once, the first way to play at the book's h
   test.setTimeout(120_000);
   await page.goto("/almanac");
   const ways = page.locator(".way");
-  await expect(ways.first()).toContainText("Микс");
-  await expect(ways.first()).toContainText("всички глави");
+  await expect(ways.first()).toContainText("Играй от всички глави");
   await expect(ways.last()).toContainText("България");
   await ways.first().click();
   await expect(page).toHaveURL(/\/play\/mix$/);
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await playRun(page);
-  await expect(page.locator(".score-leaf .chip")).toHaveText("Микс");
+  await expect(page.locator(".score-leaf .chip")).toHaveText("Всички глави");
   // Its ten come from more than one topic, each named in the review by its own.
   await page.getByRole("button", { name: "Прегледай въпросите" }).click();
   await expect(page.locator(".reviewed")).toHaveCount(10);
@@ -182,7 +181,7 @@ test("„Микс“: every topic at once, the first way to play at the book's h
 
 test("a topic's count can be backed out of, or cut short", async ({ page }) => {
   await page.goto("/almanac/history");
-  await page.getByRole("link", { name: "Игра на главата" }).click();
+  await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await page.getByRole("button", { name: "Отказ", exact: true }).click();
   await expect(page).toHaveURL(/\/almanac\/history$/);
@@ -190,12 +189,12 @@ test("a topic's count can be backed out of, or cut short", async ({ page }) => {
   await page.waitForTimeout(3500);
   await expect(page).toHaveURL(/\/almanac\/history$/);
 
-  await page.getByRole("link", { name: "Игра на главата" }).click();
+  await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/almanac\/history$/);
 
-  await page.getByRole("link", { name: "Игра на главата" }).click();
+  await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
   await page.getByRole("button", { name: "Започни сега" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10", { timeout: 1500 });
 });

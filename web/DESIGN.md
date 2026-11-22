@@ -125,7 +125,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
 
   Everything else is under „Въпросите и фактите“ (`.more`): each question with its fact (its verdict never a
   true-or-not's answer: „Точно“, „Грешно“).
-- **Алманах:** its head (Микс and България as two ways to play, words only, no glyph: theirs would sit apart from the chapters'; no lifetime totals), then the chapters, each a folded
+- **Алманах:** its head (two ways to play, „Играй от всички глави“ and „Играй за България“, „10 въпроса …“ under each, words only, no glyph: theirs would sit apart from the chapters'; no lifetime totals), then the chapters, each a folded
   card in its colour with its seal as the badge (40px), its ink („180 с мастило“), its rank over its bar and what's left to
   the next under it („Тетрадка“, the bar, „още 15 до „Книга““: a card has no room for both under the bar); a counter at zero is hidden, and the head says once how ink is written; a
   chapter's card with no ink yet is its glyph over its name, as tall as the row it stands in.
@@ -134,7 +134,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   never pages of their own: every fact as one list is what the book isn't (DECISIONS.md). A chapter's game left
   half-way today shows under the head, where it stopped, with „Продължи“ (its cross comes back here).
 - **A chapter:** its head on its sheet (glyph, name, the seal, its ink, and under them as wide as the head its bar,
-  the rank and „още 16 до „Книга““ under it: `standing()`), „Игра на главата“, then its facts, the latest first, each as tall as it holds:
+  the rank and „още 16 до „Книга““ under it: `standing()`), „Играй 10 въпроса“, then its facts, the latest first, each as tall as it holds:
   ink black, facts met in grey (a thin solid 1.5px grey outline, lighter text). An entry reads in the order it was lived:
   the dateline, the question small and muted (a kicker), the answer as the headword (big, bold) between it and the
   fact, then the fact in body text; a statement has no question, its headword right under the dateline; an answer of
@@ -548,9 +548,9 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
 
 - **Standard Bulgarian,** to one player with „ти“, short plain sentences, gender-neutral („ако броят още те чака“).
   Bulgarian words, not Russian ones, and not loanwords where a Bulgarian word is in common use (`language.test.ts`).
-- **Buttons are verbs:** „Започни“, „Продължи“, „Напред“, „Сподели“, „Игра на главата“.
+- **Buttons are verbs:** „Започни“, „Продължи“, „Напред“, „Сподели“, „Играй 10 въпроса“.
 - **The nouns are a closed list** (DECISIONS.md): Брой, близо, серия, Алманах (глави, факти, мастило), печат, игра на
-  главата (Микс, България), приятели, класация, дуел (запис), споделяне, профил, напомняне. A rank's six names are the
+  главата (всички глави, България), приятели, класация, дуел (запис), споделяне, профил, напомняне. A rank's six names are the
   seal's states; „звание“ is not a word the game uses.
 - **A chapter's name is in quotes only right after the word „глава“:** „в глава „История““, „Носиш печата на глава
   „Наука““. Standing alone it's bare: „Трудният въпрос е от История“, „Печат: История“, „Печатът на История“
