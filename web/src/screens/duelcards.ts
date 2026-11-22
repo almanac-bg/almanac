@@ -240,30 +240,36 @@ export function duelCards(kit: Kit, d: Duels, top: DuelView | null, under: Child
   const rest = (v: DuelView) => v.id !== top?.id;
   const open = [...d.yours, ...d.theirs].filter(rest).map(shown);
   const played = d.played.filter(rest).map(shown);
-  return [
-    top ? [h("ul", { class: "duel-cards landed" }, duelCard(shown(top), top.state === "yours", true)), under] : null,
-    open.length
+  // Each group under its kicker, the groups well apart: the open ones never run on into the played.
+  const group = (heading: string, cards: Child[]) =>
+    h(
+      "section",
+      { class: "stack small-gap" },
+      h("h2", { class: "section-title" }, heading),
+      h("ul", { class: "duel-cards" }, cards),
+    );
+  return h(
+    "div",
+    { class: "duel-groups" },
+    top
       ? h(
-          "ul",
-          { class: "duel-cards" },
+          "div",
+          { class: "stack" },
+          h("ul", { class: "duel-cards landed" }, duelCard(shown(top), top.state === "yours", true)),
+          under,
+        )
+      : null,
+    open.length
+      ? group(
+          "Чакащи",
           open.map((o, i) => duelCard(o, i === 0 && o.state === "yours" && top?.state !== "yours")),
         )
       : null,
     played.length
-      ? h(
-          "section",
-          { class: "stack small-gap" },
-          h(
-            "h2",
-            { class: "section-title" },
-            d.played.length >= playedShown ? `Последните ${playedShown} изиграни` : "Изиграни",
-          ),
-          h(
-            "ul",
-            { class: "duel-cards" },
-            played.map((p) => duelCard(p)),
-          ),
+      ? group(
+          d.played.length >= playedShown ? `Последните ${playedShown} изиграни` : "Изиграни",
+          played.map((p) => duelCard(p)),
         )
       : null,
-  ];
+  );
 }
