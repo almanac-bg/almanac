@@ -407,11 +407,16 @@ export async function keptPlayer(page: Page, browser: Browser): Promise<{ tag: s
 
 /** A player's name as a link, one rule everywhere (web/src/app.css, .name-words): never underlined at rest, as no
  * row of players is. A link's underline never reaches a word held whole (an inline block), so an underlined name was
- * underlined only in part („Таралеж 840“ with „840“ alone underlined). Each such link, named. */
+ * underlined only in part („Таралеж 840“ with „840“ alone underlined). Each such link, named. One under the pointer
+ * is underlined whole on purpose, and isn't at rest: in Firefox (a pointer, where the phones are touch) the mouse stays
+ * where the last click was, as on „Приеми“, whose row the friend's name then takes. */
 export async function linkedNames(page: Page): Promise<string[]> {
   return page.evaluate(() =>
     [...document.querySelectorAll("a")]
-      .filter((a) => a.querySelector(".name-words") && getComputedStyle(a).textDecorationLine !== "none")
+      .filter(
+        (a) =>
+          a.querySelector(".name-words") && !a.matches(":hover") && getComputedStyle(a).textDecorationLine !== "none",
+      )
       .map((a) => `a name underlined: „${(a.textContent ?? "").replaceAll("­", "").trim()}“`),
   );
 }

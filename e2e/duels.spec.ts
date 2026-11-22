@@ -223,9 +223,13 @@ test("every duel to play is in one stack, the first challenged on top, chosen fr
   const choose = b.getByRole("dialog", { name: "Чакат те 4 дуела" });
   const rows = choose.locator(".duel-stack-row");
   await expect(rows).toHaveCount(4);
-  expect(await rows.locator(".duel-card-go").evaluateAll((els) => els.map((el) => el.getAttribute("href")))).toEqual(
-    sentIds.map((id) => `/duel/${id}`),
-  );
+  // Their links read by CSS: evaluateAll under a dialog found by its name crashes Firefox's page (its name worked out
+  // in the page's own world), though the same count, or the same links by CSS, don't.
+  expect(
+    await b
+      .locator("dialog.duel-stack .duel-stack-row .duel-card-go")
+      .evaluateAll((els) => els.map((el) => el.getAttribute("href"))),
+  ).toEqual(sentIds.map((id) => `/duel/${id}`));
   await expect(rows.locator(".friend-name")).toHaveText(["Ана", "Ана", "Ана", "Цвети"]);
   await expect(rows.locator("a.friend-name")).toHaveCount(0);
   await choose.locator(".sheet-head").getByRole("button", { name: "Затвори" }).click();

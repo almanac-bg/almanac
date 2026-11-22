@@ -5711,15 +5711,19 @@
     padding: 18px 18px 20px;
   }
 
+  /* Where even the held sizes (.tight) leave no room for both, the weekday goes under the pill, never past the cover. */
   .issue-top {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-2);
   }
 
-  /* „Брой 31“ on an ink pill; the weekday plain. */
+  /* „Брой 31“ on an ink pill, on one line; the weekday plain. */
   .issue-n {
+    flex: none;
+    white-space: nowrap;
     display: inline-flex;
     align-items: center;
     min-height: 30px;
@@ -8059,8 +8063,19 @@
     font-size: calc(12px + 0.5rem);
   }
 
+  /* Its dateline on one line beside the pill, „понеделник“ the longest: at twice the text on the narrowest phone, a
+     wrapped pill or weekday would take „Започни“ under the places' bar every Monday. */
+  .tight :is(.issue-n, .issue-weekday) {
+    font-size: calc(6px + 0.5rem);
+  }
+
   .tight .issue-title {
     font-size: calc(8px + 0.625rem);
+  }
+
+  /* Its last lines (the title, with the glyphs and the time gone) clear of the turned corner, which cuts the sheet. */
+  .tight :is(.issue-title, .issue-meta) {
+    padding-right: calc(var(--fold, 54px) - 18px);
   }
 
   /* Nor the row of its ten chapters' glyphs (the issue's contents are under it, „В броя“). */
