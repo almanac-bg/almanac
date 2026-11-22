@@ -68,9 +68,21 @@ test("a duel with a friend: played first and sent, played back when they can, th
     timeout: 10_000,
   });
   await b.keyboard.press("Shift"); // the moment, to its end
-  await expect(b.locator(".duel-marks")).toBeVisible();
   await expect(b.locator(".duel-record")).toContainText("Срещу Ана");
+  // One action and one way back, no more.
   await expect(b.getByRole("button", { name: "Реванш" })).toBeVisible();
+  await expect(b.locator(".duel-side .actions").locator("a.btn, button.btn")).toHaveCount(2);
+  // Played today: the ten questions as rows, each with how it went for the two side by side (no rows of marks
+  // saying it again), its answers and its fact a tap away.
+  await expect(b.locator(".duel-q")).toHaveCount(10);
+  await expect(b.locator(".duel-q-side")).toHaveCount(20);
+  await expect(b.locator(".duel-marks")).toHaveCount(0);
+  await expect(b.locator(".duel-q-body")).toHaveCount(0);
+  const row = b.locator(".duel-q").first();
+  await row.getByRole("button", { name: "Отговорите и фактът" }).click();
+  await expect(row.locator(".duel-q-body")).toBeVisible();
+  await row.getByRole("button", { name: "Скрий" }).click();
+  await expect(b.locator(".duel-q-body")).toHaveCount(0);
 
   // Ana: his result is news, a dot on Приятели; it goes as she opens it, and she sees it there, played.
   const aDot = a.locator("nav.places-foot a[href='/friends']");

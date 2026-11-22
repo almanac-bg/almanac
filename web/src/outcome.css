@@ -1,7 +1,8 @@
-/* A duel's result (screens/outcome.ts): the two face to face, the duel question by question, what it meant. Loaded
+/* A duel's result (screens/outcome.ts): the two face to face, what it meant, the duel question by question. Loaded
    with it, the first time a duel's result shows; the rest of the page is app.css's. As the day's result: a white card,
    the verdict its heading, the two scores the heroes in the numerals with the colon between, „от 10“ in words under
-   each, the marks as the day's trail; no hairlines. */
+   each; no hairlines. Its questions are rows under it; once they can't be gone over, the card has the marks as the
+   day's trail. */
 
 @layer app {
   .duel-end.card.hero {
@@ -103,7 +104,7 @@
     font: 900 min(calc(24px + 1.5rem), 12vw) / 1 var(--font-numeral);
   }
 
-  /* Question by question: the player's marks over the other's, a band behind the question that decided it. */
+  /* Question by question, once the questions can't be gone over: the player's marks over the other's. */
   .duel-marks {
     display: grid;
     grid-template-columns: 24px repeat(10, minmax(0, 1fr));
@@ -140,61 +141,103 @@
     box-shadow: inset 0 0 0 1.5px var(--ink);
   }
 
-  .duel-band {
-    align-self: stretch;
-    margin: -5px -3px;
-    border-radius: var(--r-1);
-    background: var(--surface-2);
-  }
-
-  .duel-line {
-    color: var(--ink-3);
-    font-size: 0.9375rem;
-    text-wrap: pretty;
-  }
-
-  .duel-line:empty {
-    display: none;
-  }
-
-  /* What it meant: the record against this person, or whose game the recording was. */
+  /* Under the two, each said once and small, of one size and colour: what broke a tie, whose game a recording was,
+     the record against this person (its numbers in ink). */
   .duel-meant {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-1);
   }
 
   .duel-meant:empty {
     display: none;
   }
 
-  /* The words and the record on a line while they fit; with large text, the record under them. */
-  .duel-record {
+  .duel-meant p {
+    color: var(--ink-3);
+    font-size: 0.9375rem;
+    overflow-wrap: break-word;
+    text-wrap: pretty;
+  }
+
+  .duel-record b {
+    color: var(--ink);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Question by question, under the result (results.ts, reviewed): each question a white card as the result's, short:
+     its number and chapter, the question, how it went for the two side by side, the answer; the answers as they were
+     given and the fact a tap away. */
+  .duel-result > .review {
+    gap: var(--space-2);
+  }
+
+  .duel-result > .review > .section-title {
+    margin-bottom: var(--space-1);
+  }
+
+  .duel-q.reviewed {
+    gap: var(--space-2);
+    padding: var(--space-4) 20px var(--space-1);
+    border-radius: var(--r-3);
+    background: var(--surface);
+  }
+
+  .duel-q .ask {
+    font-size: 1.0625rem;
+    line-height: 1.4375rem;
+  }
+
+  /* The two, side by side, each half the row: the player's on the left, the other's on the right, as their scores
+     above. Right in ink, anything else quieter, so a question that parted them shows at a glance. With large text,
+     where two don't fit a row, one under the other. */
+  .duel-q-sides {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-1) var(--space-3);
-    font-weight: 600;
+    gap: var(--space-2) var(--space-3);
+    margin: var(--space-1) 0 0;
+  }
+
+  .duel-q-side {
+    display: flex;
+    flex: 1 1 7rem;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--ink-3);
+    font-size: 0.9375rem;
+    font-weight: 800;
+  }
+
+  .duel-q-side.right {
+    color: var(--ink);
+  }
+
+  .duel-q-side .avatar {
+    --size: 24px;
+    margin: 0;
+  }
+
+  .duel-q-answer {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: 0.9375rem;
     overflow-wrap: break-word;
   }
 
-  .duel-record > :first-child {
-    min-width: 0;
+  .duel-q-answer b {
+    color: var(--ink);
+    font-weight: 800;
   }
 
-  .duel-why {
-    color: var(--ink-3);
-    font-size: 0.8125rem;
+  .duel-q-more {
+    font-size: 0.9375rem;
   }
 
-  .duel-record-end {
+  .duel-q-body {
     display: grid;
-    justify-items: end;
-  }
-
-  .duel-record-n {
-    font: 800 1.5rem / 1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+    padding-bottom: var(--space-3);
   }
 
   /* A duel without a result: the player's own game, if they played it. */
@@ -214,17 +257,9 @@
     min-width: 0;
   }
 
-  /* A big screen: the result on the left page, the two face to face across it; the record, the ways on and what the
-     game earned on the right page, level with the verdict. */
+  /* A big screen: the pages as the day's result's (app.css, .spread): the result on the left, the two face to face
+     across it; the ways on and what the game earned on the right, level with the verdict. */
   @media (min-width: 56.25rem) {
-    .duel-result > .duel-main {
-      grid-column: 1 / span 6;
-    }
-
-    .duel-result > .duel-side {
-      grid-column: 8 / span 5;
-    }
-
     .duel-side .actions,
     .duel-side .result-actions {
       display: grid;

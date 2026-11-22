@@ -8,7 +8,7 @@
 import { news } from "../game/news.ts";
 import { summary } from "../game/results.ts";
 import { getReady, playRun, shownHere, starting, startScreen } from "../game/run.ts";
-import type { State } from "../game/types.ts";
+import type { Reviewed, State } from "../game/types.ts";
 import { duelResult } from "../kit.ts";
 import { type ApiError, api, errorText } from "../lib/api.ts";
 import { type Child, effect, h, lifetime, signal, slot } from "../lib/dom.ts";
@@ -62,9 +62,8 @@ export interface DuelView {
   /** When an open duel lapses. */
   until?: number;
   lapsed?: "you" | "they";
-  /** One duel's view: the question (from 1) after which the winner led to the end (none: the right answers were
-   * even). */
-  decided?: number;
+  /** One duel's view: the player's own game can still be gone over (play.DuelView.Review: on the day it ended). */
+  review?: boolean;
   /** One duel's view, of one won on even right answers: what broke the tie (play.DuelView.TieBy), the number nearer. */
   tieBy?: "number";
   record?: { won: number; lost: number; drawn: number };
@@ -496,13 +495,25 @@ export function duelOne(params: string[]) {
         : d.recorded
           ? again("Още един дуел срещу запис", { recording: true, level: lastLevel ?? d.level ?? "even" })
           : null;
-    screen.show(() =>
-      duelResult(
-        d,
-        { main: next ?? toFriends(true), also: next ? [toFriends(false)] : [] },
-        just && d.runId ? news(d.runId) : null,
-      ),
-    );
+    // Its questions come with it while they can be gone over (the day the player's own game ended); without them
+    // (later, or should they not come) the result is whole, its marks in their place.
+    const questions: Promise<Reviewed[] | null> = d.review
+      ? api<{ questions: Reviewed[] }>("GET", `/api/runs/${d.runId}/review`).then(
+          (r) => r.questions,
+          () => null,
+        )
+      : Promise.resolve(null);
+    void questions.then((all) => {
+      if (life.aborted) return;
+      screen.show(() =>
+        duelResult(
+          d,
+          { main: next ?? toFriends(true), also: next ? toFriends(false) : null },
+          just && d.runId ? news(d.runId) : null,
+          all,
+        ),
+      );
+    });
   };
 
   // The player's side: straight in where this tab was showing its question, after a count when a tap brought them,

@@ -118,7 +118,7 @@ for (const scheme of ["light", "dark"] as const) {
 }
 
 // A duel's result, as one won against a friend has it (the server's answer for it made here): the two face to face,
-// the duel question by question with the deciding one marked, and the record.
+// the duel question by question, and the record.
 for (const scheme of ["light", "dark"] as const) {
   test(`a duel's result is accessible (${scheme})`, async ({ page }) => {
     const mark = (right: number) => ({ right: right > 0 });
@@ -139,7 +139,6 @@ for (const scheme of ["light", "dark"] as const) {
       first: true,
       createdAt: Date.now(),
       endedAt: Date.now(),
-      decided: 8,
       record: { won: 3, lost: 2, drawn: 1 },
       friend: true,
       them: 2,
@@ -157,6 +156,29 @@ for (const scheme of ["light", "dark"] as const) {
     await expect(page.locator(".duel-pip.fast, .duel-key")).toHaveCount(0); // speed only breaks a tie: no rings
     const { violations } = await new AxeBuilder({ page }).analyze();
     expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
+
+    // On the day it was played, its questions are rows under it, in place of the marks: one right for both, one that
+    // parted them, the first opened.
+    const asked = (n: number, right: boolean) => ({
+      n,
+      category: "history",
+      view: { type: "truefalse", text: "София е столица на България от 1879 г." },
+      reveal: { id: `q${n}`, truth: true, fact: "София става столица на 3 април 1879 г." },
+      given: { truth: right },
+      right,
+    });
+    await page.route("**/api/duels/1", (r) => r.fulfill({ json: { duel: { ...duel, review: true } } }));
+    await page.route("**/api/runs/1/review", (r) =>
+      r.fulfill({ json: { questions: [asked(0, true), asked(1, false)] } }),
+    );
+    await page.reload();
+    await expect(page.locator(".duel-q")).toHaveCount(2);
+    await expect(page.locator(".duel-pip")).toHaveCount(0);
+    await page.locator(".duel-q-more").first().click();
+    await expect(page.locator(".duel-q-body")).toBeVisible();
+    await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"));
+    const rows = await new AxeBuilder({ page }).analyze();
+    expect(rows.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
   });
 }
 

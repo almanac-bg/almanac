@@ -705,6 +705,13 @@ type Reviewed struct {
 	Void bool `json:"void,omitempty"`
 }
 
+// reviewOpen says whether a run that ended at `ended` can still be gone over: until the end of the day it ended on, in
+// Bulgaria, and DayGrace at least (one ended at 23:59 is gone over after).
+func (g *Game) reviewOpen(ended int64) bool {
+	_, dayEnd := dayBounds(dayOf(time.UnixMilli(ended)))
+	return store.Ms(g.Now()) < max(dayEnd, ended+DayGrace.Milliseconds())
+}
+
 // Review goes over a finished run, question by question (an unfinished one would give answers away), on its own day
 // only (ErrReviewOver after): a game is gone over right after it, not looked up again days later (the owner's call,
 // 19 Nov 2026: past days' questions aren't kept to go back to).
@@ -720,9 +727,7 @@ func (g *Game) Review(ctx context.Context, userID, runID int64) ([]Reviewed, err
 	if err := g.DB.Read.QueryRowContext(ctx, `SELECT finished_at FROM runs WHERE id = ?`, r.id).Scan(&ended); err != nil {
 		return nil, err
 	}
-	// Until the end of the day it ended on, in Bulgaria, and DayGrace at least: one ended at 23:59 is gone over after.
-	_, dayEnd := dayBounds(dayOf(time.UnixMilli(ended)))
-	if now := store.Ms(g.Now()); now >= max(dayEnd, ended+DayGrace.Milliseconds()) {
+	if !g.reviewOpen(ended) {
 		return nil, ErrReviewOver
 	}
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT n, shown, score, is_right FROM answers WHERE run_id = ? ORDER BY n`, r.id)

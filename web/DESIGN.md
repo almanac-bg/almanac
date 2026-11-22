@@ -167,10 +167,18 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   friend's yes to a request is one line over the friends, told once; requests sent wait under „Изпратени покани“.
   Only two friends of one name show their @username. A duel's result, as the day's: a white card, the kicker, the
   verdict („Победа“, „Загуба“, „Равенство“) as its h1, the two face to face, each a column (the avatar with its seal, the name under
-  it broken only between its words, the score), their scores as the heroes and „от 10“ in words, the marks, no
-  hairlines; a spread on a big screen, the ways on (one width) and the record under them on the right (a phone has
-  them in that order too: the next duel in sight under the result); its marks as the tiles (близо ◩),
-  nothing ringed, no time on any of them: time never counts.
+  it broken only between its words, the score), their scores as the heroes and „от 10“ in words, and under them,
+  small and said once each, what broke a tie, whose game a recording was and the record („Срещу Иво досега: 3:1 и 1
+  равенство“); no hairlines. Then one action („Реванш“, „Още един дуел срещу запис“) and one way back („Към
+  Приятели“), no more; a spread on a big screen as the day's, the two of one width on the right (a phone has them
+  under the card: the next duel in sight under the result). Then „Въпрос по въпрос“ (`reviewed()` with the two
+  sides; a reading column on a big screen): each question a short white card: its number and chapter, the question,
+  how it went for the two side by side, each half the row (the small avatar, „✓ Точно“ in ink, „✕ Грешно“, „◩
+  Близо“, „– Без отговор“ quieter: a question that parted them shows at a glance), „Верният отговор: …“ where a few
+  words hold it, and „Отговорите и фактът“, which opens in place what the day's review shows (the answers as given,
+  how others answered, the fact). The questions are there on the day the player's own game ended; after it the card
+  has the two rows of marks in their place (the tiles' squares, близо ◩), never both. Nothing ringed, no time on any
+  of them: time never counts.
 - **Профил:** one column, on a big screen too: the avatar with the seal worn on its corner and a pencil on its top corner (a phone: always; a big screen: as the pointer
   comes over it, with the tooltip „Смени аватара“), the
   name; a guest's ways in one quiet line under it („Играта ти е само на това устройство. Запази я с имейл · Имаш

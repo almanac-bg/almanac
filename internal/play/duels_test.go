@@ -145,7 +145,7 @@ func TestFriendDuel(t *testing.T) {
 		t.Fatal("no news for Ana of her duel's result")
 	}
 	d, err = w.g.DuelOf(ctx, ana, id)
-	if err != nil || d.State != DuelWon || d.Decided != 1 || !d.Friend || d.Record == nil ||
+	if err != nil || d.State != DuelWon || !d.Review || !d.Friend || d.Record == nil ||
 		*d.Record != (Record{Won: 1}) || len(d.Opponent.Marks) != Length || d.You.Rights != Length {
 		t.Fatalf("Ana's result: %+v %v", d, err)
 	}
@@ -172,6 +172,11 @@ func TestFriendDuel(t *testing.T) {
 	}
 	if list, _ := w.g.FriendsOf(ctx, ana); len(list) != 1 || list[0].Won != 1 || list[0].Lost != 1 {
 		t.Fatalf("Ana's friends: %+v", list)
+	}
+	// Its questions are gone over on the day a player's own game ended, as any game's (Review): not days later.
+	w.wait(48 * time.Hour)
+	if d, _ := w.g.DuelOf(ctx, ana, re); d.Review {
+		t.Fatal("a duel's questions still to go over two days later")
 	}
 }
 
