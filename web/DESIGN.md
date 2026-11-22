@@ -332,6 +332,9 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
 - **Radii:** 10px (`--r-1`, a letter's box), 16px (`--r-2`, an answer, a button, a row card), 24px (`--r-3`, a card, a
   sheet). Avatars and glyphs are rounded tiles, their corners 28% of their size (a card's corner, small); seals are
   round (a seal is round).
+- **A box in a box sits evenly:** a letter's box in its answer, the player's row on a board's card, as far from the
+  edges it's near as from each other (an answer's height sets its padding, `--row`: `.option`); a well that meets its
+  card's corner has the card's corner drawn that far in (the card's 24px, 8px in: 16px).
 - **Space** on a 4px base (`--space-1` … `--space-7`: 4 · 8 · 12 · 16 · 24 · 32 · 48); the page's gutter is 16px on a
   phone, 40px on a big screen; the page is up to 1260px (`/admin` too); a long read in it up to 45rem.
 - **Cards** (`.card`, `.rows`) are white surfaces on the page; rows have a hairline between them and are 48px or more.
