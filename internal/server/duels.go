@@ -11,10 +11,10 @@ import (
 	"github.com/almanac-bg/almanac/internal/push"
 )
 
-// Duels are played on one's own time (play/duels.go): with a friend, who plays the same ten when they can, or against
-// a real recorded game. Each side is a run like any other (/api/runs/{id}), played on its own clock.
+// Duels are played on one's own time (play/duels.go): with a friend, who plays the same ten when they can. Each side
+// is a run like any other (/api/runs/{id}), played on its own clock.
 
-// duelsPerHour is how many duels a player may start in an hour (a friend's, or against a recording), on top of the
+// duelsPerHour is how many duels a player may start in an hour, on top of the
 // game's own limits (play.DuelsToOne, play.DuelsADay): each draws ten questions and writes a game.
 const duelsPerHour = 60
 
@@ -31,34 +31,15 @@ func (s *Server) duels(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, list)
 }
 
-// recordingReady says whether a duel against a recording can be played now (play.RecordingReady), so that the way to
-// one is offered only while there is one; to a visitor too, who becomes a guest by starting it.
-func (s *Server) recordingReady(w http.ResponseWriter, r *http.Request) error {
-	u, err := s.user(r)
-	if err != nil {
-		return err
-	}
-	var id int64
-	if u != nil {
-		id = u.ID
-	}
-	ready, err := s.game.RecordingReady(r.Context(), id)
-	if err != nil {
-		return err
-	}
-	return ok(w, map[string]any{"ready": ready})
-}
-
-// newDuel starts a duel: with a friend ({"friend": id}) or against a recording ({"recording": true}); one of the same
-// left unfinished is gone on with instead. It answers with the duel, and the player's run in it to play.
+// newDuel starts a duel with a friend ({"friend": id}); one with them left unfinished is gone on with instead. It
+// answers with the duel, and the player's run in it to play.
 func (s *Server) newDuel(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
 		return err
 	}
 	var in struct {
-		Friend    int64 `json:"friend"`
-		Recording bool  `json:"recording"`
+		Friend int64 `json:"friend"`
 	}
 	if err := readJSON(r, &in); err != nil {
 		return err
@@ -66,15 +47,10 @@ func (s *Server) newDuel(w http.ResponseWriter, r *http.Request) error {
 	if !s.limits.allow("duel:"+strconv.FormatInt(u.ID, 10), duelsPerHour, time.Hour) {
 		return errTooMany
 	}
-	var id int64
-	switch {
-	case in.Recording:
-		id, err = s.game.DuelRecording(r.Context(), u.ID)
-	case in.Friend > 0:
-		id, err = s.game.DuelFriend(r.Context(), u.ID, in.Friend)
-	default:
+	if in.Friend <= 0 {
 		return errBadRequest
 	}
+	id, err := s.game.DuelFriend(r.Context(), u.ID, in.Friend)
 	if err != nil {
 		return err
 	}

@@ -13,7 +13,7 @@ import { applyPrefs } from "./lib/prefs.ts";
 import { preparePush } from "./lib/push.ts";
 import { path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
-import { duelNew, duelOne } from "./screens/duel.ts";
+import { duelOne } from "./screens/duel.ts";
 import { missing } from "./screens/missing.ts";
 import { topic } from "./screens/play.ts";
 import { signInPage } from "./screens/signin.ts";
@@ -86,7 +86,6 @@ if (root) {
     [
       { path: /^\/$/, view: today },
       { path: /^\/play\/([a-z]+)$/, view: topic },
-      { path: /^\/duel\/new$/, view: duelNew },
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
       { path: /^\/almanac$/, view: later(() => import("./screens/almanac.ts").then((m) => m.almanac)) },
       { path: /^\/almanac\/([a-z]+)$/, view: later(() => import("./screens/almanac.ts").then((m) => m.chapter)) },

@@ -101,9 +101,8 @@ func TestSeededGame(t *testing.T) {
 	for what, q := range map[string]string{
 		"day runs":         `SELECT count(*) FROM runs WHERE kind = 'day' AND finished_at IS NOT NULL`,
 		"topic runs":       `SELECT count(*) FROM runs WHERE kind = 'topic'`,
-		"friends' duels":   `SELECT count(*) FROM duels WHERE kind = 'person' AND outcome IN ('a', 'b', 'draw')`,
-		"duels waiting":    `SELECT count(*) FROM duels WHERE kind = 'person' AND sent_at IS NOT NULL AND ended_at IS NULL`,
-		"recorded duels":   `SELECT count(*) FROM duels WHERE kind = 'recording' AND outcome IN ('a', 'b', 'draw')`,
+		"friends' duels":   `SELECT count(*) FROM duels WHERE outcome IN ('a', 'b', 'draw')`,
+		"duels waiting":    `SELECT count(*) FROM duels WHERE sent_at IS NOT NULL AND ended_at IS NULL`,
 		"friends":          `SELECT count(*) FROM friends`,
 		"requests waiting": `SELECT count(*) FROM friend_requests WHERE NOT declined`,
 		"ranks":            `SELECT count(*) FROM ranks`,

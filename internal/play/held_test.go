@@ -40,9 +40,8 @@ func TestNewQuestionsHeldForTheDays(t *testing.T) {
 		x.Extra().Added = "2026-11-28"
 	}
 	bars := barsOf(map[string][]Pick{"2026-11-30": {{ID: dealt}}}, today, b)
-	if !bars.all[fresh] || bars.now[fresh] || bars.all[dealt] || bars.all[old] {
-		t.Fatalf("held: new %v (now %v), new but dealt %v, old %v", bars.all[fresh], bars.now[fresh], bars.all[dealt],
-			bars.all[old])
+	if !bars.all[fresh] || bars.all[dealt] || bars.all[old] {
+		t.Fatalf("held: new %v, new but dealt %v, old %v", bars.all[fresh], bars.all[dealt], bars.all[old])
 	}
 	// No game but the day deals it: a topic's draw passes it by.
 	for seed := range uint64(20) {

@@ -59,8 +59,7 @@ func (w *world) reload(b *bank.Bank) {
 	w.use(b)
 }
 
-// runOf makes a player's run of the questions given (by id), of a kind; a duel's (a recording's first side) with its
-// duel.
+// runOf makes a player's run of the questions given (by id), of a kind.
 func (w *world) runOf(user int64, kind string, ids ...string) int64 {
 	w.t.Helper()
 	picks := make([]Pick, len(ids))
@@ -74,12 +73,7 @@ func (w *world) runOf(user int64, kind string, ids ...string) int64 {
 			return err
 		}
 		id = r.id
-		if kind == "duel" {
-			_, err = tx.Exec(`INSERT INTO duels (kind, questions, a_id, a_run, created_at, expires_at)
-				VALUES ('recording', '[]', ?, ?, 0, ?)`,
-				user, id, store.Ms(w.now.Add(time.Hour)))
-		}
-		return err
+		return nil
 	})
 	if err != nil {
 		w.t.Fatal(err)
@@ -172,8 +166,8 @@ func TestGradedAsShown(t *testing.T) {
 	w.reload(before)
 	run = w.runOf(gal, "topic", "geo-960")
 	w.show(gal, run)
-	sent, err := w.db.Write.Exec(`INSERT INTO duels (kind, questions, a_id, a_run, b_id, created_at, sent_at, expires_at)
-		VALUES ('person', '[]', ?, ?, ?, 0, 0, ?)`, gal, run, di, store.Ms(w.now.Add(time.Hour)))
+	sent, err := w.db.Write.Exec(`INSERT INTO duels (questions, a_id, a_run, b_id, created_at, sent_at, expires_at)
+		VALUES ('[]', ?, ?, ?, 0, 0, ?)`, gal, run, di, store.Ms(w.now.Add(time.Hour)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,51 +205,6 @@ func TestGradedAsShown(t *testing.T) {
 	q, _ := fixed.Get("geo-960")
 	if h.of(q) != hardnessOf(labelKnown[q.Base().Difficulty]) {
 		t.Fatal("the fixed question's hardness counts the answers to the one before")
-	}
-}
-
-// A recording is a game whose every question is still in play as it was played: none retired, none changed since.
-func TestRecordingsAsPlayed(t *testing.T) {
-	w := setup(t)
-	ctx := t.Context()
-	w.reload(w.b)
-	ana, bo := w.user(), w.user()
-	s, err := w.g.StartTopic(ctx, ana, MixTopic)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(ana, s.ID, repeat(w.right, Length)...)
-	played := w.picks(s.ID)
-	recorded := func() bool {
-		var rec *recorded
-		err := w.db.Tx(ctx, func(tx *sql.Tx) error {
-			var err error
-			rec, err = w.g.recordedRun(tx, bo, map[string]bool{}, nil)
-			return err
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		return rec != nil && rec.id == s.ID
-	}
-	if !recorded() {
-		t.Fatal("a game as it was played isn't a recording")
-	}
-	w.reload(editedSample(t, func(id string, q map[string]any) {
-		if id == played[2].ID {
-			q["retired"], q["retiredWhy"] = true, "weak"
-		}
-	}))
-	if recorded() {
-		t.Fatal("a game with a question retired since is a recording")
-	}
-	w.reload(editedSample(t, func(id string, q map[string]any) {
-		if id == played[5].ID {
-			q["text"] = "Вярно ли е, че " + strings.ToLower(q["text"].(string)[:2]) + q["text"].(string)[2:]
-		}
-	}))
-	if recorded() {
-		t.Fatal("a game with a question changed since is a recording")
 	}
 }
 

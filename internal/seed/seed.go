@@ -3,8 +3,8 @@
 //
 // It plays the history through the game's own functions, on a clock of its own that walks from Options.Days ago to
 // now: players arrive (account.Accounts.Guest, named and given an email by some), play the day's ten and topics
-// (play.Game: Show, Start, Answer), and duels with their friends (sent, played back, some let lapse) and against
-// recordings (DuelFriend, PlayDuel, DuelRecording); they ask each other to be friends, accept, say no, choose their
+// (play.Game: Show, Start, Answer), and duels with their friends (sent, played back, some let lapse: DuelFriend,
+// PlayDuel); they ask each other to be friends, accept, say no, choose their
 // avatar. Whatever follows from that, the game works out itself: scores, streaks, duels' results and records, the
 // facts of Моят Алманах and the notes in it.
 // Only what no game function

@@ -25,7 +25,7 @@ type player struct {
 	pace   time.Duration // how long an answer takes them, about
 	hour   int           // when in the day they usually play
 	topics float64       // topic games on a day they play, on average
-	duels  float64       // duels started (with a friend, or against a recording)
+	duels  float64       // duels started with a friend
 	social float64       // how readily they make friends
 
 	profile int // the day they give an email (-1: a guest throughout)

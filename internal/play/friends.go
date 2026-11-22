@@ -273,9 +273,9 @@ func (g *Game) FriendsNews(ctx context.Context, userID int64) (bool, error) {
 		EXISTS (SELECT 1 FROM friend_requests r WHERE (r.to_id = u.id OR r.to_email = u.email) AND NOT r.declined
 			AND r.at > u.friends_seen_at)
 		OR EXISTS (SELECT 1 FROM duels d WHERE d.a_id = u.id AND d.created_at > u.friends_seen_at - ?2
-			AND d.kind = 'person' AND d.ended_at > u.friends_seen_at)
+			AND d.ended_at > u.friends_seen_at)
 		OR EXISTS (SELECT 1 FROM duels d WHERE d.b_id = u.id AND d.created_at > u.friends_seen_at - ?2
-			AND d.kind = 'person' AND (d.sent_at > u.friends_seen_at AND d.b_run IS NULL
+			AND (d.sent_at > u.friends_seen_at AND d.b_run IS NULL
 				OR d.ended_at > u.friends_seen_at AND d.ended_at >= d.expires_at))
 		FROM users u WHERE u.id = ?1`, userID, newsReach.Milliseconds()).Scan(&news)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -309,7 +309,7 @@ func (g *Game) Unfriend(ctx context.Context, userID, friendID int64) error {
 			OR (user_id = ?2 AND friend_id = ?1)`, userID, friendID); err != nil {
 			return err
 		}
-		_, err := tx.Exec(`UPDATE duels SET expires_at = min(expires_at, ?3) WHERE kind = 'person' AND ended_at IS NULL
+		_, err := tx.Exec(`UPDATE duels SET expires_at = min(expires_at, ?3) WHERE ended_at IS NULL
 			AND ((a_id = ?1 AND b_id = ?2) OR (a_id = ?2 AND b_id = ?1))`, userID, friendID, store.Ms(g.Now()))
 		return err
 	})

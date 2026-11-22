@@ -108,8 +108,8 @@ func chapterRank(chapter string, k keptRank) ChapterRank {
 
 // rightChance is the chance a guess at a question of each kind is right: one of four options; one of two; an order of
 // three (bank.OrderDealt), one of 6; four pairs, one of 24; a split of four or five, about one of 16; a number typed
-// blind, next to none. What a recording is expected to be, by a player's mastery (expectedRights), how hard a
-// question is (countHardness, Calibrate) and how well a player knows a topic (ability.learn) count the guesses so.
+// blind, next to none. How hard a question is (countHardness, Calibrate) and how well a player knows a topic
+// (ability.learn) count the guesses so.
 var rightChance = map[string]float64{"choice": 0.25, "clues": 0.25, "truefalse": 0.5, "order": 1.0 / 6,
 	"match": 1.0 / 24, "split": 1.0 / 16, "number": 0.02}
 

@@ -204,12 +204,10 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   // Who asks, as every row of players has them: the avatar, the name (a way to their profile), and the ask under it.
   await expect(a.locator(".invitation a.who .avatar")).toHaveCount(1);
   await expect(a.locator(".invitation .invitation-line")).toHaveText("Иска да сте приятели.");
-  // While it waits, a dot on the „Приятели“ tab (seen from „Дуели“ too); answered, the dot goes.
-  const aFriends = a.getByRole("tab", { name: "Приятели" });
-  await expect(aFriends.locator(".tab-dot")).toHaveCount(1);
+  // At the page's top while it waits; answered, it goes, and the friend is on the list.
   await a.locator(".invitation").getByRole("button", { name: "Приеми" }).click();
   await expect(a.locator(".friend")).toHaveCount(1);
-  await expect(aFriends.locator(".tab-dot")).toHaveCount(0);
+  await expect(a.locator(".invitation")).toHaveCount(0);
   await b.reload();
   // One friend of that name: the name alone, the @username left to her profile.
   await expect.poll(() => readText(b.locator(".friend .friend-name"))).toMatch(/^Ана Петрова/);
@@ -300,9 +298,9 @@ test("a friend just accepted is on the day's board at once", async ({ browser })
 });
 
 // On the narrowest phone, at the usual text and at twice it, the day played: the day's board's rows hold their score
-// and small squares on both its tabs, nothing goes sideways, and in Приятели „Дуели“ with „Нов дуел“ is there without
-// a friend.
-test("the day's board at 320 px, the day played: the rows hold their squares, and a duel is a tap away", async ({
+// and small squares on both its tabs, nothing goes sideways, and Приятели holds the way to add a friend, still without
+// one.
+test("the day's board at 320 px, the day played: the rows hold their squares, and a friend is a field away", async ({
   browser,
 }) => {
   test.setTimeout(120_000);
@@ -321,12 +319,13 @@ test("the day's board at 320 px, the day played: the rows hold their squares, an
           { childList: true, subtree: true },
         );
       }, percent);
-    await page.goto("/friends?tab=duels");
+    await page.goto("/friends");
     if (percent !== 100) {
       await expect(page.locator("html")).toHaveCSS("font-size", `${(16 * percent) / 100}px`);
       await expect(page.locator("html")).toHaveClass(/\btight\b/);
     }
-    await expect(page.locator(".duels").getByRole("link", { name: "Нов дуел" })).toBeVisible();
+    await expect(page.locator(".add-friend").getByRole("textbox")).toBeVisible();
+    await expect(page.getByRole("tab")).toHaveCount(0);
     await page.goto("/");
     for (const tab of ["Приятели", "Всички"]) {
       await page.locator(".day-board").getByRole("tab", { name: tab }).click();

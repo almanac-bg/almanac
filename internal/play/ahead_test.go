@@ -347,8 +347,8 @@ func TestDatedQuestionsWaitForTheirDate(t *testing.T) {
 	days := map[string][]Pick{"2026-01-01": {{ID: dealt.Base().ID}}}
 	bars := barsOf(days, today, b)
 	for q, want := range map[bank.Question]bool{yearly: true, dealt: false, past: false, plain: false, next: true} {
-		if id := q.Base().ID; bars.all[id] != want || bars.now[id] {
-			t.Errorf("%s (on %v): kept out %v, want %v, and never as today's", id, q.Extra().On, bars.all[id], want)
+		if id := q.Base().ID; bars.all[id] != want {
+			t.Errorf("%s (on %v): kept out %v, want %v", id, q.Extra().On, bars.all[id], want)
 		}
 	}
 }

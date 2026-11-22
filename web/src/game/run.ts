@@ -66,7 +66,7 @@ function showing(run: number): void {
 }
 
 /** Plays a run from where it stands; `done` draws what comes after its last answer. A duel is named over each
- * question as its page names it (`versus`: „Дуел с Мария“, „Запис · Краси“); played second (the run's
+ * question as its page names it (`versus`: „Дуел с Мария“); played second (the run's
  * `against`), how the other's answer went (`them`, their name) shows once the player's own is in, never when they gave
  * it: a duel isn't a race. */
 export function playRun(initial: State, done: (s: State) => Child, versus = "", them = ""): Child {

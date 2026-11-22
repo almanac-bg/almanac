@@ -171,7 +171,7 @@ func (g *Game) deal(p Pick) (bank.Dealt, bool) {
 	return q.Deal(p.Seed), true
 }
 
-// Deal deals a pick as a run has it: the version it showed, if it did (a recording's), else as the
+// Deal deals a pick as a run has it: the version it showed, if it did (a duel's, played second), else as the
 // bank has it now. False if it can't be.
 func (g *Game) Deal(p Pick) (bank.Dealt, bool) { return g.deal(p) }
 

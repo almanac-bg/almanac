@@ -97,19 +97,16 @@ func TestDayRunEndsWithItsDay(t *testing.T) {
 func TestDuelsSettledAfterAStop(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	ana, bo, gal := w.user(), w.user(), w.user()
-	s, err := w.g.StartTopic(ctx, bo, MixTopic)
-	if err != nil {
-		t.Fatal(err)
-	}
-	w.play(bo, s.ID, repeat(w.wrong, Length)...)
-	w.wait(time.Minute)
+	ana, bo, gal, cy := w.user(), w.user(), w.user(), w.user()
 	w.befriend(ana, bo)
-	// Gal against a recording, all right, and Ana's side of a duel with Bo: neither is kept past its last answer.
-	rec, err := w.g.DuelRecording(ctx, gal)
+	w.befriend(gal, cy)
+	// Gal's duel with Cy, Gal's side played (all right) and sent, then Cy's (all wrong), and Ana's side of a duel with
+	// Bo: neither is kept past its last answer.
+	ended, err := w.g.DuelFriend(ctx, gal, cy)
 	if err != nil {
 		t.Fatal(err)
 	}
+	w.playSide(gal, ended, repeat(w.right, Length))
 	sent, err := w.g.DuelFriend(ctx, ana, bo)
 	if err != nil {
 		t.Fatal(err)
@@ -118,7 +115,7 @@ func TestDuelsSettledAfterAStop(t *testing.T) {
 		BEGIN SELECT RAISE(ABORT, 'stopped'); END`); err != nil {
 		t.Fatal(err)
 	}
-	w.playSide(gal, rec, repeat(w.right, Length))
+	w.playSide(cy, ended, repeat(w.wrong, Length))
 	w.playSide(ana, sent, repeat(w.right, Length))
 	if _, err := w.db.Write.Exec(`DROP TRIGGER stop`); err != nil {
 		t.Fatal(err)
@@ -127,7 +124,7 @@ func TestDuelsSettledAfterAStop(t *testing.T) {
 	if err := w.g.AfterDue(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if d, _ := w.g.DuelOf(ctx, gal, rec); d.State != DuelWon {
+	if d, _ := w.g.DuelOf(ctx, gal, ended); d.State != DuelWon || d.EndedAt == 0 {
 		t.Fatalf("the duel finished before the stop: %+v", d)
 	}
 	if d, _ := w.g.DuelOf(ctx, bo, sent); d.State != DuelYours {

@@ -61,10 +61,10 @@ const Ahead = 90
 // already; the other 60 are time to write.
 const RunwayWarn = Ahead + 60
 
-// dayBars are the questions no game deals now (now: today's, and those due for review today, overdue), and those no
-// other game deals but a recording that has them already (all: those, and the days ahead's).
+// dayBars are the questions no other game deals (all: today's, those due for review today, overdue, and the days
+// ahead's).
 type dayBars struct {
-	now, all map[string]bool
+	all map[string]bool
 }
 
 type daysCache struct {
@@ -246,10 +246,10 @@ func storedDays(tx *sql.Tx, from string) (map[string][]Pick, error) {
 	return out, rows.Err()
 }
 
-// barsOf are the questions of today and the days after it, those of the bank due for review today, and (in all only)
-// the questions that wait for their date (waiting): days holds the days played too, to tell which have had theirs.
+// barsOf are the questions of today and the days after it, those of the bank due for review today, and the questions
+// that wait for their date (waiting): days holds the days played too, to tell which have had theirs.
 func barsOf(days map[string][]Pick, today string, b *bank.Bank) dayBars {
-	bars := dayBars{now: map[string]bool{}, all: map[string]bool{}}
+	bars := dayBars{all: map[string]bool{}}
 	dealt := map[string]bool{}
 	for day, picks := range days {
 		for _, p := range picks {
@@ -258,13 +258,10 @@ func barsOf(days map[string][]Pick, today string, b *bank.Bank) dayBars {
 				continue
 			}
 			bars.all[p.ID] = true
-			if day == today {
-				bars.now[p.ID] = true
-			}
 		}
 	}
 	for _, id := range Overdue(b, today) {
-		bars.now[id], bars.all[id] = true, true
+		bars.all[id] = true
 	}
 	for _, q := range b.Live("", "") {
 		if id := q.Base().ID; !dealt[id] && (waiting(q, today) || unproven(q, today)) {
