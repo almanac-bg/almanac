@@ -183,7 +183,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   („Днешният брой: 7 от 10“, „Днешният брой: още не е изигран“, „Дуели помежду ви: 3 победи, 1 загуба“, with
   „равенства“ if any): never a bare „днес още не“, which says neither what nor whose; a friend removed only after a sheet asks „Премахваш ли Иво от приятелите си?“, „Премахни“ in red and
   „Отказ“, then at once, the duels open between them ending as if their time were up; then adding and the requests.
-  Under „Дуели“: what a duel is in a line, the open ones (theirs to play first, then those waiting), those played
+  Under „Дуели“: what a duel is in a line, the open ones under „Чакащи“ (theirs to play first, then those waiting), those played
   under „Последните 10 изиграни“ („Изиграни“ while there are fewer: the list is the last ten and says so), „Нов дуел“
   always (against a recording it needs no friend). The card is all there is of a duel: there is no page of its result
   (DECISIONS.md). A duel is a card, never a person's row
@@ -217,7 +217,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   ги играе, когато може. Срещу запис — веднага.“; under „С приятел“ a row a friend (`.duel-pick`), the whole row a
   button that starts the duel, so nothing in it looks like a way to a profile (no name underlined; under a pointer
   the row's line lights): the avatar, the name with the duels between the two under it („дуели 3:1“, or „Още нямате
-  дуели“), and „Дуел“ at its end as a small filled pill (`.duel-invite`); under „Срещу запис“ one sentence („Изиграй
+  дуели“), and „Дуел“ at its end as a small filled button, a button's corners (`.duel-invite`); the avatar and the name as a friend's row has them; under „Срещу запис“ one sentence („Изиграй
   същите десет въпроса срещу истинска игра на играч, който знае горе-долу колкото теб.“) and one button, „Играй срещу
   запис“: a recording is of one kind.
 - **Профил:** one column, on a big screen too: the avatar with the seal worn on its corner and a pencil on its top corner (a phone: always; a big screen: as the pointer

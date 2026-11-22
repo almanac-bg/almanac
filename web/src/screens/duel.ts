@@ -205,7 +205,7 @@ export function duelNew() {
                 }.`,
                 onclick: () => begin({ friend: f.id }),
               },
-              avatar(f.avatar, { size: "s", name: f.name, seal: f.seal }),
+              avatar(f.avatar, { name: f.name, seal: f.seal }),
               h(
                 "span",
                 { class: "duel-pick-text" },

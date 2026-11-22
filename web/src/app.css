@@ -1181,6 +1181,13 @@
     background: transparent;
   }
 
+  /* While a sheet is open the page under it holds still: one scroll, the sheet's, never the page's beside it. Its
+     scrollbar's room is kept, so the page doesn't shift under the scrim. */
+  html:has(.sheet[open]) {
+    overflow: hidden;
+    scrollbar-gutter: stable;
+  }
+
   /* Taller than the screen (large text on a small phone), it scrolls, its button at the foot reachable. */
   .sheet-panel {
     width: min(100%, 30rem);
@@ -3551,6 +3558,13 @@
     list-style: none;
   }
 
+  /* The duel just played, the open ones („Чакащи“), the played: each group well apart from the next. */
+  .duel-groups {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-5);
+  }
+
   .duel-card {
     display: grid;
     gap: 10px;
@@ -3622,9 +3636,10 @@
     text-align: center;
   }
 
+  /* A name as heavy as a friend's in the list (.friend-name). */
   .duel-card-name {
     max-width: 100%;
-    font: 700 0.875rem / 1.25 var(--font-sans);
+    font: 800 0.875rem / 1.25 var(--font-sans);
   }
 
   .duel-card-mid {
@@ -3855,8 +3870,9 @@
     min-width: 0;
   }
 
+  /* As heavy as a friend's name in Приятели (.friend-name). */
   .duel-pick-name {
-    font-weight: 700;
+    font-weight: 800;
     overflow-wrap: break-word;
   }
 
@@ -3871,11 +3887,12 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* „Дуел“ at the row's end: the row's action said as a small filled button, the row itself being the button. */
+  /* „Дуел“ at the row's end: the row's action said as a small filled button, the row itself being the button; its
+     corners a button's (`.btn`'s, a size down), not a pill's. */
   .duel-invite {
     flex: none;
     padding: 6px 16px;
-    border-radius: var(--radius-full);
+    border-radius: var(--r-1);
     background: var(--ink);
     color: var(--bg);
     font: 800 0.875rem / 1.25rem var(--font-sans);
