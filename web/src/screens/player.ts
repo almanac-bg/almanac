@@ -35,8 +35,6 @@ interface Profile {
   tag: string;
   me?: boolean;
   avatar: string;
-  // The day they started playing (YYYY-MM-DD, Bulgaria's).
-  since: string;
   seal?: { chapter: string; level: number };
   ranks: ChapterRank[];
   // The streak as it is now (none: none runs).
@@ -102,7 +100,6 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
         h("span", { class: "me-avatar" }, avatar(p.avatar, { size: "l", name: p.name, seal: p.seal })),
         nameWords(p.name),
         p.tag,
-        () => p.since,
         () => p.streak,
       ),
       relation(p, load),

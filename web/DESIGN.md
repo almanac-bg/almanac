@@ -220,10 +220,9 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   the two.
 - **Профил:** one column, on a big screen too: the avatar with the seal worn on its corner and a pencil on its top corner (a phone: always; a big screen: as the pointer
   comes over it, with the tooltip „Смени аватара“), the
-  name, the @username and by it, on the same line where it fits, the streak as it is now, sized to the head (the
-  flame, „58 дни без прекъсване“; never an ended one's, nothing while none runs; no card of its own), on the
-  @username's baseline by its text (the flame sits on the line as a letter does), a line of text that, where it wraps,
-  goes on flush left under the flame; under them „Играе от 6 ноември 2026 г.“, as another's page has it. What the week
+  name, the @username and under it the streak as it is now, a quiet line, its number heavy, no flame („Играеш от 58
+  дни без прекъсване“, „Играе от …“ on another's page; never an ended one's, nothing while none runs; no card of its
+  own). No day they started: the streak says how long they've kept at it. What the week
   forgives is no line of the page: the streak's `title`, for a pointer resting on it (that it's used up, only while a
   streak runs); a phone is told it where it matters, when a day missed is forgiven. A guest's ways in one quiet line
   under it („Играта ти е само на това устройство. Запази я с имейл · Имаш профил? Влез“: the first opens its form in
@@ -239,8 +238,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   animals and nothing else (an avatar is a face: a seal is worn on it, never chosen as it), are a choice made rarely,
   so never on the page: a sheet (`screens/avatar.ts`) opened by the avatar (one button, its pencil on it), the one
   worn ringed; a tap wears one and, once it's kept, puts the sheet away. Another player's page (`/players/<tag>`) is
-  laid out the same, one column (`profileHead`, `sealsSection`): the same head without a way to change it („Играе от
-  6 ноември 2026 г.“, the day they started, in the line under the @username, as on Профил), their streak by the @username as Профил has it (only as it is now: never the
+  laid out the same, one column (`profileHead`, `sealsSection`): the same head without a way to change it, their streak under the @username as Профил has it, said of them („Играе
+  от 58 дни без прекъсване“; only as it is now: never the
   longest nor an ended one's, nothing while none runs, and not what the week forgives: that's theirs), right under
   the head a card of how you stand: its kicker („Приятели“, „Покана за приятелство“, „Не сте приятели“); as
   friends the duels between you as heavy numerals with their words under them („3 / победи“, „0 / загуби“, and

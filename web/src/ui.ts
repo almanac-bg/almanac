@@ -7,7 +7,7 @@ import { errorText, passing } from "./lib/api.ts";
 import { hourInBulgaria } from "./lib/day.ts";
 import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
 import { calm, type Scheme, scheme, setScheme } from "./lib/prefs.ts";
-import { dateWords, formatNumber, formatValue, found, hyphenate, keepNumbers, stakeWords } from "./lib/words.ts";
+import { formatNumber, formatValue, found, hyphenate, keepNumbers, stakeWords } from "./lib/words.ts";
 import { glyphBox, rankName, rankNames, sealParts } from "./seal.ts";
 import { categories, topics, user } from "./state.ts";
 
@@ -332,16 +332,15 @@ export function standing(s: Standing, named = true): HTMLElement {
 export type ChapterRank = Standing;
 
 /** A player's head, one look on Профил and on a player's page: the avatar with the seal worn on its corner (`face`:
- * on Профил a button with „Смени“ under it), the name, the @username with the streak as it is now by it (`streak`:
- * its days, nothing while there's none; never an ended one's, DECISIONS.md), the day they started playing under them
- * (`since`: „Играе от 6 ноември 2026 г.“ on another's page, „Играеш от …“ on one's own, `own`), and what's only
- * Профил's under it (`more`: the way to change a name drawn at random). `why`, Профил's only: what the week forgives,
- * said when the pointer rests on the streak (a phone has it where a day missed is forgiven). */
+ * on Профил a button with „Смени“ under it), the name, the @username, the streak as it is now under them (`streak`:
+ * its days, „Играе от 11 дни без прекъсване“ on another's page, „Играеш от …“ on one's own, `own`; nothing while
+ * there's none, never an ended one's, DECISIONS.md), and what's only Профил's under it (`more`: the way to change a
+ * name drawn at random). `why`, Профил's only: what the week forgives, said when the pointer rests on the streak (a
+ * phone has it where a day missed is forgiven). */
 export function profileHead(
   face: Child,
   name: Child,
   tag: string | (() => string | undefined),
-  since: () => string | undefined,
   streak: () => number | undefined,
   why?: () => string | undefined,
   more: Child = null,
@@ -356,30 +355,21 @@ export function profileHead(
       "div",
       { class: "me-who" },
       h("h1", null, name),
-      h("p", { class: "me-ids" }, typeof tag === "function" ? () => at(tag()) : at(tag), () =>
-        streakLine(streak(), why?.()),
-      ),
-      () => {
-        const day = since();
-        return day ? h("p", { class: "me-line" }, `${own ? "Играеш" : "Играе"} от ${fullDate(day)}`) : null;
-      },
+      h("p", { class: "me-ids" }, typeof tag === "function" ? () => at(tag()) : at(tag)),
+      () => streakLine(streak(), why?.(), own),
       more,
     ),
   );
 }
 
-/** A day as the game writes it, with its year: „6 ноември 2026 г.“ („г.“ kept with its year, never alone on a line). */
-const fullDate = (day: string) => `${dateWords(day)} ${day.slice(0, 4)} г.`;
-
-/** The streak in a player's head: the flame, its number and its words („58 дни без прекъсване“), a line of text by the
- * @username's (on its baseline): where it wraps (a phone, large text), its next line starts at its left edge, under the
- * flame. Nothing while there's none. */
-function streakLine(days: number | undefined, why: string | undefined): Child {
+/** The streak in a player's head, a quiet line under the @username: „Играеш от 58 дни без прекъсване“ (one's own) or
+ * „Играе от …“ (another's), its number heavy. Nothing while there's none. */
+function streakLine(days: number | undefined, why: string | undefined, own: boolean): Child {
   if (!days) return null;
   return h(
-    "span",
-    { class: "me-streak", title: why },
-    picture("flame", "me-streak-flame"),
+    "p",
+    { class: "me-line me-streak", title: why },
+    own ? "Играеш от " : "Играе от ",
     h("b", { class: "num" }, formatNumber(days)),
     days === 1 ? " ден без прекъсване" : " дни без прекъсване",
   );

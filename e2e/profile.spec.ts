@@ -45,8 +45,8 @@ test("Профил: one list of seals, the best worn on the avatar, never chosen
   await expect(page.locator(".screen")).not.toContainText(/избери|Носиш|Печатът на/);
   // The badge is the best (every chapter alike in rank and day: the most ink), on the avatar's corner: the first row.
   await expect(page.locator(".me-avatar .avatar > .seal")).toHaveClass(/\bt-music\b/);
-  // The day they started, in the same place as another's page has it, said to them.
-  await expect(page.locator(".me-head .me-line").first()).toHaveText(/^Играеш от \d{1,2} [а-я]+ \d{4}\u00a0г\.$/);
+  // No day they started: the streak says how long they've kept at it.
+  await expect(page.locator(".me-head")).not.toContainText(/\d{4}\u00a0г\./);
   expect((await page.request.patch("/api/me/seal", { data: { chapter: "music" } })).ok()).toBe(false);
   // An avatar is a face: the fifteen animals, and no chapter's art, whatever its rank, here or by the API. A choice
   // made rarely: on a sheet, not on the page.
@@ -109,8 +109,8 @@ test("a player's profile: asked to be friends from it, and friends there", async
   await b.goto(`/players/${ana.tag}`);
   await expect(b.getByRole("heading", { level: 1, name: ana.name })).toBeVisible();
   await expect(b.locator(".me-tag")).toHaveText(`@${ana.tag}`);
-  // Since the day she started, as the game writes a date, with its year.
-  await expect(b.locator(".me-line")).toHaveText(/^Играе от \d{1,2} [а-я]+ \d{4}\u00a0г\.$/);
+  // No day she started: the streak alone says how long she's kept at it (and here she has none).
+  await expect(b.locator(".me-line")).toHaveCount(0);
   // Her avatar is hers to change, not his: no way to it here.
   await expect(b.getByRole("button", { name: "Смени аватара" })).toHaveCount(0);
   // A topic's game writes no rank and no streak: nothing yet, and no lifetime totals nor how well she knows a topic.
@@ -152,7 +152,9 @@ test("a player's profile: asked to be friends from it, and friends there", async
     "player-actions",
     "sect",
   ]);
-  await expect(b.locator(".me-head .me-ids .me-streak")).toHaveText("3 дни без прекъсване");
+  // Her streak, under her @username, said of her; no flame.
+  await expect(b.locator(".me-head .me-line.me-streak")).toHaveText("Играе от 3 дни без прекъсване");
+  await expect(b.locator(".me-head .me-streak .picture, .me-head .me-streak svg")).toHaveCount(0);
   await expect(b.locator(".me-streak")).not.toHaveAttribute("title");
   await expect(b.locator(".screen")).not.toContainText(/простен|пропуснат/);
   await expect(b.getByRole("button", { name: /^Дуел (с|със) / })).toBeVisible();
@@ -172,7 +174,7 @@ test("a player's profile: asked to be friends from it, and friends there", async
 
   // Профил has no way to the page as others see it: her own, opened by its tag, is Профил.
   await a.goto("/me");
-  await expect(a.locator(".me-head .me-streak")).toHaveText("3 дни без прекъсване");
+  await expect(a.locator(".me-head .me-streak")).toHaveText("Играеш от 3 дни без прекъсване");
   await expect(a.getByText(/Как (те|ме) виждат другите/)).toHaveCount(0);
   await a.goto(`/players/${ana.tag}`);
   await expect(a).toHaveURL(/\/me$/);
