@@ -116,8 +116,10 @@ test("the day says how its other players did with each question: under the verdi
   await answer(page);
   const says = page.locator(".after .verdict + .crowd-says");
   // The other answered nothing, so this may be the first right answer: then it says so, never „0%“.
+  // With the tests beside it playing the day too, it's a share („днес“ held to it by a no-break space: a pattern's
+  // text isn't evened out as a string's is, so the pattern says which space).
   await expect(says).toHaveText(
-    /^([А-Яа-я ]+ (\d+|под 1)\u00a0% от играчите днес|Днес (само ти го позна|още никой не го е познал))\.$/,
+    /^([А-Яа-я ]+ (\d+|под 1)\u00a0% от играчите\u00a0днес|Днес (само ти го позна|още никой не го е познал))\.$/,
   );
   await moveOn(page);
   for (let n = 1; n < 10; n++) {
@@ -126,7 +128,7 @@ test("the day says how its other players did with each question: under the verdi
     await moveOn(page);
   }
   await page.getByRole("button", { name: "Прегледай въпросите" }).click();
-  await expect(page.locator(".reviewed").first().locator(".crowd-says")).toHaveText(/от играчите днес\.$|^Днес /);
+  await expect(page.locator(".reviewed").first().locator(".crowd-says")).toHaveText(/от играчите\u00a0днес\.$|^Днес /);
 });
 
 test("a topic, ten questions, a question reported, and ten more", async ({ page }) => {
