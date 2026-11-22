@@ -45,8 +45,8 @@ test("Профил: one list of seals, the best worn on the avatar, never chosen
   await expect(page.locator(".screen")).not.toContainText(/избери|Носиш|Печатът на/);
   // The badge is the best (every chapter alike in rank and day: the most ink), on the avatar's corner: the first row.
   await expect(page.locator(".me-avatar .avatar > .seal")).toHaveClass(/\bt-music\b/);
-  // The day they started, as another's page has it, in the same place.
-  await expect(page.locator(".me-head .me-line").first()).toHaveText(/^Играе от \d{1,2} [а-я]+ \d{4}\u00a0г\.$/);
+  // The day they started, in the same place as another's page has it, said to them.
+  await expect(page.locator(".me-head .me-line").first()).toHaveText(/^Играеш от \d{1,2} [а-я]+ \d{4}\u00a0г\.$/);
   expect((await page.request.patch("/api/me/seal", { data: { chapter: "music" } })).ok()).toBe(false);
   // An avatar is a face: the fifteen animals, and no chapter's art, whatever its rank, here or by the API. A choice
   // made rarely: on a sheet, not on the page.
