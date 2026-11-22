@@ -264,14 +264,36 @@ export interface Standing {
 /** The ink still to come to the next rank: never 0 (the next rank, held for a day's count: play.StepOf). */
 const leftOf = (s: Standing) => Math.max(1, s.nextAt - s.ink);
 
-/** How full a chapter's bar is, 0 to 1, as its words say it: its ink out of the next rank's (1 of 5 a fifth, 40 of 100
- * two fifths), so the bar's length is the way to the next in the words' own units. Past Летопис, where each rank is a
- * further hundred, the ink within its hundred: counted from nothing there, the bar would always look nearly full.
- * Never the whole: the next rank isn't held yet. */
-export function wayOf(s: Standing): number {
+/** The steps of a chapter's way to its next rank, in ink, as its bar shows them: its way halved, and halved again at
+ * its right end, until five or fewer are left, and those one ink each (5: 1, 1, 1, 1, 1; 15: 8, 4, 1, 1, 1; 250: 125, 63,
+ * 31, 16, 8, 4, 1, 1, 1). So the bar is never more steps than an eye counts at a glance, and the last ones before a
+ * rank are each a fact. */
+export function stepsOf(way: number): number[] {
+  const steps: number[] = [];
+  let left = Math.max(1, way);
+  while (left > 5) {
+    const half = Math.ceil(left / 2);
+    steps.push(half);
+    left -= half;
+  }
+  for (; left > 0; left--) steps.push(1);
+  return steps;
+}
+
+/** A chapter's bar as steps (stepsOf), each with how full it is, 0 to 1, and its share of the bar: the way is its ink
+ * out of the next rank's (1 of 5, 40 of 100: never empty just past a rank); past Летопис, where each rank is a further
+ * hundred, the ink within its hundred. Each step takes half the bar the one before it does, the last two alike (1/2,
+ * 1/4, 1/8, 1/8): the big ones far from the rank, the small ones near it. Never the whole: the next rank isn't held
+ * yet. */
+export function barOf(s: Standing): { fill: number; share: number }[] {
   const start = s.level > rankNames.length ? s.from : 0;
-  const span = s.nextAt - start;
-  return span > 0 ? Math.min(1, Math.max(0, (s.nextAt - leftOf(s) - start) / span)) : 0;
+  const steps = stepsOf(s.nextAt - start);
+  let done = Math.max(0, s.nextAt - leftOf(s) - start);
+  return steps.map((n, i) => {
+    const fill = Math.min(1, done / n);
+    done = Math.max(0, done - n);
+    return { fill, share: 2 ** -Math.min(i + 1, steps.length - 1) };
+  });
 }
 
 /** Where a chapter stands, in words: the rank it holds („Страница“, „Летопис · 2“; before a first, „Още без печат“),
@@ -283,7 +305,8 @@ export function standingWords(s: Standing): [now: string, next: string] {
 }
 
 /** Where a chapter stands, one way everywhere (Профил's seals, a chapter's head and card, the result's line): a bar in
- * the chapter's colour (in ink on its sheet) filled for its ink out of the next rank's (wayOf), and under it its two
+ * the chapter's colour (in ink on its sheet) of steps filled for its ink out of the next rank's (barOf), so how many
+ * are left shows without reading a number, and under it its two
  * ends named: the rank held at the left, in ink, and what's left to the next at the right. Where both don't fit on a
  * line, the right goes under the left, never cut; `named` false (a narrow card, its rank said over the bar), the right
  * one alone. The bar is for the eye: the words say it. */
@@ -295,7 +318,13 @@ export function standing(s: Standing, named = true): HTMLElement {
     h(
       "span",
       { class: "standing-bar", "aria-hidden": "true" },
-      h("i", { style: { width: `${Math.round(wayOf(s) * 1000) / 10}%` } }),
+      barOf(s).map(({ fill, share }) =>
+        h(
+          "span",
+          { style: { "flex-grow": String(share) } },
+          h("i", { style: { width: `${Math.round(fill * 1000) / 10}%` } }),
+        ),
+      ),
     ),
     h(
       "span",

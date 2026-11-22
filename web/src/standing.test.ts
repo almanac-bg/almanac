@@ -1,6 +1,6 @@
 // Where a chapter stands (ui.ts, standing), in words and as a bar: the rank held (none before a first seal) and what's
-// left to the next, past Летопис as well; and the bar filled for the chapter's ink out of the next rank's (past Летопис,
-// within its hundred), never the whole while the next isn't held. Its colours hold their contrast: the bar's fill
+// left to the next, past Летопис as well; and the bar, in steps a glance counts, filled for the chapter's ink out of the
+// next rank's (past Летопис, within its hundred), never the whole while the next isn't held. Its colours hold their contrast: the bar's fill
 // against its track and the page, by day and by night, and on a chapter's sheet.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -11,7 +11,7 @@ Object.assign(globalThis, {
   location: { pathname: "/", search: "", hash: "" },
   document: { addEventListener: () => {}, getElementById: () => null, documentElement: { dataset: {} } },
 });
-const { standingWords, wayOf } = await import("./ui.ts");
+const { barOf, standingWords, stepsOf } = await import("./ui.ts");
 
 const at = (level: number, ink: number, from: number, nextAt: number) => ({
   chapter: "history",
@@ -34,27 +34,66 @@ test("the words say the rank held and what's left to the next", () => {
   assert.ok(standingWords(at(7, 413, 350, 450))[1]?.includes("Летопис · 3"));
 });
 
-test("the bar is the ink out of the next rank's, in the words' own units", () => {
-  // 1 of 5, 40 of 100: never empty just past a rank, so a first ink shows on the bar.
-  assert.equal(wayOf(at(1, 1, 1, 5)), 0.2);
-  assert.equal(wayOf(at(4, 40, 40, 100)), 0.4);
-  assert.equal(wayOf(at(2, 5, 5, 15)), 1 / 3);
-  assert.equal(wayOf(at(2, 10, 5, 15)), 2 / 3);
-  assert.equal(wayOf(at(6, 300, 250, 350)), 300 / 350);
-  assert.equal(wayOf(at(0, 0, 0, 1)), 0);
+test("the way is halved at its right end until five steps or fewer are left, those one ink each", () => {
+  assert.deepEqual(stepsOf(1), [1]);
+  assert.deepEqual(stepsOf(5), [1, 1, 1, 1, 1]);
+  assert.deepEqual(stepsOf(6), [3, 1, 1, 1]);
+  assert.deepEqual(stepsOf(15), [8, 4, 1, 1, 1]);
+  assert.deepEqual(stepsOf(40), [20, 10, 5, 1, 1, 1, 1, 1]);
+  assert.deepEqual(stepsOf(100), [50, 25, 13, 6, 3, 1, 1, 1]);
+  assert.deepEqual(stepsOf(250), [125, 63, 31, 16, 8, 4, 1, 1, 1]);
+  for (let way = 1; way <= 1000; way++) {
+    const steps = stepsOf(way);
+    assert.equal(
+      steps.reduce((a, b) => a + b, 0),
+      way,
+    );
+    assert.ok(steps.length <= 12, `${way} is ${steps.length} steps`);
+    assert.deepEqual(steps.slice(-Math.min(way, 3)), Array(Math.min(way, 3)).fill(1));
+    assert.ok(steps.every((n, i) => i === 0 || n <= (steps[i - 1] ?? 0)));
+  }
+});
+
+/** How full each step is, to a hundredth. */
+const fills = (s: ReturnType<typeof at>) => barOf(s).map((b) => Math.round(b.fill * 100) / 100);
+
+test("the bar is the ink out of the next rank's, step by step", () => {
+  // 1 of 5: never empty just past a rank, so a first ink shows on the bar.
+  assert.deepEqual(fills(at(1, 1, 1, 5)), [1, 0, 0, 0, 0]);
+  assert.deepEqual(fills(at(1, 3, 1, 5)), [1, 1, 1, 0, 0]);
+  // 40 of 100: four fifths of the first half.
+  assert.deepEqual(fills(at(4, 40, 40, 100)), [0.8, 0, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(fills(at(4, 98, 40, 100)), [1, 1, 1, 1, 1, 1, 0, 0]);
+  assert.deepEqual(fills(at(2, 10, 5, 15)), [1, 0.5, 0, 0, 0]);
+  assert.deepEqual(fills(at(0, 0, 0, 1)), [0]);
   // Held at one to come: as the words say it, never full.
-  assert.equal(wayOf(at(3, 45, 15, 40)), 39 / 40);
+  assert.deepEqual(fills(at(3, 45, 15, 40)), [1, 1, 1, 1, 1, 1, 1, 0]);
   // A rank never falls, though its ink may (a fact found untrue): the bar is the ink as it is.
-  assert.equal(wayOf(at(4, 30, 40, 100)), 0.3);
+  assert.deepEqual(fills(at(4, 30, 40, 100)), [0.6, 0, 0, 0, 0, 0, 0, 0]);
+});
+
+test("each step takes half the bar the one before it does, the last two alike", () => {
+  assert.deepEqual(
+    barOf(at(1, 1, 1, 5)).map((b) => b.share),
+    [1 / 2, 1 / 4, 1 / 8, 1 / 16, 1 / 16],
+  );
+  assert.deepEqual(
+    barOf(at(0, 0, 0, 1)).map((b) => b.share),
+    [1],
+  );
+  for (const s of [at(1, 1, 1, 5), at(4, 40, 40, 100), at(5, 100, 100, 250)])
+    assert.equal(
+      barOf(s).reduce((a, b) => a + b.share, 0),
+      1,
+    );
 });
 
 test("past Летопис, each rank a further hundred, the bar is the ink within its hundred", () => {
-  assert.equal(wayOf(at(7, 413, 350, 450)), 0.63);
-  assert.equal(wayOf(at(7, 350, 350, 450)), 0);
-  assert.equal(wayOf(at(8, 499, 450, 550)), 0.49);
+  assert.deepEqual(fills(at(7, 413, 350, 450)), [1, 0.52, 0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(fills(at(7, 350, 350, 450)), [0, 0, 0, 0, 0, 0, 0, 0]);
   // Held at one to come, and ink fallen under its rank's: never full, never less than empty.
-  assert.equal(wayOf(at(7, 460, 350, 450)), 0.99);
-  assert.equal(wayOf(at(8, 440, 450, 550)), 0);
+  assert.deepEqual(fills(at(7, 460, 350, 450)), [1, 1, 1, 1, 1, 1, 1, 0]);
+  assert.deepEqual(fills(at(8, 440, 450, 550)), [0, 0, 0, 0, 0, 0, 0, 0]);
 });
 
 const css = readFileSync(new URL("./app.css", import.meta.url), "utf8");
@@ -100,7 +139,7 @@ for (const [name, t] of [
   ["night", night],
 ] as const) {
   test(`${name}: the bar's fill holds 3:1 on the page and its track, in every chapter's colour`, () => {
-    const share = trackShare(".standing-bar");
+    const share = trackShare(".standing-bar > span");
     assert.ok(share > 0, "no track for .standing-bar");
     assert.ok(chapters.length >= 10);
     for (const ch of chapters)
@@ -115,7 +154,7 @@ for (const [name, t] of [
   });
 
   test(`${name}: on a chapter's sheet the bar is the sheet's ink, 3:1 on its track`, () => {
-    const share = trackShare(".leaf .standing-bar");
+    const share = trackShare(".leaf .standing-bar > span");
     assert.ok(share > 0, "no track for .leaf .standing-bar");
     const ink = rgb("#16132b");
     for (const ch of chapters) {
