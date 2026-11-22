@@ -1,14 +1,17 @@
 // Приятели, one of the three places (DESIGN.md, Places): two tabs at its top, of one weight, as the day's board has
 // them. „Приятели“: who asks to be friends, each friend with their day, the duels between you and a duel a tap away,
 // and the one way to make more (by потребителско име or email). „Дуели“: a friend's waiting for you, yours waiting for
-// them, those played (screens/duel.ts), and a new one; it carries a dot while one waits for the player, and opens
-// first then („Приятели“ has a dot while someone asks to be friends). The tab chosen is in the address (`?tab=duels`): back and a reload keep it. The day's board is on Днес's
-// result (today.ts, dayBoard).
+// them, the last ten played, each a card that holds all there is of its duel (screens/duelcards.ts), and a new one;
+// it carries a dot while one waits for the player, and opens first then („Приятели“ has a dot while someone asks to
+// be friends). The tab chosen is in the address (`?tab=duels`): back and a reload keep it; a duel named there too
+// (`&duel=<id>`: one just played, or an old link to it: screens/duel.ts) is first under „Дуели“. The day's board is on
+// Днес's result (today.ts, dayBoard).
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
 import type { Look } from "../ui.ts";
-import type { Accepted, Duels } from "./duel.ts";
+import type { Accepted, Duels, DuelView } from "./duel.ts";
+import { duelCards } from "./duelcards.ts";
 
 // The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
 // only types.
@@ -24,7 +27,8 @@ let {
   when,
   title,
   sawFriends,
-  duelLists,
+  news,
+  loadFeel,
   startDuel,
   go,
   player,
@@ -88,7 +92,8 @@ export function friends(kit: Kit): Child {
     when,
     title,
     sawFriends,
-    duelLists,
+    news,
+    loadFeel,
     startDuel,
     go,
     player,
@@ -109,17 +114,24 @@ export function friends(kit: Kit): Child {
   // Opened: what has come here is seen, on every device, and the dot on Приятели goes.
   if (user.peek()) sawFriends();
   // The page's heading is the tabs': its own is a screen reader's only, so that nothing is headed twice.
-  return h("section", { class: "screen friends-page" }, h("h1", { class: "sr" }, "Приятели"), tabs());
+  return h("section", { class: "screen friends-page" }, h("h1", { class: "sr" }, "Приятели"), tabs(kit));
 }
 
 /** The two tabs and what the chosen one shows. Приятели: who asks to be friends, each friend with their day and the
  * duels between you (and, while changing the list, removing them), the one field to add more, and the requests that
  * wait for an answer. Дуели: the player's duels, and a new one. */
-function tabs(): Child {
+function tabs(kit: Kit): Child {
   // The tab chosen, kept in the address; none chosen: Дуели while a duel waits for the player as the page opens (a
   // duel that comes later lights the tab's dot, and never moves the page under the player), else Приятели.
-  const at = new URLSearchParams(location.search).get("tab");
+  const asked = new URLSearchParams(location.search);
+  const at = asked.get("tab");
   const chosen = signal<Tab | null>(at === "duels" || at === "friends" ? at : null);
+  // The duel named in the address (just played, or an old link to its page): first under „Дуели“, where its result
+  // lands once (duelcards.ts), with what its game brought under it, asked for once (game/news.ts: it marks the game
+  // as told). One that isn't among those listed (older than the last ten) is asked for by itself.
+  const named = Number(asked.get("duel")) || 0;
+  const top = signal<DuelView | null>(null);
+  let brought: Child = null;
   const opens = signal<Tab | null>(user.peek() ? null : "friends");
   const tab = () => chosen() ?? opens();
   const choose = (to: Tab) => {
@@ -138,7 +150,23 @@ function tabs(): Child {
   const load = async () => {
     if (!user.peek()) return;
     try {
-      const [f, d] = await Promise.all([api<Friends>("GET", "/api/friends"), api<Duels>("GET", "/api/duels")]);
+      const [f, d] = await Promise.all([
+        api<Friends>("GET", "/api/friends"),
+        api<Duels>("GET", "/api/duels"),
+        // The landing's moment needs the game's feel; without it the card is whole, only still.
+        named && !duels.peek() ? loadFeel().catch(() => null) : null,
+      ]);
+      if (named) {
+        const first =
+          [...d.yours, ...d.theirs, ...d.played].find((o) => o.id === named) ??
+          top.peek() ??
+          (await api<{ duel: DuelView }>("GET", `/api/duels/${named}`).then(
+            (r) => r.duel,
+            () => null,
+          ));
+        if (first?.runId && first.state !== "yours" && !brought) brought = news(first.runId);
+        top.set(first);
+      }
       failed.set(null);
       data.set(f);
       duels.set(d);
@@ -239,7 +267,7 @@ function tabs(): Child {
       h("p", { class: "sect-lead" }, "Едни и същи десет въпроса. Всеки ги играе, когато може."),
       () => {
         const d = duels();
-        return d ? duelLists(d) : failed() ? failure(failed(), () => void load(), null) : null;
+        return d ? duelCards(kit, d, top(), brought) : failed() ? failure(failed(), () => void load(), null) : null;
       },
       h("a", { class: "btn", href: "/duel/new" }, "Нов дуел"),
       h("p", { class: "small sect-foot" }, "С приятел или срещу запис на истинска игра."),

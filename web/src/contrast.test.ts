@@ -108,7 +108,7 @@ test("by night a light chapter's sheet is darker by a fifth, the four deep ones'
 });
 
 test("no stylesheet reorders a screen: what's read is in the HTML's order", () => {
-  for (const sheet of ["app.css", "outcome.css"]) {
+  for (const sheet of ["app.css"]) {
     const text = readFileSync(new URL(`./${sheet}`, import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
     assert.doesNotMatch(text, /(^|[;{\s])order\s*:/, `${sheet} sets an order`);
   }

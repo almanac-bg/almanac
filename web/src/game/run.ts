@@ -66,7 +66,7 @@ function showing(run: number): void {
 }
 
 /** Plays a run from where it stands; `done` draws what comes after its last answer. A duel is named over each
- * question as its page names it (`versus`: „Дуел с Мария“, „По-силен запис · Краси“); played second (the run's
+ * question as its page names it (`versus`: „Дуел с Мария“, „Запис · Краси“); played second (the run's
  * `against`), how the other's answer went (`them`, their name) shows once the player's own is in, never when they gave
  * it: a duel isn't a race. */
 export function playRun(initial: State, done: (s: State) => Child, versus = "", them = ""): Child {
@@ -698,7 +698,7 @@ function question(
       const focus = document.activeElement;
       if (!focus || focus === document.body || !focus.isConnected || (focus as HTMLElement).offsetParent === null)
         after.querySelector<HTMLElement>(".up-next-go")?.focus({ preventScroll: true });
-      // A run's result sounds its own end as it lands (results.ts), a duel's its verdict (screens/outcome.ts).
+      // A run's result sounds its own end as it lands (results.ts), a duel's its verdict (screens/duelcards.ts).
       due = res.state.done ? reload : next;
     });
   };

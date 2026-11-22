@@ -211,11 +211,7 @@ func (w *world) friendDuel(p, o *player) error {
 
 // recordingDuel is a duel against a recording of another player's game (play.Game.DuelRecording), if there's one.
 func (w *world) recordingDuel(p *player) error {
-	level := play.Even
-	if p.id%3 == 0 {
-		level = play.Stronger
-	}
-	id, err := w.g.DuelRecording(w.as(p), p.id, level)
+	id, err := w.g.DuelRecording(w.as(p), p.id)
 	if errors.Is(err, play.ErrNobody) || errors.Is(err, play.ErrNoQuestion) {
 		return nil
 	}

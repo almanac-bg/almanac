@@ -200,7 +200,6 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		"bulgaria":   s.game.BulgariaOpen(), // the topic „България“ (play/bulgaria.go): a tile while it has a game's worth
 		"version":    s.cfg.Version,
 		"push":       s.pushKey(),
-		"outcomeCss": m["outcome.css"],       // a duel's result: its style, loaded with it
 		"now":        time.Now().UnixMilli(), // the clock the page keeps until the API's first answer (lib/api.ts)
 	}
 	// The player's avatar and the seal they wear on its corner, in the corner of every page (web/src/app.ts): without

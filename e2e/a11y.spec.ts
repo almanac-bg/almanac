@@ -118,48 +118,32 @@ for (const scheme of ["light", "dark"] as const) {
   });
 }
 
-// A duel's result, as one won against a friend has it (the server's answer for it made here): the two face to face,
-// the duel question by question, and the record.
+// A played duel's card in Приятели's „Дуели“, as one won against a friend today has it (the server's answers for it
+// made here): the two face to face, the score, the two rows of marks, and its questions on a sheet.
 for (const scheme of ["light", "dark"] as const) {
-  test(`a duel's result is accessible (${scheme})`, async ({ page }) => {
-    const mark = (right: number) => ({ right: right > 0 });
+  test(`a duel's card and its questions are accessible (${scheme})`, async ({ page }) => {
     const side = (name: string, tag: string, rights: number[]) => ({
       name,
       tag,
-      rights: rights.filter((p) => p > 0).length,
+      rights: rights.filter((p) => p === 1).length,
       done: true,
       look: { avatar: "hare" },
-      marks: rights.map((p) => mark(p)),
+      marks: rights.map((p) => ({ right: p === 1, close: p === 2 })),
     });
     const duel = {
       id: 1,
       state: "won",
-      you: side("Заек 817", "", [1, 1, 0, 1, 1, 0, 1, 1, 1, 1]),
+      you: side("Заек 817", "", [1, 1, 0, 1, 1, 2, 1, 1, 1, 1]),
       opponent: side("Мария", "maria", [1, 0, 1, 1, 1, 0, 1, 0, 1, 0]),
       runId: 1,
       first: true,
       createdAt: Date.now(),
       endedAt: Date.now(),
-      record: { won: 3, lost: 2, drawn: 1 },
+      review: true,
       friend: true,
       them: 2,
     };
-    await page.emulateMedia({ colorScheme: scheme });
-    await page.route("**/api/duels/1", (r) => r.fulfill({ json: { duel } }));
-    await page.goto("/duel/1");
-    await expect(page.getByRole("heading", { name: "Победа" })).toBeVisible();
-    // Whatever moves, at its end. Waited for, not cut short by a key: a key would be the page's first touch, which
-    // starts the audio and sends for the game's feel (lib/sound.ts) just as axe reads the page, and Firefox on CI's
-    // Linux crashed under that now and then. (A page's first result has no moment anyway: the feel isn't in yet.)
-    await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"));
-    await expect(page.locator(".duel-record")).toBeVisible();
-    await expect(page.locator(".duel-pip.partial, .duel-pip.right")).not.toHaveCount(0);
-    await expect(page.locator(".duel-pip.fast, .duel-key")).toHaveCount(0); // speed only breaks a tie: no rings
-    const { violations } = await new AxeBuilder({ page }).analyze();
-    expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
-
-    // On the day it was played, its questions are rows under it, in place of the marks: one right for both, one that
-    // parted them, the first opened.
+    // One right for both, one that parted them.
     const asked = (n: number, right: boolean) => ({
       n,
       category: "history",
@@ -168,15 +152,35 @@ for (const scheme of ["light", "dark"] as const) {
       given: { truth: right },
       right,
     });
-    await page.route("**/api/duels/1", (r) => r.fulfill({ json: { duel: { ...duel, review: true } } }));
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto("/");
+    expect((await page.request.post("/api/guest", { data: {} })).ok()).toBe(true);
+    await page.route("**/api/duels", (r) => r.fulfill({ json: { yours: [], theirs: [], played: [duel] } }));
     await page.route("**/api/runs/1/review", (r) =>
       r.fulfill({ json: { questions: [asked(0, true), asked(1, false)] } }),
     );
-    await page.reload();
-    await expect(page.locator(".duel-q")).toHaveCount(2);
-    await expect(page.locator(".duel-pip")).toHaveCount(0);
-    await page.locator(".duel-q-more").first().click();
-    await expect(page.locator(".duel-q-body")).toBeVisible();
+    await page.goto("/friends?tab=duels&duel=1");
+    const card = page.locator(".duel-cards.landed .duel-card");
+    await expect(card.locator(".duel-chip")).toHaveText("✓ Победа");
+    // Whatever moves, at its end. Waited for, not cut short by a key: a key would be the page's first touch, which
+    // starts the audio (lib/sound.ts) just as axe reads the page, and Firefox on CI's Linux crashed under that now and
+    // then.
+    await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"));
+    await expect(card.locator(".duel-card-score")).toHaveText("8:6");
+    // The two rows of marks, ten small squares each, right filled and близо half: nothing says how fast.
+    await expect(card.locator(".duel-card-row")).toHaveCount(2);
+    await expect(card.locator(".mini > i")).toHaveCount(20);
+    await expect(card.locator(".mini > i.right")).toHaveCount(14);
+    await expect(card.locator(".mini > i.partial")).toHaveCount(1);
+    const { violations } = await new AxeBuilder({ page }).analyze();
+    expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
+
+    // Played today: its questions on a sheet, the first opened.
+    await card.getByRole("button", { name: "Въпросите" }).click();
+    const sheet = page.locator("dialog.duel-sheet");
+    await expect(sheet.locator(".duel-q")).toHaveCount(2);
+    await sheet.locator(".duel-q-more").first().click();
+    await expect(sheet.locator(".duel-q-body")).toBeVisible();
     await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"));
     const rows = await new AxeBuilder({ page }).analyze();
     expect(rows.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);

@@ -19,7 +19,7 @@ function split(list: string): string[] {
 }
 
 test("an answer's state class has no rule of its own", () => {
-  for (const sheet of ["app.css", "outcome.css"]) {
+  for (const sheet of ["app.css"]) {
     const css = readFileSync(new URL(`./${sheet}`, import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
     const selectors = [...css.matchAll(/([^{};]+)\{/g)].flatMap((m) => split(m[1] ?? ""));
     const states = new Set(

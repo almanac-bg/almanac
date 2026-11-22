@@ -333,7 +333,7 @@ async function offSyllable(page: Page, selector: string): Promise<string[]> {
  * word of a name or a button broken, a friend's „Дуел“, a tab or a duel's card past the screen's edge, a place's name
  * at the foot cut („Алмана…“). */
 async function placeFlaws(page: Page): Promise<string[]> {
-  const names = ".friend-name, .duel-card-name, .duel-pick .who-name, .segmented button, .friend-act, .places-foot a";
+  const names = ".friend-name, .duel-card-name, .duel-pick-name, .segmented button, .friend-act, .places-foot a";
   const off = await page.evaluate(() => {
     const out: string[] = [];
     for (const e of document.querySelectorAll(".friend-act, .segmented button, .duel-card, .duel-pick"))
@@ -629,7 +629,8 @@ for (const size of sizes)
           "/almanac",
           "/almanac/history",
           "/almanac/literature",
-          `/duel/${kept.duel}`,
+          // A played duel's card, first under „Дуели“ (its old page goes there).
+          `/friends?tab=duels&duel=${kept.duel}`,
           "/duel/new",
           "/admin",
           "/settings",
@@ -666,13 +667,6 @@ for (const size of sizes)
               expect.soft(go, `„Започни“ under the places' bar${at}`).toBeLessThanOrEqual(1);
             }
           }
-          // A duel's result: its ways on of one width.
-          await page.goto(`/duel/${kept.duel}`);
-          await expect(page.locator(".duel-side .actions .btn").first()).toBeVisible();
-          const widths = await page
-            .locator(".duel-side .actions .btn")
-            .evaluateAll((all) => all.map((b) => Math.round(b.getBoundingClientRect().width)));
-          expect.soft(new Set(widths).size, `the duel's ways on${at}`).toBe(1);
           // A new visitor's cover: the mark where the bar always has it, the name and „Вход“ apart; the sign-in page
           // the mark alone, its flaws none.
           const cover = await (

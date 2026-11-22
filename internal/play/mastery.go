@@ -11,7 +11,7 @@ import (
 
 // Mastery is how well a player knows a topic: the game's own, never shown (DECISIONS.md, „The direction“: a player
 // sees their ink and their ranks). It shapes their chapter games (topicSlots: aimRight of them right) and their duels,
-// and chooses the recording they play against, „равен“ or „по-силен“ (recordingFit). It's worked out from every
+// and chooses the recording they play against, the nearest to them (recordingFit). It's worked out from every
 // answer they've given, each weighed by how hard its question is, so that harder questions drawn as a player gets
 // better don't hold them back, and a lucky guess counts for little.
 //
@@ -268,14 +268,9 @@ func (g *Game) ability(ctx context.Context, db querier, userID int64, category s
 	return a.mean, err
 }
 
-// recordingFit is how far a recording (its picks, its right answers) is from the level a player chose: lower fits
-// better (recordedRun); and whether it's that level at all (meets: „по-силен“ stronger than the player, „равен“
-// within EvenWithin of them), or only the nearest there was.
-type recordingFit func(b *bank.Bank, picks []Pick, rights int) (off float64, meets bool)
-
-// EvenWithin is how near a recording's right answers are to what the player would get on its ten, at most, to be
-// „равен“.
-const EvenWithin = 1.5
+// recordingFit is how far a recording (its picks, its right answers) is from a player: lower fits better
+// (recordedRun).
+type recordingFit func(b *bank.Bank, picks []Pick, rights int) (off float64)
 
 // expectedRights is how many of these questions a player of an ability over all topics would get right: each known
 // with the chance σ(ability − hardness), and, of the rest, guessed right as often as a guess of its kind is.
@@ -292,10 +287,9 @@ func expectedRights(b *bank.Bank, h *hardnesses, ability float64, picks []Pick) 
 	return sum
 }
 
-// recordingFit is the fit of a recording to a player at a level (Even, Stronger; anything else is Even), by their
-// hidden ability over all topics: „равен“, its right answers as near as can be to what the player would get on its ten;
-// „по-силен“, StrongerBy more, never fewer than one more.
-func (g *Game) recordingFit(ctx context.Context, userID int64, level string) (recordingFit, error) {
+// recordingFit is the fit of a recording to a player, by their hidden ability over all topics: how far its right
+// answers are from what the player would get on its ten.
+func (g *Game) recordingFit(ctx context.Context, userID int64) (recordingFit, error) {
 	h, err := g.hardness(ctx)
 	if err != nil {
 		return nil, err
@@ -304,18 +298,8 @@ func (g *Game) recordingFit(ctx context.Context, userID int64, level string) (re
 	if err != nil {
 		return nil, err
 	}
-	return func(b *bank.Bank, picks []Pick, rights int) (float64, bool) {
-		want := expectedRights(b, h, ability, picks)
-		if level != Stronger {
-			off := math.Abs(float64(rights) - want)
-			return off, off <= EvenWithin
-		}
-		off := math.Abs(float64(rights) - want - StrongerBy)
-		stronger := float64(rights) >= want+1
-		if !stronger {
-			off += Length // not stronger: after every one that is
-		}
-		return off, stronger
+	return func(b *bank.Bank, picks []Pick, rights int) float64 {
+		return math.Abs(float64(rights) - expectedRights(b, h, ability, picks))
 	}, nil
 }
 

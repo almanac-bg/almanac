@@ -250,7 +250,7 @@ func TestGoneMidDuel(t *testing.T) {
 	gus, ed := w.user(), w.user()
 	s, _ := w.g.StartTopic(ctx, gus, MixTopic)
 	w.play(gus, s.ID, append(repeat(w.right, 6), repeat(w.wrong, Length-6)...)...) // a newcomer's even: Ed's to play
-	rec, err := w.g.DuelRecording(ctx, ed, Even)
+	rec, err := w.g.DuelRecording(ctx, ed)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -106,7 +106,7 @@ func TestDuelsSettledAfterAStop(t *testing.T) {
 	w.wait(time.Minute)
 	w.befriend(ana, bo)
 	// Gal against a recording, all right, and Ana's side of a duel with Bo: neither is kept past its last answer.
-	rec, err := w.g.DuelRecording(ctx, gal, Even)
+	rec, err := w.g.DuelRecording(ctx, gal)
 	if err != nil {
 		t.Fatal(err)
 	}

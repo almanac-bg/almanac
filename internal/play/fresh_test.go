@@ -77,7 +77,7 @@ func TestNothingPlayedAgain(t *testing.T) {
 			f.w.playSide(f.bo, id, repeat(f.w.wrong, Length))
 		}},
 		{"a recording", func(f *fresh) {
-			id, err := f.w.g.DuelRecording(f.ctx(), f.ana, Even)
+			id, err := f.w.g.DuelRecording(f.ctx(), f.ana)
 			f.must(err)
 			f.w.playSide(f.ana, id, repeat(f.w.right, Length))
 		}},
@@ -125,7 +125,7 @@ func TestNothingPlayedAgain(t *testing.T) {
 				if next.deal == nil { // a recording: whole games, someone else's
 					seenNow := f.seen(f.ana)
 					best := f.recordingsSeen(seenNow, barred)
-					id, err := f.w.g.DuelRecording(f.ctx(), f.ana, Even)
+					id, err := f.w.g.DuelRecording(f.ctx(), f.ana)
 					f.must(err)
 					n := count(f.w.picks(f.w.playSide(f.ana, id, nil)), seenNow)
 					if best <= RecordingSeen && n > RecordingSeen {

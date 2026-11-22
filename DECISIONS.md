@@ -71,8 +71,15 @@ packages' doc comments; this file holds only what must not drift.
     the owner reopens it.
   - **The streak counts days the issue was played** and forgives up to two missed days a week by itself; an ended
     streak's number is never named.
-  - **Duels on one's own time:** a friend has 7 days; or a real recording, chosen as „равен“ or „по-силен“. A friend's
-    record against you stays: the one count kept between two players.
+  - **Duels on one's own time:** a friend has 7 days; or a real recording, of one kind (2026-11-22, the owner: the
+    choice between „равен“ and „по-силен“ is gone: one more thing to decide, for little; the recording is the game
+    nearest to the player, „на играч, който знае горе-долу колкото теб“). A friend's record against you stays: the
+    one count kept between two players.
+  - **A duel has no result page** (2026-11-22, the owner): everything about a duel is on its card in Приятели's
+    „Дуели“: the two, the score, the two rows of marks, one quiet line, „Въпросите“ on a sheet on the day it was
+    played, „Реванш“ or „Още един срещу запис“. A duel's game ends on that tab, its card first, the score counting up
+    once; `/duel/<id>` only starts and plays one, and an old link to a finished duel comes to its card. The played
+    list is the last ten, and says so („Последните 10 изиграни“).
   - **Friends** are added by username or email, a request the other says yes to. The personal invite link was removed
     (21 Nov): little use, much machinery; friends come by username or email.
   - **Приятели's dot is news since the player last looked there** (2026-11-21), on any device: a friend request, a

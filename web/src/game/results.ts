@@ -117,9 +117,6 @@ const moments = new Map<number, Promise<void>>();
 /** When a game's result has landed: at once if it had no moment. */
 export const landed = (run: number): Promise<void> => moments.get(run) ?? Promise.resolve();
 
-/** A game's result landing as a moment drawn elsewhere (a duel's: screens/outcome.ts), for its news to wait for. */
-export const landing = (run: number, moment: Promise<void>): void => void moments.set(run, moment);
-
 /** A game's result as a moment as it ends (feel.ts: the pips, the score, the motif), once: never again on its way
  * back to the screen; the day's pips a little slower. Without the feel loaded, the result is as it is, with the end's
  * sound. */

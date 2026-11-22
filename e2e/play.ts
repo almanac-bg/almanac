@@ -415,7 +415,7 @@ export async function cutOrOverlapping(page: Page): Promise<string[]> {
     // has no box of its own to be cut in: its row's box is the one measured (and an inline box's own widths are
     // nothing to go by: Chromium has none, Firefox its words' run against a clientWidth of 0).
     for (const el of document.querySelectorAll(
-      ".friend-name, .duel-name, .duel-card-name, .duel-pick .who-label, .me-who h1, .seal-row-name",
+      ".friend-name, .duel-card-name, .duel-pick-name, .me-who h1, .seal-row-name",
     )) {
       let box: Element = el;
       while (box.parentElement && getComputedStyle(box).display === "inline") box = box.parentElement;
