@@ -64,25 +64,12 @@ func (w *world) plan() ([]session, error) {
 			continue
 		}
 		if p.kind == lapsing && p.until < 0 && w.day >= w.today()-1-play.MostForgiven && p.id != 0 {
-			// A streak that ends yesterday (cast): stop on the day that does it. Missed from today, each day missed is
-			// forgiven while its week has forgiving left (this week's what's left of it, a Monday's its own), and the
-			// first that hasn't ends it (play/runs.go).
+			// A streak that ended as late as one can before today (cast): stop on the day that does it.
 			s, err := w.g.StreakOf(w.ctx, p.id)
 			if err != nil {
 				return nil, err
 			}
-			ends, left := w.day, s.Left
-			for {
-				if ends != w.day && w.dayAt(ends, 0, 0).Weekday() == time.Monday {
-					left = play.Forgives
-				}
-				if left == 0 {
-					break
-				}
-				left--
-				ends++
-			}
-			if ends == w.today()-1 {
+			if w.lapsesFrom(w.day, s.Left) {
 				p.until = w.day - 1
 				continue
 			}
@@ -107,6 +94,35 @@ func (w *world) plan() ([]session, error) {
 	}
 	slices.SortFunc(out, func(a, b session) int { return a.at.Compare(b.at) })
 	return out, nil
+}
+
+// lapsesFrom says whether a streak missed from day i on (left of its week's Forgives left that day) ends as late as
+// one can before today: by yesterday, where missed from the day after it wouldn't have ended yet. Yesterday itself,
+// unless the week was too young to have spent its forgiving (a Monday or a Tuesday): then the Sunday before, which
+// Начало still tells (latelyEnded).
+func (w *world) lapsesFrom(i, left int) bool {
+	next := left // what the day after has left, played on day i
+	if w.dayAt(i+1, 0, 0).Weekday() == time.Monday {
+		next = play.Forgives
+	}
+	return w.endsIfMissed(i, left) < w.today() && w.endsIfMissed(i+1, next) >= w.today()
+}
+
+// endsIfMissed is the day a streak ends on if it's missed from day i on, with left of the week's Forgives left on
+// that day: each day missed is forgiven while its week has forgiving left (a Monday's week its own), and the first
+// that hasn't ends it (play/runs.go).
+func (w *world) endsIfMissed(i, left int) int {
+	ends := i
+	for {
+		if ends != i && w.dayAt(ends, 0, 0).Weekday() == time.Monday {
+			left = play.Forgives
+		}
+		if left == 0 {
+			return ends
+		}
+		left--
+		ends++
+	}
 }
 
 // visit is one of a player's visits: they come in (the first time, as a new guest), see what waits for them, play.

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
+	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/bank/banktest"
 	"github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/play"
@@ -30,6 +31,45 @@ func TestMain(m *testing.M) {
 type discard struct{}
 
 func (discard) Send(context.Context, string, mail.Message) error { return nil }
+
+// The lapsed persona is there whatever day of the week the history ends: a player who stops on the day the history
+// chooses (lapsesFrom) has, by the game's own streak, one that ended lately as Начало tells it (latelyEnded), though a
+// week's first two days missed are forgiven and no streak ends on a Monday or a Tuesday. TestSeededGame sees only
+// the day it runs on.
+func TestLapsedEveryWeekday(t *testing.T) {
+	db := storetest.Open(t)
+	b := banktest.Sample(t)
+	ctx := t.Context()
+	for i := range 7 {
+		end := time.Date(2026, 11, 16+i, 12, 0, 0, 0, play.Bulgaria) // a Monday, and the six days after
+		w := &world{ctx: ctx, db: db, opt: Options{Days: 14}, end: end, g: play.New(db, func() *bank.Bank { return b })}
+		w.first = time.Date(end.Year(), end.Month(), end.Day(), 0, 0, 0, 0, play.Bulgaria).AddDate(0, 0, -(w.opt.Days - 1))
+		w.g.Now = func() time.Time { return end }
+		stop := -1
+		for day := 0; day < w.today(); day++ {
+			if w.lapsesFrom(day, play.Forgives) { // never missed: the week's forgiving whole
+				stop = day
+			}
+		}
+		if stop < 0 {
+			t.Fatalf("%s: no day to stop on", end.Weekday())
+		}
+		u, _, err := (&account.Accounts{DB: db}).Guest(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for day := range stop {
+			at := w.dayAt(day, 12, 0)
+			if err := w.exec(`INSERT INTO runs (user_id, kind, day, questions, started_at, finished_at)
+				VALUES (?, 'day', ?, '[{"id":""}]', ?, ?)`, u.ID, at.Format(time.DateOnly), at.UnixMilli(), at.UnixMilli()); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if e, err := w.latelyEnded(&player{id: u.ID}); err != nil || e == nil {
+			t.Errorf("%s: stopped on %s, no streak ended lately: %v", end.Weekday(), w.dayAt(stop, 0, 0).Format(time.DateOnly), err)
+		}
+	}
+}
 
 // A seeded game has its personas, each what it says, and every screen's API answers each of them: the pages a
 // review looks at, as each kind of player sees them.

@@ -196,17 +196,19 @@ func TestCodeIsTheBrowsers(t *testing.T) {
 // A class behind its school's one IPv4 address (or a carrier's) asks for its codes at once (review 2026-11-18, S9):
 // a site's share of a minute (account.SiteShare) goes, and the rest the next minute, each told to try again then.
 func TestCodesForAClass(t *testing.T) {
-	g := start(t)
-	ask := func(email string) int {
-		r := httptest.NewRequest("POST", g.url+"/api/auth/code", strings.NewReader(`{"email":"`+email+`"}`))
-		r.RemoteAddr = "198.51.100.1:1234"
-		r.Header.Set("Content-Type", "application/json")
-		r.Header.Set("Sec-Fetch-Site", "same-origin")
-		w := httptest.NewRecorder()
-		g.srv.Handler().ServeHTTP(w, r)
-		return w.Code
-	}
 	for {
+		// Each try on a server of its own: one whose minute turned midway has counted codes in the new minute, which a
+		// try again on it would start from.
+		g := start(t)
+		ask := func(email string) int {
+			r := httptest.NewRequest("POST", g.url+"/api/auth/code", strings.NewReader(`{"email":"`+email+`"}`))
+			r.RemoteAddr = "198.51.100.1:1234"
+			r.Header.Set("Content-Type", "application/json")
+			r.Header.Set("Sec-Fetch-Site", "same-origin")
+			w := httptest.NewRecorder()
+			g.srv.Handler().ServeHTTP(w, r)
+			return w.Code
+		}
 		minute := time.Now().Unix() / 60
 		i := 0
 		for ; i < account.SiteShare; i++ {

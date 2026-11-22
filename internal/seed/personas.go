@@ -48,22 +48,31 @@ func (w *world) finish() error {
 	return w.sweep()
 }
 
-// befriended makes sure a persona has n friends at least, one more asking: whoever they've asked, or else asked by
-// players they don't know yet, the persona saying yes to all but the last.
+// befriended makes sure a persona has n friends at least, and one more asking (as Приятели shows a request): asked by
+// players they don't know yet, the persona saying yes to all but the newest. Whatever the history happened to bring
+// (the game draws its own questions, so no two histories are alike), both are there: a persona already with n friends
+// and nobody asking is asked by one more.
 func (w *world) befriended(p *player, n int) error {
 	ids, err := w.friendIDs(p)
-	if err != nil || len(ids) >= n {
-		return err
-	}
-	if err := w.friendsOfPersona(p, n-len(ids)+1); err != nil {
+	if err != nil {
 		return err
 	}
 	in, _, err := w.g.Requests(w.ctx, p.id)
 	if err != nil {
 		return err
 	}
+	short := max(0, n-len(ids))
+	if short == 0 && len(in) > 0 {
+		return nil
+	}
+	if err := w.friendsOfPersona(p, short+1); err != nil {
+		return err
+	}
+	if in, _, err = w.g.Requests(w.ctx, p.id); err != nil {
+		return err
+	}
 	for i, r := range in {
-		if i == 0 {
+		if i == 0 || short == 0 {
 			continue // the newest waits
 		}
 		if _, err := w.g.Accept(w.ctx, p.id, r.ID); err != nil && !errors.Is(err, play.ErrNoRequest) {
@@ -89,11 +98,11 @@ func (w *world) personas() ([]Persona, error) {
 	}
 	out = append(out, Persona{Key: keyGuest, ID: u.ID, Name: u.Name, Tag: u.Tag, Token: token,
 		About: "a new guest: nothing played, as a browser that's never been here"})
-	// The lapsed one: whichever of its candidates' streaks ended yesterday, as Начало tells it.
+	// The lapsed one: whichever of its candidates' streaks ended lately, as Начало tells it.
 	var lapsed *player
 	for _, p := range w.players {
 		if p.kind == lapsing && p.id != 0 && lapsed == nil {
-			if e, err := w.endedYesterday(p); err != nil {
+			if e, err := w.latelyEnded(p); err != nil {
 				return nil, err
 			} else if e != nil {
 				lapsed, p.persona = p, keyLapsed
@@ -101,7 +110,7 @@ func (w *world) personas() ([]Persona, error) {
 		}
 	}
 	if lapsed == nil {
-		return nil, fmt.Errorf("seed: no player's streak ended yesterday")
+		return nil, fmt.Errorf("seed: no player's streak ended lately")
 	}
 	for _, key := range personaKinds[1:] {
 		var p *player
@@ -132,18 +141,19 @@ func (w *world) personas() ([]Persona, error) {
 	return out, nil
 }
 
-// about says what a persona is now, from what the game says of them, and checks it's what they're for.
-// endedYesterday is a player's streak that ended yesterday, as Начало tells it (two days or more: server/game.go), nil
-// for none.
-func (w *world) endedYesterday(p *player) (*play.Ended, error) {
+// latelyEnded is a player's streak that ended lately, as Начало tells it (two days or more, on one of the last three:
+// server/game.go), nil for none: yesterday, or on a Tuesday or a Wednesday the Sunday before (history.go), as a
+// week's first two days missed are forgiven and no streak ends on them.
+func (w *world) latelyEnded(p *player) (*play.Ended, error) {
 	s, err := w.g.StreakOf(w.ctx, p.id)
 	if err != nil || s.Days != 0 || s.Ended == nil || s.Ended.Days < 2 ||
-		s.Ended.On != play.DayShift(w.g.Today(), -1) {
+		s.Ended.On < play.DayShift(w.g.Today(), -3) {
 		return nil, err
 	}
 	return s.Ended, nil
 }
 
+// about says what a persona is now, from what the game says of them, and checks it's what they're for.
 func (w *world) about(p *player) (string, error) {
 	ctx := w.ctx
 	streak, err := w.g.StreakOf(ctx, p.id)
@@ -166,13 +176,17 @@ func (w *world) about(p *player) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	asking, _, err := w.g.Requests(ctx, p.id)
+	if err != nil {
+		return "", err
+	}
 	var days int
 	if err := w.one(&days, `SELECT count(*) FROM active_days WHERE user_id = ?`, p.id); err != nil {
 		return "", err
 	}
-	facts := fmt.Sprintf("%d days played, streak %d (spare %v), %s, %d friends, "+
+	facts := fmt.Sprintf("%d days played, streak %d (spare %v), %s, %d friends (%d asking), "+
 		"duels: %d to play, %d waiting, %d played", days, streak.Days, streak.Spare, rank,
-		len(friends), len(duels.Yours), len(duels.Theirs), len(duels.Played))
+		len(friends), len(asking), len(duels.Yours), len(duels.Theirs), len(duels.Played))
 	fail := func(why string) (string, error) {
 		return "", fmt.Errorf("seed: the %s persona %s: %s", p.persona, why, facts)
 	}
@@ -183,16 +197,17 @@ func (w *world) about(p *player) (string, error) {
 		}
 		return "day two: played yesterday's ten (a guest), not today's yet; " + facts, nil
 	case keyRegular:
-		if len(friends) < 3 || days < min(25, w.opt.Days*2/3) || len(duels.Yours) == 0 || len(duels.Theirs) == 0 {
-			return fail("isn't a month's regular with friends, a friend's duel to play and one of theirs waiting")
+		if len(friends) < 3 || len(asking) == 0 || days < min(25, w.opt.Days*2/3) || len(duels.Yours) == 0 ||
+			len(duels.Theirs) == 0 {
+			return fail("isn't a month's regular with friends, one asking, a friend's duel to play and one of theirs waiting")
 		}
-		return "a month's regular with friends, a friend's duel to play and one waiting; " + facts, nil
+		return "a month's regular with friends, one asking, a friend's duel to play and one waiting; " + facts, nil
 	case keyLapsed:
-		e, err := w.endedYesterday(p)
+		e, err := w.latelyEnded(p)
 		if err != nil || e == nil {
-			return fail("has no streak that ended yesterday")
+			return fail("has no streak that ended lately")
 		}
-		return fmt.Sprintf("a streak of %d that broke yesterday (%s missed), told on Начало; %s", e.Days, e.On, facts), nil
+		return fmt.Sprintf("a streak of %d that broke on %s, the day missed, told on Начало; %s", e.Days, e.On, facts), nil
 	case keyLegend:
 		return "the strongest player, a streak from the first day; " + facts, nil
 	case keyAdmin:
