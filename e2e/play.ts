@@ -425,7 +425,7 @@ export async function cutOrOverlapping(page: Page): Promise<string[]> {
     // A name in a wide row whole: never clipped or ended with „…“. A name set inline (its words wrapping in its row)
     // has no box of its own to be cut in: its row's box is the one measured (and an inline box's own widths are
     // nothing to go by: Chromium has none, Firefox its words' run against a clientWidth of 0).
-    for (const el of document.querySelectorAll(".friend-name, .duel-card-name, .me-who h1, .seal-row-name")) {
+    for (const el of document.querySelectorAll(".friend-name, .me-who h1, .seal-row-name")) {
       let box: Element = el;
       while (box.parentElement && getComputedStyle(box).display === "inline") box = box.parentElement;
       const style = getComputedStyle(box);
@@ -437,7 +437,7 @@ export async function cutOrOverlapping(page: Page): Promise<string[]> {
       if ((el as HTMLElement).offsetParent !== null) out.push(`a tag shown ${say(el)}`);
     // Inside its card: a seal's name, a friend's day, a chapter's words.
     for (const card of document.querySelectorAll(
-      ".seal-row, .friend, .duel-card, .ch-stand, .entry, .way, .card-leaf",
+      ".seal-row, .friend, .duel-row, .ch-stand, .entry, .way, .card-leaf",
     )) {
       const box = card.getBoundingClientRect();
       for (const el of card.querySelectorAll("*")) {

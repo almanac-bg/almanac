@@ -1,10 +1,10 @@
 // Приятели, one of the three places (DESIGN.md, Places), one page with no tabs (owner, 2026-11-22: both in sight at
-// once): who asks to be friends; the duels open („Чакащи“: a friend's waiting for you first, yours waiting for them),
-// first while there are any, for a duel to play stays first here until it's played; the friends, each with their day,
-// the duels between you and a duel a tap away (the one way to start one here), and the one way to make more (by
-// потребителско име or email); and the last ten duels played. Each duel is a card that holds all there is of it
-// (screens/duelcards.ts). A duel named in the address (`?duel=<id>`: one just played, or an old link to it:
-// screens/duel.ts) is first in its group. The day's board is on Днес's result (today.ts, dayBoard).
+// once): who asks to be friends; the duels open („Чакащи дуели“: a friend's waiting for you first, yours waiting for
+// them), first while there are any, for a duel to play stays first here until it's played; the friends, each with
+// their day, the duels between you and „Дуел“ (the one way to start one here), and the one way to make more (by
+// потребителско име or email); and the last ten duels played („Изиграни дуели“, compact rows). Each duel holds all
+// there is of it (screens/duelcards.ts). A duel named in the address (`?duel=<id>`: one just played, or an old link
+// to it: screens/duel.ts) is first in its group. The day's board is on Днес's result (today.ts, dayBoard).
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -18,6 +18,7 @@ let {
   acceptedLine,
   api,
   errorText,
+  formatNumber,
   h,
   onCleanup,
   nameWords,
@@ -48,10 +49,11 @@ interface Friend {
   avatar?: string;
   /** The seal they wear on their avatar (play.Seal). */
   seal?: { chapter: string; level: number };
-  today?: { rights: number; of: number };
   won: number;
   lost: number;
   drawn: number;
+  /** Three duels the player sent wait for them: no new one until they play one (play.Friend.Full). */
+  full?: boolean;
 }
 
 /** A friend request: from someone (to you), or to someone or an email address (from you). */
@@ -76,6 +78,7 @@ export function friends(kit: Kit): Child {
     acceptedLine,
     api,
     errorText,
+    formatNumber,
     h,
     onCleanup,
     nameWords,
@@ -259,18 +262,26 @@ function page(kit: Kit): Child {
     return h(
       "section",
       { class: "sect friends" },
-      h("div", { class: "sect-head" }, h("h2", null, "Приятели"), () => {
-        const n = data()?.friends.length ?? 0;
-        return n
-          ? h(
-              "span",
-              { class: "sect-note" },
-              h("button", { class: "link muted", type: "button", onclick: () => editing.update((e) => !e) }, () =>
-                editing() ? "Готово" : "Премахни приятел",
-              ),
-            )
-          : null;
-      }),
+      h(
+        "div",
+        { class: "sect-head" },
+        h("h2", null, () => {
+          const n = data()?.friends.length ?? 0;
+          return n ? `Приятели (${formatNumber(n)})` : "Приятели";
+        }),
+        () => {
+          const n = data()?.friends.length ?? 0;
+          return n
+            ? h(
+                "span",
+                { class: "sect-note" },
+                h("button", { class: "link muted", type: "button", onclick: () => editing.update((e) => !e) }, () =>
+                  editing() ? "Готово" : "Премахни приятел",
+                ),
+              )
+            : null;
+        },
+      ),
       yes,
       () => {
         const d = data();
@@ -280,7 +291,11 @@ function page(kit: Kit): Child {
           return user()
             ? null
             : [
-                h("p", { class: "muted friends-none" }, "Добави приятели и ще виждате резултатите си всеки ден."),
+                h(
+                  "p",
+                  { class: "muted friends-none" },
+                  "Добави приятели, за да играете дуели и да виждате всеки ден как сте изиграли днешния брой.",
+                ),
                 h(
                   "button",
                   {
@@ -314,7 +329,7 @@ function page(kit: Kit): Child {
           : h(
               "p",
               { class: "muted friends-none" },
-              "Още нямаш приятели тук. Добави ги по потребителско име или имейл.",
+              "Още нямаш приятели тук. С приятел можете да играете дуели: едни и същи десет въпроса, всеки ги играе, когато може. И всеки ден ще виждате как сте изиграли днешния брой. Добави приятел по потребителско име или имейл.",
             );
       },
       // Outside the parts drawn again on each look (every 15 s): drawn again, its field would lose the focus mid-word.
@@ -417,21 +432,11 @@ function addFriend(reload: () => Promise<void>): Child {
   );
 }
 
-/** One thing about a friend on the line under their name: an icon, then the number alone („7/10“, „3:1“), in figures
- * of one width so the rows line up; what it is in whole words (`words`) as its tooltip on a big screen and for a
- * screen reader. `none`: nothing to count yet, quieter. */
-const stat = (icon: string, figure: string, words: string, none = false): Child =>
-  h(
-    "span",
-    { class: none ? "friend-stat none" : "friend-stat", role: "img", title: words, "aria-label": words },
-    h("span", { class: `i i-${icon}`, "aria-hidden": "true" }),
-    figure,
-  );
-
 /** A friend: their name (with their @username only where another friend has the same name: `same`); under it the
- * day's issue (the calendar, „7/10“; „—“ while it isn't played) and the duels between the two (the crossed swords,
- * „3:1“, the viewer's wins first: the one count kept between two players; left out before the first duel), each said
- * whole by its tooltip; and a duel a tap away (while changing the list, removing them instead). */
+ * duels between the two in words, the one count kept between two players („Дуели помежду ви: 3 победи, 1 загуба“;
+ * „Още нямате дуели“ before the first: owner, 2026-11-22, the words the new duel picker had; how they did today is
+ * the day's board's); while three duels the player sent wait for them (`full`), a line that says so, and „Дуел“ off
+ * until they play one; and „Дуел“, a button, at its end (while changing the list, „Премахни“ instead). */
 function row(f: Friend, remove: () => void, challenge: () => void, editing: () => boolean, same = false): Child {
   const played = f.won + f.lost + f.drawn;
   return playerRow(
@@ -440,10 +445,12 @@ function row(f: Friend, remove: () => void, challenge: () => void, editing: () =
     f.tag,
     [nameWords(f.name), h("span", { class: same ? "friend-tag same" : "friend-tag" }, ` @${f.tag}`)],
     [
-      f.today
-        ? stat("today", `${f.today.rights}/${f.today.of}`, `Днешният брой: ${f.today.rights} от ${f.today.of}`)
-        : stat("today", "—", "Днешният брой: още не е изигран", true),
-      played ? stat("duel", `${f.won}:${f.lost}`, `Дуели помежду ви: ${record(f.won, f.lost, f.drawn)}`) : null,
+      h(
+        "span",
+        { class: "friend-record" },
+        played ? ["Дуели помежду ви: ", h("b", null, record(f.won, f.lost, f.drawn))] : "Още нямате дуели",
+      ),
+      f.full ? h("span", { class: "friend-full" }, "Три дуела чакат. Нов — щом изиграе някой.") : null,
     ],
     null,
     () =>
@@ -452,8 +459,9 @@ function row(f: Friend, remove: () => void, challenge: () => void, editing: () =
         : h(
             "button",
             {
-              class: "link friend-act",
+              class: "btn inline friend-act",
               type: "button",
+              disabled: !!f.full,
               "aria-label": `Дуел ${withWord(f.name)}`,
               onclick: challenge,
             },

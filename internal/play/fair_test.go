@@ -143,16 +143,7 @@ func TestScriptedDayIsTheirsAlone(t *testing.T) {
 		b.Mine.Rights != Length {
 		t.Fatalf("the day as the script's player sees it: %+v %v", b, err)
 	}
-	// Friends: the script's day is in no friend's list nor board, and in its player's own.
-	friends, err := w.g.FriendsOf(ctx, cy)
-	if err != nil || len(friends) != 2 {
-		t.Fatalf("Cy's friends: %+v %v", friends, err)
-	}
-	for _, f := range friends {
-		if (f.ID == bot) != (f.Today == nil) {
-			t.Fatalf("Cy's friend %d's day: %+v", f.ID, f.Today)
-		}
-	}
+	// Friends: the script's day is in no friend's board, and in its player's own.
 	if fb, _ := w.g.FriendsBoard(ctx, today, cy); len(fb) != 2 || slices.ContainsFunc(fb, func(s Score) bool { return s.Name == "Бот" }) {
 		t.Fatalf("the day among Cy's friends: %+v", fb)
 	}

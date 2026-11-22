@@ -207,12 +207,27 @@ func TestDuelLimits(t *testing.T) {
 	if _, err := w.g.DuelFriend(ctx, ana, bo); !errors.Is(err, ErrDuelsToOne) {
 		t.Fatalf("one more with Bo: %v", err)
 	}
+	// Her list says so: no new duel with Bo until he plays one.
+	full := func(who, friend int64) bool {
+		list, err := w.g.FriendsOf(ctx, who)
+		if err != nil {
+			t.Fatal(err)
+		}
+		i := slices.IndexFunc(list, func(f Friend) bool { return f.ID == friend })
+		return i >= 0 && list[i].Full
+	}
+	if !full(ana, bo) || full(ana, cy) || full(bo, ana) {
+		t.Fatalf("full: Ana to Bo %v, to Cy %v; Bo to Ana %v", full(ana, bo), full(ana, cy), full(bo, ana))
+	}
 	// Bo sending Ana one is his: the other way round has its own.
 	if _, err := w.g.DuelFriend(ctx, bo, ana); err != nil {
 		t.Fatalf("Bo to Ana: %v", err)
 	}
 	// One played back, there's room for another.
 	w.playSide(bo, ids[0], repeat(w.wrong, Length))
+	if full(ana, bo) {
+		t.Fatal("full after Bo played one")
+	}
 	if _, err := w.g.DuelFriend(ctx, ana, bo); err != nil {
 		t.Fatalf("after Bo played one: %v", err)
 	}

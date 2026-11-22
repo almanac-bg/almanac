@@ -330,29 +330,29 @@ func (g *Game) Friend(ctx context.Context, userID, friendID int64) (string, erro
 	return name, err
 }
 
-// Friend is a friend as the player's list shows them: how they did today, and the duels between the two.
+// Friend is a friend as the player's list shows them: who they are, and the duels between the two (owner, 2026-11-22:
+// not their day, which is the day's board's).
 type Friend struct {
 	ID    int64  `json:"id"`
 	Name  string `json:"name"`
 	Tag   string `json:"tag"`
 	Since int64  `json:"since"`
 	Look
-	Today *Score `json:"today,omitempty"` // their day's questions, once finished
 	// The duels between the two, from the player's side.
 	Won   int `json:"won"`
 	Lost  int `json:"lost"`
 	Drawn int `json:"drawn"`
+	// Full is that DuelsToOne duels the player sent wait for this friend to play them: no new one until they play one
+	// (DuelFriend: ErrDuelsToOne). Not while one of them is the player's own to finish: „Дуел“ goes on with it.
+	Full bool `json:"full,omitempty"`
 }
 
-// FriendsOf lists a player's friends by name (the day's ranking is the board's). A friend's
-// day played at a script's speed is theirs alone to see (fair.go).
+// FriendsOf lists a player's friends by name (how each did today is the day's board's: FriendsBoard).
 func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	db := g.DB.Read
-	rows, err := db.QueryContext(ctx, `SELECT u.id, u.name, u.tag, f.since, r.rights, r.closeness,
-			`+countedOf("r.questions")+`, `+lookColumns+`
+	rows, err := db.QueryContext(ctx, `SELECT u.id, u.name, u.tag, f.since, `+lookColumns+`
 		FROM friends f JOIN users u ON u.id = f.friend_id
-		LEFT JOIN runs r ON r.user_id = u.id AND r.kind = 'day' AND r.day = ? AND r.finished_at IS NOT NULL AND NOT r.shadow AND NOT r.pencil
-		WHERE f.user_id = ?`, g.Today(), userID)
+		WHERE f.user_id = ?`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -360,17 +360,12 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 	at := map[int64]int{}
 	for rows.Next() {
 		var f Friend
-		var rights, closeness, of sql.NullInt64
 		var avatar string
-		if err := rows.Scan(&f.ID, &f.Name, &f.Tag, &f.Since, &rights, &closeness, &of, &avatar); err != nil {
+		if err := rows.Scan(&f.ID, &f.Name, &f.Tag, &f.Since, &avatar); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		f.Look = g.lookOf(f.ID, avatar)
-		if rights.Valid {
-			f.Today = &Score{Name: f.Name, Rights: int(rights.Int64), Of: int(of.Int64),
-				tie: tiebreak{closeness: int(closeness.Int64)}}
-		}
 		at[f.ID] = len(list)
 		list = append(list, f)
 	}
@@ -403,6 +398,28 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 		default:
 			list[i].Drawn = n
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	rows, err = db.QueryContext(ctx, `SELECT b_id FROM duels WHERE a_id = ? AND b_id IS NOT NULL AND ended_at IS NULL
+		GROUP BY b_id HAVING count(*) >= ? AND count(*) FILTER (WHERE sent_at IS NULL) = 0`, userID, DuelsToOne)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		if i, ok := at[id]; ok {
+			list[i].Full = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	// By name, as a list of people is read (the day's ranking is the board's): Latin before Cyrillic, each in its
 	// alphabet's order, which lower case in Unicode keeps for Bulgarian.
