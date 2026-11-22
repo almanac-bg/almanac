@@ -83,6 +83,8 @@
     /* The one action: ink by day, the page's light by night. */
     --action: #16132b;
     --on-action: #ffffff;
+    /* A switch's knob when off: white by day, the page's light by night (on, it is --on-action on --action). */
+    --knob: #ffffff;
     /* Text on a chapter's colour: always the dark ink, in both themes. */
     --on-sheet: #16132b;
     /* Something gone wrong (a failed send, a field refused) and a step that can't be undone. */
@@ -184,6 +186,7 @@
       --line-2: #7f7aa8;
       --action: #f5f3ff;
       --on-action: #16132b;
+      --knob: #cdc9e6;
       --danger: #ff8f80;
       --petal: #f5f3ff;
       --scrim: rgb(0 0 0 / 0.6);
@@ -238,6 +241,7 @@
     --line-2: #7f7aa8;
     --action: #f5f3ff;
     --on-action: #16132b;
+    --knob: #cdc9e6;
     --danger: #ff8f80;
     --petal: #f5f3ff;
     --scrim: rgb(0 0 0 / 0.6);
@@ -7114,17 +7118,18 @@
     width: 24px;
     height: 24px;
     border-radius: var(--radius-full);
-    background: var(--ink-3);
+    background: var(--knob);
+    box-shadow: 0 1px 3px rgb(22 19 43 / 0.3);
     transition: transform 160ms ease;
   }
 
   .switch[aria-checked="true"] {
-    background: var(--ink);
+    background: var(--action);
     box-shadow: none;
   }
 
   .switch[aria-checked="true"] .switch-knob {
-    background: var(--bg);
+    background: var(--on-action);
     transform: translateX(22px);
   }
 
