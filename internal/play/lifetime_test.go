@@ -98,7 +98,7 @@ func TestDuelsSettledAfterAStop(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana, bo, gal := w.user(), w.user(), w.user()
-	s, err := w.g.StartTopic(ctx, bo, MixTopic)
+	s, err := w.g.startTopic(ctx, bo, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,4 +1,4 @@
-// Pictures: the game's illustrations — the avatars, the topics, the ways to play, Рила and
+// Pictures: the game's illustrations — the avatars, the topics, the ways to play and
 // the streak's flame — drawn by hand as paths on a 64 × 64 grid, in one style, so that they belong
 // together (web/DESIGN.md, Pictures).
 //
@@ -722,38 +722,6 @@ const modes: Record<string, Layer[]> = {
   ],
 };
 
-// ---- Рила, for the topic „България“: a mountain deep in snow on a round of sky, a star over it. Lit from the left: a
-// peak's right face is in shade.
-
-/** A peak on the line y = 50: its lit face, then its face in shade. */
-const peak = (cx: number, h: number, w: number, lit = "k3", shade = "k2"): Layer[] => [
-  [lit, `M${n(cx - w)} 50L${cx} ${n(50 - h)}L${cx} 50Z`],
-  [shade, `M${cx} ${n(50 - h)}L${n(cx + w)} 50L${cx} 50Z`],
-];
-/** Snow on a peak, `s` down from its top, with a ragged edge: white on the lit face, pale in the shade. */
-const snow = (cx: number, h: number, w: number, s: number): Layer[] => {
-  const top = 50 - h;
-  const x = (w * s) / h;
-  return [
-    ["kw", `M${cx} ${n(top)}L${n(cx - x)} ${n(top + s)}L${n(cx - x * 0.45)} ${n(top + s * 0.72)}L${cx} ${n(top + s)}Z`],
-    ["k5", `M${cx} ${n(top)}L${cx} ${n(top + s)}L${n(cx + x * 0.4)} ${n(top + s * 0.7)}L${n(cx + x)} ${n(top + s)}Z`],
-  ];
-};
-const rila: Layer[] = [
-  lift(C(32, 32, 28)),
-  ["k5", C(32, 32, 28)],
-  ["kh", "M9 25A24 24 0 0 1 25 8.2L26 11.6A20.5 20.5 0 0 0 12.4 26Z"],
-  ...peak(19, 23, 8.4, "k2", "k1"),
-  ...snow(19, 23, 8.4, 6),
-  ...peak(45, 25, 8.4, "k2", "k1"),
-  ...snow(45, 25, 8.4, 6),
-  ...peak(32, 37, 18),
-  ...snow(32, 37, 18, 12),
-  ["kw", sparkle(17, 18, 3.8)],
-  ["k4", sparkle(47.5, 14, 2.4)],
-  ["k1", "M10.55 50A28 28 0 0 0 53.45 50Z"],
-];
-
 const draw = (layers: Layer[]) =>
   layers.map(([ink, d, attrs]) => `<path class="${ink}" d="${d}"${attrs ? ` ${attrs}` : ""}/>`).join("");
 
@@ -762,8 +730,6 @@ const draw = (layers: Layer[]) =>
 export const pictures: Record<string, string> = {
   ...Object.fromEntries(Object.entries(avatars).map(([id, l]) => [id, draw(l)])),
   ...Object.fromEntries(Object.entries(topics).map(([id, l]) => [`topic-${id}`, draw(l)])),
-  // „България“, the questions about Bulgaria from every topic: Рила.
-  "topic-bulgaria": draw(rila),
   ...Object.fromEntries(Object.entries(modes).map(([id, l]) => [`mode-${id}`, draw(l)])),
   ...Object.fromEntries(Object.entries(marks).map(([id, l]) => [id, draw(l)])),
 };

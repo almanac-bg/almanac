@@ -14,7 +14,7 @@ func TestRecordingsOverAllTopicsFirst(t *testing.T) {
 	ctx := t.Context()
 	one, other, ana := w.user(), w.user(), w.user()
 	game := func(user int64, category string) int64 {
-		s, err := w.g.StartTopic(ctx, user, category)
+		s, err := w.g.startTopic(ctx, user, category)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -85,7 +85,7 @@ func TestRecordingsNotTheSameTenAgain(t *testing.T) {
 	ctx := t.Context()
 	friend, far, ana := w.user(), w.user(), w.user()
 	game := func(user int64) int64 {
-		s, err := w.g.StartTopic(ctx, user, MixTopic)
+		s, err := w.g.startTopic(ctx, user, MixTopic)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -121,7 +121,7 @@ func TestRecordingsLeaveOutGamesLeft(t *testing.T) {
 	near, far, ana := w.user(), w.user(), w.user()
 	none := func(int64, int) json.RawMessage { return nil }
 	game := func(user int64, answers ...func(int64, int) json.RawMessage) int64 {
-		s, err := w.g.StartTopic(ctx, user, MixTopic)
+		s, err := w.g.startTopic(ctx, user, MixTopic)
 		if err != nil {
 			t.Fatal(err)
 		}

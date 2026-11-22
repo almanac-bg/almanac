@@ -70,12 +70,12 @@ var (
 	vivid = map[string]color.RGBA{
 		"general": hex(0xffc21a), "science": hex(0x22ccc4), "history": hex(0xff6b4a), "geography": hex(0x4b90ff),
 		"movies": hex(0xe863e6), "music": hex(0x9a82ff), "sports": hex(0xff9a2e), "technology": hex(0xa3db2e),
-		"literature": hex(0xff77ae), "nature": hex(0x33cf7a), "mix": hex(0xc9c4de), "bulgaria": hex(0x2ec4a0),
+		"literature": hex(0xff77ae), "nature": hex(0x33cf7a), "mix": hex(0xc9c4de),
 	}
 	deep = map[string]color.RGBA{
 		"general": hex(0x8a5d00), "science": hex(0x00777a), "history": hex(0xc33a1c), "geography": hex(0x1f5fd6),
 		"movies": hex(0xa52ba6), "music": hex(0x5a43e0), "sports": hex(0xad5300), "technology": hex(0x4c7700),
-		"literature": hex(0xc42d6c), "nature": hex(0x0f8148), "mix": hex(0x4a4766), "bulgaria": hex(0x0b7a60),
+		"literature": hex(0xc42d6c), "nature": hex(0x0f8148), "mix": hex(0x4a4766),
 	}
 )
 

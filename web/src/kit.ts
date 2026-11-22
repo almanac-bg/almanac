@@ -44,7 +44,6 @@ import { noEmail, noEmailLine, signIn } from "./screens/signin.ts";
 import { loadStats } from "./screens/stats.ts";
 import { rankName, rankNames } from "./seal.ts";
 import {
-  bulgaria,
   categories,
   checkNews,
   look,
@@ -106,7 +105,6 @@ export const kit = {
   back,
   board,
   boardRow,
-  bulgaria,
   byTap,
   chapterName,
   chip,

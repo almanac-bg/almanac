@@ -140,13 +140,12 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   second and a half; nothing moves. With less motion it shows as long and goes at once, with no fade. A chapter reads
   the facts from its address once (`?fact=<id>`, one for each), opens on the page that holds them, the first of them
   in sight, and the address becomes the chapter's own: a reload or the way back marks nothing.
-- **Алманах:** its head (two ways to play, „Играй от всички глави“ and „Играй за България“, „10 въпроса …“ under each, words only, no glyph: theirs would sit apart from the chapters'; no lifetime totals), then the chapters, each a folded
+- **Алманах:** its head (whose book it is and what ink and grey mean, nothing to play there: a game is a chapter's, from its page; no lifetime totals), then the chapters, each a folded
   card in its colour with its seal as the badge (40px), its ink („180 с мастило“), its rank over its bar and what's left to
   the next under it („Тетрадка“, the bar, „още 15 до „Книга““: a card has no room for both under the bar); a counter at zero is hidden, and the head says once how ink is written; a
   chapter's card with no ink yet is its glyph over its name, as tall as the row it stands in.
   Two across on a phone, five on a big screen (the page's whole width, the head a reading width).
-  The chapters in their numbers' order (Глава 1, 2, …), always: a book's contents, never resorted. Микс and България are ways to play (`/play/mix`, `/play/bulgaria`),
-  never pages of their own: every fact as one list is what the book isn't (DECISIONS.md). A chapter's game left
+  The chapters in their numbers' order (Глава 1, 2, …), always: a book's contents, never resorted. A chapter's game left
   half-way today shows under the head, where it stopped, with „Продължи“ (its cross comes back here).
 - **A chapter:** its head on its sheet (glyph, name, the seal, its ink, and under them as wide as the head its bar,
   the rank and „още 16 до „Книга““ under it: `standing()`), „Играй 10 въпроса“, then its facts, the latest first, each as tall as it holds:
@@ -165,8 +164,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   Its game's result: on the chapter's sheet its chip, the score and its tiles; under it, with no number (grey is never
   counted), „Фактите от играта са в твоя Алманах, в сиво.“ While the day's issue waits, „Към днешния брой“ is the
   action, the streak's stake under it; once it's played, „Още десет въпроса“ the action. The other ways on are quiet
-  links in a line: „Още десет въпроса“, „Прегледай въпросите“, „Към главата“ (from Микс and България, which aren't
-  chapters, „Към Алманаха“). On a big screen the result is a spread, as the day's: the sheet on the left page, the
+  links in a line: „Още десет въпроса“, „Прегледай въпросите“, „Към главата“. On a big screen the result is a spread, as the day's: the sheet on the left page, the
   action, the ways on and that line on the right. „Прегледай въпросите“, the sheet and each tile open the questions'
   dialog, as the day's do. Its start
   (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name.
@@ -291,8 +289,7 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
 | technology | `#a3db2e`           | `#4c7700` / `#a3db2e`   | `#82af25`          |
 | literature | `#ff77ae`           | `#c42d6c` / `#ff89b9`   | `#cc5f8b`          |
 | nature     | `#33cf7a`           | `#0f8148` / `#33cf7a`   | `#29a662`          |
-| Микс       | `#c9c4de`           | `#4a4766` / `#c9c4de`   | `#a19db2`          |
-| България   | `#2ec4a0`           | `#0b7a60` / `#2ec4a0`   | `#259d80`          |
+| mix        | `#c9c4de`           | `#4a4766` / `#c9c4de`   | `#a19db2`          |
 
 - **Vivid** is a tile, a seal, a glyph's ground, and a large sheet by day; **deep** is a line or a word in the
   chapter's colour on the page (a hollow tile's outline, the seal's fine edge by day); **sheet** is a large sheet by
@@ -602,7 +599,7 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
   Bulgarian words, not Russian ones, and not loanwords where a Bulgarian word is in common use (`language.test.ts`).
 - **Buttons are verbs:** „Започни“, „Продължи“, „Напред“, „Сподели“, „Играй 10 въпроса“.
 - **The nouns are a closed list** (DECISIONS.md): Брой, близо, серия, Алманах (глави, факти, мастило), печат, игра на
-  главата (всички глави, България), приятели, класация, дуел (запис), споделяне, профил, напомняне. A rank's six names are the
+  главата, приятели, класация, дуел (запис), споделяне, профил, напомняне. A rank's six names are the
   seal's states; „звание“ is not a word the game uses.
 - **A chapter's name is in quotes only right after the word „глава“:** „в глава „История““, „Носиш печата на глава
   „Наука““. Standing alone it's bare: „Трудният въпрос е от История“, „Печат: История“, „Печатът на История“

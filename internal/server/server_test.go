@@ -353,12 +353,12 @@ func TestPages(t *testing.T) {
 	g := start(t)
 	for path, want := range map[string]int{
 		"/": 200, "/play": 404, "/play/history": 200, "/me": 200, "/duel/new": 200, "/duel/12": 404, "/duel/other": 404, "/duel": 404,
-		"/play/mix": 200, "/play/nosuch": 404, "/players/nobody": 404, "/nowhere": 404, "/api/nowhere": 404,
+		"/play/mix": 404, "/play/bulgaria": 404, "/play/nosuch": 404, "/players/nobody": 404, "/nowhere": 404, "/api/nowhere": 404,
 		"/qimg/edf5f1c42d5e21e8.webp": 200, "/qimg/../../go.mod": 404, "/qimg/0000000000000000.webp": 404,
 		"/privacy": 200, "/.well-known/security.txt": 200,
 		// An app's page with a slash after it is that page; the slash after anything else isn't.
 		"/almanac/": 200, "/almanac/history/": 200, "/almanac/nosuch/": 404, "/nowhere/": 404,
-		// „Микс“ and „България“ are ways to play, not chapters of the book: no page of their own.
+		// Every topic at once and Bulgaria's are no game and no chapter of the book.
 		"/almanac/mix": 404, "/almanac/bulgaria": 404,
 	} {
 		res, err := http.Get(g.url + path)
