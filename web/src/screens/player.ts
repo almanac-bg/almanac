@@ -2,8 +2,9 @@
 // screen too): the same head (their avatar with the seal they wear on its corner, their name and tag, and the day they
 // started playing), with their streak as it is now by the tag (never an ended one's), a card of how you stand with
 // them under it (friends: the duels between you and „Дуел“; or the request either way), and the same „Печати“ (ui.ts:
-// profileHead, sealsSection). Nothing that's only theirs (play/profile.go: no week's forgiving, no lifetime totals), and
-// nothing that's only one's own (Смени, Настройки). One's own, opened by its tag, is simply the page as others see it.
+// profileHead, sealsSection). Nothing that's only theirs (play/profile.go: no week's forgiving), and nothing that's
+// only one's own (Смени, Настройки). One's own, opened by its tag, is Профил: the page goes there (ui.ts, profileHref,
+// links there already).
 
 import type { Kit } from "../kit.ts";
 import type { Child } from "../lib/dom.ts";
@@ -21,12 +22,12 @@ let {
   checkNews,
   user,
   avatar,
-  dateWords,
   go,
   startDuel,
   withWord,
   profileHead,
   sealsSection,
+  isOwnTag,
 } = {} as Kit;
 
 interface Profile {
@@ -47,9 +48,6 @@ interface Profile {
   id?: number;
 }
 
-// A day as the game writes it, with its year: „6 ноември 2026 г.“ („г.“ kept with its year, never alone on a line).
-const fullDate = (day: string) => `${dateWords(day)} ${day.slice(0, 4)} г.`;
-
 export function playerProfile(kit: Kit, [tag]: string[]): Child {
   ({
     api,
@@ -61,19 +59,26 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
     checkNews,
     user,
     avatar,
-    dateWords,
     go,
     startDuel,
     withWord,
     profileHead,
     sealsSection,
+    isOwnTag,
   } = kit);
+  // One's own: Профил, the page with what's one's own on it.
+  if (isOwnTag(tag ?? "")) {
+    go("/me", true);
+    return null;
+  }
   title(`@${tag}`);
   const profile = signal<Profile | null>(null);
   const error = signal("");
   const load = () =>
     api<Profile>("GET", `/api/players/${tag}`).then(
       (p) => {
+        // One's own by another spelling of it (the server's word): Профил too.
+        if (p.me) return go("/me", true);
         profile.set(p);
         title(p.name);
       },
@@ -97,11 +102,11 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
         h("span", { class: "me-avatar" }, avatar(p.avatar, { size: "l", name: p.name, seal: p.seal })),
         nameWords(p.name),
         p.tag,
-        h("span", { class: "muted" }, `Играе от ${fullDate(p.since)}`),
+        () => p.since,
         () => p.streak,
       ),
-      p.me ? null : relation(p, load),
-      sealsSection(p.ranks, h("p", { class: "seal-worn" }, "Още няма печат.")),
+      relation(p, load),
+      sealsSection(p.ranks, h("p", { class: "seal-worn" }, "Още няма печат."), p.seal?.chapter),
     );
   });
 }

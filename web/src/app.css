@@ -4602,20 +4602,19 @@
     font: 700 1rem / 1.2 var(--font-sans);
   }
 
-  /* The @username and, by it, the streak as it is now: the flame, the number heavy, the words in the tag's size; the
-     streak goes under the tag where they don't fit, never broken. */
+  /* The @username and, by it, the streak as it is now: the flame, the number heavy, the words in the tag's size, on
+     the tag's baseline (by the text, never the flame); the streak goes under the tag where they don't fit, and is a
+     line of text: where it wraps, its next line starts at its left edge, under the flame, never indented. */
   .me-ids {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: baseline;
     gap: 4px 14px;
     margin: 0;
   }
 
   .me-streak {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
+    min-width: 0;
     max-width: 100%;
     color: var(--ink-2);
     font: 700 1rem / 1.2 var(--font-sans);
@@ -4627,14 +4626,18 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* The flame sits on the line as a letter does, its foot a little under the baseline, never lifting the words. */
   .me-streak-flame {
     --tone: var(--t-sports);
-    width: 22px;
-    height: 22px;
+    display: inline-block;
+    width: 1.25em;
+    height: 1.25em;
+    margin-right: 0.25em;
+    vertical-align: -0.25em;
   }
 
-  /* The head's quiet line under the tag: on Профил the way to change the name, on a player's page since when they
-     play. */
+  /* The head's quiet lines under the tag: since when they play (Профил and a player's page alike), and on Профил the
+     way to change a name drawn at random. */
   .me-line {
     color: var(--ink-3);
     font: 600 0.9375rem / 1.4 var(--font-sans);
@@ -5846,7 +5849,7 @@
     font: 600 0.9375rem / 1.3 var(--font-sans);
   }
 
-  /* ---- The day's result, in its budget's order: the score on its sheet, the day's entry and its ink, the friends,
+  /* ---- The day's result, in its budget's order: the score on its sheet, what the day wrote in the book, the friends,
      the action, tomorrow; „Въпросите и фактите“ under them ---- */
 
   .result-main,
@@ -5951,48 +5954,12 @@
     fill: var(--gold);
   }
 
-  /* The day's entry: a sheet of its chapter, the chip and how few knew it, the answer, the question, the fact. */
-  .day-entry {
+  /* What the day wrote („Днес в Алманаха“): „+6 с мастило“ and its chapters, the facts met before (grey), the ranks
+     risen. */
+  .day-news {
     gap: var(--space-3);
   }
 
-  .entry-leaf {
-    gap: 8px;
-    padding: 18px 20px 22px;
-  }
-
-  .entry-tags {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .entry-kicker {
-    font: 800 0.875rem / 1.2 var(--font-sans);
-  }
-
-  .entry-leaf .entry-word {
-    margin-top: 4px;
-    font: 900 calc(14px + 0.875rem) / 1.08 var(--font-sans);
-    letter-spacing: -0.01em;
-  }
-
-  .entry-leaf .entry-q {
-    font: 600 0.9375rem / 1.35 var(--font-sans);
-  }
-
-  /* On the chapter's sheet, the dark ink only: the page's greys don't hold on its colour (contrast.test.ts). */
-  .entry-leaf :is(.entry-q, .entry-untrue) {
-    color: var(--on-sheet);
-  }
-
-  .entry-leaf .entry-fact {
-    font: 500 1.0625rem / 1.45 var(--font-sans);
-  }
-
-  /* What the day wrote: „+6 с мастило“, the facts met before (grey), and the chapter nearest its next rank. */
   .inkline {
     display: grid;
     gap: 12px;
@@ -6022,40 +5989,53 @@
     line-height: 0.85;
   }
 
+  /* The chapters the ink went to, a row that wraps: each its glyph and its „+1“, a tap from its chapter. */
+  .ink-chapters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .ink-chapter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  .ink-chapter .tile {
+    width: 2rem;
+  }
+
+  .ink-chapter .num {
+    font-size: 1.5rem;
+    line-height: 1;
+  }
+
   .news-met {
     color: var(--ink-3);
     font: 700 0.875rem / 1.35 var(--font-sans);
   }
 
-  .news-step {
+  /* Ranks risen: their seals and one line, under a rule (none when they're the card's first). */
+  .news-rose {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 12px;
     padding-top: 12px;
     border-top: 1px solid var(--line);
-    font: 700 1rem / 1.3 var(--font-sans);
+    font: 700 1rem / 1.35 var(--font-sans);
   }
 
-  .inkline > .news-step:first-child {
+  .inkline > .news-rose:first-child {
     padding-top: 0;
     border-top: 0;
-  }
-
-  .step-seal {
-    flex: none;
-  }
-
-  /* The chapter's name over where it stands (.standing), as wide as the line. */
-  .step-words {
-    display: grid;
-    flex: 1 1 auto;
-    gap: 6px;
-    min-width: 0;
-  }
-
-  .news-rose {
-    flex-wrap: wrap;
-    font: 700 1rem / 1.35 var(--font-sans);
   }
 
   .news-rose p {
@@ -6578,7 +6558,7 @@
       display: grid;
     }
 
-    /* The result: the score and the day's entry on the left page, the action, tomorrow and the day's board on the right;
+    /* The result: the score and what the day wrote on the left page, the action, tomorrow and the day's board on the right;
        what's under „Въпросите и фактите“ across both. */
     .result.spread > .result-main {
       grid-column: 1 / span 7;

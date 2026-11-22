@@ -121,11 +121,6 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 					out["tomorrowHard"] = later[n-1]
 				}
 			}
-			if st.Done { // the entry its right answers wrote that the result shows
-				if out["entry"], err = s.game.EntryOfDay(ctx, u.ID, day); err != nil {
-					return nil, err
-				}
-			}
 		}
 	}
 	board, err := s.game.BoardOf(ctx, day, viewer)

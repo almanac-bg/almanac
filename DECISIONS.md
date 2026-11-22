@@ -69,6 +69,8 @@ packages' doc comments; this file holds only what must not drift.
     These are the only levels, titles and unlocks; nothing else adds up across games (no XP, currencies, goals,
     achievements, notes as rewards, lifetime totals, rating, divisions, leagues, rooms). Anything live stays out until
     the owner reopens it.
+    Профил names the book's whole ink beside „Печати“ (2026-11-22): it is ink, summed, earned only by the day's issue,
+    so it adds no second score.
   - **The streak counts days the issue was played** and forgives up to two missed days a week by itself; an ended
     streak's number is never named.
   - **Duels on one's own time:** a friend has 7 days; or a real recording, of one kind (2026-11-22, the owner: the
@@ -87,7 +89,8 @@ packages' doc comments; this file holds only what must not drift.
     a to-do count: as „a duel waits for you“ it stayed lit up to a week after its news was read (the owner hit it), and
     a result never lit it. A duel to play stays first in Приятели until it's played; the ping is for news arriving.
   - **Sharing:** the score and its tiles, never the answers, unsigned, with a way into the same ten.
-  - **A result has a budget:** the score and tiles, the day's entry and its growth line, one action, tomorrow, the
+  - **A result has a budget:** the score and tiles, what the day wrote in the book (its ink by chapter, a rank risen:
+    2026-11-22, no single question picked out of the ten), one action, tomorrow, the
     day's board (Приятели · Всички); with a crowd, how Bulgaria did that day („средно 6,2“). Everything else under „Въпросите и фактите“. A
     wrong game is never celebrated; a best rank rising and a ten of ten are the only big moments.
   - **The player's nouns are a closed list:** Брой, близо, серия, Алманах (глави, факти, мастило), печат, игра на

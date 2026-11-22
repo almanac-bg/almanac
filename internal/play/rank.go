@@ -289,16 +289,13 @@ func roseOf(tx *sql.Tx, userID int64) (*Rose, error) {
 	return &r, nil
 }
 
-// Step is the chapter nearest its next rank, as the day's result and its reminder say it („История: още 2 до
-// Тетрадка“): the chapter, the ink it still needs (Left), and the rank's name (Next); the rank it has (Level, 0 before
-// any), and the ink it starts at and the next one's (From, NextAt), for its seal and the bar of the way between.
+// Step is the chapter nearest its next rank, as the reminder says it („История: още 2 до Тетрадка“): the chapter,
+// the ink it still needs (Left), the rank's name (Next), and the rank it has (Level, 0 before any).
 type Step struct {
-	Chapter string `json:"chapter"`
-	Left    int    `json:"left"`
-	Next    string `json:"next"`
-	Level   int    `json:"level"`
-	From    int    `json:"from"`
-	NextAt  int    `json:"nextAt"`
+	Chapter string
+	Left    int
+	Next    string
+	Level   int
 }
 
 // StepOf is a player's chapter nearest its next rank, by the ink their ranks are counted from (inkIn, now: an issue
@@ -325,8 +322,7 @@ func (g *Game) StepOf(ctx context.Context, userID int64) (*Step, error) {
 			left = 1 // the next rank, held for a day's count
 		}
 		if best == nil || left < best.Left {
-			best = &Step{Chapter: c.ID, Left: left, Next: RankName(level + 1), Level: level, From: RankFrom(level),
-				NextAt: RankFrom(level + 1)}
+			best = &Step{Chapter: c.ID, Left: left, Next: RankName(level + 1), Level: level}
 		}
 	}
 	return best, nil

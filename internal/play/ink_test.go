@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"maps"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -108,6 +109,27 @@ func TestInkAndGrey(t *testing.T) {
 	ink, err := w.g.InkOf(ctx, ana)
 	if err != nil || inkTotal(ink) != news.Ink {
 		t.Fatalf("the book's ink: %v %v, want %d", ink, err, news.Ink)
+	}
+	// The day's ink by chapter, each once, in the order the issue asked them: the book's own, as it was empty before.
+	byChapter, order := map[string]int{}, []string{}
+	for _, c := range news.Chapters {
+		if _, twice := byChapter[c.Chapter]; twice || c.Ink < 1 {
+			t.Errorf("the news's chapters: %+v", news.Chapters)
+		}
+		byChapter[c.Chapter] = c.Ink
+		order = append(order, c.Chapter)
+	}
+	if !maps.Equal(byChapter, ink) {
+		t.Errorf("the news's ink by chapter %v, the book's %v", byChapter, ink)
+	}
+	var asked []string
+	for _, p := range picks {
+		if q, _ := w.g.Bank().Get(p.ID); byChapter[q.Base().Category] > 0 && !slices.Contains(asked, q.Base().Category) {
+			asked = append(asked, q.Base().Category)
+		}
+	}
+	if !slices.Equal(order, asked) {
+		t.Errorf("the news's chapters in the order %v, the issue asked them %v", order, asked)
 	}
 
 	// Another game: grey only, right or wrong; and the issue's wrong one, right now, stays grey.

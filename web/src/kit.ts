@@ -68,6 +68,7 @@ import {
   formatNumber,
   glyph,
   inSight,
+  isOwnTag,
   leaf,
   mini,
   nameWords,
@@ -97,6 +98,7 @@ import {
 export const kit = {
   acceptedLine,
   inSight,
+  isOwnTag,
   answered,
   answering,
   ApiError,

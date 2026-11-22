@@ -42,7 +42,6 @@ func TestReadsNeverNest(t *testing.T) {
 		"DuelsOf":      func(ctx context.Context) error { _, err := w.g.DuelsOf(ctx, ana); return err },
 		"DuelOf":       func(ctx context.Context) error { _, err := w.g.DuelOf(ctx, bo, duel); return err },
 		"FriendsNews":  func(ctx context.Context) error { _, err := w.g.FriendsNews(ctx, bo); return err },
-		"EntryOfDay":   func(ctx context.Context) error { _, err := w.g.EntryOfDay(ctx, ana, w.g.Today()); return err },
 		"Suspects":     func(ctx context.Context) error { _, err := w.g.Suspects(ctx); return err },
 	}
 	for name, read := range reads {

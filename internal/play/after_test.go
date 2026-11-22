@@ -166,7 +166,7 @@ func TestTheLastAnswerDoesntWaitForWhatFollows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n := w.count(`SELECT count(*) FROM ranks WHERE user_id = ?`, ana); n == 0 || news.Step == nil {
+	if n := w.count(`SELECT count(*) FROM ranks WHERE user_id = ?`, ana); n == 0 {
 		t.Fatalf("the news before what the game earned was kept: %+v, %d ranks", news, n)
 	}
 	if n := w.count(`SELECT count(*) FROM runs_after`); n != 0 {

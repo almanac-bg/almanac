@@ -91,13 +91,13 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      it opens the phone's browser, elsewhere it copies the link for it; the app's menu named under it, „Или от менюто
      на приложението: ··· → Отвори в Safari“); sharing then stays a quiet link beside the tiles („Сподели резултата“).
      On a big screen that action heads the right page (moved there, never drawn twice), the two pages of a height.
-  3. The day's entry („Днес в Алманаха“, or „Най-рядкото ти попадение“ with a crowd): a sheet of its chapter with the
-     chip, the answer as a headword (an order, a match, a split: its parts a line each, at the entry's size), the
-     question, the fact. Under it what the day wrote (`game/news.ts`): „+6 с
-     мастило“; „Един от въпросите вече беше в твоя Алманах и остава в сиво.“; the chapter nearest its next rank with
-     its seal, its name and where it stands (`standing()`: its bar, „Тетрадка“ and „още 2 до „Книга““ under it); or ranks
-     risen, their seals and one line, each rank once with its chapters, their names the links („Нови печати: „Страница“ в География и в Технологии и игри.“; one chapter's: its
-     ladder under it).
+  3. What the day wrote in the book, „Днес в Алманаха“ (`game/news.ts`), on a card: the whole of its ink at a glance,
+     „+6 с мастило“ (a tap from the Алманах), and under it the chapters it went to, in the order the issue asked them,
+     a row of their tiles (a right answer's, as the score has them), each with its „+1“ (or „+2“; a tap from its chapter); „Един от въпросите вече беше в твоя
+     Алманах и остава в сиво.“; ranks risen, their seals and one line, each rank once with its chapters, their names the
+     links („Нови печати: „Страница“ в География и в Технологии и игри.“; one chapter's: its ladder under it). No
+     single question picked out of the ten (the day's ten are all under „Въпросите и фактите“), and no one chapter's
+     bar beside the day's whole ink: next to it, either reads as the day's ink.
   4. The action, past the first results: „Сподели“.
   5. Tomorrow: the next issue's date set big (over its words with large text), „Утре, неделя · Брой 32“ (a line each
      with large text, no dot), the chapter of its hard question with its
@@ -204,12 +204,16 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
 - **Профил:** one column, on a big screen too: the avatar with the seal worn on its corner and a pencil on its top corner (a phone: always; a big screen: as the pointer
   comes over it, with the tooltip „Смени аватара“), the
   name, the @username and by it, on the same line where it fits, the streak as it is now, sized to the head (the
-  flame, „58 дни без прекъсване“; never an ended one's, nothing while none runs; no card of its own). What the week
+  flame, „58 дни без прекъсване“; never an ended one's, nothing while none runs; no card of its own), on the
+  @username's baseline by its text (the flame sits on the line as a letter does), a line of text that, where it wraps,
+  goes on flush left under the flame; under them „Играе от 6 ноември 2026 г.“, as another's page has it. What the week
   forgives is no line of the page: the streak's `title`, for a pointer resting on it (that it's used up, only while a
   streak runs); a phone is told it where it matters, when a day missed is forgiven. A guest's ways in one quiet line
   under it („Играта ти е само на това устройство. Запази я с имейл · Имаш профил? Влез“: the first opens its form in
-  the line's place, the second is the sign-in page); „Печати“, one list on a card
-  (`sealList()`), a row a chapter with a rank (only those earned), in the bank's order: its seal; its name with its
+  the line's place, the second is the sign-in page); „Печати“, and beside it at the right the book's whole ink, the
+  rows' summed („47 факта с мастило“, „1 факт с мастило“; nothing at none: ink only, so no second score), one list on
+  a card (`sealList()`), a row a chapter with a rank (only those earned), the most ink first, then the bank's order,
+  the seal worn on the avatar's corner first (so the list explains the badge): its seal; its name with its
   ink at the line's end („27 с мастило“, the book's count; under the name where they don't fit); under them where it
   stands (`standing()`); a view of the ranks: nothing to tap, none ringed, no single chapter's ladder (the one worn is
   the best, never chosen: on the avatar's corner); Настройки last. No way to the page as others see it: it is this one
@@ -219,14 +223,14 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   so never on the page: a sheet (`screens/avatar.ts`) opened by the avatar (one button, its pencil on it), the one
   worn ringed; a tap wears one and, once it's kept, puts the sheet away. Another player's page (`/players/<tag>`) is
   laid out the same, one column (`profileHead`, `sealsSection`): the same head without a way to change it („Играе от
-  6 ноември 2026 г.“, the day they started, in the line under the @username), their streak by the @username as Профил has it (only as it is now: never the
+  6 ноември 2026 г.“, the day they started, in the line under the @username, as on Профил), their streak by the @username as Профил has it (only as it is now: never the
   longest nor an ended one's, nothing while none runs, and not what the week forgives: that's theirs), right under
   the head a card of how you stand: its kicker („Приятели“, „Покана за приятелство“, „Не сте приятели“); as
   friends the duels between you as heavy numerals with their words under them („3 / победи“, „0 / загуби“, and
   „равенства“ only where there are any; „Още нямате дуели.“ before any) and „Дуел“ its one primary button, the row's
   width on a phone; else a line and its buttons (ask to be friends, answer their asking, call it off); the same seals; nothing of one's own
-  (Смени, Настройки). One's own, opened by its @username, is simply the page as others see it, with no card of how
-  you stand. Where no email may be asked for (an app's browser that reads what's typed: `noEmail`), Профил and
+  (Смени, Настройки). A link to oneself, wherever one's name is (a board, the friends, a duel), goes to Профил
+  (`profileHref`), and one's own page opened by its @username is Профил too (`/me`). Where no email may be asked for (an app's browser that reads what's typed: `noEmail`), Профил and
   Настройки offer none, only the line that says so.
 
 ## Colour
@@ -584,7 +588,7 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
   nothing names any more goes, with its rules.
 - **Test hooks** the browser tests depend on: `.question-head`, `.options .option`, `.keypad`, `.sortable-list`,
   `.verdict`, `.right-said`, `.after`, `.up-next-go`; `.issue`, `.issue-go`, `.today-side`, `.result`, `.result-main`, `.score-n`,
-  `.tiles .tile`, `.tomorrow`, `.result-share`, `.share-sheet`, `.streak-chip`, `.streak-notice`, `.day-entry`, `.missed-day`;
+  `.tiles .tile`, `.tomorrow`, `.result-share`, `.share-sheet`, `.streak-chip`, `.streak-notice`, `.day-news`, `.missed-day`;
   `.summary`, `.reviewed`, `.news-facts`; `.toc-row`, `.entry`; `.day-board`, `.rank-row`, `.friend`, `.invitation`,
   `.accepted-notice`, `.duels`, `.duel-cards` (`.landed`), `.duel-card` (`.turn`, `.s-<state>`), `.duel-card-mid`, `.duel-card-go`, `.duel-chip`, `.duel-card-marks`, `.duel-card-acts`, `.duel-sheet`, `.tab-dot`, `.duel-pick`, `.duel-invite`, `.their-line`; `.me-ladder`, `.ladder`.
 

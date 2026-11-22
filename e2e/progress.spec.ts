@@ -49,41 +49,36 @@ test("a topic's game never tells how well the topic is known, and the avatar is 
   await expect(page.locator("html")).not.toHaveClass(/calm/);
 });
 
-// The day as the server would have it, the entry its right answers wrote told (as the server does) only once the day
-// is played: with others playing, the right answer a tenth of them got; with too few, the hardest, nothing of others.
-for (const { crowd, head, kicker } of [
-  { crowd: true, head: "Най-рядкото ти попадение", kicker: "вярно отговарят 10\u00a0%" },
-  { crowd: false, head: "Днес в Алманаха", kicker: "въпрос 8" },
-]) {
-  test(`just played, an entry of the day is told as the book has it (${crowd ? "a crowd" : "no crowd"})`, async ({
-    page,
-  }) => {
-    test.setTimeout(120_000);
-    await page.route("**/api/day", async (route) => {
-      if (route.request().method() !== "GET") return route.continue();
-      const res = await route.fetch();
-      const t = await res.json();
-      if (t.run?.done)
-        t.entry = {
-          n: 7,
-          crowd,
-          right: crowd ? 0.1 : 0,
-          fact: { category: "history", question: "Кой въпрос?", answer: "Този отговор", fact: "Ето защо." },
-        };
-      await route.fulfill({ response: res, json: t });
-    });
-    await page.goto("/");
-    await startDay(page);
-    await playRun(page);
-    const entry = page.locator(".summary .day-entry");
-    await expect(entry.locator("h2")).toHaveText(head);
-    await expect(entry.locator(".chip")).toHaveText("История");
-    await expect(entry.locator(".entry-kicker")).toHaveText(kicker);
-    await expect(entry.locator(".entry-word")).toHaveText("Този отговор");
-    await expect(entry.locator(".entry-q")).toHaveText("Кой въпрос?");
-    await expect(page.locator(".summary .btn.primary")).toHaveCount(1);
-  });
-}
+// What the day wrote, as the server would have it: the whole of its ink at a glance, its chapters each with its own,
+// in the order the issue asked them, and the facts met before; no single question picked out of the ten, and no
+// one chapter's bar beside the day's whole ink.
+test("just played, the day's ink is told whole, by its chapters", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.route("**/api/me/news", (route) =>
+    route.fulfill({
+      json: {
+        ink: 3,
+        chapters: [
+          { chapter: "history", ink: 2 },
+          { chapter: "geography", ink: 1 },
+        ],
+        metBefore: 1,
+      },
+    }),
+  );
+  await page.goto("/");
+  await startDay(page);
+  await playRun(page);
+  const news = page.locator(".summary .day-news");
+  await expect(news.locator("h2")).toHaveText("Днес в Алманаха");
+  await expect(news.locator(".ink-row")).toHaveText("+3 с\u00a0мастило");
+  await expect(news.locator(".ink-chapters a")).toHaveCount(2);
+  await expect(news.getByRole("link", { name: "История: +2" })).toHaveAttribute("href", "/almanac/history");
+  await expect(news.getByRole("link", { name: "География: +1" })).toHaveAttribute("href", "/almanac/geography");
+  await expect(news.locator(".news-met")).toHaveText("Един от въпросите вече беше в твоя Алманах и остава в сиво.");
+  await expect(page.locator(".summary .day-entry, .summary .entry-q, .summary .standing")).toHaveCount(0);
+  await expect(page.locator(".summary .btn.primary")).toHaveCount(1);
+});
 
 test("after the day: one gold thing to do next", async ({ page }) => {
   test.setTimeout(120_000);

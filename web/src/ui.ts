@@ -7,9 +7,9 @@ import { errorText, passing } from "./lib/api.ts";
 import { hourInBulgaria } from "./lib/day.ts";
 import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
 import { calm, type Scheme, scheme, setScheme } from "./lib/prefs.ts";
-import { formatNumber, formatValue, found, hyphenate, keepNumbers, stakeWords } from "./lib/words.ts";
+import { dateWords, formatNumber, formatValue, found, hyphenate, keepNumbers, stakeWords } from "./lib/words.ts";
 import { glyphBox, rankName, rankNames, sealParts } from "./seal.ts";
-import { categories, topics } from "./state.ts";
+import { categories, topics, user } from "./state.ts";
 
 export { formatNumber, formatValue };
 
@@ -139,7 +139,7 @@ export function chip(topic: string, words: Child = chapterName(topic)): HTMLElem
   return h("span", { class: `chip t-${topic}` }, glyph(topic), words);
 }
 
-/** A large sheet in a chapter's colour: a question, the day's entry, a chapter's head. `fold`: its corner turned, the
+/** A large sheet in a chapter's colour: a question, the day's score, a chapter's head. `fold`: its corner turned, the
  * next sheet's colour under it (`next`: its topic; none, the page), as the issue's cover and the chapters' cards have
  * it, and nothing else does. */
 export function leaf(topic: string, parts: Child, cls = "", fold: { next?: string } | null = null): HTMLElement {
@@ -306,16 +306,18 @@ export type ChapterRank = Standing;
 
 /** A player's head, one look on Профил and on a player's page: the avatar with the seal worn on its corner (`face`:
  * on Профил a button with „Смени“ under it), the name, the @username with the streak as it is now by it (`streak`:
- * its days, nothing while there's none; never an ended one's, DECISIONS.md), and a quiet line under them (`line`: on
- * Профил the way to change the name, on another's page since when they play). `why`, Профил's only: what the week
- * forgives, said when the pointer rests on the streak (a phone has it where a day missed is forgiven). */
+ * its days, nothing while there's none; never an ended one's, DECISIONS.md), the day they started playing under them
+ * (`since`, the same on both: „Играе от 6 ноември 2026 г.“), and what's only Профил's under it (`more`: the way to
+ * change a name drawn at random). `why`, Профил's only: what the week forgives, said when the pointer rests on the
+ * streak (a phone has it where a day missed is forgiven). */
 export function profileHead(
   face: Child,
   name: Child,
   tag: string | (() => string | undefined),
-  line: Child,
+  since: () => string | undefined,
   streak: () => number | undefined,
   why?: () => string | undefined,
+  more: Child = null,
 ): HTMLElement {
   const at = (t: string | undefined) => (t ? h("span", { class: "me-tag" }, `@${t}`) : null);
   return h(
@@ -329,13 +331,21 @@ export function profileHead(
       h("p", { class: "me-ids" }, typeof tag === "function" ? () => at(tag()) : at(tag), () =>
         streakLine(streak(), why?.()),
       ),
-      h("p", { class: "me-line" }, line),
+      () => {
+        const day = since();
+        return day ? h("p", { class: "me-line" }, `Играе от ${fullDate(day)}`) : null;
+      },
+      more,
     ),
   );
 }
 
-/** The streak in a player's head: the flame, its number and its words („58 дни без прекъсване“), on one line; nothing while
- * there's none. */
+/** A day as the game writes it, with its year: „6 ноември 2026 г.“ („г.“ kept with its year, never alone on a line). */
+const fullDate = (day: string) => `${dateWords(day)} ${day.slice(0, 4)} г.`;
+
+/** The streak in a player's head: the flame, its number and its words („58 дни без прекъсване“), a line of text by the
+ * @username's (on its baseline): where it wraps (a phone, large text), its next line starts at its left edge, under the
+ * flame. Nothing while there's none. */
 function streakLine(days: number | undefined, why: string | undefined): Child {
   if (!days) return null;
   return h(
@@ -347,24 +357,44 @@ function streakLine(days: number | undefined, why: string | undefined): Child {
   );
 }
 
-/** „Печати“, one section on Профил and on a player's page: the seals' list (sealList), or `none` before a first seal. */
-export function sealsSection(ranks: ChapterRank[], none: Child): HTMLElement {
+/** „Печати“, one section on Профил and on a player's page: the seals' list (sealList), the one worn on the avatar
+ * (`worn`: its chapter) first, or `none` before a first seal; beside the heading the book's whole ink, the rows'
+ * summed („47 факта с мастило“; nothing at none). */
+export function sealsSection(ranks: ChapterRank[], none: Child, worn?: string): HTMLElement {
+  const had = sealsHad(ranks, worn);
+  const ink = had.reduce((n, r) => n + r.ink, 0);
   return h(
     "section",
     { class: "sect me-seals" },
-    h("div", { class: "sect-head" }, h("h2", null, "Печати")),
-    sealList(ranks) ?? none,
+    h(
+      "div",
+      { class: "sect-head" },
+      h("h2", null, "Печати"),
+      ink > 0
+        ? h("span", { class: "sect-note seals-ink" }, `${formatNumber(ink)} ${ink === 1 ? "факт" : "факта"} с мастило`)
+        : null,
+    ),
+    sealList(had) ?? none,
   );
 }
 
-/** A player's seals, one list, a row a chapter with a rank, in the bank's order: the seal (its glyph in it); the
- * chapter's name with its ink at the row's end; under them where it stands (standing: its bar, „Страница“ under its
- * left end and „още 8 до „Тетрадка““ under its right). A view, never a choice: the one worn is the best (play.sealOf). Nothing before a first
- * seal: the page says what brings one. */
-function sealList(ranks: ChapterRank[]): Child {
-  const had = categories
+/** The chapters with a rank, the most ink first (then in the bank's order), so that the first is the seal worn on
+ * the avatar's corner (play.sealOf: the highest rank, then the most ink) and the list explains the badge; `worn`, where
+ * it's known, first whatever its ink (a tie the server broke by the day it came). */
+function sealsHad(ranks: ChapterRank[], worn?: string): ChapterRank[] {
+  return categories
     .map((c) => ranks.find((r) => r.chapter === c.id))
-    .filter((r): r is ChapterRank => !!r && r.level > 0);
+    .filter((r): r is ChapterRank => !!r && r.level > 0)
+    .map((r, i) => ({ r, i, first: r.chapter === worn ? 0 : 1 }))
+    .sort((a, b) => a.first - b.first || b.r.ink - a.r.ink || a.i - b.i)
+    .map(({ r }) => r);
+}
+
+/** A player's seals, one list, a row a chapter with a rank, the most ink first (sealsHad): the seal (its glyph in
+ * it); the chapter's name with its ink at the row's end; under them where it stands (standing: its bar, „Страница“
+ * under its left end and „още 8 до „Тетрадка““ under its right). A view, never a choice: the one worn is the best
+ * (play.sealOf), the first row. Nothing before a first seal: the page says what brings one. */
+function sealList(had: ChapterRank[]): Child {
   if (!had.length) return null;
   return h(
     "ul",
@@ -654,8 +684,11 @@ export function rosette(): SVGSVGElement {
   return svg;
 }
 
-/** Where a player's profile is: by their tag. */
-export const profileHref = (tag: string) => `/players/${tag}`;
+/** Whether a tag is the player's own (tags are lower case on the server: account.NormalTag). */
+export const isOwnTag = (tag: string) => !!tag && tag.toLowerCase() === user.peek()?.tag?.toLowerCase();
+
+/** Where a player's profile is: by their tag; one's own is Профил, wherever it's named (a board, friends, a duel). */
+export const profileHref = (tag: string) => (isOwnTag(tag) ? "/me" : `/players/${tag}`);
 
 /** A day's score as a row says it (a friend's, a board's): the right answers in a heavy numeral, „от 10“ small beside
  * them, never parted from them. */
