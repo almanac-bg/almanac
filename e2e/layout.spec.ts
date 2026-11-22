@@ -1026,7 +1026,7 @@ for (const width of [390, 1366])
       const places = page.locator(":is(nav.places, nav.places-foot):visible");
       await places.getByRole("link", { name: "Алманах" }).click();
       await places.getByRole("link", { name: "Днес" }).click();
-      for (const tab of ["Приятели", "България"]) {
+      for (const tab of ["Приятели", "Всички"]) {
         await page.locator(".day-board").getByRole("tab", { name: tab }).click();
         const minis = page.locator(".day-board .rank-row .mini");
         await expect(minis).toHaveCount(4);

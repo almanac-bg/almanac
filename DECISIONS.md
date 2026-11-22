@@ -39,7 +39,7 @@ packages' doc comments; this file holds only what must not drift.
   - **Three places:** Днес (the issue and, on its result, the day's board), Алманах (the book), Приятели (friends,
     duels). Профил and Настройки open from the avatar. Nothing else gets a place. The board is about the day's issue,
     so it is Днес's (2026-11-22), and Приятели is what it says, the people and the duels. It is one card on the result
-    with two tabs, Приятели and България (2026-11-22, the owner: a „Класация“ link to a page of its own was a detour,
+    with two tabs, Приятели and Всички (2026-11-22, the owner: a „Класация“ link to a page of its own was a detour,
     and the tabs were what worked in Приятели): it takes the place of „Приятели днес“ and „България днес“, so the
     result holds no more than before, and it has no page of its own.
   - **The issue is asked once.** Its score is the number right out of 10; a close answer is „близо“, not right. No
@@ -81,7 +81,7 @@ packages' doc comments; this file holds only what must not drift.
     a result never lit it. A duel to play stays first in Приятели until it's played; the ping is for news arriving.
   - **Sharing:** the score and its tiles, never the answers, unsigned, with a way into the same ten.
   - **A result has a budget:** the score and tiles, the day's entry and its growth line, one action, tomorrow, the
-    day's board (Приятели · България); with a crowd, how Bulgaria did that day („средно 6,2“). Everything else under „Въпросите и фактите“. A
+    day's board (Приятели · Всички); with a crowd, how Bulgaria did that day („средно 6,2“). Everything else under „Въпросите и фактите“. A
     wrong game is never celebrated; a best rank rising and a ten of ten are the only big moments.
   - **The player's nouns are a closed list:** Брой, близо, серия, Алманах (глави, факти, мастило), печат, игра на
     главата (Микс, България), приятели, класация, дуел (запис), споделяне, профил, напомняне. Adding one is the owner's
