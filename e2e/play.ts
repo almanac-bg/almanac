@@ -185,15 +185,17 @@ export async function playedBefore(page: Page, days: number): Promise<void> {
 
 /** Makes the player (a guest, made now if there's none) one who finished the day's ten on each of these days, counted
  * back from today in Bulgaria (1: yesterday), straight in the test server's database: games of nothing, for the
- * streak only. */
+ * streak only. Counted by the calendar, never as 24 hours a day: late in the evening, a month back crosses the end of
+ * summer time, and two days of 24 hours would land on one. */
 export async function daysPlayed(page: Page, ...back: number[]): Promise<void> {
-  const bulgaria = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" });
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" }).format(Date.now());
   await inDB(page, (db, id) => {
     const add = db.prepare(`INSERT INTO runs (user_id, kind, day, questions, started_at, finished_at)
       VALUES (?, 'day', ?, '[{"id":""}]', ?, ?)`);
     for (const d of back) {
-      const at = Date.now() - d * 24 * 60 * 60 * 1000;
-      add.run(id, bulgaria.format(at), at, at);
+      // Noon in UTC: the afternoon of that day in Bulgaria, whatever its time.
+      const at = Date.parse(`${today}T12:00:00Z`) - d * 24 * 60 * 60 * 1000;
+      add.run(id, new Date(at).toISOString().slice(0, 10), at, at);
     }
   });
 }

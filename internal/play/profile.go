@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"time"
 )
 
 // A profile is a player as anyone may see them, found by their tag: how they look, the seal they wear, their ranks by
@@ -12,7 +11,7 @@ import (
 // streak as it is now (runs.go: its days, nothing more): never an ended one's, nor the longest (an ended streak's
 // number is never named), nor what their week has forgiven (theirs). No lifetime totals, and nothing of how well they
 // know a topic (mastery is the game's own). What only they see stays theirs: their games one by one, their Алманах,
-// their email, their friends. Its time is a date, the day they started, never the moment (review 2026-11-18, S12).
+// their email, their friends, and when they started (the streak says how long they've kept at it).
 // The privacy page says what it shows; the server limits how many anyone looks at (server.profileOf).
 
 // Profile is a player as another sees them, and how the viewer stands with them.
@@ -22,8 +21,6 @@ type Profile struct {
 	// Me says it's the viewer's own.
 	Me bool `json:"me,omitempty"`
 	Look
-	// Since is the day they started playing, in Bulgaria (YYYY-MM-DD).
-	Since string `json:"since"`
 	// Seal is the seal they wear (none before a rank), whole (its name, the way to the next): over the look's, which says
 	// only its chapter and level. Ranks their ranks in the bank's chapters.
 	Seal  *Seal         `json:"seal,omitempty"`
@@ -55,9 +52,8 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 	var p Profile
 	var id int64
 	var avatar string
-	var since int64
-	err := db.QueryRowContext(ctx, `SELECT u.id, u.name, u.tag, u.created_at, `+lookColumns+` FROM users u WHERE u.tag = ?`, tag).
-		Scan(&id, &p.Name, &p.Tag, &since, &avatar)
+	err := db.QueryRowContext(ctx, `SELECT u.id, u.name, u.tag, `+lookColumns+` FROM users u WHERE u.tag = ?`, tag).
+		Scan(&id, &p.Name, &p.Tag, &avatar)
 	if errors.Is(err, sql.ErrNoRows) {
 		return p, ErrNoPlayer
 	}
@@ -69,7 +65,6 @@ func (g *Game) ProfileOf(ctx context.Context, tag string, viewer int64) (Profile
 		return p, err
 	}
 	p.Seal = sealOf(p.Ranks)
-	p.Since = dayOf(time.UnixMilli(since))
 	if p.Streak, err = g.Streak(ctx, id); err != nil {
 		return p, err
 	}

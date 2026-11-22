@@ -4763,45 +4763,21 @@
     font: 700 1rem / 1.2 var(--font-sans);
   }
 
-  /* The @username and, by it, the streak as it is now: the flame, the number heavy, the words in the tag's size, on
-     the tag's baseline (by the text, never the flame); the streak goes under the tag where they don't fit, and is a
-     line of text: where it wraps, its next line starts at its left edge, under the flame, never indented. */
   .me-ids {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    gap: 4px 14px;
     margin: 0;
   }
 
-  .me-streak {
-    min-width: 0;
-    max-width: 100%;
-    color: var(--ink-2);
-    font: 700 1rem / 1.2 var(--font-sans);
-  }
-
-  .me-streak .num {
-    color: var(--ink);
-    font: 900 1.125rem / 1 var(--font-numeral);
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* The flame sits on the line as a letter does, its foot a little under the baseline, never lifting the words. */
-  .me-streak-flame {
-    --tone: var(--t-sports);
-    display: inline-block;
-    width: 1.25em;
-    height: 1.25em;
-    margin-right: 0.25em;
-    vertical-align: -0.25em;
-  }
-
-  /* The head's quiet lines under the tag: since when they play (Профил and a player's page alike), and on Профил the
-     way to change a name drawn at random. */
+  /* The head's quiet line under the tag: the streak as it is now (Профил and a player's page alike, its number
+     heavy). */
   .me-line {
     color: var(--ink-3);
     font: var(--t-note);
+  }
+
+  .me-streak .num {
+    color: var(--ink-2);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
   }
 
   /* How you stand with a player, on their page under the head, on a card: its kicker („Приятели“, or the request), as

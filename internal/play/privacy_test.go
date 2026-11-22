@@ -5,20 +5,15 @@ import (
 	"errors"
 	"strings"
 	"testing"
-	"time"
 )
 
 // A profile, anyone's to see, shows the seal and the ranks by chapter (DECISIONS.md, „The direction“), and the streak
 // only as it is now (TestProfileShowsTheStreakNow): no lifetime totals and nothing of mastery. The ranks are kept as a
-// day's issue finishes, so a game under way never shows; its time is a date (review 2026-11-18, S12).
+// day's issue finishes, so a game under way never shows; nor does the day they started.
 func TestProfileShowsSealAndRanks(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
-	joined := time.Date(2026, 9, 17, 23, 30, 0, 0, Bulgaria)
-	if _, err := w.db.Write.Exec(`UPDATE users SET created_at = ? WHERE id = ?`, joined.UnixMilli(), ana); err != nil {
-		t.Fatal(err)
-	}
 	p, err := w.g.ProfileOf(ctx, "player1", 0)
 	if err != nil || p.Seal != nil || len(p.Ranks) != len(w.b.Categories) {
 		t.Fatalf("a newcomer's profile: %+v %v", p, err)
@@ -38,13 +33,10 @@ func TestProfileShowsSealAndRanks(t *testing.T) {
 		t.Fatalf("a game under way moved the profile: %+v, was %+v", again.Seal, p.Seal)
 	}
 	out, _ := json.Marshal(p)
-	for _, total := range []string{`"days"`, `"games"`, `"answers"`, `"right"`, `"duels"`, `"won"`, `"mastery"`, `"best"`, `"ended"`, `"forgiven"`, `"spare"`, `"left"`} {
+	for _, total := range []string{`"days"`, `"games"`, `"answers"`, `"right"`, `"duels"`, `"won"`, `"mastery"`, `"best"`, `"ended"`, `"forgiven"`, `"spare"`, `"left"`, `"since"`} {
 		if strings.Contains(string(out), total) {
 			t.Errorf("the profile says %s: %s", total, out)
 		}
-	}
-	if p.Since != "2026-09-17" { // the day in Bulgaria, never the moment
-		t.Fatalf("since: %v", p.Since)
 	}
 }
 

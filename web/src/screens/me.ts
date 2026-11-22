@@ -71,19 +71,15 @@ export function me(kit: Kit) {
       () => {
         const data = signal<Stats | null>(null);
         const ranks = signal<ChapterRank[] | null>(null);
-        const since = signal<string | undefined>(undefined);
         // Профил that couldn't load (no line): said, with the way to try again (the whole page, afresh).
         const failed = signal<unknown>(null);
         loadStats().then(data.set, failed.set);
-        // The ranks and the day they started, as others see them on the player's page (not the book's: opening it is
-        // counted as opening the book).
+        // The ranks, as others see them on the player's page (not the book's: opening it is counted as opening the
+        // book).
         const tag = user.peek()?.tag;
         if (tag)
-          api<{ ranks?: ChapterRank[]; since?: string }>("GET", `/api/players/${encodeURIComponent(tag)}`).then(
-            (p) => {
-              since.set(p.since);
-              ranks.set(p.ranks ?? []);
-            },
+          api<{ ranks?: ChapterRank[] }>("GET", `/api/players/${encodeURIComponent(tag)}`).then(
+            (p) => ranks.set(p.ranks ?? []),
             () => ranks.set([]),
           );
         else ranks.set([]);
@@ -95,7 +91,7 @@ export function me(kit: Kit) {
             "div",
             { class: "me-intro" },
             said ? h("p", { class: "muted", role: "status" }, said) : null,
-            head(data, since, pick),
+            head(data, pick),
             () => (failed() && !data() ? failure(failed(), () => go("/me", true)) : null),
             // A guest keeps their game with an email, or signs in to a profile they have elsewhere: one line of ways
             // (not loose ones before anything else). Either way in, Профил again, as the profile has it.
@@ -127,10 +123,9 @@ export function me(kit: Kit) {
 }
 
 /** Who you are: your avatar as you wear it, the seal you wear on its corner, and a pencil on it (a tap on the avatar
- * opens the animals: `pick`); your name and tag, the streak as it is now by it; the day you started (`since`, said
- * to you: „Играеш от …“); a name still the one drawn says so, with the way to change it. The same head as another's
- * page (ui.ts, profileHead), but for what the week forgives: yours, on the streak for a pointer resting on it. */
-function head(data: () => Stats | null, since: () => string | undefined, pick: () => void): Child {
+ * opens the animals: `pick`); your name and tag, the streak as it is now under them (said to you: „Играеш от …“).
+ * The same head as another's page (ui.ts, profileHead), but for what the week forgives: yours, on the streak for a pointer resting on it. */
+function head(data: () => Stats | null, pick: () => void): Child {
   return profileHead(
     // The avatar is the button: a pencil on its corner says so (on a big screen as the pointer comes over it, with the
     // tooltip; on a phone always), never a word beside it.
@@ -142,19 +137,8 @@ function head(data: () => Stats | null, since: () => string | undefined, pick: (
     ),
     () => nameWords(user()?.name ?? "Профил"),
     () => user()?.tag,
-    since,
     () => data()?.streak,
     () => forgives(data()),
-    // The name is changed in Настройки, rarely: said here only while it's one drawn at random, which asks for it.
-    () =>
-      user()?.drawn
-        ? h(
-            "p",
-            { class: "me-line" },
-            "Това име е избрано наслуки. ",
-            h("a", { class: "link", href: "/settings#name" }, "Смени го"),
-          )
-        : null,
     true,
   );
 }
