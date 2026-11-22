@@ -33,7 +33,7 @@ let {
   play,
   profileHref,
   reviewSheet,
-  who,
+  playerRow,
   withWord,
 } = {} as Kit;
 
@@ -239,36 +239,35 @@ function choose(stack: DuelView[]): void {
     { class: "sheet duel-stack", "aria-labelledby": "duel-stack-title" },
     h(
       "div",
-      { class: "card sheet-panel stack" },
-      h("h2", { id: "duel-stack-title" }, `Чакат те ${formatNumber(stack.length)} дуела`),
+      { class: "sheet-panel" },
+      // Its head as every sheet's that's gone through (the questions', the avatars'): the title, „Затвори“ beside it.
+      h(
+        "div",
+        { class: "sheet-head" },
+        h("h2", { id: "duel-stack-title" }, `Чакат те ${formatNumber(stack.length)} дуела`),
+        h("button", { class: "link", type: "button", onclick: () => box.close() }, "Затвори"),
+      ),
       h(
         "ol",
         { class: "rows duel-stack-list" },
+        // Each a row as a friend's in Приятели (ui.ts, playerRow): the avatar with its seal, the name (a way to their
+        // profile), how long is left on the line under it, „Играй“ at its end.
         stack.map((d) =>
-          h(
-            "li",
-            { class: "duel-stack-row" },
-            h(
-              "span",
-              { class: "duel-stack-who" },
-              who(
-                d.opponent?.name ?? "Съперник",
-                d.opponent?.look ?? {},
-                null,
-                d.opponent?.name ?? "",
-                tagOf(d.opponent),
-              ),
-              h(
-                "span",
-                { class: "duel-stack-left" },
-                d.first ? `Довърши своята игра · ${leftWords(d.until ?? 0)}` : leftWords(d.until ?? 0),
-              ),
-            ),
-            playLink(d, false, "inline"),
+          playerRow(
+            "friend duel-stack-row",
+            {
+              name: d.opponent?.name ?? "",
+              avatar: d.opponent?.look?.avatar,
+              seal: d.opponent?.look?.seal ?? undefined,
+            },
+            tagOf(d.opponent) || undefined,
+            nameWords(d.opponent?.name ?? "Съперник"),
+            d.first ? `Довърши своята игра · ${leftWords(d.until ?? 0)}` : leftWords(d.until ?? 0),
+            null,
+            playLink(d, false, "inline friend-act"),
           ),
         ),
       ),
-      h("button", { class: "link tap sheet-skip", type: "button", onclick: () => box.close() }, "Затвори"),
     ),
   ) as HTMLDialogElement;
   // A tap beside the sheet puts it away, as Esc does; put away, it goes (the router closes it with the screen).
@@ -358,7 +357,7 @@ export function duelGroup(
     play,
     profileHref,
     reviewSheet,
-    who,
+    playerRow,
     withWord,
   } = kit);
   sighted = sight;

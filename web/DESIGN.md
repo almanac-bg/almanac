@@ -211,7 +211,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   challenged: the first on top, its card whole, the edges of one or two more under it, each a little narrower, as
   sheets lie in a stack (`.duel-pile`); beside its „Играй“, „Избери дуел (4)“ opens them all in a dialog („Чакат те 4
   дуела“), in the same order, a row each: who it's with (avatar and name, a way to their profile), how long is left
-  („Довърши своята игра“ before it, of one the player began), and its own „Играй“; „Затвори“ under them.
+  („Довърши своята игра“ before it, of one the player began), and its own „Играй“; „Затвори“ in its head, beside the title, as every sheet that's gone through has it.
   A duel named in the address (`?duel=<id>`: its game just ended, or an old link to its page) is first in its group,
   brought into sight, and its result lands there once (`feel.duel`: the marks fill pair by pair, the score counts
   up, the chip lands with the end's sound), never again. The record between two is the friend's row's, never a duel's. Friends are added in one field, „име или

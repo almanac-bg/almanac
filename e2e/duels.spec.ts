@@ -230,8 +230,8 @@ test("every duel to play is in one stack, the first challenged on top, chosen fr
   expect(await rows.locator(".duel-card-go").evaluateAll((els) => els.map((el) => el.getAttribute("href")))).toEqual(
     sentIds.map((id) => `/duel/${id}`),
   );
-  await expect(rows.locator(".who-name")).toHaveText(["Ана", "Ана", "Ана", "Цвети"]);
-  await choose.getByRole("button", { name: "Затвори" }).click();
+  await expect(rows.locator(".friend-name")).toHaveText(["Ана", "Ана", "Ана", "Цвети"]);
+  await choose.locator(".sheet-head").getByRole("button", { name: "Затвори" }).click();
   await expect(choose).toHaveCount(0);
   // He chooses Cy's, the last.
   await pile.getByRole("button", { name: "Избери дуел (4)" }).click();

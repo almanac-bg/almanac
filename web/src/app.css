@@ -3779,34 +3779,6 @@
     margin: 0;
   }
 
-  /* The stack's duels in a dialog, to choose which to play: a row each, who it's with and how long is left, „Играй“
-     at its end. */
-  .duel-stack-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-2) 0;
-  }
-
-  .duel-stack-who {
-    display: grid;
-    flex: 1;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .duel-stack-left {
-    padding-left: calc(28px + 10px);
-    color: var(--ink-3);
-    font: var(--t-fine);
-  }
-
-  .duel-stack-row .duel-card-go {
-    min-height: 2.75rem;
-    padding-inline: var(--space-4);
-    font-size: 1rem;
-  }
-
   /* A game's questions gone over, in their dialog (results.ts, reviewSheet: the day's issue's, a chapter's game's, a
      duel's): the game's sheet, a reading column wide, never the whole height of a phone (the page shows over it, and
      a tap there puts it away); its head, „Въпросите“ and „Затвори“, stays as the questions scroll under it; under the
