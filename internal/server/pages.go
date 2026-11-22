@@ -393,7 +393,7 @@ func accepts(r *http.Request, encoding string) bool {
 
 // publicFiles are served from the site's root as they are (web/public).
 var publicFiles = []string{
-	"favicon.svg", "bimi.svg", "manifest.webmanifest", "sw.js",
+	"favicon.svg", "bimi.svg", "manifest.webmanifest", "sw.js", "scheme.js",
 	"icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "badge-96.png",
 }
 

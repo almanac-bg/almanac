@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 // The device says Day; the player chooses Night, then Day, then the device's again („Изглед“ in Настройки), and the
-// choice holds over a reload.
+// choice holds over a reload and on the pages the server draws alone.
 test.use({ colorScheme: "light" });
 
 test("Night or Day, whatever the device says", async ({ page }) => {
@@ -26,6 +26,12 @@ test("Night or Day, whatever the device says", async ({ page }) => {
   await page.getByRole("radiogroup", { name: "Изглед" }).getByRole("radio", { name: "Ден" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-scheme", "day");
   expect(await ground()).toBe("rgb(243, 244, 250)");
+
+  // The pages the server draws alone (the privacy notice) look as chosen too, not as the device is set.
+  await page.goto("/privacy");
+  await expect(page.locator("html")).toHaveAttribute("data-scheme", "day");
+  expect(await ground()).toBe("rgb(243, 244, 250)");
+  await page.goBack();
 
   await page.getByRole("radiogroup", { name: "Изглед" }).getByRole("radio", { name: "Като устройството" }).click();
   await expect(page.locator("html")).not.toHaveAttribute("data-scheme");
