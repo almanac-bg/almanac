@@ -111,7 +111,7 @@ func TestRecordingsNamed(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.play(owner, s.ID, repeat(w.right, Length)...)
-	duel, err := w.g.DuelRecording(ctx, gal, Even)
+	duel, err := w.g.DuelRecording(ctx, gal)
 	if err != nil {
 		t.Fatal(err)
 	}

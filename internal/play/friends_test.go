@@ -204,7 +204,7 @@ func TestFriendsNews(t *testing.T) {
 		w.wait(time.Minute)
 		looks(w, ana)
 		looks(w, bo)
-		id, err := w.g.DuelRecording(t.Context(), bo, Even)
+		id, err := w.g.DuelRecording(t.Context(), bo)
 		if err != nil {
 			t.Fatal(err)
 		}

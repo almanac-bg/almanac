@@ -388,7 +388,7 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands, gap = 
   });
 }
 
-/** What a duel's moment needs besides its card (screens/outcome.ts): each side's right answers question by question (the
+/** What a duel's moment needs besides its card (screens/duelcards.ts): each side's right answers question by question (the
  * other's none while the duel waits for them), and the end's sound. */
 export interface DuelPlan {
   mine: number[];
@@ -397,11 +397,12 @@ export interface DuelPlan {
 }
 
 /**
- * A duel's result as a moment, once (at most 1.6 s; a tap anywhere jumps to the end). The verdict waits while the
- * duel is gone through question by question, 75 ms apart, a pluck on the scale for each of the player's right ones
- * and a muted thud for each that wasn't; the two scores count up with them, so the lead changes hands as it did (the
- * card's marks, where it has them, fill pair by pair). Then the verdict and the scores land, the winner's in full
- * ink, with the end's sound (the motif over a low D for a win, a soft fall for a loss). Resolves once it's over.
+ * A duel's result as a moment on its card, once (at most 1.6 s; a tap anywhere jumps to the end). The verdict waits
+ * while the duel is gone through question by question, 75 ms apart, a pluck on the scale for each of the player's
+ * right ones and a muted thud for each that wasn't; the two scores count up with them, so the lead changes hands as it
+ * did, and the card's rows of marks fill pair by pair. Then the verdict (the chip, and the line under the marks) and
+ * the scores land, with the end's sound (the motif over a low D for a win, a soft fall for a loss). Resolves once
+ * it's over.
  */
 export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<void> {
   const { play, format } = hands;
@@ -421,9 +422,8 @@ export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<v
   const rise = (el: Element | null, delay: number, from: Keyframe = { opacity: 0, transform: "translateY(6px)" }) => {
     if (el) moving.push(el.animate([from, {}], { duration: 240, delay, easing: settleIn, fill: "backwards" }));
   };
-  const pips = [...card.querySelectorAll<HTMLElement>(".duel-pip")];
   const n = Math.max(plan.mine.length, plan.theirs.length);
-  const rows = [pips.slice(0, pips.length / 2), pips.slice(pips.length / 2)];
+  const rows = [...card.querySelectorAll(".duel-card-row .mini")].map((row) => [...row.children]);
   const scores = [...card.querySelectorAll<HTMLElement>(".duel-score[data-n]")];
   const finals = scores.map((p) => Number(p.dataset.n ?? 0));
   const sums = [0, 0];
@@ -455,7 +455,7 @@ export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<v
     });
   }
   const landAt = first + n * step + 50;
-  for (const el of card.querySelectorAll(".duel-head h1, .duel-line")) rise(el, landAt);
+  for (const el of card.querySelectorAll(".duel-chip, .duel-card-note")) rise(el, landAt);
   for (const p of scores)
     moving.push(
       p.animate(
@@ -466,11 +466,7 @@ export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<v
         { duration: 260, delay: landAt, easing: spring, fill: "backwards" },
       ),
     );
-  // The winner is in full ink only once it's landed.
-  const winner = card.querySelector(".duel-face.win");
-  winner?.classList.remove("win");
   const settle = () => {
-    winner?.classList.add("win");
     scores.forEach((p, k) => {
       p.textContent = format(finals[k] ?? 0);
     });

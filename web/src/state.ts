@@ -34,8 +34,6 @@ export const bulgaria = { id: "bulgaria", name: "България", open: boot.b
 export const topics: Category[] = [...categories, mix, bulgaria];
 /** The key browsers subscribe to notifications with ("": none here). */
 export const pushKey = boot.push ?? "";
-/** The style of a duel's result (outcome.css): loaded with it (kit.ts). */
-export const outcomeCss = boot.outcomeCss ?? "";
 
 /** A guest on its way: one, however many ask for the player meanwhile (a double tap on a first „Започни“). */
 let making: Promise<User> | null = null;

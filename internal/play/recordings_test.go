@@ -3,7 +3,6 @@ package play
 import (
 	"database/sql"
 	"encoding/json"
-	"strings"
 	"testing"
 	"time"
 )
@@ -48,7 +47,7 @@ func TestRecordingsOverAllTopicsFirst(t *testing.T) {
 	if rec := pick(nil); rec == nil || rec.id != history || rec.topic != "history" {
 		t.Fatalf("got %+v, want the history game %d", rec, history)
 	}
-	duel, err := w.g.DuelRecording(ctx, ana, Even)
+	duel, err := w.g.DuelRecording(ctx, ana)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,78 +158,42 @@ func TestRecordingsLeaveOutGamesLeft(t *testing.T) {
 	}
 }
 
-// A duel against a recording keeps the level it was chosen at, „равен“ or „по-силен“ (anything else is „равен“), and
-// says it (DuelView.Level): „По-силен запис · Краси“; played to its end, another follows, a new one. A friend's duel
-// has none.
-func TestRecordingLevel(t *testing.T) {
+// A duel against a recording left unfinished is gone on with when another is asked for; played to its end, another
+// follows, a new one.
+func TestRecordingAgain(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	one, two, ana, bo := w.user(), w.user(), w.user(), w.user()
-	// A game stronger than Ana (all right), and one as strong: as many right as she'd get on its ten.
+	one, two, ana := w.user(), w.user(), w.user()
 	w.game(one, nil)
 	w.wait(time.Minute)
-	s, err := w.g.StartTopic(ctx, two, MixTopic)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fit, err := w.g.recordingFit(ctx, ana, Even)
-	if err != nil {
-		t.Fatal(err)
-	}
-	even, nearest := -1, float64(Length)
-	for r := RecordingRights; r <= Length; r++ {
-		if off, meets := fit(w.b, w.picks(s.ID), r); meets && off < nearest {
-			even, nearest = r, off
-		}
-	}
-	if even < 0 {
-		t.Fatal("no score of that game is „равен“ to Ana")
-	}
-	w.play(two, s.ID, append(repeat(w.right, even), repeat(w.wrong, Length-even)...)...)
+	w.game(two, nil)
 	w.wait(time.Minute)
-	for i, c := range []struct{ chosen, level string }{{Stronger, Stronger}, {Even, Even}, {"", Even}, {"hard", Even}} {
-		// Each chosen by a new player as Ana was (no answers yet: her level); Ana herself the first.
-		ana := ana
-		if i > 0 {
-			ana = w.user()
-		}
-		id, err := w.g.DuelRecording(ctx, ana, c.chosen)
-		if err != nil {
-			t.Fatal(err)
-		}
-		d, err := w.g.DuelOf(ctx, ana, id)
-		if err != nil || !d.Recorded || d.Level != c.level {
-			t.Fatalf("chosen %q: %+v %v, want the level %q", c.chosen, d, err, c.level)
-		}
-		data, _ := json.Marshal(d)
-		if !strings.Contains(string(data), `"level":"`+c.level+`"`) {
-			t.Fatalf("chosen %q: %s", c.chosen, data)
-		}
-		// Listed once its first question has shown (made and left before, it isn't: TestUnbegunDuelGoes).
-		w.show(ana, w.playSide(ana, id, nil))
-		list, err := w.g.DuelsOf(ctx, ana)
-		if err != nil || len(list.Yours) == 0 || list.Yours[0].Level != c.level {
-			t.Fatalf("chosen %q, in the list: %+v %v", c.chosen, list.Yours, err)
-		}
-		// Asked again before it's played: the same one, gone on with.
-		if again, err := w.g.DuelRecording(ctx, ana, c.chosen); err != nil || again != id {
-			t.Fatalf("chosen %q again while it's open: %d %v, want %d", c.chosen, again, err, id)
-		}
-		// Played to its end: the next is a new one, not this one.
-		w.playSide(ana, id, repeat(w.wrong, Length))
-		if d, err := w.g.DuelOf(ctx, ana, id); err != nil || d.State == DuelYours {
-			t.Fatalf("chosen %q, played to its end: %+v %v", c.chosen, d, err)
-		}
-		next, err := w.g.DuelRecording(ctx, ana, c.chosen)
-		if err != nil || next == id {
-			t.Fatalf("chosen %q after one played: %d %v, want a new one (not %d)", c.chosen, next, err, id)
-		}
-		if d, err := w.g.DuelOf(ctx, ana, next); err != nil || d.State != DuelYours {
-			t.Fatalf("chosen %q, the one after: %+v %v", c.chosen, d, err)
-		}
+	id, err := w.g.DuelRecording(ctx, ana)
+	if err != nil {
+		t.Fatal(err)
 	}
-	friendly := w.duel(ana, bo, repeat(w.right, Length), repeat(w.wrong, Length))
-	if d, err := w.g.DuelOf(ctx, bo, friendly); err != nil || d.Level != "" {
-		t.Fatalf("a friend's duel has no level: %+v %v", d, err)
+	if d, err := w.g.DuelOf(ctx, ana, id); err != nil || !d.Recorded {
+		t.Fatalf("%+v %v", d, err)
+	}
+	// Listed once its first question has shown (made and left before, it isn't: TestUnbegunDuelGoes).
+	w.show(ana, w.playSide(ana, id, nil))
+	if list, err := w.g.DuelsOf(ctx, ana); err != nil || len(list.Yours) != 1 || !list.Yours[0].Recorded {
+		t.Fatalf("in the list: %+v %v", list.Yours, err)
+	}
+	// Asked again before it's played: the same one, gone on with.
+	if again, err := w.g.DuelRecording(ctx, ana); err != nil || again != id {
+		t.Fatalf("again while it's open: %d %v, want %d", again, err, id)
+	}
+	// Played to its end: the next is a new one, not this one.
+	w.playSide(ana, id, repeat(w.wrong, Length))
+	if d, err := w.g.DuelOf(ctx, ana, id); err != nil || d.State == DuelYours {
+		t.Fatalf("played to its end: %+v %v", d, err)
+	}
+	next, err := w.g.DuelRecording(ctx, ana)
+	if err != nil || next == id {
+		t.Fatalf("after one played: %d %v, want a new one (not %d)", next, err, id)
+	}
+	if d, err := w.g.DuelOf(ctx, ana, next); err != nil || d.State != DuelYours {
+		t.Fatalf("the one after: %+v %v", d, err)
 	}
 }

@@ -57,9 +57,8 @@ func (s *Server) newDuel(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	var in struct {
-		Friend    int64  `json:"friend"`
-		Recording bool   `json:"recording"`
-		Level     string `json:"level"`
+		Friend    int64 `json:"friend"`
+		Recording bool  `json:"recording"`
 	}
 	if err := readJSON(r, &in); err != nil {
 		return err
@@ -70,7 +69,7 @@ func (s *Server) newDuel(w http.ResponseWriter, r *http.Request) error {
 	var id int64
 	switch {
 	case in.Recording:
-		id, err = s.game.DuelRecording(r.Context(), u.ID, in.Level)
+		id, err = s.game.DuelRecording(r.Context(), u.ID)
 	case in.Friend > 0:
 		id, err = s.game.DuelFriend(r.Context(), u.ID, in.Friend)
 	default:
@@ -107,7 +106,7 @@ func (s *Server) playDuel(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{"duel": d})
 }
 
-// duelOne is one of the player's duels, with what its result says (play.DuelOf).
+// duelOne is one of the player's duels (play.DuelOf): for the page it's played on, and for its card.
 func (s *Server) duelOne(w http.ResponseWriter, r *http.Request) error {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {

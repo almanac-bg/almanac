@@ -1315,10 +1315,10 @@
   }
 
   /* Близо, one rule wherever it's drawn as a square (the result's tiles and the issue's, the small squares of the
-     boards, a duel's marks; the share's ◩ and its card say it the same): the upper left half filled, cut on the
+     boards and of a duel's card; the share's ◩ and its card say it the same): the upper left half filled, cut on the
      diagonal, the lower right empty, so that it parts from a full one at a glance. Filled in --half: a tile's chapter
      colour, else ink. */
-  :is(.tile.near, .mini > i.partial, .duel-pip.partial) {
+  :is(.tile.near, .mini > i.partial) {
     background-image: linear-gradient(to bottom right, var(--half, var(--ink)) 50%, transparent 50%);
   }
 
@@ -3509,8 +3509,9 @@
     vertical-align: 0.45em;
   }
 
-  /* Duels as cards (Приятели's „Дуели“): each the whole of it one link to its duel, told from a friend's row at a
-     glance: its kind at the top, the two face to face, how it stands between them. */
+  /* Duels as cards (Приятели's „Дуели“, screens/duelcards.ts), each all there is of its duel, told from a friend's
+     row at a glance: its kind at the top, the two face to face, how it stands between them, the duel question by
+     question, and what it leads to. One to play is a link to its game, the whole of it; any other is no link. */
   .duel-cards {
     display: grid;
     gap: var(--space-2);
@@ -3532,13 +3533,13 @@
     text-decoration: none;
   }
 
-  /* Under a pointer the card lights whole, by its line: no name in it is a link, so none is underlined. */
+  /* Under a pointer a card to play lights whole, by its line: no name in it is a link, so none is underlined. */
   @media (hover: hover) and (pointer: fine) {
-    .duel-card:hover {
+    a.duel-card:hover {
       box-shadow: inset 0 0 0 2px var(--line-2);
     }
 
-    .duel-card.turn:hover {
+    a.duel-card.turn:hover {
       box-shadow: inset 0 0 0 4px var(--ink);
     }
   }
@@ -3639,14 +3640,144 @@
     text-align: center;
   }
 
-  /* Two cards a row where there's room for both. */
+  /* A played duel's score: each side's a number of its own, of one width while the landing counts them up. */
+  .duel-score {
+    display: inline-block;
+    min-width: 0.6em;
+    text-align: center;
+  }
+
+  /* The duel question by question: the player's row of marks over the other's, each ten small squares (.mini, as
+     the boards draw them), whose it is before it. */
+  .duel-card-marks {
+    display: grid;
+    justify-content: center;
+    gap: 5px;
+  }
+
+  .duel-card-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .duel-card-row .avatar.s {
+    --size: 20px;
+    margin: 0;
+  }
+
+  /* What a card leads to (its questions, another duel): small buttons in a row at its foot, wrapping where two don't
+     fit. */
+  .duel-card-acts {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-top: 2px;
+  }
+
+  .duel-card-acts .btn {
+    min-height: 2.75rem;
+    padding: 8px 16px;
+    font-size: 0.875rem;
+  }
+
+  .duel-card-no {
+    font-size: 0.8125rem;
+    text-align: center;
+  }
+
+  /* Two cards a row where there's room for both; the one named in the address (just played) alone at the head. */
   @media (min-width: 48rem) {
     .duel-cards {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
+    .duel-cards.landed {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
-  /* A friend to start a duel with (/duel/new): a row, the whole width a button, „Дуел“ at its end. */
+  /* A duel's questions on a sheet („Въпросите“: results.ts, reviewed): under its heading whose duel it is, then each
+     question a short tinted card: its number and chapter, the question, how it went for the two side by side, the
+     answer; the answers as they were given and the fact a tap away. */
+  .duel-sheet .sheet-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+    width: min(100%, 36rem);
+  }
+
+  .duel-sheet .review {
+    gap: var(--space-2);
+  }
+
+  .duel-q.reviewed {
+    gap: var(--space-2);
+    padding: var(--space-4) var(--space-4) var(--space-1);
+    border-radius: var(--r-2);
+  }
+
+  .duel-q .ask {
+    font-size: 1.0625rem;
+    line-height: 1.4375rem;
+  }
+
+  /* The two, side by side, each half the row: the player's on the left, the other's on the right, as on the card.
+     Right in ink, anything else quieter, so a question that parted them shows at a glance. With large text, where two
+     don't fit a row, one under the other. */
+  .duel-q-sides {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-3);
+    margin: var(--space-1) 0 0;
+  }
+
+  .duel-q-side {
+    display: flex;
+    flex: 1 1 7rem;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--ink-3);
+    font-size: 0.9375rem;
+    font-weight: 800;
+  }
+
+  .duel-q-side.right {
+    color: var(--ink);
+  }
+
+  .duel-q-side .avatar.s {
+    --size: 24px;
+    margin: 0;
+  }
+
+  .duel-q-answer {
+    margin: 0;
+    color: var(--ink-3);
+    font-size: 0.9375rem;
+    overflow-wrap: break-word;
+  }
+
+  .duel-q-answer b {
+    color: var(--ink);
+    font-weight: 800;
+  }
+
+  .duel-q-more {
+    font-size: 0.9375rem;
+  }
+
+  .duel-q-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+    padding-bottom: var(--space-3);
+  }
+
+  /* A friend to start a duel with (/duel/new): a row, the whole of it a button (never a way to a profile: under a
+     pointer the row lights by its line, and no name is underlined): the avatar, the name with the duels between the
+     two under it, „Дуел“ at its end. */
   .duel-picks {
     display: grid;
     gap: var(--space-2);
@@ -3672,26 +3803,48 @@
     cursor: pointer;
   }
 
-  /* The name keeps at least two fifths of the row. */
-  .duel-pick > .who {
-    flex: 1 0 40%;
+  @media (hover: hover) and (pointer: fine) {
+    .duel-pick:hover:not(:disabled) {
+      box-shadow: inset 0 0 0 2px var(--line-2);
+    }
   }
 
-  /* „Дуел“ at a friend's row's end: the link's look it has on Приятели (.link), one look for one action. */
-  .duel-invite {
-    color: var(--ink);
-    font: 800 0.875rem / 1.25rem var(--font-sans);
-    text-decoration: underline;
-    text-decoration-thickness: 2px;
-    text-underline-offset: 4px;
+  .duel-pick > .avatar {
+    flex: none;
   }
 
-  /* A friend's duel just played first: sent, and how long the friend has (screens/duel.ts). */
-  .duel-sent {
-    margin: 0;
-    color: var(--ink-3);
-    font-size: 0.875rem;
+  /* The name, whole, and the duels between the two under it: they have the row but for the avatar and „Дуел“. */
+  .duel-pick-text {
+    display: grid;
+    flex: 1 1 40%;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .duel-pick-name {
     font-weight: 700;
+    overflow-wrap: break-word;
+  }
+
+  .duel-pick-record {
+    color: var(--ink-3);
+    font: 600 0.8125rem / 1.3 var(--font-sans);
+  }
+
+  .duel-pick-record b {
+    color: var(--ink);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* „Дуел“ at the row's end: the row's action said as a small filled button, the row itself being the button. */
+  .duel-invite {
+    flex: none;
+    padding: 6px 16px;
+    border-radius: var(--radius-full);
+    background: var(--ink);
+    color: var(--bg);
+    font: 800 0.875rem / 1.25rem var(--font-sans);
   }
 
   /* ---- Results ---- */
@@ -3843,7 +3996,7 @@
     a.who:hover .who-name,
     a.friend-name:hover,
     a:hover > .name-words,
-    :is(a.who, a.friend-name, .duel-pick, a:has(> .name-words)):hover .whole-word {
+    :is(a.who, a.friend-name, a:has(> .name-words)):hover .whole-word {
       text-decoration: underline;
     }
   }
@@ -7879,13 +8032,21 @@
     text-align: left;
   }
 
+  .tight .duel-card-marks {
+    justify-content: start;
+  }
+
+  .tight .duel-card-acts {
+    justify-content: flex-start;
+  }
+
   /* A friend to pick for a duel: „Дуел“ under the name, whose words stay whole. */
   .tight .duel-pick {
     flex-wrap: wrap;
   }
 
-  .tight .duel-pick > .who {
-    flex-basis: 100%;
+  .tight .duel-pick-text {
+    flex-basis: 60%;
   }
 
   /* Tomorrow: its date over its words, which have the column's width; the issue's name and its number a line each,

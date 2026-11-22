@@ -29,13 +29,17 @@ import (
 // way round. A player may have DuelsToOne duels open with one friend at once, and start DuelsADay a day.
 //
 // A duel against a recording (DuelRecording): the same ten as a real player's finished game (recordedRun: a real
-// one, played at a person's speed, none of its questions the player has seen first), chosen as „равен“ (Even: about
-// as many right as the player would get on its ten) or „по-силен“ (Stronger: a couple more), by the player's hidden
-// mastery (mastery.go: expectedRights), played against it as it went:
-// its marks come with the duel, for the screen to show at their times. It's shown by who played it, as anyone is seen
-// anywhere in the game (owner, 2026-11-19): their name (a way to their profile) and avatar, during the duel, on its
-// result and in the duel history, always labelled a recording, never taken for a person here now. The recorded player
-// is never told who played it.
+// one, played at a person's speed, none of its questions the player has seen first), of one kind (owner, 2026-11-22:
+// a choice between „равен“ and „по-силен“ was one more thing to decide, for little): the game whose right answers are
+// nearest to what the player would get on its ten, by their hidden mastery (mastery.go: expectedRights), played
+// against it as it went: its marks come with the player's run, each as far as the player has come. It's shown by who
+// played it, as anyone is seen anywhere in the game (owner, 2026-11-19): their name and avatar, during the duel and
+// on its card, always labelled a recording, never taken for a person here now. The recorded player is never told who
+// played it.
+//
+// A duel has no page of its own but the one it's played on (owner, 2026-11-22): everything about it is on its card
+// in Приятели's „Дуели“ (DuelsOf): the two, the score, how each question went for each side, and, on the day the
+// player's own game ended, its questions gone over (Review).
 //
 // A duel the player started and left unfinished is gone on with when they start one the same way again (with the same
 // friend, or against a recording); one never finished goes at its time, as if never started (SettleDue). One left
@@ -91,10 +95,6 @@ type DuelView struct {
 	Opponent *DuelSide `json:"opponent,omitempty"`
 	You      *DuelSide `json:"you,omitempty"`
 	Recorded bool      `json:"recorded,omitempty"`
-	// Level is, against a recording, the level it was chosen at, Even („равен“) or Stronger („по-силен“), where the
-	// recording is that level (recordingFit: meets); none where it was only the nearest there was („Запис“), nor
-	// against a friend.
-	Level string `json:"level,omitempty"`
 	// Topic is, against a recording of a topic's game, its topic (none: a game over all of them, „Микс“).
 	Topic string `json:"topic,omitempty"`
 	// First says the player played first (sent it).
@@ -107,8 +107,8 @@ type DuelView struct {
 	Until int64 `json:"until,omitempty"`
 	// Lapsed is, of a duel that expired, who didn't play it in time: "you" or "they" (none: cut off, from before).
 	Lapsed string `json:"lapsed,omitempty"`
-	// Review says the player's own game in it can still be gone over (Review: on the day it ended), so its result shows
-	// the questions. One duel's view (DuelOf) only.
+	// Review says the player's own game in it can still be gone over (Review: on the day it ended), so its card opens
+	// the questions.
 	Review bool `json:"review,omitempty"`
 	// TieBy is, of a duel won on even right answers, what broke the tie (duelScore): TieNumber, the number nearer;
 	// "" for a draw, or a duel won on right answers.
@@ -135,7 +135,8 @@ type DuelSide struct {
 	Look    *Look `json:"look,omitempty"`
 	// Gone is a player who has gone since (play.Forget): their game went with them, so their score isn't known.
 	Gone bool `json:"gone,omitempty"`
-	// Marks are how each question answered went (DuelOf): the player's own; the other's once the duel has a result.
+	// Marks are how each question answered went, of a duel the player has played their side of: the player's own; the
+	// other's once the duel has a result.
 	// While the player plays, the other's come with the run, each as far as the player has come (State.Against).
 	Marks []DuelMark `json:"marks,omitempty"`
 
@@ -251,29 +252,16 @@ func (g *Game) RecordingReady(ctx context.Context, userID int64) (bool, error) {
 	return ready, err
 }
 
-// The recordings a player may choose to play against (DuelRecording).
-const (
-	// Even is a recording about as strong as the player: about as many right as they'd get on its ten.
-	Even = "even"
-	// Stronger is a recording a little stronger: StrongerBy more right than they'd get.
-	Stronger = "stronger"
-	// StrongerBy is how many more right answers „по-силен“ aims for.
-	StrongerBy = 2
-)
-
 // DuelRecording starts a duel against a recording: another player's finished game, the one with the fewest questions
-// the player has seen that fits the level chosen best (recordedRun: Even or Stronger, by the player's hidden mastery;
-// anything else is Even), and the player's run of its ten; the duel keeps the level only if the recording is it. One the
-// player started and left unfinished is gone on with instead. ErrNobody if there's none yet. It says the duel's id.
-func (g *Game) DuelRecording(ctx context.Context, userID int64, level string) (int64, error) {
+// the player has seen that is nearest to them (recordedRun, recordingFit: about as many right as they'd get on its
+// ten, by their hidden mastery), and the player's run of its ten. One the player started and left unfinished is gone
+// on with instead. ErrNobody if there's none yet. It says the duel's id.
+func (g *Game) DuelRecording(ctx context.Context, userID int64) (int64, error) {
 	seen := map[string]bool{}
 	if err := seenBy(ctx, g.DB.Read, userID, seen); err != nil {
 		return 0, err
 	}
-	if level != Stronger {
-		level = Even
-	}
-	fit, err := g.recordingFit(ctx, userID, level)
+	fit, err := g.recordingFit(ctx, userID)
 	if err != nil {
 		return 0, err
 	}
@@ -298,13 +286,8 @@ func (g *Game) DuelRecording(ctx context.Context, userID int64, level string) (i
 		}
 		data, _ := json.Marshal(rec.picks)
 		now := g.Now()
-		// The level it's called by only if it is that level: else (the nearest there was) only „Запис“.
-		var kept *string
-		if rec.meets {
-			kept = &level
-		}
-		res, err := tx.Exec(`INSERT INTO duels (kind, questions, a_id, a_run, recording_run, level, created_at, expires_at)
-			VALUES ('recording', ?, ?, ?, ?, ?, ?, ?)`, string(data), userID, r.id, rec.id, kept,
+		res, err := tx.Exec(`INSERT INTO duels (kind, questions, a_id, a_run, recording_run, created_at, expires_at)
+			VALUES ('recording', ?, ?, ?, ?, ?, ?)`, string(data), userID, r.id, rec.id,
 			store.Ms(now), store.Ms(now.Add(DuelFor)))
 		if err != nil {
 			return err
@@ -442,8 +425,6 @@ type recorded struct {
 	picks []Pick
 	// topic is the one topic the recorded game was in (a topic's game), "" for all of them (a duel's, „Микс“).
 	topic string
-	// meets is whether it's the level chosen (recordingFit), not only the nearest there was.
-	meets bool
 }
 
 // RecordingRights is how many right answers make a game worth playing against, RecordingMissed how many not answered
@@ -465,7 +446,7 @@ const (
 // choose. Above all of it, a game with more than RecordingSeen of its questions seen by the player comes after every
 // game with more than RecordingSeen of its questions seen by the player comes after every game with fewer: the same ten
 // again (a duel the player has just played, then the other's game in it as a recording) is no duel. Of those as few
-// seen, the one that fits the level the player chose best (fit, if given: the lower the better). Nil if there's none.
+// seen, the one nearest to the player (fit, if given: the lower the better). Nil if there's none.
 func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool, fit recordingFit) (*recorded, error) {
 	days, err := g.days(tx)
 	if err != nil {
@@ -526,13 +507,13 @@ func (g *Game) recordedRun(tx *sql.Tx, userID int64, seen map[string]bool, fit r
 			kind += 4 // mostly seen: after every game the player hasn't
 		}
 		real := rights >= RecordingRights && missed <= RecordingMissed
-		off, meets := 0.0, false
+		off := 0.0
 		if fit != nil {
-			off, meets = fit(b, picks, rights)
+			off = fit(b, picks, rights)
 		}
 		for level, ok := range [2]bool{real, true} {
 			if k := 2*level + kind; ok && (n < fewest[k] || n == fewest[k] && off < fits[k]) {
-				best[k], fewest[k], fits[k] = &recorded{id: id, picks: picks, topic: topic, meets: meets}, n, off
+				best[k], fewest[k], fits[k] = &recorded{id: id, picks: picks, topic: topic}, n, off
 			}
 		}
 	}
@@ -812,15 +793,16 @@ func (g *Game) endDue(ctx context.Context, duelID, runID int64) error {
 }
 
 // Duels are a player's duels, as Приятели lists them: theirs to play (sent to them, or their own side not finished),
-// sent and waiting for the friend, and those played (the latest ended first, DuelsShown of them).
+// sent and waiting for the friend, and those played (the latest ended first, DuelsShown of them, the last: the list
+// says so). Each one played, or waiting, as its card shows it whole (duelMore): there's no other page of it.
 type Duels struct {
 	Yours  []DuelView `json:"yours"`
 	Theirs []DuelView `json:"theirs"`
 	Played []DuelView `json:"played"`
 }
 
-// DuelsShown is how many duels played Приятели lists.
-const DuelsShown = 30
+// DuelsShown is how many duels played Приятели lists: the last ten.
+const DuelsShown = 10
 
 // DuelsOf are a player's duels, as Приятели lists them.
 func (g *Game) DuelsOf(ctx context.Context, userID int64) (Duels, error) {
@@ -841,9 +823,15 @@ func (g *Game) DuelsOf(ctx context.Context, userID int64) (Duels, error) {
 		case DuelYours:
 			out.Yours = append(out.Yours, v)
 		case DuelTheirs:
+			if err := g.duelMore(ctx, userID, &v); err != nil {
+				return out, err
+			}
 			out.Theirs = append(out.Theirs, v)
 		default:
 			if len(out.Played) < DuelsShown {
+				if err := g.duelMore(ctx, userID, &v); err != nil {
+					return out, err
+				}
 				out.Played = append(out.Played, v)
 			}
 		}
@@ -860,8 +848,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 			coalesce(CASE WHEN NOT d.mine THEN d.a_run WHEN d.kind = 'recording' THEN d.recording_run ELSE d.b_run END, 0),
 			coalesce(CASE WHEN NOT d.mine THEN d.a_id WHEN d.kind = 'recording'
 				THEN (SELECT user_id FROM runs WHERE id = d.recording_run) ELSE d.b_id END, 0),
-			coalesce((SELECT category FROM runs WHERE id = d.recording_run AND kind = 'topic' AND category <> ?3), ''),
-			coalesce(d.level, '')
+			coalesce((SELECT category FROM runs WHERE id = d.recording_run AND kind = 'topic' AND category <> ?3), '')
 		FROM (SELECT *, coalesce(a_id = ?1, 0) AS mine FROM duels
 			WHERE (a_id = ?1 OR (b_id = ?1 AND sent_at IS NOT NULL)) AND (?2 = 0 OR id = ?2)) d
 		ORDER BY d.ended_at IS NOT NULL, CASE WHEN d.ended_at IS NULL THEN d.expires_at ELSE -d.ended_at END
@@ -880,7 +867,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 	for rows.Next() {
 		var r row
 		if err := rows.Scan(&r.v.ID, &r.kind, &r.v.First, &r.v.CreatedAt, &r.v.EndedAt, &r.expires, &r.sent,
-			&r.outcome, &r.myRun, &r.theirRun, &r.theirs, &r.v.Topic, &r.v.Level); err != nil {
+			&r.outcome, &r.myRun, &r.theirRun, &r.theirs, &r.v.Topic); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -984,10 +971,8 @@ func (g *Game) DuelExists(ctx context.Context, id int64) (bool, error) {
 	return yes, err
 }
 
-// DuelOf is one of a player's duels, as DuelsOf has it, with more: how each question went for each side (the other's
-// once it has a result, or while it's the player's turn, for its screen: DuelSide.Marks), whether their own game can
-// still be gone over, their record against this person, and whether they're friends. ErrNoDuel if it isn't theirs, ErrDuelGone if
-// there's no such duel.
+// DuelOf is one of a player's duels, as DuelsOf has it (duelMore), with their record against this person. ErrNoDuel
+// if it isn't theirs, ErrDuelGone if there's no such duel.
 func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, error) {
 	list, err := g.duelsOf(ctx, userID, duelID)
 	if err != nil {
@@ -1002,26 +987,8 @@ func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, erro
 		return DuelView{}, ErrNoDuel
 	}
 	v := list[0]
-	if v.You != nil && v.RunID != 0 {
-		if v.You.Marks, err = g.duelMarks(ctx, v.RunID); err != nil {
-			return v, err
-		}
-	}
-	if v.You != nil && v.You.Done && v.RunID != 0 {
-		var ended int64
-		if err := g.DB.Read.QueryRowContext(ctx, `SELECT COALESCE(finished_at, 0) FROM runs WHERE id = ?`, v.RunID).Scan(&ended); err != nil {
-			return v, err
-		}
-		v.Review = ended != 0 && g.reviewOpen(ended)
-	}
-	result := v.State == DuelWon || v.State == DuelLost || v.State == DuelDraw
-	if v.Opponent != nil && v.theirRun != 0 && result {
-		if v.Opponent.Marks, err = g.duelMarks(ctx, v.theirRun); err != nil {
-			return v, err
-		}
-		if v.You != nil && v.State != DuelDraw {
-			v.TieBy = v.You.score.tieBy(v.Opponent.score)
-		}
+	if err := g.duelMore(ctx, userID, &v); err != nil {
+		return v, err
 	}
 	if !v.Recorded && v.against != 0 {
 		r, err := g.recordAgainst(ctx, userID, v.against)
@@ -1029,15 +996,43 @@ func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, erro
 			return v, err
 		}
 		v.Record = &r
+	}
+	return v, nil
+}
+
+// duelMore adds to a duel (duelsOf) what its card shows of it: how each question went for each side (the player's
+// own; the other's once it has a result: DuelSide.Marks), whether the player's own game can still be gone over
+// (Review), and whether the other is their friend now (a rematch is a tap away).
+func (g *Game) duelMore(ctx context.Context, userID int64, v *DuelView) error {
+	var err error
+	if v.You != nil && v.RunID != 0 {
+		if v.You.Marks, err = g.duelMarks(ctx, v.RunID); err != nil {
+			return err
+		}
+	}
+	if v.You != nil && v.You.Done && v.RunID != 0 {
+		var ended int64
+		if err := g.DB.Read.QueryRowContext(ctx, `SELECT COALESCE(finished_at, 0) FROM runs WHERE id = ?`, v.RunID).Scan(&ended); err != nil {
+			return err
+		}
+		v.Review = ended != 0 && g.reviewOpen(ended)
+	}
+	result := v.State == DuelWon || v.State == DuelLost || v.State == DuelDraw
+	if v.Opponent != nil && v.theirRun != 0 && result {
+		if v.Opponent.Marks, err = g.duelMarks(ctx, v.theirRun); err != nil {
+			return err
+		}
+	}
+	if !v.Recorded && v.against != 0 {
 		if err := g.DB.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM friends WHERE user_id = ? AND friend_id = ?)`,
 			userID, v.against).Scan(&v.Friend); err != nil {
-			return v, err
+			return err
 		}
 		if v.Friend {
 			v.Them = v.against
 		}
 	}
-	return v, nil
+	return nil
 }
 
 // duelMarks is how each question of a run went, in order.

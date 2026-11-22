@@ -47,7 +47,7 @@ func TestDayQuestionsKeptOut(t *testing.T) {
 	data, _ := json.Marshal(w.picks(day.ID))
 	_, _ = w.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, at, started_at, finished_at)
 		VALUES (?, 'topic', ?, ?, 0, 1)`, ana, string(data), Length)
-	if _, err := w.g.DuelRecording(ctx, bo, Even); !errors.Is(err, ErrNobody) {
+	if _, err := w.g.DuelRecording(ctx, bo); !errors.Is(err, ErrNobody) {
 		t.Fatalf("a recording with today's questions: %v", err)
 	}
 	w.befriend(ana, bo)
@@ -77,7 +77,7 @@ func TestDayQuestionsKeptOut(t *testing.T) {
 
 	// The next day, yesterday's questions are a recording like any other.
 	w.wait(24 * time.Hour)
-	duel, err := w.g.DuelRecording(ctx, bo, Even)
+	duel, err := w.g.DuelRecording(ctx, bo)
 	if d, _ := w.g.DuelOf(ctx, bo, duel); err != nil || d.Opponent == nil || d.Opponent.ID != ana {
 		t.Fatalf("yesterday's recording: %+v %v", d, err)
 	}
@@ -122,7 +122,7 @@ func TestRunEndedByTheClock(t *testing.T) {
 	}
 
 	// Against a recording, too.
-	duel, err = w.g.DuelRecording(ctx, gal, Even)
+	duel, err = w.g.DuelRecording(ctx, gal)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +140,7 @@ func TestRunEndedByTheClock(t *testing.T) {
 	}
 
 	// One finished and not settled then (a restart in between) gets its result once its time is up.
-	duel, _ = w.g.DuelRecording(ctx, gal, Even)
+	duel, _ = w.g.DuelRecording(ctx, gal)
 	w.playSide(gal, duel, repeat(w.right, Length))
 	_, _ = w.db.Write.Exec(`UPDATE duels SET ended_at = NULL, outcome = NULL WHERE id = ?`, duel)
 	w.wait(DuelFor)
@@ -221,7 +221,7 @@ func TestFairRecordings(t *testing.T) {
 	w.pace = func(int) time.Duration { return 50 * time.Millisecond }
 	scripted := topic(bot, Length)
 	w.pace = nil
-	duel, err := w.g.DuelRecording(ctx, ana, Even)
+	duel, err := w.g.DuelRecording(ctx, ana)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,11 +258,11 @@ func TestRecordingsArePeoples(t *testing.T) {
 	}
 	ana := w.user()
 	scripted := game(quick(MostQuick + 1)) // one quick answer too many
-	if _, err := w.g.DuelRecording(ctx, ana, Even); !errors.Is(err, ErrNobody) {
+	if _, err := w.g.DuelRecording(ctx, ana); !errors.Is(err, ErrNobody) {
 		t.Fatalf("with only a script's game to play against: %v, want nobody", err)
 	}
 	person := game(quick(MostQuick)) // knew two at once
-	duel, err := w.g.DuelRecording(ctx, ana, Even)
+	duel, err := w.g.DuelRecording(ctx, ana)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -74,7 +74,7 @@ func build(watch, sourceMaps bool) error {
 		return err
 	}
 	opts := api.BuildOptions{
-		EntryPoints:   []string{"web/src/app.ts", "web/src/app.css", "web/src/outcome.css", "web/src/admin.css"},
+		EntryPoints:   []string{"web/src/app.ts", "web/src/app.css", "web/src/admin.css"},
 		Outdir:        filepath.Join(out, "assets"),
 		Bundle:        true,
 		Write:         true,
