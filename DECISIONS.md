@@ -114,9 +114,14 @@ packages' doc comments; this file holds only what must not drift.
     never before the player has finished, never anyone's answers. The day is the same ten for everyone, and this turns
     a score into something to talk about. The day's issue only: a duel's dialog shows its two sides, a chapter's game
     has no friends in it. The faces there are without the seal (owner, 2026-11-22): that small, it covered them.
-  - **The player's nouns are a closed list:** Брой, близо, серия, Алманах (глави, факти, мастило), печат, игра на
-    главата, приятели, класация, дуел, споделяне, профил, напомняне. Adding one is the owner's
+  - **The player's nouns are a closed list:** Брой, близо, серия, тема, Алманах (глави, факти, мастило), печат, игра
+    по тема, приятели, класация, дуел, споделяне, профил, напомняне. Adding one is the owner's
     call.
+  - **What questions are about is a „тема“; „глава“ is the book's word** (owner, 2026-11-22, undoing „глава“
+    everywhere): in the Алманах a topic is a chapter of the book („Глава 1“ over „Обща култура“, „Главите“), and
+    everywhere else it's a „тема“ („всяка от десетте теми“, „тема „История““, „Игра по тема“, „Към темата“, „Печат за
+    тема“). „Глава“ read oddly out of the book: one is „силен в тема Технологии“, never „в глава Технологии“
+    (`language.test.ts`: „глава“ is said only in `screens/almanac.ts`).
   - **The rule for later.** A change is made only if it makes the issue better or names the measure it moves and what
     it removes; adds no noun; keeps every place's budget; is good at zero (first player, first day, 0 right, no
     friends); pays one deed once; removes at least as much as it adds while effects are too small to detect (judged
@@ -133,7 +138,7 @@ packages' doc comments; this file holds only what must not drift.
   classrooms, schools): no levels, question pools, filters, reports or texts that exist for one group (owner,
   2026-11-18, after the product review's classroom items).
 - **A game outside the day is a chapter's** (owner, 2026-11-22, undoing 2026-11-20's „Микс“ and „България“ at the
-  Алманах's head): no „Играй от всички глави“, no „Играй за България“. The book's head says whose book it is and what
+  Алманах's head): no „Играй от всички теми“, no „Играй за България“. The book's head says whose book it is and what
   ink means, and its chapters are the ways to play; a duel still draws from every topic. Past games of „България“ are
   kept as games of every topic.
 - **Accessibility for special needs comes later, not now.** No new work for screen readers, extra time, pausing the

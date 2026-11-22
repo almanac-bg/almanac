@@ -102,7 +102,7 @@ export function filed(topic: string): Child {
     "p",
     { class: "filed" },
     h("span", { class: "i i-nib", "aria-hidden": "true" }),
-    `Записано с мастило · глава „${chapterName(topic)}“`,
+    `Записано с мастило · тема „${chapterName(topic)}“`,
   );
 }
 
@@ -111,7 +111,7 @@ export function toneOf(category: string): string {
   return `t-${category}`;
 }
 
-/** A chapter's name, as players read it ("history" → „История“; "mix" → „Всички глави“). */
+/** A chapter's name, as players read it ("history" → „История“; "mix" → „Всички теми“). */
 export const chapterName = (topic: string): string => topics.find((c) => c.id === topic)?.name ?? "";
 
 /** A chapter's glyph: its art on a white disc, `size` across (for the eye: its name is said beside it). */
