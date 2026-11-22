@@ -327,7 +327,7 @@ export function profileHead(
   );
 }
 
-/** The streak in a player's head: the flame, its number and its words („58 дни в серията“), on one line; nothing while
+/** The streak in a player's head: the flame, its number and its words („58 дни без прекъсване“), on one line; nothing while
  * there's none. */
 function streakLine(days: number | undefined, why: string | undefined): Child {
   if (!days) return null;
@@ -336,7 +336,7 @@ function streakLine(days: number | undefined, why: string | undefined): Child {
     { class: "me-streak", title: why },
     picture("flame", "me-streak-flame"),
     h("b", { class: "num" }, formatNumber(days)),
-    days === 1 ? " ден в серията" : " дни в серията",
+    days === 1 ? " ден без прекъсване" : " дни без прекъсване",
   );
 }
 

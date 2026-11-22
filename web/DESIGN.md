@@ -61,7 +61,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   - On a phone the cover is under half the screen (its date sized by the height), so that „Започни“ is whole by 500px
     on 320 × 568 and 540px on 375 × 600 (`layout.spec.ts`). With large text its display type stays near its usual size
     (the date by the height) and „Около три минути“ gives way (`.issue-time`), so the cover never fills the screen.
-  - The streak (`.streak-chip`): the flame, the number and „дни в серията“, from three days; under it one line: what
+  - The streak (`.streak-chip`): the flame, the number and „дни без прекъсване“ (one: „ден“), from three days; under it one line: what
     came of the days just missed (told once), a day the week forgave, or while the day waits what it makes of the
     streak (`stakeLine`). Below three days, what came of the days just missed is that line on its own, in the
     streak's place (`.streak-notice`).
@@ -175,7 +175,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
 - **Профил:** one column, on a big screen too: the avatar with the seal worn on its corner and a pencil on its top corner (a phone: always; a big screen: as the pointer
   comes over it, with the tooltip „Смени аватара“), the
   name, the @username and by it, on the same line where it fits, the streak as it is now, sized to the head (the
-  flame, „58 дни в серията“; never an ended one's, nothing while none runs; no card of its own). What the week
+  flame, „58 дни без прекъсване“; never an ended one's, nothing while none runs; no card of its own). What the week
   forgives is no line of the page: the streak's `title`, for a pointer resting on it (that it's used up, only while a
   streak runs); a phone is told it where it matters, when a day missed is forgiven. A guest's ways in one quiet line
   under it („Играта ти е само на това устройство. Запази я с имейл · Имаш профил? Влез“: the first opens its form in

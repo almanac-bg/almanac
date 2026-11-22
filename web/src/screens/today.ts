@@ -484,7 +484,7 @@ function contents(t: Today): Child {
 /** Whether the streak ends at midnight without today's issue, and it's the evening (stakeWords): no day left to forgive. */
 const endsTonight = (t: Today) => t.streak >= 1 && !(t.spare ?? true) && hourInBulgaria() >= stakeHour;
 
-/** The streak: its number and „дни в серията“, and its one line under it: what came of the days just missed (`said`,
+/** The streak: its number and „дни без прекъсване“, and its one line under it: what came of the days just missed (`said`,
  * once), or a day the week forgave; while the day's ten wait (`done` false), it is at stake, unlit, and from the
  * evening, if it ends at midnight, that's said, before anything else. Nothing below three days (direction: the streak
  * shows from 3). */
@@ -506,7 +506,7 @@ function streakSection(t: Today, stats: () => Stats | null, done: boolean, said?
       h(
         "span",
         { class: "status-text" },
-        h("span", { class: "status-label" }, "дни в серията"),
+        h("span", { class: "status-label" }, days === 1 ? "ден без прекъсване" : "дни без прекъсване"),
         said
           ? h("span", { class: "streak-note", role: "status" }, said.short)
           : forgiven
