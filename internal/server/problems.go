@@ -253,6 +253,10 @@ const (
 	clientErrorsSample = 20
 )
 
+// harmlessBrowser is what browsers say that is no fault of the page: a ResizeObserver's callback that changed the
+// layout again in the same frame (the next frame catches up).
+var harmlessBrowser = regexp.MustCompile(`^ResizeObserver loop (completed with undelivered notifications|limit exceeded)`)
+
 // clientError takes an error from a player's browser: logged, and counted as a problem. No session is needed: a page
 // that breaks before it has one (a new player's first) is the one most worth hearing of. A page of another version
 // (loaded before a deploy) is only logged: it loads itself anew soon (web/src/fresh.ts), and what is still wrong then
@@ -278,6 +282,11 @@ func (s *Server) clientError(w http.ResponseWriter, r *http.Request) error {
 		s.logClientError(r, in.Message, in.Where, in.Page, in.Stack, in.Version, int(n)-1)
 	}
 	if in.Version != "" && in.Version != s.cfg.Version {
+		return ok(w, map[string]bool{"ok": true})
+	}
+	// A browser's word that is no fault of the page (lib/errors.ts, harmless; pages of before it still send it): logged,
+	// never mailed.
+	if harmlessBrowser.MatchString(in.Message) {
 		return ok(w, map[string]bool{"ok": true})
 	}
 	site := s.cfg.PublicURL

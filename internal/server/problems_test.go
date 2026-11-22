@@ -221,3 +221,23 @@ func TestBackgroundPanicsTold(t *testing.T) {
 		t.Fatalf("the panic wasn't told: %v", news)
 	}
 }
+
+// A browser's word that is no fault of the page (a ResizeObserver's loop, which Safari reports from a duel's page) is
+// never a problem told by mail; a real error beside it still is.
+func TestHarmlessBrowserWordsUntold(t *testing.T) {
+	g := start(t)
+	p := g.player()
+	p.call("POST", "/api/errors", map[string]string{
+		"message": "ResizeObserver loop completed with undelivered notifications.", "where": "https://almanac.bg/duel/45:0:0",
+	})
+	p.call("POST", "/api/errors", map[string]string{"message": "TypeError: x is undefined", "where": "x"})
+	news, _ := g.srv.problems.take()
+	for kind := range news {
+		if strings.Contains(kind, "ResizeObserver") {
+			t.Errorf("told: %q", kind)
+		}
+	}
+	if len(news) != 1 {
+		t.Errorf("the real error wasn't told alone: %v", news)
+	}
+}

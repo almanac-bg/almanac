@@ -22,10 +22,15 @@ export function reportProblem(message: string, stack = ""): void {
   report(message, "caught", stack);
 }
 
+/** What a browser says that is no fault of the page: Safari's and Chrome's word that a ResizeObserver's callback
+ * changed the layout again in the same frame (the next frame catches up; nothing is lost or shown wrong). */
+export const harmless = /^ResizeObserver loop (completed with undelivered notifications|limit exceeded)/;
+
 export function reportErrors(): void {
-  addEventListener("error", (e) =>
-    report(String(e.message), `${e.filename}:${e.lineno}:${e.colno}`, e.error?.stack ?? ""),
-  );
+  addEventListener("error", (e) => {
+    if (harmless.test(String(e.message))) return;
+    report(String(e.message), `${e.filename}:${e.lineno}:${e.colno}`, e.error?.stack ?? "");
+  });
   addEventListener("unhandledrejection", (e) => {
     const r = e.reason;
     // A request that failed has already said so to the player; it isn't a fault of the page.
