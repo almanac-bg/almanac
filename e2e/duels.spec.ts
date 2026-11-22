@@ -55,7 +55,7 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await expect(sent.locator(".duel-card-go")).toHaveCount(0);
   await expect(sent.locator("a.duel-card-side").first()).toHaveAttribute("href", "/me");
   await expect(sent.locator("a.duel-card-side").last()).toHaveAttribute("href", /^\/players\//);
-  await expect(sent.locator(".duel-card-open")).toHaveAccessibleName(/^Въпросите от дуела с /);
+  await expect(sent.locator(".duel-card-open")).toHaveAccessibleName(/^Въпросите от дуела (с|със) /);
   const sentId = ((await sent.getAttribute("id")) ?? "").replace("duel-", "");
   // Приятели is one page, no tabs; a duel she sent is his to play, not hers: not listed (only as it lands). Her
   // friends, with their count.
@@ -106,12 +106,12 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await expect(result.locator(".mini > i")).toHaveCount(20);
   await expect(b.locator(".duels-open")).toHaveCount(0);
   await expect(b.locator(".duel-card")).toHaveCount(1);
-  // The card opens its questions, the whole of it but the names (ways to profiles), with no button on it to say so: a
-  // tap on it (here on its marks) opens the ten in their dialog, each with how it went for the two side by side, its
-  // answers and its fact.
+  // A played card opens its questions, the whole of it (no name on it a link: those are an open duel's), with no
+  // button on it to say so: a tap on it (here on its marks) opens the ten in their dialog, each with how it went for
+  // the two side by side, its answers and its fact.
   const open = result.locator(".duel-card-open");
   await expect(open).toHaveAccessibleName("Въпросите от дуела с Ана");
-  await expect(result.getByRole("link", { name: "Ана", exact: true })).toHaveAttribute("href", /^\/players\//);
+  await expect(result.getByRole("link")).toHaveCount(0);
   const box = await result.boundingBox();
   await b.mouse.click((box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + (box?.height ?? 0) - 20);
   const sheet = b.locator("dialog.review-sheet");
@@ -344,10 +344,10 @@ test("every duel played, beyond the ten listed, in a dialog a page at a time", a
   await expect(box.getByRole("button", { name: "По-стари" })).toBeDisabled();
   await box.getByRole("button", { name: "По-нови" }).click();
   await expect(box.locator(".pages-at")).toHaveText("Страница 2 от 3");
-  // A card there as in the list: its names ways to the profiles, the rest of it to its questions.
-  await expect(box.locator(".duel-card").first().locator("a.duel-card-side").last()).toHaveAttribute(
-    "href",
-    "/players/maria13",
+  // A card there as in the list: the whole of it its questions, no name a link.
+  await expect(box.locator(".duel-card").first().getByRole("link")).toHaveCount(0);
+  await expect(box.locator(".duel-card").first().locator(".duel-card-open")).toHaveAccessibleName(
+    "Въпросите от дуела с Мария 13",
   );
   await box.locator(".sheet-head").getByRole("button", { name: "Затвори" }).click();
   await expect(box).toHaveCount(0);

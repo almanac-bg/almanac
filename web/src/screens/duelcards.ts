@@ -1,6 +1,6 @@
 // A duel as a card, and the cards as Приятели lists them (friends.ts). The card is all there is of a duel
-// (DECISIONS.md: no page of its result): the two face to face (each a way to their profile, the player's own to
-// Профил) with how it stands between them, how each question went for each side (two rows of ten small squares, as the
+// (DECISIONS.md: no page of its result): the two face to face (on an open one each a way to their profile, the
+// player's own to Профил) with how it stands between them, how each question went for each side (two rows of ten small squares, as the
 // boards draw them), one quiet line where there's more to say; theirs to play, „Играй“, the card's one way to its game
 // (the card itself leads nowhere); and, once the player's own game is played, a tap anywhere on it but a name opens its
 // questions in their dialog (results.ts, reviewSheet), on any day (play.Review). A new duel starts from a friend's row
@@ -179,25 +179,28 @@ const playLink = (d: DuelView, first: boolean, cls = ""): Child =>
     "Играй",
   );
 
-/** A duel as a card: the two face to face, the player on the left, each a way to their profile, with how it stands
+/** A duel as a card: the two face to face, the player on the left (open, each a way to their profile), with how it stands
  * between them (cardMiddle), the duel question by question (marksRows), and what more there is to say on one quiet
  * line (noteLine). Theirs to play, „Играй“ at its foot, the card's one way to its game (`play`: the first, filled; the
- * card itself leads nowhere). Once the player's own game in it is played, a button laid over the whole card (under its
- * names' links) opens its questions, nothing on it to say so but its light under a pointer. `stack`: the duels to play
+ * card itself leads nowhere). Once the player's own game in it is played, a button laid over the whole card (under an open
+ * one's names' links) opens its questions, nothing on it to say so but its light under a pointer. `stack`: the duels to play
  * (all of them, it the first), the edges of sheets under the card and „Виж всички (3)“ under its „Играй“, which opens
  * them in a dialog. `top`: the duel named in the address, shown in sight, its result landing as a moment, once. */
 function duelCard(d: DuelView, play = false, stack: DuelView[] = [], top = false): Child {
   const them = d.opponent;
   const note = noteLine(d);
+  // The names lead to the profiles on a duel still open only (owner, 2026-11-22): a played card is its questions, the
+  // whole of it.
+  const open = d.state === "yours" || d.state === "theirs";
   const card = h(
     "div",
     { class: `duel-card s-${d.state}${play ? " turn" : ""}${top ? " landed" : ""}`, id: `duel-${d.id}` },
     h(
       "span",
       { class: "duel-card-sides" },
-      cardSide("Ти", d.you?.look ?? {}, d.you?.name ?? "", tagOf(d.you)),
+      cardSide("Ти", d.you?.look ?? {}, d.you?.name ?? "", open ? tagOf(d.you) : ""),
       h("span", { class: "duel-card-mid" }, cardMiddle(d)),
-      cardSide(them?.name ?? "Съперник", them?.look ?? {}, them?.name ?? "", tagOf(them)),
+      cardSide(them?.name ?? "Съперник", them?.look ?? {}, them?.name ?? "", open ? tagOf(them) : ""),
     ),
     marksRows(d),
     note ? h("span", { class: "duel-card-note" }, note) : null,
