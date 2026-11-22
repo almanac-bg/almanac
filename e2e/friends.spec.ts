@@ -111,7 +111,9 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
       const font = `${hint.fontWeight} ${hint.fontSize} ${hint.fontFamily}`;
       await document.fonts.load(font, el.placeholder);
       ctx.font = font;
-      const inner = el.clientWidth - parseFloat(s.paddingLeft) - parseFloat(s.paddingRight);
+      // From the field's own box, not clientWidth: Chromium's for an <input> already leaves its padding out.
+      const edges = ["borderLeftWidth", "paddingLeft", "paddingRight", "borderRightWidth"] as const;
+      const inner = el.getBoundingClientRect().width - edges.reduce((sum, edge) => sum + parseFloat(s[edge]), 0);
       return inner - ctx.measureText(el.placeholder).width;
     });
     expect(room, `the hint at ${width}px`).toBeGreaterThanOrEqual(0);
