@@ -65,6 +65,15 @@ export interface Duels {
   yours: DuelView[];
   theirs: DuelView[];
   played: DuelView[];
+  /** How many the player has played in all (the list holds the last ten: the rest a page at a time, play.DuelsPlayed). */
+  playedAll: number;
+}
+
+/** A page of the player's duels played (play.PlayedPage). */
+export interface PlayedPage {
+  duels: DuelView[];
+  page: number;
+  pages: number;
 }
 
 /** One of the player's duels. */

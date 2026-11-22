@@ -94,7 +94,9 @@ packages' doc comments; this file holds only what must not drift.
     they've played opens its questions; the names are ways to the profiles, as a name is everywhere. Nothing else: „Реванш“ is
     gone (2026-11-22, the owner), a new duel starts from the friend's row or profile. A duel's game ends on Приятели,
     first in its group, the score counting up once; `/duel/<id>` only starts and plays one, and an old link to a
-    finished duel comes to it there. The played list is the last ten, and says so („Последните 10 изиграни дуела“).
+    finished duel comes to it there. The played list is the last ten, and says so („Последните 10 изиграни дуела“); all
+    of them open from under it in a dialog, a page at a time (2026-11-22, the owner). A duel the player sent and the
+    friend hasn't played isn't listed: it's the friend's to do (2026-11-22, the owner: it only muddled the list).
   - **Friends** are added by username or email, a request the other says yes to. The personal invite link was removed
     (21 Nov): little use, much machinery; friends come by username or email.
   - **Приятели's dot is news since the player last looked there** (2026-11-21), on any device: a friend request, a
