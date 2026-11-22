@@ -409,7 +409,7 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   stays.
 - **Buttons:** `.btn` (outlined in `--line-2`), `.btn.primary` (the one action), `.btn.danger`, `.link` (`.tap` for a
   finger's height). Fields (`input`) are white boxes with a 2px `--line-2` frame, a button's height. `.segmented`: tabs
-  or a setting's few choices on a well, the chosen one a raised surface, of one width unless a word needs more (never broken inside one). A switch is a 52 × 30 track. Never a native
+  or a setting's few choices on a well, the chosen one a raised surface, of one width unless a word needs more (never broken inside one). A switch is a 52 × 30 track, its knob white by day (on: the action's colours). Never a native
   select, radio or checkbox.
 - **Sheets over the page** (`.sheet`, a `<dialog>`): a surface with round top corners over a scrim, from the foot on a
   phone, centred on a big screen (a name asked for, the share, a way out of a game, the avatars, an entry's picture,
