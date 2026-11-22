@@ -14,18 +14,9 @@ import { answering } from "./game/answering.ts";
 import { news } from "./game/news.ts";
 import { count } from "./game/numbers.ts";
 import { answered, crowdLine, picture } from "./game/questions.ts";
-import {
-  board,
-  boardRow,
-  hands,
-  landing,
-  nextSteps,
-  reviewed,
-  reviewParts,
-  scoreCard,
-  summary,
-} from "./game/results.ts";
+import { board, boardRow, hands, landing, nextSteps, reviewed, scoreCard, summary } from "./game/results.ts";
 import { guardLeaving, questionHead, readyClock, startScreen, timer, trail, upNext } from "./game/run.ts";
+import type { Reviewed } from "./game/types.ts";
 import { ApiError, api, errorText } from "./lib/api.ts";
 import { dayInBulgaria } from "./lib/day.ts";
 import {
@@ -42,7 +33,6 @@ import {
   when,
 } from "./lib/dom.ts";
 import { reportProblem } from "./lib/errors.ts";
-import { ordinal } from "./lib/ordinal.ts";
 import { calm, setTick, tickOn } from "./lib/prefs.ts";
 import { needsHomeScreen, pushable, pushOn, pushPrefs, setPushPref, turnOff, turnOn } from "./lib/push.ts";
 import { byTap, go, goBack, rename, title } from "./lib/router.ts";
@@ -172,7 +162,6 @@ export const kit = {
 
   notice,
   onCleanup,
-  ordinal,
   picture,
   standing,
   play,
@@ -198,7 +187,6 @@ export const kit = {
   rename,
   reportProblem,
   reviewed,
-  reviewParts,
   schemeSwitch,
   scoreCard,
   seal,
@@ -274,16 +262,17 @@ function stylesheet(href: string): Promise<void> {
   });
 }
 
-/** A duel's result as it stands or ended (screens/outcome.ts), drawn once it has loaded: `again` is the gold button
- * where there's another duel to play (else a friend's has a rematch), `more` what the game earned. Should it not load
- * (no line, or a version of the game gone by), the duel's own page has it: loaded as a page, it's whole again. */
-export function duelResult(d: DuelView, again: Child | Steps = null, more: Child = null): Child {
+/** A duel's result as it ended (screens/outcome.ts), drawn once it has loaded: `steps` what to do next (the gold
+ * button, and one plain way on), `more` what the game earned, `questions` its questions while they can be gone over.
+ * Should it not load (no line, or a version of the game gone by), the duel's own page has it: loaded as a page, it's
+ * whole again. */
+export function duelResult(d: DuelView, steps: Steps, more: Child, questions: Reviewed[] | null): Child {
   const screen = signal<Outcome | null>(null);
   const failed = signal(false);
   loadDuelResult().then(screen.set, () => failed.set(true));
   return () => {
     const m = screen();
-    if (m) return untracked(() => m.outcome(kit, d, again, more));
+    if (m) return untracked(() => m.outcome(kit, d, steps, more, questions));
     return failed()
       ? h(
           "div",

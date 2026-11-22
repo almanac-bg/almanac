@@ -107,10 +107,9 @@ type DuelView struct {
 	Until int64 `json:"until,omitempty"`
 	// Lapsed is, of a duel that expired, who didn't play it in time: "you" or "they" (none: cut off, from before).
 	Lapsed string `json:"lapsed,omitempty"`
-	// Decided is, in a duel won on right answers, the question (from 1) after which the winner led to the end
-	// (decided); 0 when the right answers were even and the tie was broken (or nothing did). One duel's view (DuelOf)
-	// only.
-	Decided int `json:"decided,omitempty"`
+	// Review says the player's own game in it can still be gone over (Review: on the day it ended), so its result shows
+	// the questions. One duel's view (DuelOf) only.
+	Review bool `json:"review,omitempty"`
 	// TieBy is, of a duel won on even right answers, what broke the tie (duelScore): TieNumber, the number nearer;
 	// "" for a draw, or a duel won on right answers.
 	TieBy string `json:"tieBy,omitempty"`
@@ -986,8 +985,8 @@ func (g *Game) DuelExists(ctx context.Context, id int64) (bool, error) {
 }
 
 // DuelOf is one of a player's duels, as DuelsOf has it, with more: how each question went for each side (the other's
-// once it has a result, or while it's the player's turn, for its screen: DuelSide.Marks), the question that decided
-// it, their record against this person, and whether they're friends. ErrNoDuel if it isn't theirs, ErrDuelGone if
+// once it has a result, or while it's the player's turn, for its screen: DuelSide.Marks), whether their own game can
+// still be gone over, their record against this person, and whether they're friends. ErrNoDuel if it isn't theirs, ErrDuelGone if
 // there's no such duel.
 func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, error) {
 	list, err := g.duelsOf(ctx, userID, duelID)
@@ -1008,16 +1007,20 @@ func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, erro
 			return v, err
 		}
 	}
+	if v.You != nil && v.You.Done && v.RunID != 0 {
+		var ended int64
+		if err := g.DB.Read.QueryRowContext(ctx, `SELECT COALESCE(finished_at, 0) FROM runs WHERE id = ?`, v.RunID).Scan(&ended); err != nil {
+			return v, err
+		}
+		v.Review = ended != 0 && g.reviewOpen(ended)
+	}
 	result := v.State == DuelWon || v.State == DuelLost || v.State == DuelDraw
 	if v.Opponent != nil && v.theirRun != 0 && result {
 		if v.Opponent.Marks, err = g.duelMarks(ctx, v.theirRun); err != nil {
 			return v, err
 		}
-		if v.You != nil {
-			v.Decided = decided(v.You.Marks, v.Opponent.Marks, v.You.Rights, v.Opponent.Rights)
-			if v.State != DuelDraw {
-				v.TieBy = v.You.score.tieBy(v.Opponent.score)
-			}
+		if v.You != nil && v.State != DuelDraw {
+			v.TieBy = v.You.score.tieBy(v.Opponent.score)
 		}
 	}
 	if !v.Recorded && v.against != 0 {
@@ -1093,39 +1096,6 @@ func duelAgainst(tx *sql.Tx, runID int64, at int) ([]DuelMark, error) {
 		out = append(out, m)
 	}
 	return out, rows.Err()
-}
-
-// decided is the question (from 1) after which a duel's winner on right answers led to the end, by how each question
-// went for each side (a and b) and their games' right answers (those that count: the last question's lead is theirs);
-// 0 when their right answers end even, and what broke the tie decided it.
-func decided(a, b []DuelMark, rightsA, rightsB int) int {
-	n := max(len(a), len(b))
-	if n == 0 {
-		return 0
-	}
-	lead := make([]int, n) // a's lead over b after each question
-	sum := 0
-	for i := range n {
-		if i < len(a) && a[i].Right {
-			sum++
-		}
-		if i < len(b) && b[i].Right {
-			sum--
-		}
-		lead[i] = sum
-	}
-	lead[n-1] = rightsA - rightsB
-	sum = lead[n-1]
-	if sum == 0 {
-		return 0
-	}
-	at := 1
-	for i, l := range lead {
-		if (sum > 0 && l <= 0) || (sum < 0 && l >= 0) {
-			at = i + 2 // not ahead after this one: if anywhere, it was decided on the next
-		}
-	}
-	return at
 }
 
 // duelScore is one side's game in a duel as its result goes: its right answers and what breaks a tie between the
