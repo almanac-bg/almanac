@@ -261,10 +261,11 @@ function nameForm(): Child {
           oninput: typed(tag.set),
         }),
       ),
+      // One player's only, but never private: it's on their page for anyone to see (account.NormalTag's rule after).
       h(
         "small",
         { class: "muted", id: "tag-how" },
-        "Само твое е: по него те намират приятелите. Латински букви, цифри и долна черта (_).",
+        "Никой друг няма същото. По него те намират приятелите и го виждат в профила ти. Латински букви, цифри, точка и долна черта.",
       ),
     ),
     h("button", { class: "btn", disabled: busy }, "Запази"),

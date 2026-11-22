@@ -6488,7 +6488,11 @@
     white-space: nowrap;
   }
 
+  /* A board's score, as wide on every row („9 от 10“ as „10 от 10“, which is 3.49rem): the squares after it start in
+     one column. In rem, so that it grows with the text. */
   .rank-score {
+    min-width: 3.5rem;
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
 

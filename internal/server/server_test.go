@@ -1017,6 +1017,40 @@ func TestLinkPreviews(t *testing.T) {
 	}
 }
 
+// A tag with a dot in it is a tag like any other: taken in Настройки, its page and its profile opened by it, in any
+// case; one a dot can't be in (two in a row, at its end) is no page.
+func TestDottedTag(t *testing.T) {
+	g := start(t)
+	p, _ := g.guest()
+	if status, out := p.call("PATCH", "/api/me", map[string]string{"tag": "@Ana.Petrova"}); status != 200 {
+		t.Fatalf("a tag with a dot: %d %v", status, out)
+	}
+	if status, out := p.call("PATCH", "/api/me", map[string]string{"tag": "ana..petrova"}); status != 400 ||
+		out["error"] != "bad_tag" {
+		t.Fatalf("two dots in a row: %d %v", status, out)
+	}
+	for path, want := range map[string]int{
+		"/players/ana.petrova": 200, "/players/Ana.Petrova": 200, "/players/anapetrova": 404,
+		"/players/ana..petrova": 404, "/players/ana.petrova.": 404,
+	} {
+		res, err := http.Get(g.url + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		if res.StatusCode != want {
+			t.Errorf("%s: %d, want %d", path, res.StatusCode, want)
+		}
+		if want == 200 && !strings.Contains(string(body), "(@ana.petrova) в АЛМАНАХ") {
+			t.Errorf("%s: no preview of whose page it is", path)
+		}
+	}
+	if status, out := g.player().call("GET", "/api/players/ana.petrova", nil); status != 200 || out["tag"] != "ana.petrova" {
+		t.Fatalf("the profile by a dotted tag: %d %v", status, out)
+	}
+}
+
 // rankWords are the seal's states' names.
 func rankWords() []string {
 	var words []string

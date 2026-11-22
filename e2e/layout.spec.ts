@@ -19,7 +19,17 @@
 // that's over isn't kept in memory. FIT_SHOTS=<folder> keeps a picture of each question before and after its answer.
 import { expect, type Page, test } from "@playwright/test";
 import { answerAs, beside, closeable, flaws, kinds, panelFlaws, type Q, unseenAnswers } from "./kinds.ts";
-import { cutOrOverlapping, daysPlayed, dealt, keptPlayer, knows, linkedNames, moveOn, startDay } from "./play.ts";
+import {
+  cutOrOverlapping,
+  daysPlayed,
+  dealt,
+  keptPlayer,
+  knows,
+  linkedNames,
+  moveOn,
+  playRun,
+  startDay,
+} from "./play.ts";
 
 const sizes = [
   { width: 320, height: 568, go: 500 },
@@ -977,3 +987,52 @@ test.describe("the questions gone over, twice the text, 320 × 568", () => {
     expect(await sideways(page)).toEqual([]);
   });
 });
+
+// The day's board's rows, on a phone and on a laptop: every row's ten squares start in one column, whatever its
+// score's digits („10 от 10“ is wider than „9 от 10“), on both its tabs.
+for (const width of [390, 1366])
+  test.describe(`the day's board at ${width} px`, () => {
+    test.use({
+      viewport: { width, height: 900 },
+      colorScheme: "light",
+      ...(width > 1000 ? { isMobile: false, hasTouch: false } : {}),
+    });
+
+    test("every row's squares start in one column", async ({ page }) => {
+      test.setTimeout(120_000);
+      await page.goto("/");
+      await startDay(page);
+      await playRun(page);
+      await expect(page.locator(".day-board")).toBeVisible();
+      // The day as the server says it: a row of every width of score, each with its squares; Днес opened again from
+      // another place, so that it asks for the day.
+      const row = (name: string, rights: number, place: number, me = false) => ({
+        name,
+        rights,
+        of: 10,
+        place,
+        me,
+        trail: Array.from({ length: 10 }, (_, i) => ({ right: i < rights })),
+      });
+      const rows = [row("Ана", 10, 1), row("Бо", 9, 2), row("Цвета", 1, 3), row("Аз", 0, 4, true)];
+      await page.route("**/api/day", async (route) => {
+        const day = await (await route.fetch()).json();
+        day.friends = rows;
+        day.befriended = true;
+        day.board = { ...day.board, players: 53, place: 4, top: rows, mine: rows[3] };
+        await route.fulfill({ json: day });
+      });
+      // The places at the foot on a phone, at the top on a laptop: whichever is shown.
+      const places = page.locator(":is(nav.places, nav.places-foot):visible");
+      await places.getByRole("link", { name: "Алманах" }).click();
+      await places.getByRole("link", { name: "Днес" }).click();
+      for (const tab of ["Приятели", "България"]) {
+        await page.locator(".day-board").getByRole("tab", { name: tab }).click();
+        const minis = page.locator(".day-board .rank-row .mini");
+        await expect(minis).toHaveCount(4);
+        await expect(page.locator(".day-board .rank-row .rank-score").first()).toHaveText(/^10\sот\s10$/);
+        const lefts = await minis.evaluateAll((all) => all.map((el) => el.getBoundingClientRect().left));
+        expect(Math.max(...lefts) - Math.min(...lefts), `${tab}: the squares start at ${lefts}`).toBeLessThanOrEqual(1);
+      }
+    });
+  });
