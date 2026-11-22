@@ -40,6 +40,12 @@ import (
 // (DayRules) or the bank's days and Bulgarian questions do (bank.Tail.On, BG): a day drawn ahead is drawn by today's
 // rules, never an older version's.
 //
+// Past the days drawn, the day and the other games keep apart by what they prefer, not by a bar: of the questions
+// that fit, the day takes one nobody has answered, and a chapter's game or a duel one somebody has (Draw), each while
+// any is left. A question met in another game before an issue deals it is never ink for that player (ink.go), so a
+// player who plays the chapters most would otherwise meet more and more of the days to come there, and lose their
+// ink in the issue for it; this way the other games walk the bank already walked, and leave the untouched to the days.
+//
 // Ahead is three months, not a year (the owner's call, 16 Nov 2026): long enough that the players who play most meet
 // no day as a rerun, and what the days hold out of every other game is a season's questions, not a year's 3,650; the
 // runway warns a season and two months before a place runs out, early enough to write for it.
@@ -62,9 +68,11 @@ const Ahead = 90
 const RunwayWarn = Ahead + 60
 
 // dayBars are the questions no other game deals (all: today's, those due for review today, overdue, and the days
-// ahead's).
+// ahead's), and the questions anyone has answered as the days were last drawn (met: answeredQuestions), which the
+// other games deal first (Draw). Met is nil until KeepDays has drawn the days for this day and bank: the other games
+// then draw as if nobody had.
 type dayBars struct {
-	all map[string]bool
+	all, met map[string]bool
 }
 
 type daysCache struct {
@@ -137,6 +145,7 @@ func (g *Game) EnsureDays(ctx context.Context) error {
 		return err
 	}
 	g.daysAhead.mu.Lock()
+	bars.met = answered
 	g.daysAhead.day, g.daysAhead.bank, g.daysAhead.bars = today, b, bars
 	g.daysAhead.mu.Unlock()
 	return nil

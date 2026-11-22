@@ -167,7 +167,7 @@ func TestTopicNumberIsAnEstimate(t *testing.T) {
 		t.Fatal("no estimate left in history")
 	}
 	for seed := range uint64(30) {
-		picks := Draw(b, "history", 0, nil, nil, rand.New(rand.NewPCG(seed, 5)))
+		picks := Draw(b, "history", 0, nil, nil, nil, rand.New(rand.NewPCG(seed, 5)))
 		for _, p := range picks {
 			if q, _ := b.Get(p.ID); q.Base().Type == "number" && q.Base().Difficulty == bank.Hard && !slices.Contains(estimates, p.ID) {
 				t.Fatalf("seed %d: the number is %s, not an estimate", seed, p.ID)

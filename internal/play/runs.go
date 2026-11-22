@@ -208,11 +208,11 @@ func (g *Game) startTopic(ctx context.Context, userID int64, category string) (S
 		case !errors.Is(err, ErrNoRun):
 			return err
 		}
-		barred, err := g.dayQuestions(tx)
+		bars, err := g.days(tx)
 		if err != nil {
 			return err
 		}
-		picks := Draw(b, category, p.ability, p.seen, barred, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+		picks := Draw(b, category, p.ability, p.seen, bars.all, bars.met, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 		if len(picks) == 0 {
 			return ErrNoQuestion
 		}
