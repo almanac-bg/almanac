@@ -5509,15 +5509,11 @@
     -webkit-appearance: none;
   }
 
-  /* A chapter's search stays in reach over its facts as they scroll, on the page's own ground (the entries pass under
-     it, never through it). */
+  /* A chapter's search stays in reach over its facts as they scroll: the field alone, no band behind it to cut them. */
   .chapter-facts > .search {
     position: sticky;
-    top: 0;
+    top: var(--space-2);
     z-index: 2;
-    margin-block: calc(-1 * var(--space-2));
-    padding-block: var(--space-2);
-    background: var(--bg);
   }
 
   /* What grey is, where it first shows. */
