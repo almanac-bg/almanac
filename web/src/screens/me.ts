@@ -123,9 +123,8 @@ export function me(kit: Kit) {
 }
 
 /** Who you are: your avatar as you wear it, the seal you wear on its corner, and a pencil on it (a tap on the avatar
- * opens the animals: `pick`); your name and tag, the streak as it is now under them (said to you: „Играеш от …“); a
- * name still the one drawn says so, with the way to change it. The same head as another's
- * page (ui.ts, profileHead), but for what the week forgives: yours, on the streak for a pointer resting on it. */
+ * opens the animals: `pick`); your name and tag, the streak as it is now under them (said to you: „Играеш от …“).
+ * The same head as another's page (ui.ts, profileHead), but for what the week forgives: yours, on the streak for a pointer resting on it. */
 function head(data: () => Stats | null, pick: () => void): Child {
   return profileHead(
     // The avatar is the button: a pencil on its corner says so (on a big screen as the pointer comes over it, with the
@@ -140,16 +139,6 @@ function head(data: () => Stats | null, pick: () => void): Child {
     () => user()?.tag,
     () => data()?.streak,
     () => forgives(data()),
-    // The name is changed in Настройки, rarely: said here only while it's one drawn at random, which asks for it.
-    () =>
-      user()?.drawn
-        ? h(
-            "p",
-            { class: "me-line" },
-            "Това име е избрано наслуки. ",
-            h("a", { class: "link", href: "/settings#name" }, "Смени го"),
-          )
-        : null,
     true,
   );
 }

@@ -334,16 +334,14 @@ export type ChapterRank = Standing;
 /** A player's head, one look on Профил and on a player's page: the avatar with the seal worn on its corner (`face`:
  * on Профил a button with „Смени“ under it), the name, the @username, the streak as it is now under them (`streak`:
  * its days, „Играе от 11 дни без прекъсване“ on another's page, „Играеш от …“ on one's own, `own`; nothing while
- * there's none, never an ended one's, DECISIONS.md), and what's only Профил's under it (`more`: the way to change a
- * name drawn at random). `why`, Профил's only: what the week forgives, said when the pointer rests on the streak (a
- * phone has it where a day missed is forgiven). */
+ * there's none, never an ended one's, DECISIONS.md). `why`, Профил's only: what the week forgives, said when the
+ * pointer rests on the streak (a phone has it where a day missed is forgiven). */
 export function profileHead(
   face: Child,
   name: Child,
   tag: string | (() => string | undefined),
   streak: () => number | undefined,
   why?: () => string | undefined,
-  more: Child = null,
   own = false,
 ): HTMLElement {
   const at = (t: string | undefined) => (t ? h("span", { class: "me-tag" }, `@${t}`) : null);
@@ -357,7 +355,6 @@ export function profileHead(
       h("h1", null, name),
       h("p", { class: "me-ids" }, typeof tag === "function" ? () => at(tag()) : at(tag)),
       () => streakLine(streak(), why?.(), own),
-      more,
     ),
   );
 }

@@ -4742,8 +4742,8 @@
     margin: 0;
   }
 
-  /* The head's quiet lines under the tag: the streak as it is now (Профил and a player's page alike, its number
-     heavy), and on Профил the way to change a name drawn at random. */
+  /* The head's quiet line under the tag: the streak as it is now (Профил and a player's page alike, its number
+     heavy). */
   .me-line {
     color: var(--ink-3);
     font: var(--t-note);

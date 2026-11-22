@@ -221,14 +221,8 @@ function nameForm(): Child {
         "aria-label": "Име",
         "aria-describedby": "name-how",
         autocomplete: "nickname",
-        // Come to change the name (Профил's „Смени го“ under a name drawn): the field, ready for the new one.
         ref: (el) => {
           nameField = el as HTMLInputElement;
-          if (location.hash === "#name")
-            queueMicrotask(() => {
-              (el as HTMLInputElement).focus();
-              (el as HTMLInputElement).select();
-            });
         },
         // Room past the rule's 30, so that a longer name is refused in words (the server's), never cut short and saved.
         maxlength: 60,
