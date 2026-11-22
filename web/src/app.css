@@ -3673,6 +3673,42 @@
     margin: 0;
   }
 
+  /* One friend's duels sent to the player, a pile: its avatar a tile on one or two more, as sheets lie in a stack; on
+     its line the way to unfold the rest under it (a chevron down, up once unfolded), each then a row of its own,
+     set in under the first. */
+  .duel-pile > .avatar {
+    box-shadow: 4px -4px 0 0 var(--surface-3);
+  }
+
+  .duel-pile[data-more="2"] > .avatar {
+    box-shadow:
+      4px -4px 0 0 var(--surface-3),
+      8px -8px 0 0 var(--line);
+  }
+
+  .duel-pile-fold {
+    display: inline-flex;
+    align-items: center;
+    justify-self: start;
+    gap: 4px;
+    min-height: 2rem;
+    color: var(--ink-2);
+    font: var(--t-fine);
+    font-weight: 800;
+  }
+
+  .duel-pile-fold .i {
+    transform: rotate(90deg);
+  }
+
+  .duel-pile-fold[aria-expanded="true"] .i {
+    transform: rotate(-90deg);
+  }
+
+  .duel-row.in-pile {
+    padding-left: calc(8px + var(--space-5));
+  }
+
   /* Too narrow for the marks beside the row's end (the narrowest phones), or at large text: the marks a line of their
      own across the row, under the avatar too. */
   @media (max-width: 359px) {

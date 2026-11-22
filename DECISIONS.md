@@ -89,7 +89,8 @@ packages' doc comments; this file holds only what must not drift.
     score, the two rows of marks, one quiet line, and „Въпросите“, its questions in their dialog, on any day (2026-11-22, the owner: the other side plays when they can, so a duel's result often comes
     on another day, and its questions are what the two talk over). Every duel is a compact
     row, „Чакащи дуели“ and „Изиграни дуели“ (2026-11-22, the owner: cards were too long): one the player's to play
-    acts only by its „Играй“; one whose side they've played opens its questions; the other's name is a way to their
+    acts only by its „Играй“; one friend's several sent to the player are one row, a pile, the earliest on top,
+    unfolded to choose which to play (2026-11-22, the owner); one whose side they've played opens its questions; the other's name is a way to their
     profile, as a name is everywhere. Nothing else: „Реванш“ is
     gone (2026-11-22, the owner), a new duel starts from the friend's row or profile. A duel's game ends on Приятели,
     first in its group, the score counting up once; `/duel/<id>` only starts and plays one, and an old link to a

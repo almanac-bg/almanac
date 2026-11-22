@@ -180,7 +180,7 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await expect(sheet.getByRole("alert")).toHaveCount(0);
 });
 
-test("one friend's duels sent are one pile, „Играй“ on it; one played back lands first of the played, under those waiting", async ({
+test("one friend's duels sent are one pile, the earliest on top, unfolded to choose one; played back, first of the played", async ({
   browser,
 }) => {
   test.setTimeout(360_000);
@@ -188,6 +188,7 @@ test("one friend's duels sent are one pile, „Играй“ on it; one played b
   const b = await (await browser.newContext()).newPage();
   await befriend(a, b);
   // Ana sends him three, as many as may wait with one friend (play.DuelsToOne).
+  const sentIds: string[] = [];
   for (let n = 0; n < 3; n++) {
     await a.goto("/friends");
     await a.locator(".friend").getByRole("button", { name: /^Дуел/ }).click();
@@ -195,6 +196,7 @@ test("one friend's duels sent are one pile, „Играй“ on it; one played b
     await countIn(a);
     await playRun(a);
     await expect(a).toHaveURL(/\/friends\?duel=\d+$/);
+    sentIds.push(new URL(a.url()).searchParams.get("duel") ?? "");
   }
   // Hers wait each on its own row: each has her own score on it. Three wait for him: no fourth until he plays one,
   // and his row says so, „Дуел“ off.
@@ -203,17 +205,31 @@ test("one friend's duels sent are one pile, „Играй“ on it; one played b
   await expect(a.locator(".friend").getByRole("button", { name: /^Дуел/ })).toBeDisabled();
   await expect(a.locator(".duel-pile")).toHaveCount(0);
 
-  // Bo: the three are one row, the next to lapse, with „Играй“, the count said on its line and in the heading.
+  // Bo: the three are one row, a pile, the earliest on top with „Играй“, the count said on its line and in the heading.
   await b.goto("/friends");
   const pile = b.locator(".duel-pile");
+  const rows = b.locator(".duels-open .duel-row");
   await expect(pile).toHaveCount(1);
   await expect(pile).toHaveAttribute("data-more", "2");
-  await expect(b.locator(".duels-open .duel-row")).toHaveCount(1);
+  await expect(pile).toHaveAttribute("id", `duel-${sentIds[0]}`);
+  await expect(rows).toHaveCount(1);
   await expect(b.locator(".duels-open h2")).toHaveText("Чакащи дуели (3)");
   await expect(pile).toHaveClass(/\bturn\b/);
   await expect(pile.locator(".duel-card-go")).toHaveText("Играй");
-  await expect(pile.locator(".duel-card-note")).toHaveText("Още 2 дуела чакат.");
-  await pile.locator(".duel-card-go").click();
+  // Unfolded: all three, earliest first, each with its own „Играй“; folded again, one.
+  const fold = pile.getByRole("button", { name: "Още 2 дуела чакат" });
+  await expect(fold).toHaveAttribute("aria-expanded", "false");
+  await fold.click();
+  await expect(rows).toHaveCount(3);
+  expect(await rows.evaluateAll((els) => els.map((el) => el.id))).toEqual(sentIds.map((id) => `duel-${id}`));
+  await expect(b.locator(".duels-open .duel-card-go")).toHaveCount(3);
+  await expect(pile.getByRole("button", { name: "Скрий другите" })).toHaveAttribute("aria-expanded", "true");
+  await pile.getByRole("button", { name: "Скрий другите" }).click();
+  await expect(rows).toHaveCount(1);
+  // He chooses the last one sent.
+  await pile.getByRole("button", { name: "Още 2 дуела чакат" }).click();
+  await rows.last().locator(".duel-card-go").click();
+  await expect(b).toHaveURL(new RegExp(`/duel/${sentIds[2]}$`));
   await countIn(b);
   await playSecond(b, "Ана");
 
@@ -224,9 +240,11 @@ test("one friend's duels sent are one pile, „Играй“ on it; one played b
   const playedOnes = b.locator(".duels-played");
   await expect(waiting.getByRole("heading")).toHaveText("Чакащи дуели (2)");
   await expect(waiting.locator(".duel-pile")).toHaveAttribute("data-more", "1");
-  await expect(waiting.locator(".duel-card-note")).toHaveText("Още един дуел чака.");
+  await expect(waiting.locator(".duel-pile")).toHaveAttribute("id", `duel-${sentIds[0]}`);
+  await expect(waiting.getByRole("button", { name: "Още един дуел чака" })).toBeVisible();
   await expect(playedOnes.getByRole("heading")).toHaveText("Изиграни дуели");
   const landed = playedOnes.locator(".duel-row").first();
+  await expect(landed).toHaveAttribute("id", `duel-${sentIds[2]}`);
   await expect(landed).toHaveClass(/\blanded\b/);
   await expect(landed).toHaveClass(/s-(won|lost|draw)/);
   await expect(landed).toBeInViewport();
