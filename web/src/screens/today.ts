@@ -785,10 +785,10 @@ function tenthLine(review: Promise<Reviewed[]>): Child {
 /** Where the day's board looks: among the player and their friends, or at all of България. */
 type Among = "friends" | "all";
 
-/** The day's board, one card on the result (DESIGN.md, The result): „Класация“ and two tabs, Приятели and България.
- * It opens among friends, or on all България for a player with none yet (`among` keeps the tab chosen while the
- * result is open). Nothing until the day as it stands with the game played is here: before, the board doesn't name
- * its players to the player, nor show anyone's squares (play.FriendsBoard). */
+/** The day's board, one card on the result (DESIGN.md, The result): „Класация“ and two tabs, Всички first, then
+ * Приятели. It opens among friends all the same, or on all България for a player with none yet (`among` keeps the
+ * tab chosen while the result is open). Nothing until the day as it stands with the game played is here: before,
+ * the board doesn't name its players to the player, nor show anyone's squares (play.FriendsBoard). */
 function dayBoard(t: Today, run: State, among: Signal<Among | null>): Child {
   if (!t.run?.done) return null;
   const opens: Among = t.friends?.length || t.befriended ? "friends" : "all";
@@ -800,8 +800,8 @@ function dayBoard(t: Today, run: State, among: Signal<Among | null>): Child {
     segmented<Among>(
       "Класация сред",
       [
-        ["friends", "Приятели"],
         ["all", "Всички"],
+        ["friends", "Приятели"],
       ],
       now,
       (v) => among.set(v),

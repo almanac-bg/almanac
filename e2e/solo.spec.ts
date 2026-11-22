@@ -47,7 +47,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // The result tells the streak tomorrow makes.
   await expect(page.locator(".tomorrow")).toContainText("С него серията ти става 2.");
   // The day's board on the result: of friends (none yet), and of all България, where it opens, the player on it.
-  await expect(page.locator(".day-board").getByRole("tab")).toHaveText(["Приятели", "Всички"]);
+  await expect(page.locator(".day-board").getByRole("tab")).toHaveText(["Всички", "Приятели"]);
   await expect(page.locator(".day-board").getByRole("tab", { name: "Всички" })).toHaveAttribute(
     "aria-selected",
     "true",

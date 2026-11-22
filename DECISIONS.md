@@ -39,8 +39,8 @@ packages' doc comments; this file holds only what must not drift.
   - **Three places:** Днес (the issue and, on its result, the day's board), Алманах (the book), Приятели (friends,
     duels). Профил and Настройки open from the avatar. Nothing else gets a place. The board is about the day's issue,
     so it is Днес's (2026-11-22), and Приятели is what it says, the people and the duels. It is one card on the result
-    with two tabs, Приятели and Всички (2026-11-22, the owner: a „Класация“ link to a page of its own was a detour,
-    and the tabs were what worked in Приятели): it takes the place of „Приятели днес“ and „България днес“, so the
+    with two tabs, Всички first, then Приятели, where it opens once the player has friends (2026-11-22, the owner: a
+    „Класация“ link to a page of its own was a detour, and the tabs were what worked in Приятели): it takes the place of „Приятели днес“ and „България днес“, so the
     result holds no more than before, and it has no page of its own.
   - **The issue is asked once.** Its score is the number right out of 10; a close answer is „близо“, not right. No
     points and no bonus. No played question is asked again (no Втори шанс, no past issues), and a share link opened
@@ -98,7 +98,7 @@ packages' doc comments; this file holds only what must not drift.
   - **Sharing:** the score and its tiles, never the answers, unsigned, with a way into the same ten.
   - **A result has a budget:** the score and tiles, what the day wrote in the book (its ink by chapter, a rank risen:
     2026-11-22, no single question picked out of the ten), one action, tomorrow, the
-    day's board (Приятели · Всички); with a crowd, how Bulgaria did that day („средно 6,2“). Everything else is in the
+    day's board (Всички · Приятели); with a crowd, how Bulgaria did that day („средно 6,2“). Everything else is in the
     questions' dialog, off the page: one dialog for every game's questions (the day's, a chapter's game's, a
     duel's), opened by „Прегледай въпросите“, by the score's card, and by a tile at its question (2026-11-22, the
     owner: the list in the page made the result long, and a duel had a second kind of it). A
