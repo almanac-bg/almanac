@@ -5512,6 +5512,14 @@
     font: 900 calc(14px + 0.875rem) / 1 var(--font-sans);
   }
 
+  /* A national day's name under the date, a line of its own in the weekday's type: quiet. */
+  .issue-national {
+    flex-basis: 100%;
+    margin-top: 4px;
+    font: 800 0.9375rem / 1.2 var(--font-sans);
+    text-wrap: balance;
+  }
+
   .issue-body {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -6370,6 +6378,10 @@
     .issue-month {
       padding-bottom: 22px;
       font-size: 2.75rem;
+    }
+
+    .issue-national {
+      font-size: 1.25rem;
     }
 
     .issue-title {

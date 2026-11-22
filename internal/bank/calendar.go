@@ -9,29 +9,45 @@ import "slices"
 // the bank checked has none for a day the live bank has some for: a fix to another question is never held up by a
 // national day already empty). Moving feasts (Великден) aren't here: their questions are dated by the year.
 
-// NationalDay is a day of the national calendar: its date (MM-DD) and what it marks.
+// NationalDay is a day of the national calendar: its date (MM-DD) and its name, as the day's issue says it on Днес,
+// on its card and in its share („3 март · Освобождението“).
 type NationalDay struct {
 	On   string
-	What string
+	Name string
 }
 
 // NationalDays are the national calendar, in the year's order.
 var NationalDays = []NationalDay{
-	{"01-01", "New Year (Васильовден)"},
-	{"01-06", "Epiphany (Йордановден)"},
-	{"02-19", "the hanging of Vasil Levski"},
-	{"03-01", "Baba Marta"},
-	{"03-03", "the Liberation, the national day"},
-	{"05-06", "St George's Day, the day of the army"},
-	{"05-24", "the Bulgarian alphabet and culture"},
-	{"06-02", "Hristo Botev and those who fell for Bulgaria"},
-	{"07-18", "the birth of Vasil Levski"},
-	{"09-06", "the Unification"},
-	{"09-22", "Independence"},
-	{"11-01", "the Enlighteners (будителите)"},
-	{"12-08", "the students' day"},
-	{"12-24", "Christmas Eve"},
-	{"12-25", "Christmas"},
+	{"01-01", "Нова година"},       // and Васильовден
+	{"01-06", "Йордановден"},       // Epiphany
+	{"02-19", "В памет на Левски"}, // his hanging, 1873
+	{"03-01", "Баба Марта"},
+	{"03-03", "Освобождението"}, // the national day
+	{"05-06", "Гергьовден"},     // and the day of the army
+	{"05-24", "Денят на българската азбука и култура"},
+	{"06-02", "Денят на Ботев"}, // and of those who fell for Bulgaria
+	{"07-18", "Рожденият ден на Левски"},
+	{"09-06", "Съединението"},
+	{"09-22", "Независимостта"},
+	{"11-01", "Денят на будителите"},
+	{"12-08", "Студентският празник"},
+	{"12-24", "Бъдни вечер"},
+	{"12-25", "Коледа"},
+}
+
+// NationalName is the name of the national day a day (YYYY-MM-DD) falls on, "" on any other day. The day's issue says
+// it in one quiet line: the questions dated to the day come first in its draw (play/draw.go), and the issue stays one
+// question a chapter, never a themed ten.
+func NationalName(day string) string {
+	if len(day) != 10 {
+		return ""
+	}
+	for _, d := range NationalDays {
+		if day[5:] == d.On {
+			return d.Name
+		}
+	}
+	return ""
 }
 
 // NationalWant is how many questions about Bulgaria a national day should have: a few, for it comes every year and a

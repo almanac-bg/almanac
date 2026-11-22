@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
+	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/play"
 )
 
-// today is the day screen's state: the day and its issue (play.Issue), the viewer's streak and run (if any),
-// whether they've finished a game yet, the hard question's chapter in tomorrow's issue,
-// how many have played the day (and how well on average), and their friends' day.
+// today is the day screen's state: the day and its issue (play.Issue), on a national day its name (bank.NationalName),
+// the viewer's streak and run (if any), whether they've finished a game yet, the hard question's chapter in tomorrow's
+// issue, how many have played the day (and how well on average), and their friends' day.
 func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.user(r)
 	if err != nil {
@@ -36,6 +37,9 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 		return nil, err
 	}
 	out["topics"] = topics
+	if name := bank.NationalName(day); name != "" {
+		out["national"] = name
+	}
 	var viewer int64
 	done := false // the viewer has finished the day's ten
 	if u != nil {
@@ -91,8 +95,12 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 				return nil, err
 			}
 			midnight, _ := time.ParseInLocation(time.DateOnly, day, play.Bulgaria)
-			out["yesterday"] = map[string]any{"day": open.Day, "issue": play.Issue(open.Day), "topics": topics, "run": open,
+			y := map[string]any{"day": open.Day, "issue": play.Issue(open.Day), "topics": topics, "run": open,
 				"until": midnight.Add(play.DayGrace).UnixMilli()}
+			if name := bank.NationalName(open.Day); name != "" {
+				y["national"] = name
+			}
+			out["yesterday"] = y
 		}
 		var runID int64
 		err = s.db.Read.QueryRowContext(ctx, `SELECT id FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, u.ID, day).Scan(&runID)

@@ -14,13 +14,14 @@ import type { Mark } from "./types.ts";
 export type Shared = "shared" | "copied" | "cancelled" | { text: string };
 
 /** A finished day as it's shared: its issue, how many were right of how many count, the streak with it, and how each
- * question went. */
+ * question went; on a national day its date and name („3 март · Освобождението“: bank.NationalName). */
 export interface SharedDay {
   issue: number;
   rights: number;
   of: number;
   streak: number;
   marks: Mark[];
+  national?: string;
 }
 
 /** The day's tiles as text: ■ right, ◩ близо, □ not; a question that counts for nobody has no place. */
@@ -31,12 +32,14 @@ export function squares(marks: Mark[]): string {
     .join("");
 }
 
-/** The text a day is shared with: „Брой 42 · 8/10 · серия 23 дни“ (the streak from three days), its squares, and the link
- * (`url`) whole, its scheme too: a messenger links „https://almanac.bg/d/…“, and not every one links it without.
- * Unsigned: nothing in it says whose it is. */
+/** The text a day is shared with: „Брой 42 · 8/10 · серия 23 дни“ (the streak from three days; on a national day its
+ * date and name after the issue, „Брой 112 · 3 март · Освобождението · 8/10“), its squares, and the link (`url`) whole,
+ * its scheme too: a messenger links „https://almanac.bg/d/…“, and not every one links it without. Unsigned: nothing in
+ * it says whose it is. */
 export function shareWords(d: SharedDay, url: string): string {
+  const national = d.national ? ` · ${d.national}` : "";
   const streak = d.streak >= 3 ? ` · серия ${d.streak} дни` : "";
-  return `Брой ${d.issue} · ${d.rights}/${d.of}${streak}\n${squares(d.marks)}\n${url}`;
+  return `Брой ${d.issue}${national} · ${d.rights}/${d.of}${streak}\n${squares(d.marks)}\n${url}`;
 }
 
 const links = new Map<number, Promise<string>>();

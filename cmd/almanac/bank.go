@@ -196,9 +196,9 @@ func nationalDays(b, live *bank.Bank, against bool, used play.Used, today string
 			} else {
 				empty = append(empty, d.On)
 			}
-			few = append(few, fmt.Sprintf("%s %s: none", d.On, d.What))
+			few = append(few, fmt.Sprintf("%s %s: none", d.On, d.Name))
 		case d.N < bank.NationalWant:
-			few = append(few, fmt.Sprintf("%s %s: %d", d.On, d.What, d.N))
+			few = append(few, fmt.Sprintf("%s %s: %d", d.On, d.Name, d.N))
 		}
 	}
 	var s strings.Builder

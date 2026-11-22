@@ -3,8 +3,8 @@
 // opens it:
 //
 //   - a shared day's card (Draw), the picture a shared day's link shows and the browser shares as the day is shared
-//     (web/src/game/share.ts, cardFile): the mark and the name, „Брой“ and the issue's number big with its date,
-//     almanac.bg, and the ten tiles two rows of five, each its chapter's colour with its glyph, filled right (the glyph
+//     (web/src/game/share.ts, cardFile): the mark and the name, „Брой“ and the issue's number big with its date (and
+//     on a national day its name: „3 март · Освобождението“), almanac.bg, and the ten tiles two rows of five, each its chapter's colour with its glyph, filled right (the glyph
 //     on a white tile), the upper left half filled близо (◩), dashed and hollow wrong (so that they part in grey too),
 //     dashed and empty one that counts for
 //     nobody. Never an answer, never a name, never the score in figures (the link's title says it: server/pages.go);
@@ -44,9 +44,11 @@ const (
 
 // Card is what a shared day's card shows.
 type Card struct {
-	// Issue is the day's issue, and Date its day in words („21 ноември“).
-	Issue int
-	Date  string
+	// Issue is the day's issue, Date its day in words („21 ноември“), and National the name of the national day it is
+	// (bank.NationalName), if it is one.
+	Issue    int
+	Date     string
+	National string
 	// Topics are the issue's ten chapters in the order they're asked (play.Game.IssueTopics).
 	Topics []string
 	// Shape is how each of the issue's ten went, in its order (play.Share.Shape): '1' right, '2' близо, '3' one that
@@ -118,7 +120,16 @@ func Draw(c Card) ([]byte, error) {
 		size *= 370 / w
 	}
 	p.write(p.face("sofia-sans-extra-condensed-900", size), ink, 56, 456, n, 0)
-	p.write(p.face("sofia-sans-800", 44), ink, 64, 530, c.Date, 0)
+	// The date, with a national day's name after it, on one line under the tiles: smaller should it ever be wider.
+	date := c.Date
+	if c.National != "" {
+		date += " · " + c.National
+	}
+	size = 44
+	if w := p.measure(p.face("sofia-sans-800", size), date, 0); w > Width-2*64 {
+		size *= (Width - 2*64) / w
+	}
+	p.write(p.face("sofia-sans-800", size), ink, 64, 530, date, 0)
 	if err := p.tiles(c.Topics, c.Shape); err != nil {
 		return nil, err
 	}

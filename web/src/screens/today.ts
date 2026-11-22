@@ -67,6 +67,9 @@ export interface Today {
   issue?: number;
   /** The issue's topics, in the order its ten are asked (play.IssueTopics): „В броя“. */
   topics?: string[] | null;
+  /** On a national day, its name (bank.NationalName: „Освобождението“): the cover says it under the date, and the
+   * share after the issue. */
+  national?: string;
   streak: number;
   /** Whether this week would still forgive a day missed (play/runs.go: two a week). */
   spare?: boolean;
@@ -95,7 +98,7 @@ export interface Today {
   back?: { last: string };
   /** Yesterday's issue left half-way before midnight, while it can still be finished (play.Unfinished, DayGrace): its
    * day, issue, chapters and run, and until when (ms). Днес offers it first. */
-  yesterday?: { day: string; issue: number; topics: string[] | null; run: State; until: number };
+  yesterday?: { day: string; issue: number; national?: string; topics: string[] | null; run: State; until: number };
   /** Днес drawn for yesterday's issue (lateView): until when it can be finished, and the way on to today's. */
   late?: { until: number; today: () => void };
 }
@@ -209,6 +212,7 @@ export function today() {
       ...t,
       day: y.day,
       issue: y.issue,
+      national: y.national,
       topics: y.topics,
       run: y.run,
       entry: null,
@@ -384,6 +388,9 @@ function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): 
           h("time", { datetime: t.day }, h("b", { class: "issue-day" }, String(date))),
           " ",
           h("span", { class: "issue-month" }, dateWords(t.day).split(" ")[1] ?? ""),
+          // A national day's name under its date („3 март“, „Освобождението“), quietly: the questions dated to it
+          // come first, one a chapter still.
+          t.national ? [" ", h("span", { class: "issue-national" }, t.national)] : null,
         ),
         h(
           "div",
@@ -1001,7 +1008,8 @@ function shareButton(run: State, t: Today, streak: () => number, known: () => bo
  * away. */
 function shareSheet(run: State, t: Today, streak: number): void {
   const issue = t.issue ?? issueOf(t.day);
-  const day: SharedDay = { issue, rights: run.rights, of: outOf(run), streak, marks: run.trail };
+  const national = t.national ? `${dateWords(t.day)} · ${t.national}` : undefined;
+  const day: SharedDay = { issue, rights: run.rights, of: outOf(run), streak, marks: run.trail, national };
   const text = signal("");
   const said = signal("");
   const card = signal<File | null>(null);
