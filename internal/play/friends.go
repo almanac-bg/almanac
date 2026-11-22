@@ -418,6 +418,11 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 // Once the player has finished the day, the first BoardTop rows and their own carry how each of the ten went (Trail),
 // as Начало shows them beside the result; before that, nothing of how the others' went.
 func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Score, error) {
+	return g.friendsBoard(ctx, day, userID, BoardTop)
+}
+
+// friendsBoard is FriendsBoard with the trails of its first `trails` rows (and the player's own).
+func (g *Game) friendsBoard(ctx context.Context, day string, userID int64, trails int) ([]Score, error) {
 	// From the player and their friends to each one's game of the day (runs_one_a_day): CROSS JOIN keeps that order,
 	// so it costs as many as they are, not as many as the day has players.
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT r.id, u.id, u.name, u.tag, r.rights, r.closeness,
@@ -457,17 +462,65 @@ func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Sc
 	at := map[int64]int{}
 	var ids []int64
 	for i, run := range runs {
-		if i < BoardTop || board[i].Me {
+		if i < trails || board[i].Me {
 			at[run] = i
 			ids = append(ids, run)
 		}
 	}
-	trails, err := trailsOf(ctx, g.DB.Read, day, ids)
+	marks, err := trailsOf(ctx, g.DB.Read, day, ids)
 	if err != nil {
 		return nil, err
 	}
 	for run, i := range at {
-		board[i].Trail = trails[run]
+		board[i].Trail = marks[run]
 	}
 	return board, nil
+}
+
+// FriendDay is a friend's game of the day as the player's questions gone over show it, beside each question: who, and
+// how each of the ten went for them.
+type FriendDay struct {
+	Name string `json:"name"`
+	Look
+	// Marks are the ten in the issue's order, as a share says them (Share.Shape): '1' right, '2' close (not right),
+	// '0' wrong or not answered, '3' a question that counts for nobody.
+	Marks string `json:"marks"`
+}
+
+// FriendsOn is how the player's friends did with each question of the player's game of the day (run), for its
+// questions gone over: every friend who finished that day's issue (the run's day, not today's: a game finished in the
+// grace after midnight is gone over beside its own day's friends), in the order of the day's friends' board (best
+// first), each with their ten marks. As the board, never before the player has finished the day (ErrOutOfStep), and a
+// game played at a script's speed left out (fairFor); and, as the questions themselves, only on the day they can be
+// gone over (ErrReviewOver). Not a day's game: none. A player has at most MaxFriends, so it's at most that many rows of
+// ten marks, read as the board reads its first rows' (trailsOf): one read of their answers.
+func (g *Game) FriendsOn(ctx context.Context, userID, runID int64) ([]FriendDay, error) {
+	var day, kind string
+	var finished sql.NullInt64
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT coalesce(day, ''), kind, finished_at FROM runs WHERE id = ? AND user_id = ?`,
+		runID, userID).Scan(&day, &kind, &finished)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNoRun
+	}
+	switch {
+	case err != nil:
+		return nil, err
+	case !finished.Valid:
+		return nil, ErrOutOfStep
+	case !g.reviewOpen(finished.Int64):
+		return nil, ErrReviewOver
+	case kind != "day":
+		return []FriendDay{}, nil
+	}
+	board, err := g.friendsBoard(ctx, day, userID, MaxFriends+1)
+	if err != nil {
+		return nil, err
+	}
+	out := []FriendDay{}
+	for _, s := range board {
+		if !s.Me {
+			out = append(out, FriendDay{Name: s.Name, Look: s.Look, Marks: shapeOf(s.Trail)})
+		}
+	}
+	return out, nil
 }

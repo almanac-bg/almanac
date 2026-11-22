@@ -8,6 +8,7 @@ import { calm } from "../lib/prefs.ts";
 import { feelKit, play } from "../lib/sound.ts";
 import { categories } from "../state.ts";
 import { avatar, chapterName, chip, fact, type Look, leaf, tiles, who } from "../ui.ts";
+import { type FriendDay, fewFriends, friendsLine, groupWords, markAt, shortName } from "./knew.ts";
 import { closeLine, closeWords } from "./numbers.ts";
 import { answered, crowdLine, picture } from "./questions.ts";
 import { report } from "./report.ts";
@@ -202,6 +203,9 @@ export interface ReviewOf {
   of: string;
   /** A duel's two sides: each question says how it went for both. */
   versus?: Versus;
+  /** The day's issue: how the player's friends who finished it did, asked for as the dialog opens (play.FriendsOn);
+   * each question says it under how Bulgaria did. Without them (none came), the questions as they are. */
+  friends?: () => Promise<FriendDay[]>;
   /** The question to open at (its place, from 0), marked for a moment: the tile tapped. */
   at?: number;
 }
@@ -213,6 +217,7 @@ export interface ReviewOf {
  * chapter's colour for a moment (app.css, .lit). Esc, „Затвори“ or a tap beside it puts it away. */
 export function reviewSheet(o: ReviewOf): void {
   const all = signal<Reviewed[] | null>(null);
+  let friends: FriendDay[] = [];
   const error = signal("");
   const close = () => box.close();
   const box = h(
@@ -230,7 +235,7 @@ export function reviewSheet(o: ReviewOf): void {
       h("p", { class: "muted review-of" }, o.of),
       () => {
         const list = all();
-        if (list) return reviewed(list, o.versus);
+        if (list) return reviewed(list, o.versus, friends);
         return error() ? h("p", { class: "bad", role: "alert" }, error()) : h("p", { class: "muted" }, "…");
       },
     ),
@@ -242,8 +247,11 @@ export function reviewSheet(o: ReviewOf): void {
   box.addEventListener("close", () => box.remove());
   document.body.append(box);
   box.showModal();
-  o.load().then(
-    (list) => {
+  // The friends with the questions, drawn once (nothing moves under the player's eye); questions without them if they
+  // didn't come.
+  Promise.all([o.load(), o.friends?.().catch(() => []) ?? []]).then(
+    ([list, theirs]) => {
+      friends = theirs;
       all.set(list);
       if (o.at === undefined) return;
       // Once the list is drawn: the question asked for right under the head, and marked. The list alone is moved
@@ -297,7 +305,7 @@ function side(name: string, look: string | undefined, kind: keyof typeof verdict
  * as they were given with the right one, how others answered, the fact behind it, and a word about the question if
  * something's wrong with it. A duel's (`versus`): how it went for the two side by side under the question, in place of
  * the one word. */
-function reviewed(all: Reviewed[], versus?: Versus): Child {
+function reviewed(all: Reviewed[], versus?: Versus, friends: FriendDay[] = []): Child {
   return h(
     "section",
     { class: "review" },
@@ -336,10 +344,103 @@ function reviewed(all: Reviewed[], versus?: Versus): Child {
         picture(it.view),
         answered(it.view, it.reveal, it.given, it.right ? "right" : it.close ? "partial" : "wrong"),
         crowdLine(it.view.type, it.reveal.crowd, it.right),
+        friendsOn(friends, it.n),
         note,
         report(it.reveal.id),
       );
     }),
+  );
+}
+
+/** How the player's friends who finished the day did with its question `n`, under how Bulgaria did (knew.ts says
+ * the words): a line, then up to four friends each by name, their sign beside it, right in ink and the rest quieter
+ * as a duel's sides are; more, and two rows, those who got it and those who didn't, each a few faces and names, which
+ * opens to its whole list. Nothing for a question that counts for nobody, or with no friend finished. */
+function friendsOn(friends: FriendDay[], n: number): Child {
+  const played = friends.filter((f) => f.marks.length > n && markAt(f, n) !== "void");
+  if (!played.length) return null;
+  const knew = played.filter((f) => markAt(f, n) === "right");
+  const line = friendsLine(
+    knew.map((f) => f.name),
+    played.length,
+  );
+  return h(
+    "div",
+    { class: "friends-on" },
+    line ? h("p", { class: "crowd-says" }, line) : null,
+    played.length <= fewFriends
+      ? h(
+          "p",
+          { class: "duel-q-sides friends-few" },
+          played.map((f) => {
+            const kind = markAt(f, n) as "right" | "close" | "wrong";
+            const [sign, word] = verdicts[kind];
+            return h(
+              "span",
+              { class: kind === "right" ? "duel-q-side right" : "duel-q-side" },
+              avatar(f.avatar, { size: "s", name: f.name, seal: f.seal }),
+              h("span", { class: "duel-q-sign", "aria-hidden": "true" }, sign),
+              shortName(f.name),
+              h("span", { class: "sr" }, `: ${word}`),
+            );
+          }),
+        )
+      : [
+          friendsGroup(knew, true, n),
+          friendsGroup(
+            played.filter((f) => markAt(f, n) !== "right"),
+            false,
+            n,
+          ),
+        ],
+  );
+}
+
+/** One of a question's two rows of many friends: those who got it (`knew`) or those who didn't, best first. A button:
+ * up to five faces one over another, the sign, the first names and how many more; a tap opens the whole list under
+ * it, each friend's face and full name (a „близо“ with its sign). */
+function friendsGroup(list: FriendDay[], knew: boolean, n: number): Child {
+  if (!list.length) return null;
+  const open = signal(false);
+  const id = `friends-${n}-${knew ? "knew" : "not"}`;
+  return h(
+    "div",
+    { class: "friends-group" },
+    h(
+      "button",
+      {
+        class: knew ? "friends-row right" : "friends-row",
+        type: "button",
+        "aria-expanded": () => open(),
+        "aria-controls": id,
+        onclick: () => open.set(!open.peek()),
+      },
+      h(
+        "span",
+        { class: "friends-faces", "aria-hidden": "true" },
+        list.slice(0, 5).map((f) => avatar(f.avatar, { size: "s", name: f.name })),
+      ),
+      h("span", { class: "duel-q-sign", "aria-hidden": "true" }, knew ? "✓" : "✕"),
+      h("span", { class: "sr" }, knew ? "Познаха: " : "Не познаха: "),
+      h("span", { class: "friends-names" }, groupWords(list.map((f) => f.name))),
+
+      h("span", { class: "i i-right friends-more", "aria-hidden": "true" }),
+    ),
+    h(
+      "ul",
+      { class: knew ? "friends-list right" : "friends-list", id, hidden: () => !open() },
+      list.map((f) => {
+        const close = markAt(f, n) === "close";
+        return h(
+          "li",
+          { class: "friends-chip" },
+          avatar(f.avatar, { size: "s", name: f.name, seal: f.seal }),
+          close ? h("span", { class: "duel-q-sign", "aria-hidden": "true" }, verdicts.close[0]) : null,
+          f.name,
+          close ? h("span", { class: "sr" }, `: ${verdicts.close[1]}`) : null,
+        );
+      }),
+    ),
   );
 }
 

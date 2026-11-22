@@ -1,6 +1,8 @@
 package play
 
 import (
+	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -213,4 +215,95 @@ func TestFriendsNews(t *testing.T) {
 			t.Fatal("news of a duel against a recording")
 		}
 	})
+}
+
+// Beside each of the day's questions gone over, how the player's friends did with it (FriendsOn): every friend who
+// finished the run's day, best first as the friends' board has them, past the board's first rows too; never a
+// stranger, a game played at a script's speed, or anything before the player has finished; on the run's own day.
+func TestFriendsOnTheDaysQuestions(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	w.at(15, 20, 0, 0)
+	ana, stranger, bot := w.user(), w.user(), w.user()
+	// More friends than the board shows the squares of, each with a few right: the i-th gets the first i%(Length+1).
+	friends := make([]int64, BoardTop+3)
+	for i := range friends {
+		friends[i] = w.user()
+		w.befriend(ana, friends[i])
+		k := i % (Length + 1)
+		w.dayGame(friends[i], nil, append(repeat(w.right, k), repeat(w.wrong, Length-k)...)...)
+	}
+	w.befriend(ana, bot)
+	w.dayGame(bot, scriptPace)
+	w.dayGame(stranger, nil)
+
+	// Before Ana has finished (she plays just before midnight): nothing of anyone's.
+	w.at(15, 23, 55, 0)
+	s, err := w.g.StartDay(ctx, ana)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.g.FriendsOn(ctx, ana, s.ID); !errors.Is(err, ErrOutOfStep) {
+		t.Fatalf("before the day is finished: %v", err)
+	}
+	w.play(ana, s.ID, repeat(w.wrong, Length)...)
+	// Nobody else's game.
+	if _, err := w.g.FriendsOn(ctx, stranger, s.ID); !errors.Is(err, ErrNoRun) {
+		t.Fatalf("another's game: %v", err)
+	}
+
+	on, err := w.g.FriendsOn(ctx, ana, s.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	board, err := w.g.FriendsBoard(ctx, w.g.Today(), ana)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Every friend who finished, the script's and the stranger's games left out, in the board's order.
+	if len(on) != len(friends) {
+		t.Fatalf("%d friends beside the questions, want %d", len(on), len(friends))
+	}
+	var order []Score
+	for _, s := range board {
+		if !s.Me {
+			order = append(order, s)
+		}
+	}
+	for i, f := range on {
+		if f.Name != order[i].Name {
+			t.Fatalf("friend %d is %q, the board has %q", i, f.Name, order[i].Name)
+		}
+		if len(f.Marks) != Length || strings.Trim(f.Marks, "01") != "" || f.Avatar == "" {
+			t.Fatalf("friend %d: %+v", i, f)
+		}
+		// Each one's marks as they played: right answers first, as many as their score.
+		k := strings.Count(f.Marks, "1")
+		if f.Marks != strings.Repeat("1", k)+strings.Repeat("0", Length-k) || k != order[i].Rights {
+			t.Fatalf("friend %d's marks %q", i, f.Marks)
+		}
+	}
+	if on[len(on)-1].Marks != strings.Repeat("0", Length) {
+		t.Fatalf("the last friend's marks: %q", on[len(on)-1].Marks)
+	}
+
+	// Past midnight, the game is still gone over beside its own day's friends, not today's (where none played).
+	w.at(16, 0, 1, 0)
+	if again, err := w.g.FriendsOn(ctx, ana, s.ID); err != nil || len(again) != len(friends) {
+		t.Fatalf("just after midnight: %d %v", len(again), err)
+	}
+	// The next day, as the questions themselves, not at all.
+	w.at(16, 12, 0, 0)
+	if _, err := w.g.FriendsOn(ctx, ana, s.ID); !errors.Is(err, ErrReviewOver) {
+		t.Fatalf("the day after: %v", err)
+	}
+	// A chapter's game: nobody beside its questions.
+	topic, err := w.g.StartTopic(ctx, ana, "history")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(ana, topic.ID, repeat(w.right, len(w.picks(topic.ID)))...)
+	if on, err := w.g.FriendsOn(ctx, ana, topic.ID); err != nil || len(on) != 0 {
+		t.Fatalf("a chapter's game: %+v %v", on, err)
+	}
 }

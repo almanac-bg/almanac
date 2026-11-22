@@ -296,6 +296,20 @@ func (s *Server) review(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]any{"questions": items})
 }
 
+// reviewFriends is how the player's friends did with each of the day's questions, for its questions gone over
+// (play.FriendsOn): asked as the dialog opens, so a friend who played since is there.
+func (s *Server) reviewFriends(w http.ResponseWriter, r *http.Request) error {
+	user, id, err := s.runOf(r)
+	if err != nil {
+		return err
+	}
+	friends, err := s.game.FriendsOn(r.Context(), user, id)
+	if err != nil {
+		return err
+	}
+	return ok(w, map[string]any{"friends": friends})
+}
+
 func (s *Server) stats(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {

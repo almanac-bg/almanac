@@ -55,10 +55,10 @@ func DateWords(day string) string {
 	return fmt.Sprintf("%d %s", d.Day(), months[d.Month()-1])
 }
 
-// shapeOf is a run's shape, as Share has it.
-func shapeOf(s State) string {
+// shapeOf is a trail's shape, as Share has it.
+func shapeOf(trail []Mark) string {
 	var b strings.Builder
-	for _, m := range s.Trail {
+	for _, m := range trail {
 		switch {
 		case m.Void:
 			b.WriteByte('3')
@@ -100,7 +100,7 @@ func (g *Game) Share(ctx context.Context, userID, runID int64) (Share, error) {
 	if st.Kind != "day" || !st.Done {
 		return Share{}, ErrNotShared
 	}
-	sh := Share{Day: st.Day, Issue: Issue(st.Day), Shape: shapeOf(st)}
+	sh := Share{Day: st.Day, Issue: Issue(st.Day), Shape: shapeOf(st.Trail)}
 	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		err := tx.QueryRow(`SELECT code FROM shares WHERE run_id = ?`, runID).Scan(&sh.Code)
 		if !errors.Is(err, sql.ErrNoRows) {
@@ -145,5 +145,5 @@ func (g *Game) Shared(ctx context.Context, issue int, code string) (Share, error
 	if Issue(st.Day) != issue {
 		return Share{}, ErrNoRun
 	}
-	return Share{Code: code, Day: st.Day, Issue: issue, Shape: shapeOf(st)}, nil
+	return Share{Code: code, Day: st.Day, Issue: issue, Shape: shapeOf(st.Trail)}, nil
 }
