@@ -481,7 +481,8 @@ func (g *Game) friendsBoard(ctx context.Context, day string, userID int64, trail
 // how each of the ten went for them.
 type FriendDay struct {
 	Name string `json:"name"`
-	Look
+	// Avatar is their face alone, without the seal: beside a question it's small, and the seal covered it.
+	Avatar string `json:"avatar"`
 	// Marks are the ten in the issue's order, as a share says them (Share.Shape): '1' right, '2' close (not right),
 	// '0' wrong or not answered, '3' a question that counts for nobody.
 	Marks string `json:"marks"`
@@ -519,7 +520,7 @@ func (g *Game) FriendsOn(ctx context.Context, userID, runID int64) ([]FriendDay,
 	out := []FriendDay{}
 	for _, s := range board {
 		if !s.Me {
-			out = append(out, FriendDay{Name: s.Name, Look: s.Look, Marks: shapeOf(s.Trail)})
+			out = append(out, FriendDay{Name: s.Name, Avatar: s.Avatar, Marks: shapeOf(s.Trail)})
 		}
 	}
 	return out, nil

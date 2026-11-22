@@ -378,7 +378,7 @@ function friendsOn(friends: FriendDay[], n: number): Child {
             return h(
               "span",
               { class: kind === "right" ? "duel-q-side right" : "duel-q-side" },
-              avatar(f.avatar, { size: "s", name: f.name, seal: f.seal }),
+              avatar(f.avatar, { size: "s", name: f.name }),
               h("span", { class: "duel-q-sign", "aria-hidden": "true" }, sign),
               shortName(f.name),
               h("span", { class: "sr" }, `: ${word}`),
@@ -434,7 +434,7 @@ function friendsGroup(list: FriendDay[], knew: boolean, n: number): Child {
         return h(
           "li",
           { class: "friends-chip" },
-          avatar(f.avatar, { size: "s", name: f.name, seal: f.seal }),
+          avatar(f.avatar, { size: "s", name: f.name }),
           close ? h("span", { class: "duel-q-sign", "aria-hidden": "true" }, verdicts.close[0]) : null,
           f.name,
           close ? h("span", { class: "sr" }, `: ${verdicts.close[1]}`) : null,

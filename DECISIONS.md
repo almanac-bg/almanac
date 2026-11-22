@@ -108,7 +108,7 @@ packages' doc comments; this file holds only what must not drift.
     name, each with their sign; more, two rows, those who did and those who didn't, each opening to its whole list);
     never before the player has finished, never anyone's answers. The day is the same ten for everyone, and this turns
     a score into something to talk about. The day's issue only: a duel's dialog shows its two sides, a chapter's game
-    has no friends in it.
+    has no friends in it. The faces there are without the seal (owner, 2026-11-22): that small, it covered them.
   - **The player's nouns are a closed list:** Брой, близо, серия, Алманах (глави, факти, мастило), печат, игра на
     главата (всички глави, България), приятели, класация, дуел (запис), споделяне, профил, напомняне. Adding one is the owner's
     call.
