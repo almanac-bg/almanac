@@ -8,7 +8,7 @@ func TestKeptWhileTheGamesStand(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
-	first, _ := w.g.StartTopic(ctx, ana, MixTopic)
+	first, _ := w.g.startTopic(ctx, ana, MixTopic)
 	w.play(ana, first.ID, repeat(w.wrong, Length)...)
 	mastery := func(finished bool) int {
 		t.Helper()

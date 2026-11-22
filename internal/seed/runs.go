@@ -172,12 +172,13 @@ func (w *world) dayRun(p *player) error {
 	return nil
 }
 
-// topicRun is a game of a topic („Микс“ now and then), maybe left half-way; it says the run.
+// topicRun is a game of a chapter, maybe left half-way; it says the run.
 func (w *world) topicRun(p *player) (play.State, error) {
-	topic := play.MixTopic
-	if cats := w.b.Categories; len(cats) > 0 && w.chance(0.8) {
-		topic = cats[w.r.IntN(len(cats))].ID
+	cats := w.b.Categories
+	if len(cats) == 0 {
+		return play.State{}, nil
 	}
+	topic := cats[w.r.IntN(len(cats))].ID
 	s, err := w.g.StartTopic(w.as(p), p.id, topic)
 	if errors.Is(err, play.ErrNoQuestion) {
 		return s, nil

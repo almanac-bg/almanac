@@ -7,7 +7,7 @@ import (
 )
 
 // Right or not (0112): an order answered so far is worth 1 or 0, never close; a run keeps neither time nor whom it was
-// against; a duel keeps no ghost_run (it became recording_run, gone since 0116); an avatar is its shape alone; Днес's
+// against; a duel keeps no ghost_run (it became recording_run, gone since 0117); an avatar is its shape alone; Днес's
 // lines are today_lines.
 func TestRightOrNot(t *testing.T) {
 	db := openBefore(t, filepath.Join(t.TempDir(), "game.db"), "0112_right_or_not.sql")
@@ -53,10 +53,10 @@ func TestRightOrNot(t *testing.T) {
 	db.Close()
 }
 
-// No recordings (0116): a duel is with a friend only; those played against a recording go, their runs stay the players'
+// No recordings (0117): a duel is with a friend only; those played against a recording go, their runs stay the players'
 // games; a friend's duel stays; a duel names neither a kind nor a recording.
 func TestNoRecordings(t *testing.T) {
-	db := openBefore(t, filepath.Join(t.TempDir(), "game.db"), "0116_no_recordings.sql")
+	db := openBefore(t, filepath.Join(t.TempDir(), "game.db"), "0117_no_recordings.sql")
 	for _, q := range []string{
 		`INSERT INTO users (id, name, tag, created_at, seen_at) VALUES (1, 'Ана', 'ana', 1, 1), (2, 'Бо', 'bo', 1, 1)`,
 		`INSERT INTO runs (id, user_id, kind, questions, started_at, finished_at) VALUES (10, 1, 'duel', '[]', 1, 2),
@@ -70,7 +70,7 @@ func TestNoRecordings(t *testing.T) {
 			t.Fatal(q, err)
 		}
 	}
-	if err := db.migrateTo(migrationsThrough("0116_no_recordings.sql")); err != nil {
+	if err := db.migrateTo(migrationsThrough("0117_no_recordings.sql")); err != nil {
 		t.Fatal(err)
 	}
 	var duels string

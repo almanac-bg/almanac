@@ -250,7 +250,7 @@ func TestCountsStandOverAReload(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
-	s, _ := w.g.StartTopic(ctx, ana, MixTopic)
+	s, _ := w.g.startTopic(ctx, ana, MixTopic)
 	w.play(ana, s.ID, repeat(w.right, Length)...)
 	if err := w.g.Count(ctx); err != nil {
 		t.Fatal(err)

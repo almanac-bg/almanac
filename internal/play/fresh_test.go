@@ -22,7 +22,7 @@ import (
 // of them), each with the game below that holds it to the rule (TestNothingPlayedAgain), or why it's a repeat by
 // design. A new way fails the test until it's here.
 var freshFor = map[string]string{
-	"StartTopic": "a topic",
+	"startTopic": "a topic",
 	"Draw":       "a topic",
 	"DuelFriend": "a friend's duel",
 	// By design:
@@ -63,7 +63,7 @@ func TestNothingPlayedAgain(t *testing.T) {
 			f.w.play(f.ana, s.ID, repeat(f.w.right, Length)...)
 		}},
 		{"a topic", func(f *fresh) {
-			s, err := f.w.g.StartTopic(f.ctx(), f.ana, MixTopic)
+			s, err := f.w.g.startTopic(f.ctx(), f.ana, MixTopic)
 			f.must(err)
 			f.w.play(f.ana, s.ID, repeat(f.w.right, Length)...)
 		}},
@@ -83,7 +83,7 @@ func TestNothingPlayedAgain(t *testing.T) {
 	}
 	nexts := []next{
 		{"a topic", func(f *fresh) ([]Pick, func(bank.Question) bool, []int64) {
-			s, err := f.w.g.StartTopic(f.ctx(), f.ana, MixTopic)
+			s, err := f.w.g.startTopic(f.ctx(), f.ana, MixTopic)
 			f.must(err)
 			return f.w.picks(s.ID), anyQuestion, []int64{f.ana}
 		}},

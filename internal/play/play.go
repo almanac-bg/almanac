@@ -1,4 +1,4 @@
-// Package play is the game: runs through a set of questions (the day's, a topic's, „България“'s: bulgaria.go), one
+// Package play is the game: runs through a set of questions (the day's, a chapter's: topics.go, a duel's), one
 // question at a time, against the server's clock; duels, kept as runs; friends.
 //
 // A question's time runs only while it's shown: Show starts it, Answer stops it. How long it is is the server's

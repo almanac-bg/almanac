@@ -24,7 +24,7 @@ func TestDayQuestionsKeptOut(t *testing.T) {
 	ana, bo := w.user(), w.user()
 
 	// Before anyone plays the day, a topic run draws it, and keeps out of it.
-	topic, err := w.g.StartTopic(ctx, bo, MixTopic)
+	topic, err := w.g.startTopic(ctx, bo, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestDayQuestionsKeptOut(t *testing.T) {
 	// No draw deals them: topics, duels.
 	for range 20 {
 		for _, c := range []string{MixTopic, "science"} {
-			s, err := w.g.StartTopic(ctx, bo, c)
+			s, err := w.g.startTopic(ctx, bo, c)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -157,7 +157,7 @@ func TestMergeBringsProgress(t *testing.T) {
 // mustStart starts a topic run for a player, its id.
 func mustStart(t *testing.T, w *world, user int64) int64 {
 	t.Helper()
-	s, err := w.g.StartTopic(t.Context(), user, MixTopic)
+	s, err := w.g.startTopic(t.Context(), user, MixTopic)
 	if err != nil {
 		t.Fatal(err)
 	}

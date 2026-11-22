@@ -45,7 +45,6 @@ const chapters = [
   "literature",
   "nature",
   "mix",
-  "bulgaria",
 ];
 
 for (const [name, t] of [

@@ -111,7 +111,7 @@ packages' doc comments; this file holds only what must not drift.
     a score into something to talk about. The day's issue only: a duel's dialog shows its two sides, a chapter's game
     has no friends in it. The faces there are without the seal (owner, 2026-11-22): that small, it covered them.
   - **The player's nouns are a closed list:** Брой, близо, серия, Алманах (глави, факти, мастило), печат, игра на
-    главата (всички глави, България), приятели, класация, дуел, споделяне, профил, напомняне. Adding one is the owner's
+    главата, приятели, класация, дуел, споделяне, профил, напомняне. Adding one is the owner's
     call.
   - **The rule for later.** A change is made only if it makes the issue better or names the measure it moves and what
     it removes; adds no noun; keeps every place's budget; is good at zero (first player, first day, 0 right, no
@@ -128,8 +128,10 @@ packages' doc comments; this file holds only what must not drift.
 - **For everyone, not for a group.** The game is made for any player, not tailored to one audience (children,
   classrooms, schools): no levels, question pools, filters, reports or texts that exist for one group (owner,
   2026-11-18, after the product review's classroom items).
-- **„Микс“ and „България“ lead the Алманах** as two ways to play at its head, not chapters: „Микс“ is a game of every
-  topic at once, „България“ the questions about Bulgaria from every topic (owner, 2026-11-20).
+- **A game outside the day is a chapter's** (owner, 2026-11-22, undoing 2026-11-20's „Микс“ and „България“ at the
+  Алманах's head): no „Играй от всички глави“, no „Играй за България“. The book's head says whose book it is and what
+  ink means, and its chapters are the ways to play; a duel still draws from every topic. Past games of „България“ are
+  kept as games of every topic.
 - **Accessibility for special needs comes later, not now.** No new work for screen readers, extra time, pausing the
   pace or similar needs until the owner calls for it; what the game already has (contrast, labels, the axe checks)
   stays and isn't broken. Layout that breaks for ordinary players (large system text, small tap targets) is not this:

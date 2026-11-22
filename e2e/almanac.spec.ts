@@ -23,14 +23,14 @@ test("the book's contents: a chapter a row with its ink, and no count of it all"
 
   await page.goto("/almanac");
   await expect(page.locator(".book")).not.toContainText("факта");
-  // Ten topics, each a chapter's card with its ink; „Микс“ and „България“ two ways to play at the book's head.
+  // Ten topics, each a chapter's card with its ink, and nothing else to play at the book's head.
   const cards = page.locator(".chapter-card");
   await expect(cards).toHaveCount(10);
   const movies = cards.filter({ hasText: "Кино и телевизия" });
   await expect(movies).toContainText(/7\s*с\sмастило/);
   // A counter at zero is hidden: the book's head says how ink is written.
   await expect(cards.filter({ hasText: "География" })).not.toContainText("с мастило");
-  await expect(page.locator(".way")).toHaveText([/всички глави/, /България/]);
+  await expect(page.locator(".book-head a")).toHaveCount(0);
   // The chapters in their numbers' order, whatever their ink: a book's contents.
   await expect(cards.first()).toContainText("Обща култура");
   await expect(cards.nth(4)).toContainText("Кино и телевизия");
@@ -122,17 +122,13 @@ test("a chapter finds its facts by their words", async ({ page }) => {
   await expect(page.getByText("Нищо не е намерено. Опитай с друга дума.")).toBeVisible();
 });
 
-test("„Микс“ and „България“ are ways to play, not chapters: no page of their own lists every fact", async ({
-  page,
-}) => {
+test("a game is a chapter's: every topic at once and Bulgaria's are no page and no game", async ({ page }) => {
   await page.goto("/");
   await knows(page, ["his-002", "geo-961"]);
-  for (const way of ["mix", "bulgaria"]) {
-    await page.goto(`/almanac/${way}`);
+  for (const path of ["/almanac/mix", "/almanac/bulgaria", "/play/mix", "/play/bulgaria"]) {
+    await page.goto(path);
     await expect(page.getByRole("heading", { level: 1, name: "Няма такава страница" })).toBeVisible();
   }
-  await page.goto("/almanac");
-  await expect(page.locator(".way").first()).toHaveAttribute("href", "/play/mix");
 });
 
 test("a chapter's entries: the latest first, each with its dateline; a statement is its own headword", async ({
@@ -265,6 +261,25 @@ test("on a big screen a chapter's entries are one column, the latest first, top 
   expect(new Set(boxes.map((b) => Math.round(b.left))).size).toBe(1);
   for (const [i, b] of boxes.slice(1).entries()) expect(b.top).toBeGreaterThan(boxes[i]?.bottom ?? 0);
   expect(boxes[0]?.width).toBeLessThanOrEqual(44 * 16 + 1);
+});
+
+test("down a chapter's facts, its search stays in reach, and on a big screen its card and game beside them", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await knows(page, sampleFacts("geography"));
+  for (const size of [
+    { width: 1366, height: 800 },
+    { width: 375, height: 700 },
+  ]) {
+    await page.setViewportSize(size);
+    await page.goto("/almanac/geography");
+    const last = page.locator(".entry").last();
+    await last.scrollIntoViewIfNeeded();
+    await expect(last).toBeInViewport();
+    await expect(page.getByRole("searchbox", { name: "Търси във фактите" })).toBeInViewport();
+    if (size.width > 900) await expect(page.getByRole("link", { name: "Играй 10 въпроса" })).toBeInViewport();
+  }
 });
 
 test("a chapter the book doesn't have is the page that isn't there; the book with a slash after it is the book", async ({

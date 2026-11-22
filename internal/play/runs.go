@@ -7,7 +7,6 @@ import (
 	"errors"
 	"maps"
 	mrand "math/rand/v2"
-	"slices"
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
@@ -161,22 +160,27 @@ func (g *Game) Unfinished(ctx context.Context, userID int64) (*State, error) {
 	return &s, nil
 }
 
-// MixTopic is the topic „Микс“: the questions of every topic at once, played and kept as a topic is (runs.category).
-// Its games are shaped by how well the player knows all the topics, and count toward each question's own topic.
+// MixTopic is every topic at once: what a duel draws from, and the topic of a game of all of them kept from before
+// (runs.category), which a duel may take as a recording. Its games are shaped by how well the player knows all the
+// topics, and count toward each question's own topic.
 const MixTopic = "mix"
 
-// StartTopic starts a run of a topic (MixTopic for all of them, BulgariaTopic for Bulgaria's from every topic:
-// bulgaria.go), shaped by how well the player knows it; or, if the player left a run of the topic unfinished today, goes on with it
-// where it stopped, as the day's ten do. One left on an earlier day isn't taken up again: it was drawn before today's
+// StartTopic starts a run of one of the bank's topics (a chapter's game), shaped by how well the player knows it; or,
+// if the player left a run of the topic unfinished today, goes on with it where it stopped, as the day's ten do. One left on an earlier day isn't taken up again: it was drawn before today's
 // questions were kept from other games.
 func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (State, error) {
-	b := g.Bank()
-	if category != MixTopic && category != BulgariaTopic &&
-		!slices.ContainsFunc(b.Categories, func(c bank.Category) bool { return c.ID == category }) {
+	if !g.IsTopic(category) {
 		return State{}, ErrNoTopic
 	}
-	known := category // how well the player knows „Микс“'s and Bulgaria's questions: all the topics
-	if category == MixTopic || category == BulgariaTopic {
+	return g.startTopic(ctx, userID, category)
+}
+
+// startTopic is StartTopic for any topic, MixTopic too: a game of every topic, as players had before (the tests make
+// them; a duel takes one as a recording).
+func (g *Game) startTopic(ctx context.Context, userID int64, category string) (State, error) {
+	b := g.Bank()
+	known := category // how well the player knows a game of every topic's questions: all the topics
+	if category == MixTopic {
 		known = ""
 	}
 	p, err := g.pastOf(ctx, known, userID)
@@ -207,9 +211,6 @@ func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (S
 		barred, err := g.dayQuestions(tx)
 		if err != nil {
 			return err
-		}
-		if category == BulgariaTopic && bulgariaLeft(b, barred) < Length {
-			return ErrNoTopic // not open: too few of its questions are left beside the days'
 		}
 		picks := Draw(b, category, p.ability, p.seen, barred, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 		if len(picks) == 0 {
@@ -244,8 +245,8 @@ type LeftRun struct {
 func (g *Game) Left(ctx context.Context, userID int64) ([]LeftRun, error) {
 	today, _ := time.ParseInLocation(time.DateOnly, g.Today(), Bulgaria)
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT max(id) FROM runs WHERE user_id = ? AND finished_at IS NULL
-		AND kind = 'topic' AND started_at >= ? GROUP BY category ORDER BY 1 DESC`,
-		userID, store.Ms(today))
+		AND kind = 'topic' AND category <> ? AND started_at >= ? GROUP BY category ORDER BY 1 DESC`,
+		userID, MixTopic, store.Ms(today))
 	if err != nil {
 		return nil, err
 	}

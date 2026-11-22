@@ -111,7 +111,7 @@ export function toneOf(category: string): string {
   return `t-${category}`;
 }
 
-/** A chapter's name, as players read it ("history" → „История“; „Микс“, „България“). */
+/** A chapter's name, as players read it ("history" → „История“; "mix" → „Всички глави“). */
 export const chapterName = (topic: string): string => topics.find((c) => c.id === topic)?.name ?? "";
 
 /** A chapter's glyph: its art on a white disc, `size` across (for the eye: its name is said beside it). */
