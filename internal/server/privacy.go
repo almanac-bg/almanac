@@ -19,6 +19,7 @@ var plainPage = template.Must(template.New("page").Parse(`<!doctype html>
 <title>{{.Title}} · АЛМАНАХ</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 {{if .CSS}}<link rel="stylesheet" href="/{{.CSS}}">{{end}}
+<script src="/scheme.js"></script>
 </head>
 <body>
 <div id="app">
