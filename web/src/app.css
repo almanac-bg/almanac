@@ -3553,10 +3553,9 @@
   }
 
   /* Duels as cards (Приятели, screens/duelcards.ts), each all there is of its duel, told from a friend's row at a
-     glance: the two face to face (each a way to their profile), how it stands between them, the duel question by
-     question, and, theirs to play, „Играй“ at its foot, the card's one action. One whose game the player has played has
-     a button laid over the whole of it to its questions, under the names' links. One a row, on a phone and a big
-     screen alike. */
+     glance: the two face to face (no name a link), how it stands between them, the duel question by question, and,
+     theirs to play, „Играй“ at its foot, the card's one action. One whose game the player has played has a button laid
+     over the whole of it to its questions. One a row, on a phone and a big screen alike. */
   .duel-cards {
     display: grid;
     gap: var(--space-2);
@@ -3584,7 +3583,7 @@
   }
 
   /* The button to a card's questions, laid over the whole card: under a pointer, or reached by the keyboard, the card
-     lights by its line. The names, links, lie over it. */
+     lights by its line. */
   .duel-card-open {
     position: absolute;
     inset: 0;
@@ -3604,22 +3603,6 @@
   .duel-card-open:focus-visible {
     outline: none;
     box-shadow: inset 0 0 0 2px var(--line-2);
-  }
-
-  /* A side as a way to the player's profile, over the card's button: its name underlined under a pointer, as a name
-     is anywhere. */
-  a.duel-card-side {
-    position: relative;
-    z-index: 1;
-    color: inherit;
-    text-decoration: none;
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    a.duel-card-side:hover .duel-card-name {
-      text-decoration: underline;
-      text-underline-offset: 3px;
-    }
   }
 
   /* „Играй“ at a card's foot, and, on the stack, „Виж всички (3)“ under it. */
