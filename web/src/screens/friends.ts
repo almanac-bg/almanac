@@ -166,8 +166,10 @@ function tabs(kit: Kit): Child {
         top.set(first);
       }
       failed.set(null);
-      data.set(f);
-      duels.set(d);
+      // Drawn anew only when something changed: a look every quarter minute that found the same would otherwise
+      // rebuild the lists under the pointer (a tooltip showing, a row hovered, gone).
+      if (JSON.stringify(f) !== JSON.stringify(data.peek())) data.set(f);
+      if (JSON.stringify(d) !== JSON.stringify(duels.peek())) duels.set(d);
       if (!opens.peek()) opens.set(d.yours.length ? "duels" : "friends");
       if (f.accepted && !yes.peek()) yes.set(acceptedLine(f.accepted));
     } catch (err) {
