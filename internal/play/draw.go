@@ -342,6 +342,21 @@ func wishes(b *bank.Bank, s slot) []func(bank.Question) bool {
 	return nil
 }
 
+// metFirst puts, before each of a slot's wishes, the same wish of a question somebody has met (met), and last that
+// alone: what the slot wishes for still comes first, and of it, or of anything where it wishes for nothing, a question
+// the days to come won't take (Draw).
+func metFirst(wishes []func(bank.Question) bool, met map[string]bool) []func(bank.Question) bool {
+	if len(met) == 0 {
+		return wishes
+	}
+	isMet := func(q bank.Question) bool { return met[q.Base().ID] }
+	out := make([]func(bank.Question) bool, 0, 2*len(wishes)+1)
+	for _, w := range wishes {
+		out = append(out, func(q bank.Question) bool { return w(q) && isMet(q) }, w)
+	}
+	return append(out, isMet)
+}
+
 // newKinds are the kinds that take turns at the run's one slot for them ("split" in a run's shape): one or the other
 // in each run.
 var newKinds = []string{"split", "clues"}
@@ -501,16 +516,19 @@ func matches(q bank.Question, s slot, typ, pictures bool) bool {
 // Draw draws ten questions of a topic (MixTopic for all topics, BulgariaTopic for Bulgaria's from every topic) for players
 // of an ability there (mastery.go; 0 for one who knows as much as most): questions none of them has seen before those
 // one has, and so on (seen: seenAmong); never one barred (the day's: DayQuestions). Choices come with a picture or without, whichever is drawn, and the number an estimate
-// where one is left (wishes). Every run goes from easy to hard, its special questions in places drawn within their
-// difficulty (inBands). Topic runs and duels draw this way. The questions due for review are among
-// the barred (DayQuestions).
-func Draw(b *bank.Bank, category string, ability float64, seen map[string]int, barred map[string]bool, r *rand.Rand) []Pick {
+// where one is left (wishes). Of the questions as fresh to them and as fitting, one somebody has answered already (met:
+// dayBars.met) before one nobody has, which the days to come take first (ahead.go): what a player meets here is then
+// rarely an issue's question later, whose ink they'd lose. Every run goes from easy to hard, its special questions in
+// places drawn within their difficulty (inBands). Topic runs and duels draw this way. The questions due for review are
+// among the barred (DayQuestions).
+func Draw(b *bank.Bank, category string, ability float64, seen map[string]int, barred, met map[string]bool,
+	r *rand.Rand) []Pick {
 	pool := topicPool(b, category)
 	taken := map[string]bool{}
 	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] && !barred[q.Base().ID] }
 	var picks []Pick
 	for _, s := range inBands(newKind(topicSlots(ability), r), r) {
-		if q := choose(pool, s, allowed, seenCount(seen), wishes(b, s), r); q != nil {
+		if q := choose(pool, s, allowed, seenCount(seen), metFirst(wishes(b, s), met), r); q != nil {
 			taken[q.Base().ID] = true
 			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})
 		}

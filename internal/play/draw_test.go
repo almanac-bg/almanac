@@ -312,3 +312,62 @@ func recurringBank(t *testing.T, n int) *bank.Bank {
 	}
 	return bank.Of(categories, questions)
 }
+
+// A chapter's game and a duel deal, of the questions as fresh to their players and as fitting, one somebody has met
+// already before one nobody has: the untouched are the days' to come (ahead.go), so a player who plays the chapters
+// most doesn't meet the issues ahead there and lose their ink for it.
+func TestOtherGamesDealWhatWasMet(t *testing.T) {
+	b, problems := bank.Load("../../bank/sample")
+	if b == nil {
+		t.Fatal(problems)
+	}
+	// An untouched medium choice without a picture, with others like it that somebody has met.
+	plain := slot{bank.Medium, "choice", eitherWay, ""}
+	var like []bank.Question
+	for _, q := range b.Live("", "") {
+		if matches(q, plain, true, false) && !bank.HasPictures(q) {
+			like = append(like, q)
+		}
+	}
+	if len(like) < 3 {
+		t.Fatalf("the sample has %d medium choices without a picture", len(like))
+	}
+	untouched := like[0].Base().ID
+	met := map[string]bool{}
+	for _, q := range b.Live("", "") {
+		if id := q.Base().ID; id != untouched {
+			met[id] = true
+		}
+	}
+	dealt := func(met map[string]bool) int {
+		n := 0
+		for seed := range uint64(300) {
+			for _, p := range Draw(b, MixTopic, 0, nil, nil, met, rand.New(rand.NewPCG(seed, 9))) {
+				if p.ID == untouched {
+					n++
+				}
+			}
+		}
+		return n
+	}
+	if n := dealt(nil); n == 0 {
+		t.Fatalf("with nothing met, %s is never dealt in 300 games: the test shows nothing", untouched)
+	}
+	if n := dealt(met); n != 0 {
+		t.Errorf("%s, untouched, was dealt %d times while others like it had been met", untouched, n)
+	}
+}
+
+// What a slot wishes for still comes before a question somebody has met: an estimate for the number, met or not,
+// before a met number that isn't one.
+func TestMetAfterTheWish(t *testing.T) {
+	estimate := func(q bank.Question) bool { return strings.HasPrefix(q.Base().ID, "e") }
+	met := map[string]bool{"n1": true}
+	prefer := metFirst([]func(bank.Question) bool{estimate}, met)
+	if len(prefer) != 3 {
+		t.Fatalf("%d wishes, want the estimate met, the estimate, then met", len(prefer))
+	}
+	if metFirst(nil, nil) != nil || len(metFirst(nil, met)) != 1 {
+		t.Error("with no wishes, met alone; with nothing met, the wishes as they were")
+	}
+}

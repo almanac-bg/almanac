@@ -369,11 +369,11 @@ func (g *Game) pastOf(ctx context.Context, category string, users ...int64) (pas
 // drawFor draws a duel's ten questions for its players (their past): all topics, shaped by how well they know them,
 // questions neither has seen first.
 func (g *Game) drawFor(tx *sql.Tx, p past) ([]Pick, error) {
-	barred, err := g.dayQuestions(tx)
+	bars, err := g.days(tx)
 	if err != nil {
 		return nil, err
 	}
-	picks := Draw(g.Bank(), MixTopic, p.ability, p.seen, barred, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+	picks := Draw(g.Bank(), MixTopic, p.ability, p.seen, bars.all, bars.met, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 	if len(picks) == 0 {
 		return nil, ErrNoQuestion
 	}
