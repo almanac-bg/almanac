@@ -3838,7 +3838,6 @@
   .duel-pick {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: var(--space-3);
     width: 100%;
     min-height: 3.75rem;
@@ -3862,7 +3861,7 @@
     flex: none;
   }
 
-  /* The name, whole, and the duels between the two under it: they have the row but for the avatar and „Дуел“. */
+  /* The name, whole, and the duels between the two under it: they have the row but for the avatar. */
   .duel-pick-text {
     display: grid;
     flex: 1 1 40%;
@@ -3885,17 +3884,6 @@
     color: var(--ink);
     font-weight: 800;
     font-variant-numeric: tabular-nums;
-  }
-
-  /* „Дуел“ at the row's end: the row's action said as a small filled button, the row itself being the button; its
-     corners a button's (`.btn`'s, a size down), not a pill's. */
-  .duel-invite {
-    flex: none;
-    padding: 6px 16px;
-    border-radius: var(--r-1);
-    background: var(--ink);
-    color: var(--bg);
-    font: 800 0.875rem / 1.25rem var(--font-sans);
   }
 
   /* ---- Results ---- */

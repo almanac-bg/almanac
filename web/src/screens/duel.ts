@@ -126,9 +126,9 @@ interface Friend {
 }
 
 /** Нов дуел: with a friend, each a row that starts one (the whole row a button: its line lights under a pointer, no
- * name in it underlined, for it's no way to a profile), the duels between the two under the name in Приятели's
- * tooltip's words („Дуели помежду ви: 3 победи, 1 загуба“, or „Още нямате дуели“) and „Дуел“ at its end; or against a
- * recording of a real game, one kind of it, offered while there is one. */
+ * name in it underlined, for it's no way to a profile, and no button in it, for the row says it already), the duels
+ * between the two under the name in Приятели's tooltip's words („Дуели помежду ви: 3 победи, 1 загуба“, or „Още
+ * нямате дуели“); or against a recording of a real game, one kind of it, offered while there is one. */
 export function duelNew() {
   title("Нов дуел");
   const friends = signal<Friend[] | null>(null);
@@ -220,7 +220,6 @@ export function duelNew() {
                   played ? ["Дуели помежду ви: ", h("b", null, record(f.won, f.lost, f.drawn))] : "Още нямате дуели",
                 ),
               ),
-              h("span", { class: "duel-invite" }, "Дуел"),
             ),
           );
         }),

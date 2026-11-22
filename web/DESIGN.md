@@ -216,8 +216,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   **„Нов дуел“** (`/duel/new`): the way back reads „Дуели“ (to `?tab=duels`); the lead „Десет въпроса. С приятел — той
   ги играе, когато може. Срещу запис — веднага.“; under „С приятел“ a row a friend (`.duel-pick`), the whole row a
   button that starts the duel, so nothing in it looks like a way to a profile (no name underlined; under a pointer
-  the row's line lights): the avatar, the name with the duels between the two under it („дуели 3:1“, or „Още нямате
-  дуели“), and „Дуел“ at its end as a small filled button, a button's corners (`.duel-invite`); the avatar and the name as a friend's row has them; under „Срещу запис“ one sentence („Изиграй
+  the row's line lights): the avatar, the name with the duels between the two under it in Приятели's tooltip's words
+  („Дуели помежду ви: 3 победи, 1 загуба“, or „Още нямате дуели“), and nothing at its end: the row is the button; the avatar and the name as a friend's row has them; under „Срещу запис“ one sentence („Изиграй
   същите десет въпроса срещу истинска игра на играч, който знае горе-долу колкото теб.“) and one button, „Играй срещу
   запис“: a recording is of one kind.
 - **Профил:** one column, on a big screen too: the avatar with the seal worn on its corner and a pencil on its top corner (a phone: always; a big screen: as the pointer
@@ -610,7 +610,7 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
   `.verdict`, `.right-said`, `.after`, `.up-next-go`; `.issue`, `.issue-go`, `.today-side`, `.result`, `.result-main`, `.score-n`,
   `.tiles .tile`, `.tomorrow`, `.result-share`, `.share-sheet`, `.streak-chip`, `.streak-notice`, `.day-news`, `.missed-day`;
   `.summary`, `.reviewed`, `.news-facts`; `.toc-row`, `.entry`; `.day-board`, `.rank-row`, `.friend`, `.invitation`,
-  `.accepted-notice`, `.duels`, `.duel-cards` (`.landed`), `.duel-card` (`.turn`, `.s-<state>`), `.duel-card-mid`, `.duel-card-go`, `.duel-chip`, `.duel-card-marks`, `.duel-card-acts`, `.review-sheet`, `.review-of`, `.duel-q-side`, `.tile-tap`, `.lit`, `.friend-stat`, `.tab-dot`, `.duel-pick`, `.duel-invite`, `.their-line`; `.me-ladder`, `.ladder`.
+  `.accepted-notice`, `.duels`, `.duel-cards` (`.landed`), `.duel-card` (`.turn`, `.s-<state>`), `.duel-card-mid`, `.duel-card-go`, `.duel-chip`, `.duel-card-marks`, `.duel-card-acts`, `.review-sheet`, `.review-of`, `.duel-q-side`, `.tile-tap`, `.lit`, `.friend-stat`, `.tab-dot`, `.duel-pick`, `.their-line`; `.me-ladder`, `.ladder`.
 
 ## Before a UI change ships
 
