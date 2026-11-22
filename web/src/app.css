@@ -3250,7 +3250,7 @@
     font-weight: 900;
   }
 
-  /* Where a right answer's fact went: „Записано с мастило · глава „История““, on a well, the nib before it. */
+  /* Where a right answer's fact went: „Записано с мастило · тема „История““, on a well, the nib before it. */
   .filed {
     display: flex;
     align-items: center;
@@ -5230,8 +5230,8 @@
     }
   }
 
-  /* A chapter: its head on its sheet (its glyph, its name, the seal, its ink, where it stands), „Игра на
-     главата“, then its facts. */
+  /* A chapter: its head on its sheet (its glyph, its name, the seal, its ink, where it stands), „Игра по
+     тема“, then its facts. */
   .chapter-side {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

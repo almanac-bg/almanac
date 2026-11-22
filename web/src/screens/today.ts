@@ -441,7 +441,7 @@ function issueGo(start: () => void, at: number, error: string, first: boolean): 
           "div",
           { class: "issue-words" },
           h("h2", null, "Едни и същи за цяла България."),
-          h("p", { class: "deck" }, "По един въпрос от всяка от десетте глави, от лесен към труден. Без регистрация."),
+          h("p", { class: "deck" }, "По един въпрос от всяка от десетте теми, от лесен към труден. Без регистрация."),
         )
       : null,
   ];

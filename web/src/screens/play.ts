@@ -1,5 +1,5 @@
 // A chapter's game: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays
-// the same game. It's started from its chapter in the Алманах („Играй главата“); a run of one is /play/<topic>, whose
+// the same game. It's started from its chapter in the Алманах („Играй 10 въпроса“); a run of one is /play/<topic>, whose
 // result has one action (the day's ten while they wait, else ten more at once) and the rest as quiet links: ten more,
 // its questions gone over, the way back to its chapter.
 
@@ -33,7 +33,7 @@ export function topic([category = ""]: string[]) {
     name,
     chapter: category,
     home: `/almanac/${category}`,
-    lead: "Десет въпроса от главата, от лесен към труден.",
+    lead: "Десет въпроса от темата, от лесен към труден.",
     begin: async () => {
       const s = await api<State>("POST", "/api/topic", { category });
       ask();
@@ -68,7 +68,7 @@ export function topic([category = ""]: string[]) {
  * first), the streak at stake under it, and „Още десет въпроса“ a quiet link beside the way back; once the day is
  * played, „Още десет въпроса“ is the action, and the way back is to the chapter. */
 function nextOf(d: DayWaits | null, again: () => void, chapter: string): { main: Child; also: Child[] } {
-  const book = h("a", { class: "link tap", href: `/almanac/${chapter}` }, "Към главата");
+  const book = h("a", { class: "link tap", href: `/almanac/${chapter}` }, "Към темата");
   if (!d) return { main: h("button", { class: "btn primary big", onclick: again }, "Още десет въпроса"), also: [book] };
   return {
     main: [h("a", { class: "btn primary big", href: "/" }, "Към днешния брой"), stakeLine(d.streak, d.spare)],

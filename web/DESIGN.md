@@ -164,7 +164,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   Its game's result: on the chapter's sheet its chip, the score and its tiles; under it, with no number (grey is never
   counted), „Фактите от играта са в твоя Алманах, в сиво.“ While the day's issue waits, „Към днешния брой“ is the
   action, the streak's stake under it; once it's played, „Още десет въпроса“ the action. The other ways on are quiet
-  links in a line: „Още десет въпроса“, „Прегледай въпросите“, „Към главата“. On a big screen the result is a spread, as the day's: the sheet on the left page, the
+  links in a line: „Още десет въпроса“, „Прегледай въпросите“, „Към темата“. On a big screen the result is a spread, as the day's: the sheet on the left page, the
   action, the ways on and that line on the right. „Прегледай въпросите“, the sheet and each tile open the questions'
   dialog, as the day's do. Its start
   (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name.
@@ -494,7 +494,7 @@ to show it whole; nothing over the question.
   to its edge (`.after-foot`), what goes on under it fading out over it: nothing shows under it. In it, the verdict,
   a choice
   missed its right answer in words („Вярно е: Съединението.“; not a choice of pictures, each named under it, nor
-  where the question names it), how many got it, „Записано с мастило · глава История“
+  where the question names it), how many got it, „Записано с мастило · тема „История““
   for ink, on a question of the date „На този ден“ and what happened that day, „Знаеше ли?“ and the fact, a picture's credits (a choice of pictures' too, here where nothing covers
   them), and „Напред“ (the one action).
 - **Verdicts** are a fixed set, never an answer's own word: „Точно!“, „Вярно!“ (a number near enough to count, not
@@ -598,11 +598,12 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
 - **Standard Bulgarian,** to one player with „ти“, short plain sentences, gender-neutral („ако броят още те чака“).
   Bulgarian words, not Russian ones, and not loanwords where a Bulgarian word is in common use (`language.test.ts`).
 - **Buttons are verbs:** „Започни“, „Продължи“, „Напред“, „Сподели“, „Играй 10 въпроса“.
-- **The nouns are a closed list** (DECISIONS.md): Брой, близо, серия, Алманах (глави, факти, мастило), печат, игра на
-  главата, приятели, класация, дуел, споделяне, профил, напомняне. A rank's six names are the
+- **The nouns are a closed list** (DECISIONS.md): Брой, близо, серия, тема, Алманах (глави, факти, мастило), печат, игра
+  по тема, приятели, класация, дуел, споделяне, профил, напомняне. What questions are about is a „тема“; „глава“ only
+  in the Алманах itself („Глава 1“ over a topic's name), never out of the book (`language.test.ts`). A rank's six names are the
   seal's states; „звание“ is not a word the game uses.
-- **A chapter's name is in quotes only right after the word „глава“:** „в глава „История““, „Носиш печата на глава
-  „Наука““. Standing alone it's bare: „Трудният въпрос е от История“, „Печат: История“, „Печатът на История“
+- **A topic's name is in quotes only right after the word „тема“ (or „глава“ in the book):** „тема „История““,
+  „Носиш печата на тема „Наука““. Standing alone it's bare: „Трудният въпрос е от История“, „Печат: История“, „Печатът на История“
   (`language.test.ts`).
 - **Copy promises nothing the game doesn't do:** ink is „вярно отговорени“ in the issue, never „знаеш“; a counter at
   zero is hidden; an ended streak's number is never named.

@@ -26,7 +26,7 @@ export interface Category {
 export const user = signal<User | null>(boot.user ?? null);
 export const categories: Category[] = boot.categories ?? [];
 /** Every topic at once (play.MixTopic): what a duel draws from, and a game of all of them kept from before. */
-const mix: Category = { id: "mix", name: "Всички глави" };
+const mix: Category = { id: "mix", name: "Всички теми" };
 /** Every topic a game can be of, the bank's and every topic at once: for naming a game's topic. */
 export const topics: Category[] = [...categories, mix];
 /** The key browsers subscribe to notifications with ("": none here). */
