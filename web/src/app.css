@@ -5509,6 +5509,17 @@
     -webkit-appearance: none;
   }
 
+  /* A chapter's search stays in reach over its facts as they scroll, on the page's own ground (the entries pass under
+     it, never through it). */
+  .chapter-facts > .search {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    margin-block: calc(-1 * var(--space-2));
+    padding-block: var(--space-2);
+    background: var(--bg);
+  }
+
   /* What grey is, where it first shows. */
   .grey-note {
     color: var(--ink-3);
@@ -5777,6 +5788,15 @@
 
     .chapter.spread > .page-1 {
       grid-column: 1 / span 5;
+    }
+
+    /* The chapter's card and its game stay beside the facts as they scroll, where the screen is tall enough to hold
+       them whole. */
+    @media (min-height: 40rem) {
+      .chapter.spread > .page-1 {
+        position: sticky;
+        top: var(--space-2);
+      }
     }
 
     /* The facts in one column, a reading width (its head and search with it): a book reads top to bottom, the latest
