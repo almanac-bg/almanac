@@ -172,8 +172,13 @@ for (const scheme of ["light", "dark"] as const) {
     const { violations } = await new AxeBuilder({ page }).analyze();
     expect(violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
 
-    // Its questions in their dialog, each with how it went for the two, its answers and its fact.
-    await card.getByRole("button", { name: "Въпросите" }).click();
+    // Its questions in their dialog, each with how it went for the two, its answers and its fact: the card is the
+    // button to them, named first for them, then by what it says.
+    await expect(card).toHaveRole("button");
+    await expect(card).toHaveAccessibleName(
+      /^Въпросите от дуела с Мария\. С приятел Ти 8 : 6 ✓ Победа Мария Ти: 1: вярно/,
+    );
+    await card.click();
     const sheet = page.locator("dialog.review-sheet");
     await expect(sheet.locator(".reviewed")).toHaveCount(2);
     await expect(sheet.locator(".duel-q-side")).toHaveCount(4);
