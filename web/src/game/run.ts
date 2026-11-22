@@ -258,18 +258,8 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
     h(
       "div",
       { class: "actions" },
-      h(
-        "button",
-        { class: "btn primary big", onclick: begin },
-        "Започни сега",
-        h("kbd", { class: "key-hint", "aria-hidden": "true" }, "Enter"),
-      ),
-      h(
-        "button",
-        { class: "btn", onclick: () => leave(cancel) },
-        "Отказ",
-        h("kbd", { class: "key-hint", "aria-hidden": "true" }, "Esc"),
-      ),
+      h("button", { class: "btn primary big", onclick: begin }, "Започни сега"),
+      h("button", { class: "btn", onclick: () => leave(cancel) }, "Отказ"),
     ),
   );
 }
@@ -521,9 +511,8 @@ export function readingTime(text?: string): number {
   return text ? Math.min(9000, 1200 + 45 * text.length) : 0;
 }
 
-/** The game moving on by itself: a line that fills while the answer shows (`enter`: and on a computer, that Enter goes
- * on at once). */
-export function upNext(ms: number, label: string, enter = false): Child {
+/** The game moving on by itself: a line that fills while the answer shows. */
+export function upNext(ms: number, label: string): Child {
   const fill = h("i", { class: "up-next-fill" });
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
@@ -534,7 +523,7 @@ export function upNext(ms: number, label: string, enter = false): Child {
   return h(
     "div",
     { class: "up-next", role: "status" },
-    h("span", { class: "up-next-label" }, label, enter ? h("kbd", { class: "key-hint" }, "Enter") : null),
+    h("span", { class: "up-next-label" }, label),
     h("span", { class: "track" }, fill),
   );
 }
@@ -668,7 +657,7 @@ function question(
         fact(res.reveal.fact, res.reveal.day),
         res.reveal.credit ? pictureCredit(res.reveal.credit) : null,
         res.reveal.credits?.length ? h("p", { class: "credit" }, creditsWords(res.reveal.credits)) : null,
-        upNext(lasts, res.state.done ? "Резултатът идва след малко…" : `Въпрос ${q.n + 2} идва след малко…`, true),
+        upNext(lasts, res.state.done ? "Резултатът идва след малко…" : `Въпрос ${q.n + 2} идва след малко…`),
         // „Напред“ on a foot of its own, opaque to the panel's edge: what scrolls in the panel never shows under it.
         h(
           "div",

@@ -78,8 +78,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
     friend's yes.
 - **The day's result** (Днес once the day is played):
   1. The score on a sheet of the issue's first chapter: „Брой 9 · 20 ноември“, the score as the hero numeral „7 от
-     10“, the tiles, „На десетия въпрос вярно отговарят 14 %“ (or „Десетият въпрос е най-трудният днес“ before a
-     crowd), and with a crowd „България днес: средно 6,2“ (the average always to one decimal: „6,0“). Ten of ten:
+     10“, the tiles, „На десетия въпрос вярно отговарят 14 %“ (nothing before a crowd: the tenth is
+     always the hardest), and with a crowd „България днес: средно 6,2“ (the average always to one decimal: „6,0“). Ten of ten:
      „Всички верни“ and the mark drawn over it. None right: right under the score, „Въпросите и фактите“ open
      (`.missed-day`): the first four, each its dashed tile, the question, the right answer (an order, a match, a split
      in lines) and its fact, and „Още 6 въпроса“, which shows the rest in place; no word of praise. A best rank risen, the big moment, right
@@ -412,7 +412,7 @@ to show it whole; nothing over the question.
   to adding more.
 - **A cell's words** (`wholeWords()`): a long word breaks only at its syllables (soft hyphens, `lib/words.ts`) and only
   where it's wider than its cell; a punctuation mark stays with its word. Never `break-all`.
-- **Answers** (`.option`): white, a 2px `--line-2` frame, the letter in a box (А–Г, keys 1–4 on a computer); a
+- **Answers** (`.option`): white, a 2px `--line-2` frame, the letter in a box (А–Г; keys 1–4 answer on a computer, never drawn on a button); a
   choice's words have the row's width while it's asked.
 - **Answered:** the player's own right answer is ink — a dark fill with white text by day, a light fill with dark
   text by night — and a solid ✓; the right one they didn't give has a 3px ink outline and a ✓ in a ring; their wrong

@@ -325,20 +325,18 @@ test.describe("on a computer", () => {
     test.setTimeout(120_000);
     await page.goto("/play/history");
     await page.getByRole("button", { name: "Започни", exact: true }).click();
-    // The count says its keys: Enter starts at once.
-    await expect(page.getByRole("button", { name: "Започни сега" }).locator(".key-hint")).toHaveText("Enter");
+    // The keys still play, unsaid (no key is drawn on a button): Enter starts at once.
+    await expect(page.locator(".key-hint")).toHaveCount(0);
     await page.keyboard.press("Enter");
-    // Beside an answer's letter, the key that gives it; the key answers, and Enter goes on at once.
+    // 1–4 answer by the letters' order, and Enter goes on at once.
     let keyed = false;
     for (let n = 0; n < 10; n++) {
       await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
       const options = page.locator("article.question .options:not(.pic-options, .sortable-list) > button.option");
       if (!keyed && (await options.count()) === 4) {
         await expect(options.locator(".letter")).toHaveText(["А", "Б", "В", "Г"]);
-        await expect(options.locator(".key-hint")).toHaveText(["1", "2", "3", "4"]);
         await page.keyboard.press("2");
         await expect(options.nth(1)).toHaveClass(/right|wrong/);
-        await expect(page.locator(".up-next .key-hint")).toHaveText("Enter");
         await page.keyboard.press("Enter");
         keyed = true;
         continue;

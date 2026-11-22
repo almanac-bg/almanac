@@ -255,10 +255,6 @@ export function picturesIn(view: View, ms: number): Promise<void> {
 /** What marks each answer, on every screen: a letter, so that everyone at a table (saying „Б“) names the same answer. */
 const letters = ["А", "Б", "В", "Г"];
 
-/** The key that gives an answer, beside it while it's asked (shown on a computer only: app.css): 1–4, the same on
- * every keyboard layout, Latin or Cyrillic. */
-const keyHint = (key: string) => h("kbd", { class: "key-hint", "aria-hidden": "true" }, key);
-
 /** Keys 1–4 press the answer they mark, while the question waits for one (never in a field, never with a modifier). */
 function answerKeys(buttons: HTMLElement[], locked: Signal<boolean>): void {
   listen(document, "keydown", (e: KeyboardEvent) => {
@@ -296,7 +292,6 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
         ? [
             h("span", { class: "letter", "aria-hidden": "true" }, letters[i]),
             h("span", { class: "option-words" }, wholeWords(option)),
-            display ? null : keyHint(String(i + 1)),
           ]
         : [
             // The picture, its letter in one corner (its key in another, on a computer), its ✓ or ✕ in the other
@@ -315,7 +310,6 @@ function choice(view: ChoiceView, submit: (a: Answer) => void, locked: Signal<bo
                 decoding: "async",
               }),
               h("span", { class: "letter pic-letter", "aria-hidden": "true" }, letters[i]),
-              display ? null : keyHint(String(i + 1)),
             ),
             names[i],
           ],
@@ -891,7 +885,6 @@ function truefalse(
         onclick: () => pick(truth),
       },
       h("span", { class: "tf-line" }, h("span", { class: "tf-word" }, truth ? "Вярно" : "Невярно")),
-      display ? null : keyHint(truth ? "1" : "2"),
     );
   const yes = button(true);
   const no = button(false);
@@ -1348,7 +1341,6 @@ function clues(
       },
       h("span", { class: "letter", "aria-hidden": "true" }, letters[i]),
       h("span", { class: "option-words" }, wholeWords(text)),
-      display ? null : keyHint(String(i + 1)),
     ),
   );
   if (!display) answerKeys(buttons, locked);
