@@ -93,3 +93,49 @@ test("without a share sheet, the day's text is copied", async ({ page }) => {
   await page.getByRole("dialog", { name: "Сподели резултата" }).getByRole("button", { name: "Копирай текста" }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { copied: string[] }).copied)).toEqual(copied);
 });
+
+test("a national day: the cover names it under the date, and the share says it after the issue", async ({ page }) => {
+  test.setTimeout(120_000);
+  // Today made 3 March as the server sends it (bank.NationalName): in the page's boot and in GET /api/day.
+  const name = "Освобождението";
+  await page.route(
+    (url) => url.pathname === "/",
+    async (route) => {
+      const res = await route.fetch();
+      const body = (await res.text()).replace(
+        /(<script type="application\/json" id="boot">)([\s\S]*?)(<\/script>)/,
+        (_, open: string, json: string, close: string) => {
+          const boot = JSON.parse(json);
+          if (boot.day) boot.day.national = name;
+          return open + JSON.stringify(boot).replaceAll("<", "\\u003c") + close;
+        },
+      );
+      await route.fulfill({ response: res, body });
+    },
+  );
+  await page.route("**/api/day", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    const res = await route.fetch();
+    const t = await res.json();
+    t.national = name;
+    await route.fulfill({ response: res, json: t });
+  });
+  await standIn(page, false);
+  await page.goto("/");
+  // One quiet line under the date, on the issue, and „Започни“ still in sight under it.
+  const line = page.locator(".issue .issue-national");
+  await expect(line).toHaveText(name);
+  await expect(page.getByRole("heading", { name: "Десет въпроса за днес" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Започни" })).toBeInViewport();
+  await daysPlayed(page, 1);
+  await page.reload();
+  await expect(line).toHaveText(name);
+  await startDay(page);
+  await playRun(page);
+  await page.getByRole("button", { name: "Сподели", exact: true }).click();
+  const sheet = page.getByRole("dialog", { name: "Сподели резултата" });
+  await sheet.getByRole("button", { name: "Копирай текста" }).click();
+  await expect(sheet.getByRole("status")).toHaveText("Копирано.");
+  const [copied = ""] = await page.evaluate(() => (window as unknown as { copied: string[] }).copied);
+  expect(copied).toMatch(/^Брой \d+ · \d{1,2} [а-я]+ · Освобождението · \d+\/10\n[■◩□]{10}\n/);
+});

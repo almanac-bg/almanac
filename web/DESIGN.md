@@ -58,6 +58,10 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
     tiles so far, and „Продължи“; yesterday's left so just before midnight, while the game lets it be finished
     (`play.DayGrace`), comes first, with its date and „Вчерашният брой. Довърши го до 00:15.“ Come by a shared link:
     „Някой позна 7 от 10. А ти?“ and the shared tiles.
+  - On a national day (`bank.NationalDays`) its name is one quiet line under the date, in the weekday's type
+    (`.issue-national`: „3 март“, „Освобождението“), and the share and the card say it after the issue; nothing else
+    marks it. The questions dated to the day come first in its draw, but the issue stays one question a chapter, never
+    a themed ten, and those of them on the date have their „На този ден“, as any day's.
   - On a phone the cover is under half the screen (its date sized by the height), so that „Започни“ is whole by 500px
     on 320 × 568 and 540px on 375 × 600 (`layout.spec.ts`). With large text its display type stays near its usual size
     (the date by the height) and „Около три минути“ gives way (`.issue-time`), so the cover never fills the screen.
@@ -511,11 +515,12 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
 
 ## The share
 
-- **The text:** „Брой 42 · 8/10 · серия 23 дни“ (the streak from three days), the squares ■ right, ◩ близо (U+25E9, the upper left half, as the tiles), □ not, and the
+- **The text:** „Брой 42 · 8/10 · серия 23 дни“ (the streak from three days; on a national day its date and name after
+  the issue, „Брой 112 · 3 март · Освобождението · 8/10“), the squares ■ right, ◩ близо (U+25E9, the upper left half, as the tiles), □ not, and the
   link whole, „https://almanac.bg/d/…“, so that every messenger links it (`game/share.ts`). Unsigned.
 - **The card** (`internal/card`, `/card/<issue>-<shape>.png`), drawn once, by the server, one look in every theme: the
   picture a shared link's preview shows, and the one the sheet shows and shares. The mark and the name, „Брой N“ big
-  with its date, the ten tiles two rows of five (filled with the glyph on a white tile, the upper left half, dashed and hollow: they part in
+  with its date (on a national day „3 март · Освобождението“), the ten tiles two rows of five (filled with the glyph on a white tile, the upper left half, dashed and hollow: they part in
   grey too), and
   almanac.bg. No score, no streak, no name. In the same look the site's own picture (`/og.png`): the mark and the name,
   „Десет въпроса на ден, едни и същи за цяла България.“, a day's ten tiles and almanac.bg.

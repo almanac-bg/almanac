@@ -435,6 +435,33 @@ func TestBootDataIsSafeInTheScript(t *testing.T) {
 	}
 }
 
+// A national day's issue carries the day's name, to a visitor and to a player alike; any other day's carries none.
+func TestNationalDayNamed(t *testing.T) {
+	g := start(t)
+	on := func(day string) map[string]any {
+		t.Helper()
+		d, _ := time.ParseInLocation(time.DateOnly, day, play.Bulgaria)
+		g.srv.game.Now = func() time.Time { return d.Add(12 * time.Hour) }
+		_, today := g.player().call("GET", "/api/day", nil)
+		return today
+	}
+	if today := on("2027-03-03"); today["national"] != "Освобождението" || today["day"] != "2027-03-03" {
+		t.Errorf("3 March: %v on %v", today["national"], today["day"])
+	}
+	if today := on("2027-03-04"); today["national"] != nil {
+		t.Errorf("4 March named: %v", today["national"])
+	}
+	p := g.player()
+	p.call("POST", "/api/guest", map[string]any{})
+	if _, today := p.call("GET", "/api/day", nil); today["national"] != nil {
+		t.Errorf("4 March named to a player: %v", today["national"])
+	}
+	on("2027-12-24")
+	if _, today := p.call("GET", "/api/day", nil); today["national"] != "Бъдни вечер" {
+		t.Errorf("Christmas Eve to a player: %v", today["national"])
+	}
+}
+
 func TestPlayingOverHTTP(t *testing.T) {
 	g := start(t)
 	p := g.player()

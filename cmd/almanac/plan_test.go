@@ -161,7 +161,7 @@ func TestNationalDaysReport(t *testing.T) {
 		t.Fatal(problems)
 	}
 	s, missing, empty := nationalDays(b, nil, false, play.Used{}, "2026-11-18")
-	if !slices.Contains(missing, "09-06") || len(empty) > 0 || !strings.Contains(s, "09-06 the Unification: none") {
+	if !slices.Contains(missing, "09-06") || len(empty) > 0 || !strings.Contains(s, "09-06 Съединението: none") {
 		t.Errorf("missing %v, empty %v in\n%s", missing, empty, s)
 	}
 	// One question about Bulgaria for the Liberation; once a day has had it, 3 March is empty.
