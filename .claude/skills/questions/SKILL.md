@@ -17,7 +17,8 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 - The format and the checks are the code: `internal/bank` (one file per type, `check.go` for the format,
   `rules.go` and the files it names for the rules below, `balance.go`). `internal/bank/names.json` is the spelling of
   names written more than one way; `internal/bank/language.json` the Russian words and loanwords the game never uses
-  (the client's language test reads it too). A bank's `waivers.json` (in `private/`) lists its true exceptions.
+  (the client's language test reads it too). A bank's `waivers.json` (in `private/`) lists its true exceptions, and
+  its `themes.json` each chapter's themes with the share of the chapter each aims for (`internal/bank/themes.go`).
 - The tools (from the repo root):
   - `go run ./cmd/almanac bank fmt private` writes the files in their one format, and sets the typography kept one
     way („…“ for three dots, „ — “ for a spaced hyphen, a no-break space between a number and its „г.“ or its „%“); run it after
@@ -27,7 +28,9 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
     line);
   - `go run ./cmd/almanac bank plan [-n N] [-json] [-used file] private` plans a batch of N a category: the cells to
     write (the day's shortest runway first, at most a third of the batch in one place), how many about Bulgaria (30%,
-    per cell: `bg`), the dates with the fewest questions left, the ids and the subjects to avoid;
+    per cell: `bg`), the dates with the fewest questions left, the ids and the subjects to avoid, and **the themes to
+    write into**: each chapter's themes furthest short of their targets, those about Bulgaria first, with how many of
+    the batch each takes;
   - `go run ./cmd/almanac bank add [-check] [-checked-by P] <batch> private` puts a batch into the bank: new
     questions, changes to existing ones and retirements (`<category>.json` files, `images/`, maybe `retire.json`:
     `[{"id", "why", "by"}]`). It is the one checked way to change the bank, for a fix of one question and a content
@@ -37,7 +40,7 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
       whole, in its place. It keeps `added` as the bank has it, sets `updated` to today, and sets `changed` to today
       if what it asks changed (its text, answer, options, items, pairs, decoy, clues, groups, picture, tolerance,
       unit, step, scale or direction, against the bank's version); if only the fact, the day's line or the labels
-      (difficulty, `on`, `bg`, `sources`, `reviewBy`, a picture's credit) changed, `changed` stays as it was. A
+      (difficulty, `on`, `bg`, `theme`, `sources`, `reviewBy`, a picture's credit) changed, `changed` stays as it was. A
       retired question isn't changed (a new one takes its place), nor one the batch also retires; one the same as
       the bank's is left out of the batch;
     - all of it holds and the bank with it in loads with no errors, or nothing is written. It reports how many
@@ -95,6 +98,17 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 - **The categories about the same size:** within 2% of the mean (`bank.SizeSlack`; `bank check` fails past it). No
   category outweighs another, so a batch adds about as many to every category, and never to one that is ahead while
   another is behind.
+- **Each chapter by its themes** (the owner, 2026-11-23): a chapter isn't mostly one thing, and its Bulgarian side
+  isn't thin. The bank's `themes.json` lists each chapter's themes (Спорт: football, the other team sports, tennis,
+  the winter sports…; История: four Bulgarian periods and five of the world's), each with a target share of the
+  chapter, set by its breadth for a Bulgarian player, not by what the bank has. **Every question names its theme**
+  (`theme`): the one it is mainly about; when two fit, the more specific; a match, split or order over several of the
+  chapter's themes takes „Смесени“ (`mixed`, in Спорт, Природа and Изкуство), and what fits none „друго“ (`other`).
+  `bank check` shows each chapter's themes against their targets, the biggest gaps first; **a batch writes into the
+  themes furthest short** (`bank plan` gives how many each), never into the catch-alls, and the batch's questions
+  about Bulgaria go first to the Bulgarian themes that are short (in November 2026: Bulgarian history before 1878,
+  Bulgarian music, Bulgarian art and Bulgaria's nature, all well under their targets). The themes steer the writing
+  only: the draw never reads them.
 - **Every question has a fact** („Знаеше ли?“), **the date it was added** and **the date it last changed**
   (`added`, `updated`, both YYYY-MM-DD). The checker refuses a question added since `RulesFrom` (2026-11-14)
   without them.
@@ -146,6 +160,7 @@ enough to be worth a look, not always.
 | `pair-giveaway` (hint) | No question shows both sides of a medium or hard match's pair within four words („Кучето Лайка“ for Лайка — Куче) |
 | `shared-items` | Two orders share no two items with the same values, nor three items in the same order (one's reveal orders the other); two matches share no pair |
 | `length` (hint) | A question reads no longer than its kind's usual allows: `bank.Reading` (the letters and digits it shows, a picture as 24) past the kind's third quartile by twice the spread of its middle half. The clock gives time by length (`play.Limit`), so a long one runs long for everyone: say it shorter, drop a clause the answer doesn't need |
+| `theme` | A question names one of its chapter's themes (`themes.json`): an error for a question added since `bank.ThemesFrom` (2026-11-24), a warning for an older one without (a theme the chapter doesn't have is always an error) |
 | `same-identity` | A "who or what is this" answer (a picture choice, clues) is asked once |
 | `twin` † | Two choices (or clues) over one set of options — three of four shared, each offered by few questions — ask one thing twice: the same answer, or mirrored (Карлоф or Лугоши, each the other's wrong option). Give one other options, or keep the better one |
 | `near` (hint) | Two questions don't ask one fact in other words: a choice reworded with other options, a true-or-not of a choice's fact, two numbers of one quantity, one whose words answer another („Кой италиански град е люлка на Ренесанса?“ for „В коя държава е Флоренция?“). Read by their words (`internal/bank/near.go`): alike enough, each one's answer in the other, and one says nothing the other doesn't. About half its pairs are real: keep the better one or ask another fact; waive a false one with the two facts as its `why` |
@@ -214,6 +229,7 @@ Every question is one JSON object in its category's file:
 | `on`                 | The days it belongs to: `"03-03"` every year, `"2027-05-02"` that year only (Великден). On such a day it goes into the day's ten as „На този ден“ |
 | `day`                | With `on`, required (unless the text itself names the date it asks about): one short line (at most 100 characters, ending in a period) saying what happened on that day and naming the date: „На 16 декември 1982 г. умира Колин Чапман.“ The player reads it with the answer, only when the question is dealt on its date (never before answering: it could give the answer away; never in a chapter's game). See „A question for a day“ below |
 | `bg`                 | `true` for a question about Bulgaria (people, places, history, culture, language, sport): every day has at least three |
+| `theme`              | The one of its chapter's themes (the bank's `themes.json`: an id such as `bg_medieval`, `football`, `mixed`) it is mainly about. Every question added since 2026-11-24 has one. A label: changing it leaves `changed` as it was |
 
 How long each kind is shown is the game's, never a number written here: `play.Limit`, a base for the kind and the
 time a slow reader takes to read the question. A long question runs long for everyone (the `length` rule).
@@ -383,12 +399,13 @@ selector), fixed a chunk at a time by a fixer and an independent checker, and ad
 a check in `internal/bank/rules.go` first, then a `/fix-questions` pass over what it flags: never a pass over the whole
 bank. By hand, for a fix or a few questions:
 
-1. **Find the gaps:** run `bank check` and read the day's runway and the balance report. Plan the batch from the
-   shortest runway first (every place under 150 days at 1.5× its need before anything else), then the kinds a category lacks; about
-   the same count in every category.
+1. **Find the gaps:** run `bank check` and read the day's runway, the balance report and the chapters' themes. Plan
+   the batch from the shortest runway first (every place under 150 days at 1.5× its need before anything else), then
+   the kinds a category lacks; about the same count in every category; and in each, its questions in the themes
+   furthest short (those about Bulgaria first).
 2. **Write** the questions into a batch's category files (new ones with the next free ids, `added` and `updated` set
-   to today, and a fact on each; changed ones whole, with their own ids), and put it in with `bank add` (`-check`
-   first).
+   to today, a fact and a `theme` on each; changed ones whole, with their own ids), and put it in with `bank add`
+   (`-check` first).
 3. **Verify independently.** Give a fresh agent the new questions and answers (not your reasoning). It checks each
    one against reliable sources: the marked answer is right, no other option is also right, nothing is outdated,
    the wording has one reading, the fact is true, and the difficulty fits the definitions. It reports OK, FIX or

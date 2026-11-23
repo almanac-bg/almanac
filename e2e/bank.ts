@@ -23,6 +23,7 @@ export interface Q {
   groups?: string[];
   tolerance?: number;
   retired?: unknown;
+  theme?: string;
 }
 
 const root = resolve(import.meta.dirname, "..");
@@ -108,9 +109,11 @@ export function testBank(make: boolean): string {
     // Each waiting for a day far ahead (bank.Tail.On; play's `waiting`): dealt to a test by its id, never drawn by the
     // game, into a day's issue, a chapter's game or a duel, so that whatever the tests play by chance is the sample's,
     // here as on CI. Its day far ahead has no line of its own (bank's rule „dated“): kept a warning, as for a question
-    // added before the rules were strict, whenever it was added.
+    // added before the rules were strict, whenever it was added. Its theme stays behind: the real bank's themes are its own
+    // (a theme the sample's chapter doesn't have is an error), and one added before themes is only warned of without.
     for (const [f, q] of add)
-      if (!ids.has(q.id)) qs.set(f, [...(qs.get(f) ?? []), { ...q, on: ["2999-01-01"], added: "2026-01-01" } as Q]);
+      if (!ids.has(q.id))
+        qs.set(f, [...(qs.get(f) ?? []), { ...q, theme: undefined, on: ["2999-01-01"], added: "2026-01-01" } as Q]);
     for (const [f, list] of qs) writeFileSync(resolve(served, "questions", f), JSON.stringify(list, null, 2));
     // A picture's files with it, each width the program offers (its name, and -600, -900).
     const stems = new Set(add.flatMap(([, q]) => (q.image ? [q.image.file.replace(/\.[a-z]+$/, "")] : [])));

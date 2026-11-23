@@ -114,8 +114,8 @@ func defaultBankDir() string {
 // bank has one for it, so an urgent fix isn't held up by a day already empty; that one is warned of. It prints every
 // error, and counts the warnings by rule (bank lint lists them); it reports the mix and the sources; the day's runway:
 // how long each place of a day has questions for, where the next batch writes first (with -used, the questions the
-// days have had are taken off: `almanac bank used`), and the dates' („На този ден“); and the subjects that come back.
-// Its last line counts the problems.
+// days have had are taken off: `almanac bank used`), and the dates' („На този ден“); each chapter's themes against their
+// targets; and the subjects that come back. Its last line counts the problems.
 func bankCheck(args []string) error {
 	fs := flag.NewFlagSet("bank check", flag.ContinueOnError)
 	sample := fs.Bool("sample", false, "the public sample: pass it though its categories aren't the same size and it lacks the national days")
@@ -160,6 +160,9 @@ func bankCheck(args []string) error {
 	if len(empty) > 0 {
 		fmt.Printf("warning: national days with no question about Bulgaria left, as in the live bank: %s (write for them)\n",
 			strings.Join(empty, ", "))
+	}
+	if t := themes(b); t != "" {
+		fmt.Println(t)
 	}
 	fmt.Println(subjects(b, SubjectsShown))
 	fmt.Println(tally)
@@ -605,4 +608,37 @@ func bankFmt(dir string) error {
 		}
 	}
 	return bank.WriteCategories(dir, b.Categories)
+}
+
+// themes says how each chapter stands against its themes' targets (bank.ThemesOf; "" for a bank without themes): the
+// chapter's distance from them all and its biggest gaps, then every theme with its share and its target, the furthest
+// short first, and how many questions it has over (+) or lacks (-). A /new-questions batch writes into the short ones
+// (bank plan).
+func themes(b *bank.Bank) string {
+	chapters := b.ThemesOf()
+	if chapters == nil {
+		return ""
+	}
+	var s strings.Builder
+	s.WriteString("the chapters' themes (themes.json): each one's share of the chapter's live questions against its target, the furthest short first\n")
+	for _, ch := range chapters {
+		fmt.Fprintf(&s, "  %s (%s): %d live, %.1f points off the targets", ch.Name, ch.Category, ch.Live, ch.Off)
+		if ch.Untagged > 0 {
+			fmt.Fprintf(&s, ", %d without a theme", ch.Untagged)
+		}
+		var short []string
+		for _, t := range ch.Themes {
+			if t.Short > 0 && t.Planned() && len(short) < 3 {
+				short = append(short, fmt.Sprintf("%s %d", t.Name, -t.Short))
+			}
+		}
+		if len(short) > 0 {
+			fmt.Fprintf(&s, "; the biggest gaps: %s", strings.Join(short, ", "))
+		}
+		s.WriteString("\n")
+		for _, t := range ch.Themes {
+			fmt.Fprintf(&s, "    %-44s %5d %5.1f%% of %4.1f%% %+5d\n", t.Name, t.N, t.Share, t.Target, -t.Short)
+		}
+	}
+	return strings.TrimSuffix(s.String(), "\n")
 }

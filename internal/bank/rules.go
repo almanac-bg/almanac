@@ -95,6 +95,7 @@ var Rules = []Rule{
 	{Name: "twin", Says: "two choices over one set of options don't ask the same answer, or each other's answers mirrored", From: AuditFrom, all: ruleTwin},
 	{Name: "near", Says: "two questions don't ask one fact in other words (a choice reworded, a true-or-not of a choice's fact, two numbers of one quantity)", Hint: true, all: ruleNear},
 	{Name: "length", Says: "a question reads no longer than its kind's usual allows (bank.Reading past the third quartile by twice the middle half's spread): the clock would run long for it", Hint: true, all: ruleLength},
+	{Name: "theme", Says: "a question names the one of its chapter's themes (themes.json) it is mainly about: a batch is planned by them", From: ThemesFrom, all: ruleTheme},
 	{Name: "same-identity", Says: "a \"who or what is this\" answer (a picture choice, clues) is asked once", all: ruleSameIdentity},
 }
 

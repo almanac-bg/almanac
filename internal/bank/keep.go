@@ -36,7 +36,7 @@ func Copy(from, to, like string) error {
 	if err := copyFile(filepath.Join(from, CategoriesFile), filepath.Join(to, CategoriesFile)); err != nil {
 		return err
 	}
-	if err := copyFile(filepath.Join(from, WaiversFile), filepath.Join(to, WaiversFile)); err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err := copyBeside(from, to); err != nil {
 		return err
 	}
 	// Every entry of questions/, as it is: Load refuses a file there that isn't a category's, and so must the copy's.
@@ -257,4 +257,18 @@ func Short(commit string) string {
 		return commit[:7]
 	}
 	return commit
+}
+
+// Beside are the files of a bank Load reads besides its categories, questions and pictures, each optional: whatever
+// copies a bank for Load (Copy, Add's trial) copies them all, so that a new one is never left behind.
+var Beside = []string{WaiversFile, ThemesFile}
+
+// copyBeside copies the Beside files a bank in from has into to.
+func copyBeside(from, to string) error {
+	for _, f := range Beside {
+		if err := copyFile(filepath.Join(from, f), filepath.Join(to, f)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	return nil
 }

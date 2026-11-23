@@ -51,7 +51,8 @@ in a worktree the main checkout's (`$(dirname "$(git rev-parse --path-format=abs
 3. **Plan.** `bank plan -n <N> -json -used <batch>/used.txt <bank> > <batch>/plan.json` (N = the number given, else
    30), and add the owner's focus to it as `"focus"` if one was given. Show the owner the text plan (the same without
    `-json`) in a few lines: how many, which places of the day, the runway before → after with the day the shortest
-   runs out on, and how many about Bulgaria. Don't wait for an answer.
+   runs out on, how many about Bulgaria, and the themes each chapter writes into (the plan's `themes`: the ones
+   furthest short of their targets, the Bulgarian ones first). Don't wait for an answer.
 4. **Write and check.** Run the workflow, and wait for its notification (don't poll):
    `Workflow({scriptPath: "<repo>/.claude/skills/new-questions/batch.js", args: {plan: <plan.json's content, as an
    object>, batch: "<batch>", repo: "<repo>", bank: "<bank>", skill: "<repo>/.claude/skills/new-questions"}})`.
@@ -65,7 +66,8 @@ in a worktree the main checkout's (`$(dirname "$(git rev-parse --path-format=abs
 6. **Add it.** `bank add -checked-by "new-questions fable-5.2" <batch>/final <bank>` (the checkers' model: change it
    with batch.js), then `bank fmt <bank>` and `bank check -used <batch>/used.txt <bank>`: no errors, the
    categories within 2% of their mean, and no place of the day's runway shorter than in the plan's `days`. If anything fails,
-   `git -C <bank> checkout -- . && git -C <bank> clean -fd -- images` and stop.
+   `git -C <bank> checkout -- . && git -C <bank> clean -fd -- images` and stop. Read the chapters' themes in the
+   check's report: each theme the plan wrote into is closer to its target than before.
 7. **Fix what the batch found in the bank.** For the problems in REPORT.md about questions already in the bank: check
    each yourself from a source, and fix the real ones by the `questions` skill (set `updated`; a change in what a
    question asks retires it, and its replacement goes in the same cell). Keep these in a commit of their own.
