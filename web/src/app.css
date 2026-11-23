@@ -705,7 +705,11 @@
     #main {
       max-width: 48rem;
     }
+  }
 
+  /* The places in the bar at the top: on a big screen, and on any short wide one (a phone on its side, a laptop at
+     200 % zoom), where a bar at the foot took a fifth of the height and covered „Започни“. */
+  @media (min-width: 56.25rem), (orientation: landscape) and (max-height: 30rem) {
     .bar {
       gap: var(--space-3);
       min-height: 72px;
@@ -765,7 +769,21 @@
     #app {
       padding-bottom: var(--space-7);
     }
+  }
 
+  /* A phone on its side, narrower than a big screen: the places closer together, so that they fit beside the name. */
+  @media (orientation: landscape) and (max-height: 30rem) and (max-width: 56.24rem) {
+    .bar .places {
+      gap: 2px;
+      margin-left: auto;
+    }
+
+    .places a {
+      padding: 0 10px;
+    }
+  }
+
+  @media (min-width: 56.25rem) {
     /* A place on a big screen is a spread: the page's whole width, on a 12-column grid, its pages side by side. */
     #main:has(.spread) {
       max-width: calc(var(--page) + 2 * var(--gutter));
@@ -7112,7 +7130,7 @@
 
   /* A phone in a game, upright or on its side: the question has the whole screen, the header and the bar of places
      with it, and a stray tap can't leave it. The way out is the arrow before the question's count. */
-  @media (max-width: 47.99rem), (pointer: coarse) and (orientation: landscape) and (max-height: 30rem) {
+  @media (max-width: 47.99rem), (orientation: landscape) and (max-height: 30rem) {
     .playing .frame {
       display: none;
     }
@@ -7333,7 +7351,7 @@
 
   /* A phone on its side: the question and what answers it within the screen's height, as upright (above), with the
      head small from the start (run.ts, stays), the question smaller and a choice's answers two by two. */
-  @media (pointer: coarse) and (orientation: landscape) and (max-height: 30rem) {
+  @media (orientation: landscape) and (max-height: 30rem) {
     .question-top {
       --small: 1;
     }
@@ -7579,7 +7597,7 @@
   /* On a phone, once answered, the sheet shrinks to the question alone, the answers come up right under it, and of a
      choice of pictures only the player's and the right one stay. The answer's panel (docked, below) leaves them in
      sight. */
-  @media (max-width: 47.99rem), (pointer: coarse) and (orientation: landscape) and (max-height: 30rem) {
+  @media (max-width: 47.99rem), (orientation: landscape) and (max-height: 30rem) {
     .run-question.answered .q-leaf {
       grid-template-columns: auto minmax(0, 1fr);
       align-items: center;
@@ -7842,7 +7860,7 @@
 
   /* A phone on its side: the sheet low, the rows a little lower, so the question and its answers fit the screen's
      height. */
-  @media (pointer: coarse) and (orientation: landscape) and (max-height: 30rem) {
+  @media (orientation: landscape) and (max-height: 30rem) {
     .run-question .q-leaf {
       grid-template-columns: auto minmax(0, 1fr);
       align-items: center;
@@ -8070,6 +8088,14 @@
   /* Nor the row of its ten chapters' glyphs (the issue's contents are under it, „В броя“). */
   .tight :is(.issue-time, .issue-toc) {
     display: none;
+  }
+
+  /* A short wide screen (a phone on its side, a laptop at 200 % zoom): the cover without its glyphs and its time too,
+     so that „Започни“ is in sight under it. */
+  @media (orientation: landscape) and (max-height: 30rem) {
+    :is(.issue-time, .issue-toc) {
+      display: none;
+    }
   }
 
   /* The places at a phone's foot: a name no bigger than its third of the screen holds whole (a phone that enlarges

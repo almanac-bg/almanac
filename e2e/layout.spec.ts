@@ -941,6 +941,27 @@ test.describe("a tablet, 768 × 1024", () => {
   });
 });
 
+// A laptop at 200 % zoom (1280 × 800 is 640 × 400), a mouse: laid out as a phone on its side, the places in the bar at
+// the top (one at the foot took „Започни“ under it), the game's question within the height.
+test.describe("a short wide window with a mouse, 640 × 400", () => {
+  test.use({ viewport: { width: 640, height: 400 }, isMobile: false, hasTouch: false });
+
+  test("„Започни“ in sight, nothing over it; a question within the height", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator(".issue-go")).toBeVisible();
+    const go = await page.evaluate(() => {
+      const bar = document.querySelector(".places-foot")?.getBoundingClientRect();
+      const go = document.querySelector(".issue-go")?.getBoundingClientRect();
+      return go ? go.bottom - (bar?.height ? bar.top : innerHeight) : 0;
+    });
+    expect(go, "„Започни“ under the places or the screen's foot").toBeLessThanOrEqual(1);
+    expect(await sideways(page)).toEqual([]);
+    await startDay(page);
+    await expect(page.locator(".question-head")).toContainText("1 от 10");
+    await expect(page.locator(".question-top")).toHaveClass(/stuck/);
+  });
+});
+
 test.describe("on a laptop, Настройки and Вход", () => {
   test.use({ viewport: { width: 1366, height: 900 }, isMobile: false, hasTouch: false });
 

@@ -41,7 +41,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
 - **The frame** (`app.ts`): the bar holds the rosette and „АЛМАНАХ“ in spaced capitals (a way to Днес); on a big
   screen the three places as an icon and a word on pills (`.places`; Днес a calendar, Алманах a book, Приятели two
   people; every name bold); the player's avatar
-  (`.bar-me`), or „Вход“ (the sign-in page, `/signin`). On a phone the places float at the foot (`.places-foot`): a
+  (`.bar-me`), or „Вход“ (the sign-in page, `/signin`); in the bar too on any short wide screen (a phone on its side, a
+  laptop at 200 % zoom: one at the foot covered „Започни“). On a phone upright the places float at the foot (`.places-foot`): a
   pill clear of every edge, its icon over its name, the current one on a well, a dot on Приятели while something has come there since the player last looked (a request, a
   duel sent, a duel's result), gone as it opens. One frame, the same everywhere: the mark is always at the left. It
   steps aside in a game (`html.playing`); on a new visitor's cover and on the sign-in page it is bare (`html.bare`):
@@ -537,7 +538,8 @@ to show it whole; nothing over the question.
   order's or pairs' line on how to answer is read, not shown (the first rows show over „Готово“). With `tight`, Днес's
   cover leaves out its row of glyphs, and the places' bar at a phone's foot grows at most a quarter, so „Започни“
   stays over it. A media query's rem
-  is the browser's own size, so a short screen is a phone on its side only with `(orientation: landscape)` too.
+  is the browser's own size, so a short screen is a phone on its side only with `(orientation: landscape)` too, and any
+  short wide window is laid out as one, with a mouse as with a finger (a laptop at 200 % zoom is 640 × 400).
   `e2e/layout.spec.ts` holds it at every size above.
 
 ## Motion
