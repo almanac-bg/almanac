@@ -6666,6 +6666,17 @@
     overflow-wrap: break-word;
   }
 
+  /* A friend's name, a way to their profile: a finger's 44px to tap, drawn no taller (the row has the room). */
+  a.friend-name {
+    position: relative;
+  }
+
+  a.friend-name::after {
+    content: "";
+    position: absolute;
+    inset: -12px 0;
+  }
+
   /* The @username only where two friends share a name (`.same`): elsewhere it's on their profile. */
   .friend-tag {
     display: none;
@@ -6763,6 +6774,17 @@
     display: grid;
     gap: 2px;
     min-width: 0;
+  }
+
+  /* Who asks, a way to their profile: a finger's 44px to tap, drawn no taller. */
+  .invitation a.who {
+    position: relative;
+  }
+
+  .invitation a.who::after {
+    content: "";
+    position: absolute;
+    inset: -8px 0;
   }
 
   .invitation-line {

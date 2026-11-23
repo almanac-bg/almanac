@@ -20,13 +20,16 @@
 import { expect, type Page, test } from "@playwright/test";
 import { answerAs, beside, closeable, flaws, kinds, panelFlaws, type Q, unseenAnswers } from "./kinds.ts";
 import {
+  befriend,
   cutOrOverlapping,
   daysPlayed,
   dealt,
   keptPlayer,
   knows,
   linkedNames,
+  mailedCode,
   moveOn,
+  playedBefore,
   playRun,
   startDay,
 } from "./play.ts";
@@ -945,6 +948,47 @@ test.describe("a finger's room", () => {
       await expect(page.locator("main :is(h1, h2)").first()).toBeVisible();
       expect(await smallTargets(page), path).toEqual([]);
     }
+  });
+
+  test("a kept player's too: a friend, a request each way, Настройки with an email", async ({
+    page,
+    browser,
+  }, info) => {
+    test.setTimeout(120_000);
+    // A friend (their name a link, „Премахни приятел“ over them), someone asking (their „Откажи“), a request sent
+    // („Отмени“), and an email to sign in with („Излез“, „Излез от другите устройства“).
+    const friend = await (await browser.newContext()).newPage();
+    const asks = await (await browser.newContext()).newPage();
+    await page.goto("/");
+    await befriend(page, friend);
+    await asks.goto("/friends");
+    await asks.locator(".friends").getByRole("button", { name: "Добави приятел" }).click();
+    await playedBefore(asks, 1);
+    const tag = await page.evaluate(async () => (await (await fetch("/api/me")).json()).user.tag as string);
+    await asks.getByLabel("Потребителско име или имейл на приятел").fill(`@${tag}`);
+    await asks.getByRole("button", { name: "Добави", exact: true }).click();
+    await expect(asks.getByText(/^Поканата до .+ е изпратена\.$/)).toBeVisible();
+    await playedBefore(page, 1);
+    await page.goto("/friends");
+    await page.getByLabel("Потребителско име или имейл на приятел").fill("someone@example.com");
+    await page.getByRole("button", { name: "Добави", exact: true }).click();
+    await expect(page.locator(".waiting")).toContainText("someone@example.com");
+    await expect(page.locator(".invitation")).toHaveCount(1);
+    await expect(page.locator(".friend")).toHaveCount(1);
+    expect(await smallTargets(page), "/friends").toEqual([]);
+    await page.getByRole("button", { name: "Премахни приятел" }).click();
+    expect(await smallTargets(page), "/friends, changing the list").toEqual([]);
+    const email = `finger-${info.project.name}-${Date.now()}@example.com`;
+    await page.goto("/settings");
+    await page.getByLabel("Имейл").fill(email);
+    await page.getByRole("button", { name: "Прати ми код" }).click();
+    await expect.poll(() => mailedCode(email)).not.toBe("");
+    await page.getByLabel("Код").fill(mailedCode(email));
+    await page.getByRole("button", { name: "Потвърди" }).click();
+    await expect(page.getByRole("button", { name: "Излез от другите устройства" })).toBeVisible();
+    expect(await smallTargets(page), "/settings").toEqual([]);
+    await friend.context().close();
+    await asks.context().close();
   });
 });
 

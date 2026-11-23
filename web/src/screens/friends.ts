@@ -251,7 +251,7 @@ function page(kit: Kit): Child {
             "div",
             { class: "invitation-actions" },
             h("button", { class: "btn inline", type: "button", onclick: () => accept(r) }, "Приеми"),
-            h("button", { class: "link", type: "button", onclick: () => drop(r) }, "Откажи"),
+            h("button", { class: "link tap", type: "button", onclick: () => drop(r) }, "Откажи"),
           ),
         ),
       );
@@ -274,8 +274,10 @@ function page(kit: Kit): Child {
             ? h(
                 "span",
                 { class: "sect-note" },
-                h("button", { class: "link muted", type: "button", onclick: () => editing.update((e) => !e) }, () =>
-                  editing() ? "Готово" : "Премахни приятел",
+                h(
+                  "button",
+                  { class: "link muted tap", type: "button", onclick: () => editing.update((e) => !e) },
+                  () => (editing() ? "Готово" : "Премахни приятел"),
                 ),
               )
             : null;
@@ -340,7 +342,12 @@ function page(kit: Kit): Child {
    * that wait for an answer („Изпратени покани (2)“), each with „Отмени“. */
   function adding(): Child {
     return when(data, () => [
-      h("section", { class: "sect friends-add" }, h("div", { class: "sect-head" }, h("h2", null, "Добави приятел")), adder),
+      h(
+        "section",
+        { class: "sect friends-add" },
+        h("div", { class: "sect-head" }, h("h2", null, "Добави приятел")),
+        adder,
+      ),
       () => {
         const out = data()?.requests.out ?? [];
         return out.length
@@ -358,7 +365,7 @@ function page(kit: Kit): Child {
                     r.email
                       ? h("span", null, emailWords(r.email))
                       : h("a", { href: profileHref(r.tag ?? "") }, nameWords(r.name ?? "")),
-                    h("button", { class: "link muted", type: "button", onclick: () => drop(r) }, "Отмени"),
+                    h("button", { class: "link muted tap", type: "button", onclick: () => drop(r) }, "Отмени"),
                   ),
                 ),
               ),
@@ -470,7 +477,7 @@ function row(f: Friend, remove: () => void, challenge: () => void, editing: () =
     null,
     () =>
       editing()
-        ? h("button", { class: "link muted friend-act", type: "button", onclick: remove }, "Премахни")
+        ? h("button", { class: "link muted tap friend-act", type: "button", onclick: remove }, "Премахни")
         : h(
             "button",
             {

@@ -286,7 +286,7 @@ function account(): Child {
           h("strong", null, () => emailWords(user()?.email ?? "")),
           ".",
         ),
-        h("button", { class: "link", onclick: signOut }, "Излез"),
+        h("button", { class: "link tap", onclick: signOut }, "Излез"),
         signOutOthers(),
       ],
       () => [
@@ -602,7 +602,7 @@ function signOutOthers(): Child {
     }
   };
   return [
-    h("button", { class: "link", onclick: run, disabled: busy }, "Излез от другите устройства"),
+    h("button", { class: "link tap", onclick: run, disabled: busy }, "Излез от другите устройства"),
     () => said() && h("p", { class: bad() ? "bad" : "muted", role: "status" }, said()),
   ];
 }
