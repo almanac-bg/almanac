@@ -395,12 +395,18 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
               h("h1", null, name),
             ),
           ),
-          () =>
-            stand(
-              id,
-              first()?.ranks?.find((r) => r.chapter === id),
-              first()?.ink[id] ?? 0,
-            ),
+          // Nothing of where it stands until its numbers have come: drawn before them, it said „no ink yet“ for a moment,
+          // right after a day's „+1 с мастило“ led here.
+          () => {
+            const f = first();
+            return f || !user.peek()
+              ? stand(
+                  id,
+                  f?.ranks?.find((r) => r.chapter === id),
+                  f?.ink[id] ?? 0,
+                )
+              : null;
+          },
         ],
         "chapter-leaf",
       ),

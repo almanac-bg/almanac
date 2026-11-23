@@ -42,6 +42,26 @@ test("the book's contents: a chapter a row with its ink, and no count of it all"
   await expect(page.getByRole("link", { name: "Играй 10 въпроса" })).toHaveAttribute("href", "/play/movies");
 });
 
+test("a chapter says nothing of its ink until its numbers have come", async ({ page }) => {
+  // A fact in ink in „Кино и телевизия“; the chapter's numbers held back a moment, as on a slow line.
+  await page.goto("/");
+  await knows(page, ["mov-300"], Date.now(), true);
+  let release = () => {};
+  const held = new Promise<void>((done) => {
+    release = done;
+  });
+  await page.route(/\/api\/almanac\?/, async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.goto("/almanac/movies");
+  await expect(page.getByRole("heading", { level: 1, name: "Кино и телевизия" })).toBeVisible();
+  // Not „no ink yet“ while they're on their way: nothing.
+  await expect(page.locator(".chapter-stand")).toHaveCount(0);
+  release();
+  await expect(page.locator(".chapter-ink")).toContainText(/1\s*с\sмастило/);
+});
+
 test("a chapter comes a page at a time, by its numbers", async ({ page }) => {
   // No chapter of the sample has more than a page of facts: the server's pages (play.AlmanacOf, its own tests) are
   // stood in for here, 95 facts of „География“, thirty to a page.
