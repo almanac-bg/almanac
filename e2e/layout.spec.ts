@@ -872,6 +872,16 @@ test.describe("on a laptop, 1366 × 650", () => {
           const box = await page.locator(".answering .btn.primary").first().boundingBox();
           expect.soft(box && box.y + box.height, `${where}: its action below the screen`).toBeLessThanOrEqual(650);
         }
+        // A picture over the question: right under its sheet, and whole on the screen with it.
+        if (q.image) {
+          const at = await page.evaluate(() => {
+            const sheet = document.querySelector(".run-question > .q-leaf")?.getBoundingClientRect();
+            const pic = document.querySelector(".run-question > .picture")?.getBoundingClientRect();
+            return sheet && pic ? { gap: pic.top - sheet.bottom, bottom: pic.bottom } : null;
+          });
+          expect.soft(at?.bottom, `${where}: its picture below the screen`).toBeLessThanOrEqual(650);
+          expect.soft(at?.gap, `${where}: its picture away from its sheet`).toBeLessThanOrEqual(24);
+        }
         await answerAs(page, q, how);
         await expect(page.locator(".after .up-next-go")).toBeVisible({ timeout: 40_000 });
         await settled(page);

@@ -7379,6 +7379,16 @@
       margin-top: auto;
     }
 
+    /* A question with a picture: the sheet as tall as its words, the picture right under it, as large as the room
+       over the answers lets it be (questions.ts, picture: --fit). */
+    .run-question:has(> .picture) > .q-leaf {
+      min-height: 0;
+    }
+
+    .run-question > .picture {
+      max-height: max(120px, var(--fit, 30vh));
+    }
+
     /* A narrow phone: a long question in four lines at most. */
     @media (max-width: 22.5rem) {
       .run-question .ask {
@@ -8151,6 +8161,32 @@
 
     .run-question > .picture {
       grid-row: 4;
+    }
+
+    /* A question with a picture: the sheet as tall as its words, the picture right under it at the sheet's width, as
+       tall as the screen leaves it (questions.ts, picture: --fit), both in sight with the answers beside them. The
+       answers span the sheet's row and the picture's, the answer comes under them. */
+    .run-question:has(> .picture) {
+      grid-template-rows: auto auto auto minmax(0, 1fr);
+    }
+
+    .run-question:has(> .picture) > .q-leaf {
+      grid-row: 2;
+      min-height: 0;
+    }
+
+    .run-question:has(> .picture) > .picture {
+      grid-row: 3 / span 2;
+      align-self: start;
+      max-height: max(160px, var(--fit, 40vh));
+    }
+
+    .run-question:has(> .picture) > .answering {
+      grid-row: 2 / span 2;
+    }
+
+    .run-question:has(> .picture) > .after {
+      grid-row: 4 / span 2;
     }
 
     .run-question > .answering {

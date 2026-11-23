@@ -230,6 +230,11 @@ export function picture(view: View, fit = false): Child {
       if (!img.isConnected || !below || img.closest(".answered")) return;
       const box = img.getBoundingClientRect();
       const under = below.getBoundingClientRect();
+      // Beside the answers (a laptop's spread): the screen's height under the picture's top is its own.
+      if (under.left >= box.right - 1) {
+        img.style.setProperty("--fit", `${Math.max(pictureFloor, Math.floor(innerHeight - box.top - scrollY - 16))}px`);
+        return;
+      }
       const gap = Number.parseFloat(getComputedStyle(img.parentElement ?? img).rowGap) || 0;
       const spare = Math.max(0, under.top - box.bottom - gap);
       const end = under.bottom + scrollY - box.height - spare;
