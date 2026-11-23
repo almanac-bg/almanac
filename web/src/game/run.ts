@@ -390,10 +390,9 @@ export function guardLeaving(
     going.set(true);
     await leave(on);
   };
-  listen(document, "keydown", (e: KeyboardEvent) => {
-    if (e.key === "Escape" && asking()) keep();
-  });
-  return h(
+  // Esc asks too, as the game's arrow out does (a way out a keyboard has), and closes the asking again; not while a
+  // sheet of its own is open over the game (a picture shown large), which Esc closes.
+  const layer = h(
     "div",
     { class: "leave-layer", hidden: () => !asking() || !(now() || going()) },
     h(
@@ -408,6 +407,13 @@ export function guardLeaving(
       ),
     ),
   );
+  listen(document, "keydown", (e: KeyboardEvent) => {
+    if (e.key !== "Escape" || e.defaultPrevented) return;
+    if (asking()) keep();
+    else if (now() && !document.querySelector("dialog[open]"))
+      layer.parentElement?.querySelector<HTMLElement>(".game-leave")?.click();
+  });
+  return layer;
 }
 
 /** The top of a question: the way out, what's played (the day's issue, or the chapter: `aside`; in a duel, with whom:

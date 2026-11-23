@@ -29,6 +29,25 @@ test("the browser's back asks in the day's ten, opened from outside, and never l
   await expect(page).toHaveURL(/\/$/);
 });
 
+test("Esc mid-question asks as the arrow out does, „Остани“ first; Esc again plays on, „Излез“ leaves", async ({
+  page,
+}) => {
+  await page.goto("/almanac/history");
+  await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
+  await page.getByRole("button", { name: "Започни сега" }).click();
+  await expect(page.locator(".question-head")).toContainText("1 от 10");
+  await expect(page.locator("article.question .answering")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByText(asked)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Остани" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByText(asked)).toBeHidden();
+  await expect(page.locator(".question-head")).toContainText("1 от 10");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Излез" }).click();
+  await expect(page).toHaveURL(/\/almanac$/);
+});
+
 test("the browser's back in a chapter asks, its address kept while it does; „Излез“ comes to its chapter", async ({
   page,
 }) => {
