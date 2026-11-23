@@ -509,7 +509,7 @@ to show it whole; nothing over the question.
   10 с и 20 с“); number, typed on the game's own pad (keys
   44px at the least; with large text what's typed stays in sight under the head), answered as what was said, the
   answer (not again where it was spot on), and both on a scale with its key (the answer a filled square; „ти,
-  вярно“ a filled disc, „ти, близо“ half filled, „ти“ hollow), nothing else (how everyone guessed is said under the verdict; its chart is the review's). Pairs or groups
+  вярно“ a filled disc, „ти, близо“ half filled, „ти“ hollow), nothing else (how everyone guessed is said under the verdict; its chart is the review's: the player's own bar outlined as their disc is, one beyond the chart's range named at its end, „1900 лв. →“). Pairs or groups
   whose time ran out with nothing given show the right ones with a ✓ in a ring: none of it the player's.
 - **The answer** (`.after`): under the answers, never over them; on a phone at the screen's foot, edge to edge, a
   surface. The page moves once (run.ts, `settle`), as little as it can: to show the verdict over „Напред“ (under an

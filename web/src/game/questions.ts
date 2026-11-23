@@ -573,7 +573,9 @@ function scale(answer: number, mine: number, how: VerdictKind | undefined, view:
 }
 
 /** Where everyone's guesses at a number fell: a bar for each part of the range a guess scores in, one at each end for
- * the guesses beyond it, the answer's part in the colour of a right answer and the player's own in theirs. */
+ * the guesses beyond it, the answer's part filled as a right answer is and the player's own outlined, as their mark
+ * on the scale over it is. The player's own beyond the range isn't one of those ends' bars (it would read as the most
+ * said): it's named at that end under them, „1900 лв. →“. */
 function spread(s: Spread, answer: number, mine: number | null, view: NumberView): HTMLElement {
   const n = s.bins.length;
   const at = (v: number) =>
@@ -586,7 +588,9 @@ function spread(s: Spread, answer: number, mine: number | null, view: NumberView
   const shares = [s.below, ...s.bins, s.above];
   const top = Math.max(...shares, 0.01);
   const theAnswer = column(answer);
-  const theirs = mine === null ? -1 : column(mine);
+  const at0 = mine === null ? -1 : column(mine);
+  const beyond = at0 === 0 ? "lo" : at0 === n + 1 ? "hi" : "";
+  const theirs = beyond ? -1 : at0;
   const unit = view.unit ? ` ${view.unit}` : "";
   const inRange = s.bins.reduce((a, b) => a + b, 0);
   const bars = h(
@@ -617,6 +621,14 @@ function spread(s: Spread, answer: number, mine: number | null, view: NumberView
       h("span", null, formatNumber(s.lo, view.step)),
       h("span", null, `${formatNumber(s.hi, view.step)}${unit}`),
     ),
+    beyond && mine !== null
+      ? h(
+          "p",
+          { class: `guess-out ${beyond}`, "aria-hidden": "true" },
+          h("i", { class: "guess-swatch mine" }),
+          beyond === "lo" ? `← ${formatNumber(mine, view.step)}${unit}` : `${formatNumber(mine, view.step)}${unit} →`,
+        )
+      : null,
     h(
       "div",
       { class: "guess-key", "aria-hidden": "true" },
