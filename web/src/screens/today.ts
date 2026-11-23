@@ -646,6 +646,10 @@ function result(t: Today, run: State, just: boolean, notices: Child[], reload: (
       news(run.id, 0, undefined, best.set, "Днес в Алманаха"),
       // 3. The action, once the first results are past.
       first ? null : action,
+      // The day's questions, the player's own day's: on its page, never under the board (a phone had it after twenty
+      // rows of everyone's). None right: the first questions are open under the score already, with the way to them
+      // all there (once they came).
+      () => (missedList()?.length ? null : reviewButton(() => openReview())),
       // 4. Yesterday's issue finished after midnight: on to today's. Otherwise the asks, if any.
       t.late ? onToToday(t, t.late.today) : asks(stake, first ? null : ask, reload),
     ),
@@ -654,9 +658,6 @@ function result(t: Today, run: State, just: boolean, notices: Child[], reload: (
       { class: "result-side page-2" },
       // 5. The day's board (none for yesterday's issue finished late: Днес hasn't its board).
       t.late ? null : () => dayBoard(fresh(), run, among),
-      // None right: the first questions are open under the score already, with the way to them all there (once they
-      // came).
-      () => (missedList()?.length ? null : reviewButton(() => openReview())),
     ),
   );
   return page;

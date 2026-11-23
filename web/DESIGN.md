@@ -122,8 +122,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      in large text, as a friend's day, the line runs under the place and the avatar too). The tab chosen stays while
      the result is open. Nothing else of a board's: no page of its own, no link to one.
 
-  Everything else is in the questions' dialog, opened by „Прегледай въпросите“ (`.more`), by a tap on the score's
-  card, and by a tile, at its question.
+  Everything else is in the questions' dialog, opened by „Прегледай въпросите“ (`.more`: under the action, on the
+  player's own page, never under the board), by a tap on the score's card, and by a tile, at its question.
 - **The questions gone over** (`reviewSheet()`, `.review-sheet`): one dialog for every game (the day's issue, a
   chapter's game, a duel), on the game's sheet: „Въпросите“ and „Затвори“ at its head, which stays as the questions
   scroll under it; under it whose they are („Брой 11 · 22 ноември · 7 от 10“, „История · 6 от 10“, „Дуел с Иво ·
@@ -184,8 +184,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   (owner, 2026-11-22): „Още нямаш приятели тук. С приятел можете да играете дуели: едни и същи десет въпроса, всеки
   ги играе, когато може. И всеки ден ще виждате как сте изиграли днешния брой. Добави приятел по потребителско име
   или имейл.“ A friend removed only after a sheet asks „Премахваш ли Иво от приятелите си?“, „Премахни“ in red and
-  „Отказ“, then at once, the duels open between them ending as if their time were up; then adding and the requests
-  sent; last, the duels played, under „Последните 10 изиграни дуела“ („Изиграни дуели“ while there are fewer: the
+  „Отказ“, then at once, the duels open between them ending as if their time were up; then adding, with the player's
+  own name to be added by under the field („Твоето потребителско име е @ivo.“), and the requests sent; last, the duels played, under „Последните 10 изиграни дуела“ („Изиграни дуели“ while there are fewer: the
   list is the last ten and says so); under the last, while there are more, „Всички изиграни дуели (37)“ opens them
   all in a dialog (`.duels-all`, as the questions' sheet: its head stays as the cards scroll under it), ten at a
   time, the latest first, each a card as in the list, and under them „По-нови“ and „По-стари“ either side of
