@@ -3493,6 +3493,18 @@
     display: grid;
   }
 
+  /* On to the next question (run.ts, moveOn): at once, the panel's words go and „Напред“ stays pressed while it comes. */
+  .after.going > :not(.after-foot) {
+    opacity: 0;
+    transition: opacity 120ms ease-out;
+  }
+
+  .run-question .after.going .btn.up-next-go {
+    cursor: progress;
+    opacity: 0.7;
+    transform: scale(0.985);
+  }
+
   /* „Напред“ is the one action of an answer: the primary's look, whatever its class says (run.ts makes it a .btn). */
   .up-next-go {
     min-height: 3.75rem;

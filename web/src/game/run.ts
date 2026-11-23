@@ -594,6 +594,10 @@ function question(
     if (!due || document.hidden) return;
     const go = due;
     due = null;
+    // On its way at once, however slow the line: the answer's panel clears, „Напред“ pressed, while the next question
+    // comes (it isn't asked for sooner: its time would start).
+    after.classList.add("going");
+    after.querySelector(".up-next-go")?.setAttribute("aria-disabled", "true");
     go();
   };
   // On by itself, unless the player has taken hold of the answer (a touch, a scroll of its panel): then it waits for
