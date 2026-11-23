@@ -97,7 +97,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      факта от Кино и телевизия са с мастило в твоя Алманах.“), the ladder from Бележка to Летопис (`ladder()`), the
      art it brings, and other ranks risen with it in a line.
   2. On the first results (a guest's first day, a game just brought here, an app's own browser): the action, right
-     under the score — keeping the game and being reminded, or the way out to the phone's browser (a button: on Android
+     under what the day wrote in the book (3: what keeping the game keeps, in the first screen) — keeping the game and being reminded, or the way out to the phone's browser (a button: on Android
      it opens the phone's browser, elsewhere it copies the link for it; the app's menu named under it, „Или от менюто
      на приложението: ··· → Отвори в Safari“); sharing then stays a quiet link beside the tiles („Сподели резултата“).
   3. What the day wrote in the book, „Днес в Алманаха“ (`game/news.ts`), on a card: the whole of its ink at a glance,

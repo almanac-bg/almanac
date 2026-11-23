@@ -534,7 +534,7 @@ const outOf = (s: State) => s.total - (s.void ?? 0);
  *   1. the score on its sheet, the tiles, how many knew the tenth, and how all of България did on average;
  *   2. what the day wrote in the book („Днес в Алманаха“: its ink, by chapter; a rank risen);
  *   3. the action: sharing it (on the first results, keeping the game and being reminded, or the way out of an app's
- *      browser, which come right under the score instead);
+ *      browser, which come right under what the day wrote instead);
  *   4. tomorrow;
  *   5. the day's board, Приятели · България (dayBoard).
  *
@@ -656,11 +656,12 @@ function result(t: Today, run: State, just: boolean, notices: Child[], reload: (
       hero,
       best,
       zero ? missed(missedList, () => openReview()) : null,
-      // The first results' action, right under the score.
-      first ? action : null,
       // 2. What the day wrote in the book. Asked on every visit: the ink is counted again; a rank risen is told once
       // (play.NewsOf).
       news(run.id, 0, undefined, best.set, "Днес в Алманаха"),
+      // The first results' action (keeping the game, or the way out of an app's browser) right under it: what the
+      // game wrote is what keeping it keeps, and on a phone it was under the ask, out of the first screen.
+      first ? action : null,
       // The streak with today's in it, lit: the day just played is what made it (owner, 2026-11-23: it grew out of
       // sight). Once the day as it stands has come.
       () => (known() && !t.late ? streakSection(fresh(), () => null, true) : null),

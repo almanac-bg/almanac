@@ -14,9 +14,10 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.getByRole("heading", { level: 1 })).toContainText("от 10");
   // A first result is quiet: the right answers, no points, XP, level or goals (the game has none).
   await expect(page.locator(".screen")).not.toContainText(/XP|[Нн]иво \d|Цели за деня|точк/);
-  // The first result's action sits right under the score: keeping the game and being reminded (or, until that's there
-  // to ask, sharing it). Chapters are played from the Алманах, duels from Приятели.
-  await expect(page.locator(".result-main > .result-score + .result-share.result-first")).toBeVisible();
+  // The first result's action sits under the score and what the day wrote in the book: keeping the game and being
+  // reminded (or, until that's there to ask, sharing it). Chapters are played from the Алманах, duels from Приятели.
+  await expect(page.locator(".result-main > :is(.result-score, .day-news) + .result-share.result-first")).toBeVisible();
+  await expect(page.locator(".result-main > .result-share.result-first ~ .day-news")).toHaveCount(0);
   // The questions gone over, in their dialog: by the button, each question with its answers.
   const review = page.getByRole("dialog", { name: "Въпросите" });
   await page.getByRole("button", { name: "Прегледай въпросите" }).click();
