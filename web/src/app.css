@@ -6690,6 +6690,11 @@
       display: grid;
     }
 
+    /* A new visitor's line under „Започни“: what the ten are is „В броя“'s, under it. */
+    .issue-words-ten {
+      display: none;
+    }
+
     /* The result: the player's own day on the left page (the score, what the day wrote, the action, tomorrow), the
        day's board on the right, the room to itself. */
     .result.spread > .result-main {

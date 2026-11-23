@@ -79,7 +79,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
     the first sent (`/duel/<id>`): never the cover's action, which is the day's ten.
   - On a big screen, under them, „В броя“: the ten chapters in their order, as a book's table of contents on the
     page (no card, no lines between: nothing in it opens).
-  - A new visitor: the cover, „Започни“, and under it „Едни и същи за цяла България.“ In an app's own browser, one
+  - A new visitor: the cover, „Започни“, and under it „Едни и същи за цяла България.“ (on a big screen „В броя“ under
+    it, as a player's, and the line under the words only „Без регистрация.“). In an app's own browser, one
     line under „Започни“: on Android „Имаш игра в браузъра? Отвори я там“, a tap that opens it; on an iPhone, where no
     link can, „Имаш игра в браузъра? Отвори я там: ··· → Отвори в Safari“, no button (`coverExit`).
   - Nothing over the issue but what came of the player's own step (a profile signed in to, a game brought here).

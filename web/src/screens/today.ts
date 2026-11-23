@@ -329,8 +329,8 @@ export function today() {
           : h("p", { class: "streak-notice", role: "status" }, streakSaid.long),
         first ? null : duelWaiting(t),
         first ? null : untold(t),
-        // A new visitor's cover says once what the ten are (issueGo): no list of them again beside it.
-        first ? null : contents(t),
+        // On a big screen the issue's contents, a new visitor's too (their right page had „Започни“ and two lines).
+        contents(t),
       ),
     );
   }
@@ -445,7 +445,13 @@ function issueGo(start: () => void, at: number, error: string, first: boolean): 
           "div",
           { class: "issue-words" },
           h("h2", null, "Едни и същи за цяла България."),
-          h("p", { class: "deck" }, "По един въпрос от всяка от десетте теми, от лесен към труден. Без регистрация."),
+          h(
+            "p",
+            { class: "deck" },
+            // Said by „В броя“ under it on a big screen: there, only „Без регистрация.“
+            h("span", { class: "issue-words-ten" }, "По един въпрос от всяка от десетте теми, от лесен към труден. "),
+            "Без регистрация.",
+          ),
         )
       : null,
   ];
