@@ -263,6 +263,10 @@ test("on a big screen a chapter's entries are one column, the latest first, top 
   expect(new Set(boxes.map((b) => Math.round(b.left))).size).toBe(1);
   for (const [i, b] of boxes.slice(1).entries()) expect(b.top).toBeGreaterThan(boxes[i]?.bottom ?? 0);
   expect(boxes[0]?.width).toBeLessThanOrEqual(44 * 16 + 1);
+  // Scrolled to its last fact, the chapter's head and its „Играй“ are still beside them: no half a screen left empty.
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const play = await page.getByRole("link", { name: "Играй 10 въпроса" }).boundingBox();
+  expect(play && play.y >= 0 && play.y + play.height <= 900).toBe(true);
 });
 
 test("a chapter the book doesn't have is the page that isn't there; the book with a slash after it is the book", async ({

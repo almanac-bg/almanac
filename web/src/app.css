@@ -5436,8 +5436,17 @@
       min-height: 12.5rem;
     }
 
+    /* The chapter's head stays beside its facts as they scroll (a long chapter is thousands of pixels): never a half
+       screen left empty. Only where the screen is tall enough to hold it whole, its „Играй“ with it. */
     .chapter.spread > .page-1 {
       grid-column: 1 / span 5;
+    }
+
+    @media (min-height: 37.5rem) {
+      .chapter.spread > .page-1 {
+        position: sticky;
+        top: var(--space-4);
+      }
     }
 
     /* The facts in one column, a reading width (its head and search with it): a book reads top to bottom, the latest
