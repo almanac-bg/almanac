@@ -13,13 +13,17 @@
 #
 #   live: <commit> <title>      the game plays it
 #
-# or, with exit 1, that the server refused it or didn't say. One run at a time: a second waits for the first.
+# or, with exit 1, that the server refused it or didn't say. One run at a time, and never beside a deploy (deploy.sh
+# takes the same lock): a second run, or a deploy, waits for the first, as it waits for a deploy. A reload's work (the
+# days ahead drawn again) during a deploy's health watch could pass for the new version's fault, and send it back
+# (23 Nov 2026).
 set -eu
 repo=/srv/almanac-bank
+lock=/run/almanac-deploy.lock # deploy.sh's too
 
-exec 9>/run/almanac-bank.lock
+exec 9>"$lock"
 if ! flock -n 9; then
-	echo "another almanac-bank is under way: waiting for it"
+	echo "a deploy, or another almanac-bank, is under way: waiting for it"
 	flock 9
 fi
 

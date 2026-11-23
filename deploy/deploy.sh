@@ -8,8 +8,10 @@
 # It runs as a unit of its own (almanac-deploy-v2.0.0: journalctl -u), and whoever started it follows its output: a
 # deploy goes to its end, going back included, even if the session that started it is cut (CI cancelled, the network
 # gone; Ctrl-C stops only the following: `systemctl stop almanac-deploy-v2.0.0` stops the deploy). One deploy at a
-# time: a second waits for the first. A version that is live already is left as it is, so CI asks for the latest
-# release after every merge, and a deploy that didn't happen is tried again.
+# time: a second waits for the first. Nor beside a bank reload (almanac-bank, bank.sh, takes the same lock): each
+# waits for the other, as a reload's work (the days ahead drawn again) during the health watch below could pass for
+# the new version's fault, and send it back (23 Nov 2026). A version that is live already is left as it is, so CI asks
+# for the latest release after every merge, and a deploy that didn't happen is tried again.
 #
 # A release that went back for not being healthy is marked (/var/lib/almanac-deploy/unhealthy-vX.Y.Z, its first line
 # says why), and CI doesn't ask for it again: every merge would cut play twice for a release that fails the same way.
@@ -76,12 +78,12 @@ data=/var/lib/almanac
 link=/usr/local/bin/almanac
 marks=/var/lib/almanac-deploy
 signers=/etc/almanac/release-signers
-lock=/run/almanac-deploy.lock
+lock=/run/almanac-deploy.lock # bank.sh's too
 
 trap '' PIPE # its output is the journal's; nothing that reads it going away may stop it
 exec 9>"$lock"
 if ! flock -n 9; then
-	echo "another deploy is under way: $tag waits for it"
+	echo "another deploy, or a bank reload (almanac-bank), is under way: $tag waits for it"
 	flock 9
 fi
 

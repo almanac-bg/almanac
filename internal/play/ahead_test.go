@@ -1,6 +1,7 @@
 package play
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -361,4 +363,135 @@ func mustTx(t *testing.T, w *world) *sql.Tx {
 	}
 	t.Cleanup(func() { _ = tx.Rollback() })
 	return tx
+}
+
+// A bank reload that leaves the days ahead to draw again (here every day after tomorrow, its kinds changed: 23 Nov
+// 2026, 1,287 questions changed kind) never holds the game's one writer while it draws: the days are worked out
+// outside any transaction and written one day at a time, so a player's answer, or the health probe's write, goes
+// through within a second however long the drawing takes. Held in one transaction, the drawing timed the probe out,
+// and the deploy under way went back for it.
+func TestDaysDrawnAgainLetWritesThrough(t *testing.T) {
+	w := setup(t)
+	w.use(biggerSample(t, 20))
+	ctx := t.Context()
+	if err := w.g.EnsureDays(ctx); err != nil {
+		t.Fatal(err)
+	}
+	b := w.inPlay.Load()
+	today := w.g.Today()
+	before, err := storedDays(mustTx(t, w), DayShift(today, 2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(before) < 10 {
+		t.Fatalf("%d days after tomorrow drawn: too few to tell", len(before))
+	}
+	// A choice of every day after tomorrow turns into a true-or-not: every one of them is misshapen.
+	turned := map[string]bool{}
+	for _, picks := range before {
+		for _, p := range picks {
+			if q, _ := b.Get(p.ID); q.Base().Type == "choice" && !bank.HasPictures(q) {
+				turned[p.ID] = true
+				break
+			}
+		}
+	}
+	qs := slices.Clone(b.Questions)
+	for i, q := range qs {
+		if turned[q.Base().ID] {
+			c := q.(*bank.Choice)
+			qs[i] = &bank.TrueFalse{Head: bank.Head{ID: c.ID, Type: "truefalse", Difficulty: c.Difficulty,
+				Text: "Твърдение.", Category: c.Category}, Answer: true, Tail: c.Tail}
+		}
+	}
+	changed := bank.Of(b.Categories, qs)
+	w.swap(changed)
+
+	// Each day drawn takes a while (the real bank's do, on the server, many times the sample's).
+	const each = 100 * time.Millisecond
+	started := make(chan struct{})
+	var once sync.Once
+	w.g.drawn = func(string) {
+		once.Do(func() { close(started) })
+		time.Sleep(each)
+	}
+	done := make(chan error, 1)
+	go func() { done <- w.g.EnsureDays(ctx) }()
+	<-started
+	writes := 0
+	for finished := false; !finished; {
+		write, cancel := context.WithTimeout(ctx, time.Second)
+		at := time.Now()
+		_, err := w.db.Write.ExecContext(write, `INSERT INTO kv (key, value) VALUES ('health', ?)
+			ON CONFLICT (key) DO UPDATE SET value = excluded.value`, at.UnixMilli())
+		cancel()
+		if err != nil {
+			t.Fatalf("a write while the days are drawn again, after %v: %v", time.Since(at), err)
+		}
+		writes++
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Fatal(err)
+			}
+			finished = true
+		case <-time.After(each / 2):
+		}
+	}
+	after, err := storedDays(mustTx(t, w), DayShift(today, 2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for day, picks := range after {
+		if !shaped(changed, picks) || slices.Equal(picks, before[day]) {
+			t.Errorf("%s wasn't drawn again by the day's kinds", day)
+		}
+	}
+	// The sample, a true-or-not for a choice of each day, runs short of a place a day or two sooner as drawn again.
+	if len(after) < len(before)/2 || writes < len(after) {
+		t.Errorf("%d days after tomorrow drawn again (%d before), %d writes went through meanwhile", len(after),
+			len(before), writes)
+	}
+}
+
+// The day turns while the days ahead are drawn: none of them is written for the day that ended (the new today is a
+// player's to draw), and the next keeping goes on from the new day, its days ahead whole.
+func TestDayTurnsWhileTheDaysAreDrawn(t *testing.T) {
+	w := setup(t)
+	w.use(biggerSample(t, 20))
+	ctx := t.Context()
+	if err := w.g.EnsureDays(ctx); err != nil {
+		t.Fatal(err)
+	}
+	was := w.g.Today()
+	before, err := storedDays(mustTx(t, w), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = w.db.Write.Exec(`UPDATE kv SET value = 'older rules' WHERE key = 'days_drawn_by'`)
+	w.swap(bank.Of(w.b.Categories, w.b.Questions)) // a bank reloaded: the days are kept up with it
+	var once sync.Once
+	w.g.drawn = func(string) { once.Do(func() { w.wait(24 * time.Hour) }) }
+	if err := w.g.EnsureDays(ctx); err != nil {
+		t.Fatal(err)
+	}
+	w.g.drawn = nil
+	now, err := storedDays(mustTx(t, w), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for day := range now {
+		if day > DayShift(was, 1) {
+			t.Errorf("%s written for a day that had ended", day)
+		}
+	}
+	if !slices.Equal(now[was], before[was]) || !slices.Equal(now[DayShift(was, 1)], before[DayShift(was, 1)]) {
+		t.Error("the day that ended, or its tomorrow, changed")
+	}
+	if err := w.g.EnsureDays(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if after, _ := storedDays(mustTx(t, w), DayShift(was, 2)); len(after) < len(before)/2 {
+		t.Errorf("%d days ahead of the new day drawn, %d stored before", len(after), len(before))
+	}
 }

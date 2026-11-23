@@ -1,9 +1,11 @@
-// Package deploy holds the tests of the server's deploy scripts (deploy.sh, deploy-ci.sh): there's no Go here
-// besides. deploy.sh runs against a machine made of stubs in a temporary directory (the server, systemd, curl, the
-// clock), each of its ways through played out: the restart, going back, the marks, the checks of a release.
+// Package deploy holds the tests of the server's deploy scripts (deploy.sh, deploy-ci.sh, bank.sh): there's no Go
+// here besides. deploy.sh runs against a machine made of stubs in a temporary directory (the server, systemd, curl, the
+// clock), each of its ways through played out: the restart, going back, the marks, the checks of a release; and beside
+// bank.sh, never at once.
 package deploy
 
 import (
+	"bytes"
 	"fmt"
 	"maps"
 	"os"
@@ -12,7 +14,10 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"sync"
+	"syscall"
 	"testing"
+	"time"
 )
 
 // The stubs: what deploy.sh calls on a server, each a script acting on the world's files (WORLD): the clock, the
@@ -242,10 +247,7 @@ func (m *machine) publish(r release) {
 func (m *machine) deploy(args ...string) (string, int) {
 	m.t.Helper()
 	os.Remove(filepath.Join(m.world, "log"))
-	cmd := exec.Command("/bin/sh", append([]string{m.script}, args...)...)
-	cmd.Env = append(os.Environ(), "PATH="+filepath.Join(m.root, "stubs")+":"+os.Getenv("PATH"), "WORLD="+m.world,
-		"LINK="+m.link, "DATA="+m.data, "TMPDIR="+filepath.Join(m.root, "tmp"), "ALMANAC_DEPLOY_UNIT=1")
-	out, err := cmd.CombinedOutput()
+	out, err := m.command(m.script, args...).CombinedOutput()
 	code := 0
 	if e, ok := err.(*exec.ExitError); ok {
 		code = e.ExitCode()
@@ -256,6 +258,14 @@ func (m *machine) deploy(args ...string) (string, int) {
 		m.t.Errorf("left behind in the temporary directory: %v", left)
 	}
 	return string(out), code
+}
+
+// command runs a script on the machine, its stubs first on the PATH (deploy.sh as its own unit already).
+func (m *machine) command(script string, args ...string) *exec.Cmd {
+	cmd := exec.Command("/bin/sh", append([]string{script}, args...)...)
+	cmd.Env = append(os.Environ(), "PATH="+filepath.Join(m.root, "stubs")+":"+os.Getenv("PATH"), "WORLD="+m.world,
+		"LINK="+m.link, "DATA="+m.data, "TMPDIR="+filepath.Join(m.root, "tmp"), "ALMANAC_DEPLOY_UNIT=1")
+	return cmd
 }
 
 // log is what the stubs saw, in order: systemctl's calls.
@@ -489,4 +499,121 @@ func TestBackCutOff(t *testing.T) {
 	if !strings.HasPrefix(l[len(l)-1], "systemctl start almanac.socket almanac") {
 		t.Fatalf("not started again: %v\n%s", l, out)
 	}
+}
+
+// A deploy and a bank reload never run at once: both take one lock, the same file on the server, and each waits for
+// the other, saying so. A reload's work during a deploy's health watch sent a healthy release back (23 Nov 2026).
+func TestDeployAndBankShareALock(t *testing.T) {
+	t.Parallel()
+	lockOf := func(script string) string {
+		t.Helper()
+		src, err := os.ReadFile(script)
+		if err != nil {
+			t.Fatal(err)
+		}
+		set := regexp.MustCompile(`(?m)^lock=(\S+)`).FindAllStringSubmatch(string(src), -1)
+		if len(set) != 1 {
+			t.Fatalf("%s sets its lock %d times, not once", script, len(set))
+		}
+		return set[0][1]
+	}
+	if d, b := lockOf("deploy.sh"), lockOf("bank.sh"); d != b {
+		t.Fatalf("deploy.sh locks %s, bank.sh %s: they'd run at once", d, b)
+	}
+	for _, c := range []struct {
+		name, says string
+		run        func(m *machine) *exec.Cmd
+		ran        func(m *machine) bool
+	}{
+		{"a deploy waits for a bank reload", "a bank reload (almanac-bank), is under way: v1.0.1 waits for it",
+			func(m *machine) *exec.Cmd { m.publish(healthy); return m.command(m.script, "v1.0.1", "ci") },
+			func(m *machine) bool { return m.restarted() }},
+		{"a bank reload waits for a deploy", "a deploy, or another almanac-bank, is under way: waiting for it",
+			func(m *machine) *exec.Cmd { return m.command(m.bankScript()) },
+			func(m *machine) bool { return slices.Contains(m.log(), "git fetch") }},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			m := newMachine(t)
+			// flock as util-linux's takes it on a descriptor the shell holds open (in perl: macOS has no flock).
+			m.write(filepath.Join(m.root, "stubs", "flock"), `#!/bin/sh
+nb=0
+if [ "$1" = -n ]; then nb=1; shift; fi
+exec perl -e 'use Fcntl ":flock"; open(my $f, ">&=", $ARGV[0]) or exit 2; flock($f, LOCK_EX | ($ARGV[1] ? LOCK_NB : 0)) or exit 1' "$1" "$nb"
+`, 0o755)
+			// The other one, under way: it holds the lock.
+			held, err := os.OpenFile(filepath.Join(m.root, "lock"), os.O_CREATE|os.O_WRONLY, 0o644)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer held.Close()
+			if err := syscall.Flock(int(held.Fd()), syscall.LOCK_EX); err != nil {
+				t.Fatal(err)
+			}
+			var out lockedBuffer
+			cmd := c.run(m)
+			cmd.Stdout, cmd.Stderr = &out, &out
+			if err := cmd.Start(); err != nil {
+				t.Fatal(err)
+			}
+			for deadline := time.Now().Add(10 * time.Second); !strings.Contains(out.String(), c.says); {
+				if time.Now().After(deadline) {
+					_ = cmd.Process.Kill()
+					t.Fatalf("doesn't say %q:\n%s", c.says, out.String())
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			time.Sleep(300 * time.Millisecond) // time enough to go on, were it not waiting
+			if c.ran(m) {
+				t.Fatalf("went on while the other held the lock: %v", m.log())
+			}
+			if err := syscall.Flock(int(held.Fd()), syscall.LOCK_UN); err != nil {
+				t.Fatal(err)
+			}
+			_ = cmd.Wait()
+			if !c.ran(m) {
+				t.Fatalf("didn't go on once the lock was free: %v\n%s", m.log(), out.String())
+			}
+		})
+	}
+}
+
+// bankScript is bank.sh on the machine, its lock deploy.sh's, and its checkout a folder of the machine's (the git
+// stub only says what it was asked, and fails: the test goes as far as the lock).
+func (m *machine) bankScript() string {
+	m.t.Helper()
+	src, err := os.ReadFile("bank.sh")
+	if err != nil {
+		m.t.Fatal(err)
+	}
+	script := string(src)
+	for key, path := range map[string]string{"lock": filepath.Join(m.root, "lock"), "repo": filepath.Join(m.root, "repo")} {
+		re := regexp.MustCompile(`(?m)^` + key + `=.*$`)
+		if n := len(re.FindAllString(script, -1)); n != 1 {
+			m.t.Fatalf("bank.sh sets %s %d times, not once", key, n)
+		}
+		script = re.ReplaceAllLiteralString(script, key+"="+path)
+	}
+	m.write(filepath.Join(m.root, "stubs", "git"), "#!/bin/sh\n"+`echo "git $3" >>"$WORLD/log"; exit 1`+"\n", 0o755)
+	path := filepath.Join(m.root, "bank.sh")
+	m.write(path, script, 0o755)
+	return path
+}
+
+// lockedBuffer is a script's output, read while it runs.
+type lockedBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (l *lockedBuffer) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *lockedBuffer) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
 }
