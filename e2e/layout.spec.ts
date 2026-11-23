@@ -905,6 +905,23 @@ test("a switch in Настройки is its whole row to tap, words and all", as
   await expect(sounds).not.toHaveAttribute("aria-checked", was ?? "");
 });
 
+test("Настройки' three-way switch: every choice on one line, on a 320px phone too", async ({ page }) => {
+  for (const width of [320, 375]) {
+    await page.setViewportSize({ width, height: 740 });
+    await page.goto("/settings");
+    const choices = page.getByRole("radio");
+    await expect(choices.first()).toBeVisible();
+    const lines = await choices.evaluateAll((all) =>
+      all.map((b) => {
+        const r = document.createRange();
+        r.selectNodeContents(b);
+        return `${b.textContent}: ${r.getClientRects().length}`;
+      }),
+    );
+    expect(lines, `${width}px`).toEqual(lines.map((l) => l.replace(/\d+$/, "1")));
+  }
+});
+
 /** Controls on their own (not a link inside a sentence) whose tap reaches them less than 44px high: tried by
  * elementFromPoint 21px above and below each one's middle, so a target drawn smaller with room around it to tap
  * (a pill's padding, a row's height) counts as what a finger has. */

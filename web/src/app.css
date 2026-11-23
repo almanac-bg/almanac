@@ -3519,7 +3519,7 @@
   /* Tabs that switch what a screen shows: a well, the chosen one a raised surface, both pills; a setting's few choices
      the same, as radios. */
   /* Its choices of one width, unless one's longest word needs more („Като устройството“): that one wider, its words
-     whole, never broken inside one. */
+     whole, never broken inside one (on a phone each as wide as its words, below). */
   .segmented {
     display: inline-grid;
     grid-auto-columns: minmax(min-content, 1fr);
@@ -3533,9 +3533,12 @@
 
   /* On a phone a switch is the screen's width, its choices sharing it: a target the thumb finds, not a pill on the
      left. */
+  /* Each choice as wide as its words, the room left shared among them: one of equal thirds broke „Като устройството“
+     onto two lines. */
   @media (max-width: 47.99rem) {
     .segmented {
       display: grid;
+      grid-auto-columns: auto;
       justify-self: stretch;
     }
   }
@@ -3551,6 +3554,13 @@
     color: var(--ink-3);
     font: 800 0.9375rem / 1.1 var(--font-sans);
     cursor: pointer;
+  }
+
+  /* A phone: a little less room either side of a choice's words, so that the three fit a 320px phone whole. */
+  @media (max-width: 47.99rem) {
+    .segmented button {
+      padding-inline: 12px;
+    }
   }
 
   .segmented button:is([aria-selected="true"], [aria-checked="true"]) {
