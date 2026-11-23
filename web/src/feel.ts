@@ -325,7 +325,9 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands, gap = 
     at(i * gap, () => play(li.classList.contains("wrong") ? "dud" : "pip", lift));
   });
   const lands = Math.max(700, (pips.length - 1) * gap + 160);
-  const score = hero.querySelector(".score");
+  // The numeral alone lands: „от 10“ beside it is there from the start, the place it fills (the whole score hidden
+  // left a hole the size of the screen's biggest number for most of a second).
+  const score = hero.querySelector(".score-n");
   if (score)
     moving.push(
       score.animate(
