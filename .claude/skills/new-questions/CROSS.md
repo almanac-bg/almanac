@@ -22,7 +22,7 @@ and `<batch>` (this batch's folder).
    the key wrong → fix it, or drop the question; two answers defensible (an option that can be argued, a text read
    two ways, a value that differs by source) → change the wording or the option until one holds, or drop it; the key
    right and one reading → keep it. Don't open the answers to look for more: only these are doubts.
-1. **Pairs across categories.** Find every pair (or more) of questions across the ten verified files that ask the same
+1. **Pairs across categories.** Run `cd <repo> && go run ./cmd/almanac bank related -from <batch>/verify/general,<batch>/verify/science,…` (all ten verified folders, comma-separated) `<bank>`: under each question, the ten most like it in the bank and the whole batch, with their text, answer and fact. Read every list. Find every pair (or more) of questions across the ten verified files that ask the same
    thing, share an answer about the same subject, or give each other away: a text, option, item, clue or fact that
    names another's answer, or shows a value an order or number question asks. For each, keep exactly one, the best
    written, in the category it fits best; drop or fix the others. Check the drops in the checkers' `verify/<cat>.md` too: a

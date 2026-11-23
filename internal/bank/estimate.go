@@ -216,3 +216,19 @@ func ruleOwnNumber(q Question) []string {
 	}
 	return out
 }
+
+// EasyYearSince is when the easy-year rule became an error for new questions.
+const EasyYearSince = "2026-11-24"
+
+// ruleEasyYear: an easy number doesn't ask a year. A year is right only within a fifth of its tolerance (±2 for 1990,
+// ±3 for 1878), and three adults in four know that closely only the dates everyone is taught or lived through (1878,
+// 1944, 1989): the year a film came out, a singer died or a phone was launched is a fan's, medium at best. The audit of
+// a sample of the bank (24 Nov 2026) found most of its 160 easy years mislabelled. A date everyone has met is waived,
+// its why naming why everyone knows it.
+func ruleEasyYear(q Question) []string {
+	if n, ok := q.(*Number); ok && n.Difficulty == Easy && n.IsYear() {
+		return []string{"an easy number asks a year: only a date everyone is taught or lived through is easy (a waiver says which); " +
+			"otherwise medium or hard, or ask it as a choice of years far apart"}
+	}
+	return nil
+}

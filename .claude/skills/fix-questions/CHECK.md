@@ -19,7 +19,7 @@ chunk's name.
 1. **Every changed and every new question** as a new question is checked (`<repo>/.claude/skills/new-questions/VERIFY.md`
    §"Check every question"): the answer right under every source and no other option right; the fact and the `day`
    line true and claiming no more than the sources; one reading; the difficulty by the rubric; no give-away and no
-   near-duplicate (grep the bank); pictures and licences; Bulgarian. Confirm from pages you open yourself.
+   near-duplicate (grep the bank, and read each against the ten `bank related -from <work>/fix/<chunk>` lists under it); pictures and licences; Bulgarian. Confirm from pages you open yourself.
 2. **The decision**: a change still asks the same thing (else it should have been a replacement); a replacement is in
    the same cell (or a choice for `estimate`), and the retirement's `why` is honest; a waiver is a true exception; a
    `keep` really passes its rule; the problem the item had is gone, and no new one came in.
