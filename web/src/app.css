@@ -3402,6 +3402,26 @@
     text-wrap: pretty;
   }
 
+  /* The day's issue: a fact as the book has it, in grey where the answer wrote nothing, and in ink where it wrote it,
+     come in grey and darkened to ink once as it shows (run.ts, inkable); with less motion, in ink at once. */
+  .fact.grey > p {
+    color: var(--grey);
+  }
+
+  .fact.inking > p {
+    animation: inking 350ms ease-in-out 100ms both;
+  }
+
+  @keyframes inking {
+    from {
+      color: var(--grey);
+    }
+
+    to {
+      color: var(--ink);
+    }
+  }
+
   .fact-day {
     display: grid;
     gap: 6px;

@@ -676,7 +676,7 @@ function question(
         theirLine(them, res.state.against?.[q.n]),
         // Ink, said where it was written, as the server says it was (in the issue, met there first): grey isn't said.
         res.ink && res.reveal.fact ? filed(q.chapter) : null,
-        fact(res.reveal.fact, res.reveal.day),
+        inkable(fact(res.reveal.fact, res.reveal.day), s.kind === "day" && !!res.reveal.fact, !!res.ink),
         res.reveal.credit ? pictureCredit(res.reveal.credit) : null,
         res.reveal.credits?.length ? h("p", { class: "credit" }, creditsWords(res.reveal.credits)) : null,
         upNext(lasts, res.state.done ? "Резултатът идва след малко…" : `Въпрос ${q.n + 2} идва след малко…`),
@@ -715,6 +715,9 @@ function question(
     at(beats.crowd, () => shows(crowd));
     at(beats.fact, () => {
       for (const part of rest) shows(part);
+      // Written in ink: the fact, come in the book's grey, darkens to ink once, as it shows (app.css, .inking).
+      for (const part of rest)
+        if (part instanceof HTMLElement && part.classList.contains("ink")) part.classList.add("inking");
       // Where answering took the focus away with it (a pad, a list, a deck gone for their answer), it goes to the way
       // on; on an answer chosen, it stays there.
       const focus = document.activeElement;
@@ -847,6 +850,13 @@ function rightSaid(view: View, reveal: Reveal, kind: VerdictKind): Child {
 function names(text: string, answer: string): boolean {
   const word = answer.replaceAll("\u00ad", "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(?<!\\p{L})${word}(?!\\p{L})`, "iu").test(text.replaceAll("\u00ad", ""));
+}
+
+/** A fact of the day's issue as the book has it: in grey where the answer wrote nothing (a miss, a fact met before),
+ * and where it wrote it in ink, marked to darken to ink as it shows (`inking`). Other games' facts are as they are. */
+function inkable(part: Child, day: boolean, ink: boolean): Child {
+  if (day && part instanceof HTMLElement) part.classList.add(ink ? "ink" : "grey");
+  return part;
 }
 
 /** How long what the player chose stays chosen before the answer shows, however quick the line. */
