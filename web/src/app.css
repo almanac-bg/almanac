@@ -5241,7 +5241,22 @@
     hyphens: auto;
     border-radius: var(--r-2);
     background: var(--surface);
-    box-shadow: inset 6px 0 0 var(--ink);
+  }
+
+  /* Ink's mark: a straight bar of ink down the entry's left edge, round at its ends, clear of the card's corners
+     (an inset edge on a round card bent into a crescent). */
+  .entry.ink {
+    position: relative;
+  }
+
+  .entry.ink::before {
+    content: "";
+    position: absolute;
+    inset-block: 14px;
+    left: 6px;
+    width: 4px;
+    border-radius: 2px;
+    background: var(--ink);
   }
 
   .entry-when {
@@ -5299,9 +5314,10 @@
     font-size: 0.8125rem;
   }
 
+  /* Grey, as met: a hairline, quieter than ink, never a control's frame (nothing in it to tap but its picture). */
   .entry.met {
     background: transparent;
-    box-shadow: inset 0 0 0 1.5px var(--line-2);
+    box-shadow: inset 0 0 0 1.5px var(--line);
     color: var(--grey);
   }
 

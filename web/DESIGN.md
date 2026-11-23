@@ -153,7 +153,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   half-way today shows under the head, where it stopped, with „Продължи“ (its cross comes back here).
 - **A chapter:** its head on its sheet (glyph, name, the seal, its ink, and under them as wide as the head its bar,
   the rank and „още 16 до „Книга““ under it: `standing()`), „Играй 10 въпроса“, then its facts, the latest first, each as tall as it holds:
-  ink black, facts met in grey (a thin solid 1.5px grey outline, lighter text). An entry reads in the order it was lived:
+  ink black on a white card, a straight bar of ink down its left edge; facts met in grey (a hairline, `--line`, lighter
+  text: quieter than ink, never a control's frame). An entry reads in the order it was lived:
   the dateline, the question small and muted (a kicker), the answer as the headword (big, bold) between it and the
   fact, then the fact in body text; a statement has no question, its headword right under the dateline; an answer of
   parts a line each. A picture question shows its picture (a choice of pictures, its answer's) beside the question and
