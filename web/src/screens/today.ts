@@ -499,7 +499,6 @@ function streakSection(t: Today, stats: () => Stats | null, done: boolean, said?
       {
         class: done ? "streak-chip today-streak" : "streak-chip today-streak unlit",
         href: "/me",
-        "aria-label": `Серия: ${days} дни`,
       },
       picture("flame", "streak-flame tone-flame"),
       h("b", { class: "status-n" }, String(days)),
