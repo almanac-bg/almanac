@@ -31,7 +31,7 @@ func TestAddPutsABatchIn(t *testing.T) {
 	write(t, filepath.Join(batch, "general.json"), `[
   {"id": "`+id+`", "type": "choice", "difficulty": "easy", "text": "Коя е най-високата планина в България?", "answer": "Рила",
    "wrong": ["Пирин", "Витоша", "Странджа"], "fact": "Връх Мусала е висок 2925 м — най-високият на Балканския полуостров.",
-   "added": "`+today+`", "updated": "`+today+`", "bg": true, "sources": ["https://bg.wikipedia.org/wiki/Рила"]}
+   "added": "`+today+`", "updated": "`+today+`", "bg": true, "theme": "other", "sources": ["https://bg.wikipedia.org/wiki/Рила"]}
 ]`)
 	write(t, filepath.Join(batch, RetireFile), `[{"id": "`+old+`", "why": "twin", "by": "`+id+`"}]`)
 
@@ -195,7 +195,7 @@ func TestAddChangesQuestions(t *testing.T) {
 	write(t, filepath.Join(batch, "general.json"), "["+strings.Trim(first, "[]")+", "+strings.Trim(second, "[]")+`,
   {"id": "`+added+`", "type": "choice", "difficulty": "easy", "text": "Коя е най-високата планина в България?", "answer": "Рила",
    "wrong": ["Пирин", "Витоша", "Странджа"], "fact": "Връх Мусала е висок 2925 м — най-високият на Балканския полуостров.",
-   "added": "`+today+`", "updated": "`+today+`", "bg": true, "sources": ["https://bg.wikipedia.org/wiki/Рила"]}]`)
+   "added": "`+today+`", "updated": "`+today+`", "bg": true, "theme": "other", "sources": ["https://bg.wikipedia.org/wiki/Рила"]}]`)
 
 	before, _ := os.ReadFile(filepath.Join(dir, QuestionsDir, "general.json"))
 	if res, err := Add(dir, batch, "content-pass test", true); err != nil || res.Added != 1 || res.Changed != 2 || res.Retired != 0 {

@@ -30,6 +30,9 @@ const StrictFrom = "2026-11-17"
 // errors for new questions.
 const AuditFrom = "2026-11-21"
 
+// UnitFrom is when the unit rule became an error for new questions.
+const UnitFrom = "2026-11-23"
+
 // WaiversFile lists, in a bank's directory, the questions a rule doesn't hold for, and why: [{"id", "rule", "why"}].
 // It belongs to the bank (its ids are that bank's questions), so the private bank keeps its own.
 const WaiversFile = "waivers.json"
@@ -74,6 +77,7 @@ var Rules = []Rule{
 	{Name: "stale", Says: "wording that can stop being true („към 2026 г.“, „все още“, a record held) has reviewBy", one: ruleStale},
 	{Name: "present", Says: "a career, a show or an office told as now (играе за, води предаването, е президент на), with no year, has reviewBy", From: AuditFrom, one: ruleStalePresent},
 	{Name: "estimate", Says: "a number question is an estimate: a year, or a quantity over 20 of its steps (a small count is a choice)", one: ruleEstimate},
+	{Name: "unit", Says: "a number has its unit, or with none asks a year (коя година) or names its count (колко…): never a quantity left bare", From: UnitFrom, one: ruleUnit},
 	{Name: "anchor", Says: "an estimate counts what a well-read player can place, not an archive's count (episodes, seats, words, prize money)", Hint: true, one: ruleAnchor},
 	{Name: "countable", Says: "a number doesn't count a list's items (works, awards, articles, seats, goals, times) unless a waiver names its anchor", From: AuditFrom, one: ruleCountable},
 	{Name: "closing", Says: "a hard number can close the day: it is an estimate (Bank.Estimate: a quantity with a unit, over 20, not a count of a list)", Hint: true, all: ruleClosing},

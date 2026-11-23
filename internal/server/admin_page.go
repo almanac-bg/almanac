@@ -91,6 +91,17 @@ action="/admin/players/{{.Player}}/reports/resolve"><button class="link">Вси�
 </div>
 </section>
 
+<section class="admin-section" id="suspects">
+<h2>Под съмнение ({{n .SuspectsAll}})</h2>
+<p class="muted">Въпроси, при които отговорите на играчите говорят срещу верния отговор: грешен избор, който събира
+повече от верния; твърдение, за което повечето казват обратното; число, което повечето пишат далеч на една страна.
+Провери ги по източник.{{if gt .SuspectsAll (len .Suspects)}} Тук са {{len .Suspects}} с най-много отговори.{{end}}</p>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th>Въпрос</th><th class="num">Отговори</th></tr></thead><tbody>
+{{range .Suspects}}<tr><td>{{.ID}} · {{.Text}}<br><span class="muted">{{.Answer}} · {{.Says}}</span></td><td class="num">{{n .Answers}}</td></tr>
+{{else}}<tr><td colspan="2" class="muted">Няма.</td></tr>{{end}}
+</tbody></table></div>
+</section>
+
 <div class="admin-pair">
 <section class="admin-section" id="hardest">
 <h2>Най-трудните</h2>

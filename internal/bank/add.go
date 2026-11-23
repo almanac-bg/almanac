@@ -39,9 +39,10 @@ type Added struct {
 // Add puts a batch (from) into the bank in dir: its new questions at the end of their categories' files, its changed
 // ones in their places, the questions it retires marked so, its pictures among the bank's. It checks first and writes
 // nothing unless all of it holds: each question decodes strictly, of a kind the game deals (KindOn: never a new one
-// Off, nor a change into one); a new one takes the next numbers of its own category's ids; a changed one is a live
-// question of that category, keeps its added, is updated today, and is changed today if and only if what it asks
-// changed (askedChanges); and the bank with the batch in it loads with no errors. The files are written in the bank's
+// Off); a new one takes the next numbers of its own category's ids and is added today or in the few days before
+// (newFaults); a changed one is a live question of that category and of the same kind (never another: a day drawn
+// already holds it in a place of its kind), keeps its added, is updated today, and is changed today if and only if
+// what it asks changed (askedChanges); and the bank with the batch in it loads with no errors. The files are written in the bank's
 // format. checkedBy, if set, marks every new or changed question checked today by it (Tail.Checked, CheckedBy) where the batch doesn't say (a changed one: says no other than the bank).
 // dry checks only: the bank stays as it is.
 func Add(dir, from, checkedBy string, dry bool) (Added, error) {
@@ -105,6 +106,9 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 			case n <= last:
 				fault("%s.json:%d: %s: the bank has numbers up to %s-%d already: a new question takes the next free one",
 					c.ID, item.line, id, prefix, last)
+			}
+			for _, f := range newFaults(item.q, today) {
+				fault("%s: %s", at, f)
 			}
 			if t := item.q.Extra(); checkedBy != "" && t.CheckedBy == "" {
 				t.Checked, t.CheckedBy = today, checkedBy
@@ -251,6 +255,35 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 	return res, nil
 }
 
+// NewWithin is how many days before today a new question's added may be: the days a batch takes from its plan (whose
+// date its questions carry) to the bank.
+const NewWithin = 7
+
+// newFaults is what's wrong with q as a new question, today: it says when it joins the bank (added: today, or the day
+// its batch was planned, at most NewWithin days ago), and isn't retired. Every rule for a new question is read off
+// that date (the fact, the sources, the theme, the strict rules: RulesFrom, SourcesFrom, StrictFrom…), so a question
+// without one, or with an old one, would go in held to none of them.
+func newFaults(q Question, today string) []string {
+	t := q.Extra()
+	day, _ := time.Parse(time.DateOnly, today)
+	from := day.AddDate(0, 0, -NewWithin).Format(time.DateOnly)
+	var out []string
+	switch {
+	case t.Added == "":
+		out = append(out, fmt.Sprintf("a new question says when it's added: added is today (%s)", today))
+	case t.Added > today || t.Added < from:
+		out = append(out, fmt.Sprintf("added is %s: a new question is added today (%s), or within the %d days before, "+
+			"its batch's", t.Added, today, NewWithin))
+	}
+	if t.Updated > today {
+		out = append(out, fmt.Sprintf("updated is %s, a day still to come (today is %s)", t.Updated, today))
+	}
+	if t.Retired {
+		out = append(out, "a new question isn't retired")
+	}
+	return out
+}
+
 // changeFaults is what's wrong with q as a change to the bank's question old, in a batch's file of category, today:
 // old is a live question of that category; q keeps its added, is updated today, and is changed today if what it asks
 // changed, or keeps its changed if only the rest did (its fact, its labels, its sources).
@@ -263,6 +296,12 @@ func changeFaults(old, q Question, category, today string) []string {
 		return []string{"retired: a retired question isn't changed (a new one takes its place)"}
 	case t.Retired:
 		return []string{"a batch retires a question in " + RetireFile}
+	case old.Base().Type != q.Base().Type:
+		// A day drawn ahead holds this question in a place of its kind (play: daySlots), and today's is being played:
+		// another kind under the same id leaves that day misshapen, and the answers given to it read as nonsense.
+		return []string{fmt.Sprintf("its kind changed (%s → %s): a question of another kind is another question, and a day "+
+			"drawn already holds this one in a place of its kind; retire it (%s, by the new one) and add the new one with a new id",
+			old.Base().Type, q.Base().Type, RetireFile)}
 	}
 	// as is a date as the bank has it, for saying so.
 	as := func(date string) string {

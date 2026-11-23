@@ -1,0 +1,16 @@
+[
+  {
+    "id": "gen-5",
+    "type": "truefalse",
+    "difficulty": "easy",
+    "text": "Столицата на Франция е Париж.",
+    "answer": true,
+    "fact": "През Париж тече река Сена.",
+    "added": "TODAY",
+    "updated": "TODAY",
+    "theme": "places",
+    "sources": [
+      "https://bg.wikipedia.org/wiki/Витоша"
+    ]
+  }
+]

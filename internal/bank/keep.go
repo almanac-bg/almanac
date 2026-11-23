@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -134,6 +135,36 @@ func Dropped(dir string, b *Bank) []Problem {
 			if _, ok := b.byID[q.ID]; !ok && q.ID != "" {
 				out = append(out, Problem{File: filepath.Join(QuestionsDir, filepath.Base(f)), ID: q.ID,
 					Msg: "the bank had this question and it's gone: retire it instead (retired, retiredWhy), never take it out"})
+			}
+		}
+	}
+	return out
+}
+
+// Rekinded are the questions of b, not retired, that the bank in dir (the one in play) has as another kind, as errors.
+// A question of another kind is another question: the days drawn ahead hold it in a place of its kind (today's is
+// being played), and the answers given to it are another kind's. `almanac bank add` refuses such a change; this finds
+// one made by hand, before the bank in play moves (`almanac bank check -live`).
+func Rekinded(dir string, b *Bank) []Problem {
+	var out []Problem
+	files, _ := filepath.Glob(filepath.Join(dir, QuestionsDir, "*.json"))
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		var was []struct {
+			ID   string `json:"id"`
+			Type string `json:"type"`
+		}
+		if json.Unmarshal(data, &was) != nil {
+			continue
+		}
+		for _, w := range was {
+			if q, ok := b.byID[w.ID]; ok && !q.Extra().Retired && w.Type != "" && q.Base().Type != w.Type {
+				out = append(out, Problem{File: filepath.Join(QuestionsDir, filepath.Base(f)), ID: w.ID,
+					Msg: fmt.Sprintf("its kind changed (%s → %s): a question of another kind is another question; retire it, "+
+						"and add the new one with a new id", w.Type, q.Base().Type)})
 			}
 		}
 	}

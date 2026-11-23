@@ -1,0 +1,62 @@
+[
+  {
+    "id": "gen-1",
+    "type": "choice",
+    "difficulty": "easy",
+    "text": "Коя е столицата на Франция?",
+    "answer": "Париж",
+    "wrong": [
+      "Лион",
+      "Марсилия",
+      "Ница"
+    ],
+    "fact": "Париж е столица на Франция от края на X век.",
+    "added": "2026-11-01",
+    "updated": "2026-11-01",
+    "theme": "places"
+  },
+  {
+    "id": "gen-2",
+    "type": "number",
+    "difficulty": "medium",
+    "text": "Колко метра е висок връх Мусала?",
+    "answer": 2925,
+    "unit": "м",
+    "step": 1,
+    "scale": "linear",
+    "tolerance": 880,
+    "fact": "Мусала е най-високият връх на Балканския полуостров.",
+    "added": "2026-11-01",
+    "updated": "2026-11-01",
+    "bg": true,
+    "theme": "places"
+  },
+  {
+    "id": "gen-3",
+    "type": "choice",
+    "difficulty": "medium",
+    "text": "Кой е написал романа „Под игото“?",
+    "answer": "Иван Вазов",
+    "wrong": [
+      "Христо Ботев",
+      "Алеко Константинов",
+      "Елин Пелин"
+    ],
+    "fact": "Вазов пише романа в Одеса.",
+    "added": "2026-11-01",
+    "updated": "2026-11-01",
+    "bg": true,
+    "theme": "books"
+  },
+  {
+    "id": "gen-4",
+    "type": "truefalse",
+    "difficulty": "easy",
+    "text": "Дунав се влива в Черно море.",
+    "answer": true,
+    "fact": "Делтата на Дунав е в Румъния и Украйна.",
+    "added": "2026-11-01",
+    "updated": "2026-11-01",
+    "theme": "places"
+  }
+]

@@ -95,12 +95,42 @@ func (q *Number) Closeness(guess float64) float64 {
 // it is known or not, never estimated. A phone number or a place in a row isn't a quantity at all.
 const EstimateFrom = 20
 
-// yearText says the question asks for a year (and not „на колко години“, an age).
-var yearText = regexp.MustCompile(`(?i)годин`)
+// yearText says the question asks for a year, and howMany that it asks how many („на колко години“, an age: no year).
+// howMany is the word „колко“ itself: „няколко години по-късно“ and „колкото“ ask nothing, and a year's question that
+// says one is still a year's (tec-404, 23 Nov 2026: read as a quantity, its tolerance by the formula was 3/10 of the
+// year, 600 years, and any guess was right).
+var (
+	yearText = regexp.MustCompile(`(?i)годин`)
+	howMany  = regexp.MustCompile(`(?i)(?:^|[^\p{L}])колко(?:[^\p{L}]|$)`)
+)
 
-// IsYear is whether the question asks for a year: no unit, and its text asks when.
+// IsYear is whether the question asks for a year: no unit, and its text asks when, not how many.
 func (q *Number) IsYear() bool {
-	return q.Unit == "" && yearText.MatchString(q.Text) && !strings.Contains(strings.ToLower(q.Text), "колко")
+	return q.Unit == "" && yearText.MatchString(q.Text) && !howMany.MatchString(q.Text)
+}
+
+// namesItself are the words by which a number without a unit still says what it is: a count („колко държави“), or a
+// number named as one (an octane number, an index).
+var namesItself = regexp.MustCompile(`(?i)(?:^|[^\p{L}])(?:колко|числ\p{L}*|индекс\p{L}*)(?:[^\p{L}]|$)`)
+
+// ruleUnit: a number says what it measures. With no unit it is a year its text asks for („През коя година…“) or a
+// count its text names („Колко държави…“); anything else („Каква е височината на Мусала?“, „Кога е основан…?“) leaves
+// the player to guess the unit, and is read as a quantity: a year asked so gets 3/10 of itself for a tolerance, and
+// any guess is right. Nor is a year asked as a count („Колко години… “ with 1987 for an answer and no unit).
+func ruleUnit(q Question) []string {
+	n, ok := q.(*Number)
+	if !ok || n.Unit != "" || n.IsYear() {
+		return nil
+	}
+	if !namesItself.MatchString(n.Text) {
+		return []string{"a number without a unit: give it its unit (м, км, души…), or ask a year as „През коя година…“ " +
+			"(without one it's read as a quantity, with 3/10 of the answer for a tolerance)"}
+	}
+	if yearText.MatchString(n.Text) && n.Step == 1 && n.Answer >= 1000 && n.Answer <= float64(time.Now().Year()) {
+		return []string{fmt.Sprintf("%s reads as a year asked with „колко“: ask „През коя година…“ (as a quantity its "+
+			"tolerance is 3/10 of it, and any guess is right), or give the count its unit", formatNumber(n.Answer, n.Step))}
+	}
+	return nil
 }
 
 var notQuantity = regexp.MustCompile(`(?i)(?:^|[^\p{L}])(?:номер\p{L}*|поред)(?:[^\p{L}]|$)`)

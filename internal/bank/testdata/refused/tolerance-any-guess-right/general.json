@@ -1,0 +1,21 @@
+[
+  {
+    "id": "gen-5",
+    "type": "number",
+    "difficulty": "hard",
+    "text": "Колко метра е висок Черни връх във Витоша?",
+    "answer": 2290,
+    "step": 1,
+    "scale": "linear",
+    "tolerance": 2290,
+    "fact": "Черни връх е четвъртият по височина планински първенец в България.",
+    "added": "TODAY",
+    "updated": "TODAY",
+    "bg": true,
+    "theme": "places",
+    "sources": [
+      "https://bg.wikipedia.org/wiki/Витоша"
+    ],
+    "unit": "м"
+  }
+]

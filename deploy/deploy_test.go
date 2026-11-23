@@ -32,6 +32,8 @@ case $2 in
 %s) wc -c <"$3" | tr -d ' ' ;;
 %Y) cat "$3.mtime" 2>/dev/null || echo 0 ;;
 esac`,
+	"timeout": `shift
+exec "$@"`,
 	"setpriv": `while [ $# -gt 0 ]; do case $1 in --*) shift ;; *) break ;; esac; done
 exec "$@"`,
 	"ssh-keygen": `while [ $# -gt 0 ]; do if [ "$1" = -s ]; then sig=$2; fi; shift; done
@@ -109,7 +111,10 @@ type release struct {
 	unsigned   bool
 	badSig     bool
 	behave     string // healthy (""), never (doesn't come up), crash (comes up, stops after 30 s)
-	migrates   bool   // its start copies the database and migrates it
+	// reads says how it takes the bank the game plays (`almanac bank check`): "" for a program too old to check one
+	// (it says nothing), "yes", "no" (it can't load it), "uneven" (it loads it, and fails on the categories' sizes).
+	reads    string
+	migrates bool // its start copies the database and migrates it
 }
 
 func (r release) program() string {
@@ -121,7 +126,18 @@ func (r release) program() string {
 	if r.old {
 		list = "exit 1"
 	}
-	return fmt.Sprintf("#!/bin/sh\ncase $1 in\nversion) echo %s ;;\nmigrations) %s ;;\n*) exit 1 ;;\nesac\n", says, list)
+	check := "exit 1"
+	switch r.reads {
+	case "yes":
+		check = `echo "$3: 0 errors, 0 warnings"`
+	case "no":
+		check = `echo "questions/general.json:7: gen-2: json: unknown field \"theme\""; echo "$3: 1 errors, 0 warnings"; ` +
+			`echo "almanac: $3: 1 errors: the server would not play this bank" >&2; exit 1`
+	case "uneven":
+		check = `echo "$3: 0 errors, 0 warnings"; echo "almanac: $3: categories more than 2% off the mean" >&2; exit 1`
+	}
+	return fmt.Sprintf("#!/bin/sh\ncase $1 in\nversion) echo %s ;;\nmigrations) %s ;;\nbank) %s ;;\n*) exit 1 ;;\nesac\n",
+		says, list, check)
 }
 
 func shellQuote(s ...string) string {
@@ -138,6 +154,7 @@ func mig(sum byte, name string) string { return strings.Repeat(string(sum), 64) 
 type machine struct {
 	t                                   *testing.T
 	root, world, lib, data, link, marks string
+	bank                                string
 	script                              string
 }
 
@@ -165,7 +182,9 @@ func newMachine(t *testing.T) *machine {
 	}
 	script := string(src)
 	paths := map[string]string{"dir": m.lib, "data": m.data, "link": m.link, "marks": m.marks,
-		"signers": filepath.Join(root, "etc", "release-signers"), "lock": filepath.Join(root, "lock")}
+		"signers": filepath.Join(root, "etc", "release-signers"), "lock": filepath.Join(root, "lock"),
+		"bank": filepath.Join(root, "bank")}
+	m.bank = paths["bank"]
 	// Every path on the server is among these, so the tests never reach the machine's own.
 	set := regexp.MustCompile(`^(` + strings.Join(slices.Collect(maps.Keys(paths)), "|") + `)=`)
 	system := regexp.MustCompile(`(^|[\s="'])/(usr|var|etc|run|srv)/`)
@@ -498,6 +517,58 @@ func TestBackCutOff(t *testing.T) {
 	l := m.log()
 	if !strings.HasPrefix(l[len(l)-1], "systemctl start almanac.socket almanac") {
 		t.Fatalf("not started again: %v\n%s", l, out)
+	}
+}
+
+// The floor under going back: a program that can't read the bank the game plays is never made live, by CI or by hand,
+// and nothing restarts for it: an older one than the bank (a field it doesn't know), a newer one with a check the bank
+// doesn't pass yet. One that reads it is deployed, as is one that only fails `bank check` on what isn't the server's to
+// refuse (the categories' sizes), one too old to check a bank at all, and any on a server with no bank's checkout yet.
+func TestNotBelowTheBank(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name, reads string
+		noBank      bool
+		mode        []string
+		live        bool
+	}{
+		{"it reads the bank", "yes", false, nil, true},
+		{"it refuses the bank, by hand", "no", false, nil, false},
+		{"it refuses the bank, from CI", "no", false, []string{"ci"}, false},
+		{"only the sizes fail", "uneven", false, nil, true},
+		{"too old to check a bank", "", false, nil, true},
+		{"no bank on the server yet", "no", true, nil, true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			m := newMachine(t)
+			if !c.noBank {
+				if err := os.MkdirAll(m.bank, 0o755); err != nil {
+					t.Fatal(err)
+				}
+				m.write(filepath.Join(m.bank, "categories.json"), "[]", 0o644)
+			}
+			m.publish(release{tag: "v0.9.0", reads: c.reads})
+			out, code := m.deploy(append([]string{"v0.9.0"}, c.mode...)...)
+			if c.live {
+				expect(t, out, code, 0, "live: v0.9.0")
+				return
+			}
+			expect(t, out, code, 1, "not deployed: v0.9.0 doesn't read the bank the game plays", `unknown field "theme"`)
+			if m.live() != "v1.0.0" || m.restarted() {
+				t.Fatalf("the game was touched: live %s, %v\n%s", m.live(), m.log(), out)
+			}
+			if _, err := os.Stat(filepath.Join(m.marks, "unhealthy-v0.9.0")); err == nil {
+				t.Fatal("marked unhealthy: it never ran")
+			}
+		})
+	}
+	// What deploy.sh looks for is what `almanac bank check` says of a bank it can't load.
+	const says = "the server would not play this bank"
+	for _, file := range []string{"deploy.sh", "../cmd/almanac/bank.go"} {
+		if src, err := os.ReadFile(file); err != nil || !strings.Contains(string(src), says) {
+			t.Errorf("%s doesn't say %q (%v): deploy.sh tells a bank refused by it", file, says, err)
+		}
 	}
 }
 

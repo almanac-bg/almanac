@@ -165,7 +165,7 @@ func (d *dealtMatch) Grade(answer json.RawMessage) (Graded, error) {
 	for i := range bank {
 		bank[i] = -1
 	}
-	right, wrong := 0, 0
+	right := 0
 	for i, shown := range a.Pairs {
 		if shown == -1 {
 			continue
@@ -178,16 +178,15 @@ func (d *dealtMatch) Grade(answer json.RawMessage) (Graded, error) {
 		bank[l] = r
 		if l == r {
 			right++
-		} else {
-			wrong++
 		}
 	}
-	return Graded{
-		Score: matchScore(right, wrong, n, m),
-		Right: right == n,
-		Given: mustJSON(MatchAnswer{Pairs: bank}),
-		Shown: mustJSON(MatchAnswer{Pairs: a.Pairs}),
-	}, nil
+	// Right or not, like an order: every pair joined right, and none wrong (DECISIONS.md: „близо“ is the number's
+	// alone; a puzzle is all or nothing).
+	g := Graded{Given: mustJSON(MatchAnswer{Pairs: bank}), Shown: mustJSON(MatchAnswer{Pairs: a.Pairs})}
+	if right == n {
+		g.Score, g.Right = 1, true
+	}
+	return g, nil
 }
 
 func (d *dealtMatch) Reveal(c *Crowd) any {
@@ -209,15 +208,4 @@ func (d *dealtMatch) Reveal(c *Crowd) any {
 		Decoy *int `json:"decoy,omitempty"`
 		reveal
 	}{pairs, decoy, revealOf(&d.q.Head, &d.q.Tail, c.view(nil))}
-}
-
-// matchScore is what a match of n pairs, its right column m long, is worth: a share for each pair joined right, less
-// 1/(m-1) of one for each joined wrong (a quarter with a decoy, a third without), and nothing below 0. A pair left
-// out costs nothing, so a player who joins only what they know keeps it all; a join at random is worth nothing on
-// average (it comes out right one time in m, and the other m-1 take that back).
-func matchScore(right, wrong, n, m int) float64 {
-	if m < 2 {
-		return float64(right)
-	}
-	return max(0, (float64(right)-float64(wrong)/float64(m-1))/float64(n))
 }

@@ -111,7 +111,8 @@ func defaultBankDir() string {
 // about the same size (bank.SizeSlack), and that every national day (bank.NationalDays) has a question about Bulgaria
 // a day can still deal for „На този ден“; -sample lets the small public sample pass the last two. With -live (the bank
 // this one replaces: almanac-bank passes the checkout the game plays), a national day with none fails only if the live
-// bank has one for it, so an urgent fix isn't held up by a day already empty; that one is warned of. It prints every
+// bank has one for it, so an urgent fix isn't held up by a day already empty; that one is warned of; and it fails on a
+// question the live bank has that this one dropped, or has as another kind (bank.Dropped, bank.Rekinded). It prints every
 // error, and counts the warnings by rule (bank lint lists them); it reports the mix and the sources; the day's runway:
 // how long each place of a day has questions for, where the next batch writes first (with -used, the questions the
 // days have had are taken off: `almanac bank used`), and the dates' („На този ден“); each chapter's themes against their
@@ -146,6 +147,17 @@ func bankCheck(args []string) error {
 	if b == nil {
 		fmt.Println(tally)
 		return fmt.Errorf("%s: %d errors: the server would not play this bank", dir, count.Errors)
+	}
+	// Against the bank the game plays: no question gone from it, none of another kind (the server refuses the first,
+	// and a day drawn already holds each in a place of its kind): told here, before the bank in play moves.
+	if *liveDir != "" {
+		if against := append(bank.Dropped(*liveDir, b), bank.Rekinded(*liveDir, b)...); len(against) > 0 {
+			for _, p := range against {
+				fmt.Println(p)
+			}
+			return fmt.Errorf("%s: %d questions gone, or of another kind, against the bank in play (%s): not taken",
+				dir, len(against), *liveDir)
+		}
 	}
 	fmt.Println(summary(b))
 	fmt.Println(runway(b, used, today()))

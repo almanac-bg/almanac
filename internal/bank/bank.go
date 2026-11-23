@@ -283,7 +283,8 @@ func decodeFile(data []byte, category string, fail func(line int, id, msg string
 		_ = json.Unmarshal(raw, &probe)
 		newQuestion, ok := types[probe.Type]
 		if !ok {
-			fail(line, probe.ID, fmt.Sprintf("unknown type %q (known: %s)", probe.Type, strings.Join(Types(), ", ")))
+			kinds := slices.DeleteFunc(Types(), func(k string) bool { return !KindOn(k) })
+			fail(line, probe.ID, fmt.Sprintf("unknown type %q (the kinds: %s)", probe.Type, strings.Join(kinds, ", ")))
 			continue
 		}
 		q := newQuestion()

@@ -265,7 +265,7 @@ type Mark struct {
 }
 
 // closeAnswer is whether an answer of a score is close („близо“): worth something, but not right (a number short of
-// bank.RightFrom; never an order, right or not). It counts as not right, in the score and everywhere else.
+// bank.RightFrom; never another kind's: an order, a match and a split are right or not, graded 1 or 0). It counts as not right, in the score and everywhere else.
 func closeAnswer(score float64, right bool) bool { return score > 0 && !right }
 
 // Shown is the question on screen, with the time it has left.

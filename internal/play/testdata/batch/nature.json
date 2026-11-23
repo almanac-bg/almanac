@@ -1,0 +1,23 @@
+[
+  {
+    "id": "nat-9001",
+    "type": "number",
+    "difficulty": "hard",
+    "text": "Колко метра е дълъг Големият мост на Чудните мостове в Родопите?",
+    "answer": 96,
+    "unit": "м",
+    "step": 1,
+    "scale": "linear",
+    "tolerance": 29,
+    "fact": "Почти колкото футболно игрище. Широк е до 15 м, а най-голямата от трите му арки е висока 45 м.",
+    "added": "TODAY",
+    "updated": "TODAY",
+    "bg": true,
+    "theme": "bg_nature",
+    "sources": [
+      "https://en.wikipedia.org/wiki/Wonderful_Bridges",
+      "https://showcaves.com/english/bg/karst/Chudnite.html",
+      "https://bg.wikipedia.org/wiki/Чудните_мостове"
+    ]
+  }
+]

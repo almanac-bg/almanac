@@ -20,7 +20,8 @@ never edit it), `<work>` (this pass's folder) and your chunk's name.
 
 ## For each item, decide one
 
-- **change**: fix it in place when it still asks the same thing, better. Set `updated` to today; set `changed` to
+- **change**: fix it in place when it still asks the same thing, better, as the same kind (`bank add` refuses a
+  change of `type`: a number made a choice is a **replace**). Set `updated` to today; set `changed` to
   today too if what it asks changed (text, answer, options, items, pairs, decoy, clues, groups, picture, tolerance,
   unit, step, scale, direction), and leave `changed` as it was if only the fact, the `day` line or a label changed.
   Keep `added`. Update `sources`: the pages you read for the fix (keep the old ones that still hold).
@@ -52,8 +53,8 @@ What the rules ask (the questions skill has the details):
   what makes it answerable or fair.
 - **estimate**: see replace above. **tolerance**: set the formula's value (the questions skill).
 - **countable** (a number that counts a list's items: works, awards, articles, seats, goals, times): ask what about
-  the subject a player can place (a year, a size, a duration), or make it a choice; replace it if it then asks
-  something else. Only a true anchor everyone has (the Bible's 66 books) stays, as a waiver whose `why` names it.
+  the subject a player can place (a year, a size, a duration), or ask it as a choice (a replacement: another kind
+  is another question); replace it too if it then asks something else. Only a true anchor everyone has (the Bible's 66 books) stays, as a waiver whose `why` names it.
 - **offset-scale**: judge the tolerance a well-read guess misses by, under 1/5 of the answer (an Elo of 2 816: 60–100
   points), linear. **own-number**: reword so the text shows no number near the answer, or ask the subject another
   way („Стоте дни“: from which island Napoleon returns).

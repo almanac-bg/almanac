@@ -1,0 +1,18 @@
+[
+  {
+    "id": "gen-3",
+    "type": "truefalse",
+    "difficulty": "medium",
+    "text": "Иван Вазов е написал романа „Под игото“.",
+    "answer": true,
+    "fact": "Вазов пише романа в Одеса.",
+    "added": "2026-11-01",
+    "changed": "TODAY",
+    "updated": "TODAY",
+    "bg": true,
+    "theme": "books",
+    "sources": [
+      "https://bg.wikipedia.org/wiki/Под_игото"
+    ]
+  }
+]

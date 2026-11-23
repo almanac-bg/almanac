@@ -1,0 +1,21 @@
+[
+  {
+    "id": "gen-5",
+    "type": "choice",
+    "difficulty": "easy",
+    "text": "В кой град се издига Айфеловата кула?",
+    "answer": "Париж",
+    "wrong": [
+      "Лион",
+      "Марсилия",
+      "Ница"
+    ],
+    "fact": "Кулата е построена за Световното изложение през 1889 г.",
+    "added": "TODAY",
+    "updated": "TODAY",
+    "theme": "places",
+    "sources": [
+      "https://bg.wikipedia.org/wiki/Витоша"
+    ]
+  }
+]

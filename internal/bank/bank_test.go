@@ -577,6 +577,7 @@ func TestTrueFalseGrading(t *testing.T) {
 	}
 }
 
+// A match is right or not: every pair joined right, or nothing: no „близо“ (the number's alone), no part of a score.
 func TestMatchGrading(t *testing.T) {
 	q := &Match{Head: Head{Type: "match", Text: "Свържи:"}, Pairs: []MatchPair{
 		{"Франция", "Париж"}, {"Италия", "Рим"}, {"Испания", "Мадрид"}, {"Гърция", "Атина"},
@@ -599,15 +600,15 @@ func TestMatchGrading(t *testing.T) {
 		if !slices.Equal(rev.Pairs, right) {
 			t.Fatalf("seed %d: revealed %v, right %v", seed, rev.Pairs, right)
 		}
-		// Two swapped: two right, less two wrong at a third each; one left out: three of four, nothing taken.
+		// Two swapped, or one left out: not right, and worth nothing.
 		swapped := slices.Clone(right)
 		swapped[0], swapped[1] = swapped[1], swapped[0]
-		if g := grade(t, d, string(mustJSON(MatchAnswer{Pairs: swapped}))); g.Right || math.Abs(g.Score-1.0/3) > 1e-9 {
+		if g := grade(t, d, string(mustJSON(MatchAnswer{Pairs: swapped}))); g.Right || g.Score != 0 {
 			t.Fatalf("seed %d: two swapped graded %+v", seed, g)
 		}
 		partial := slices.Clone(right)
 		partial[3] = -1
-		if g := grade(t, d, string(mustJSON(MatchAnswer{Pairs: partial}))); g.Right || g.Score != 0.75 {
+		if g := grade(t, d, string(mustJSON(MatchAnswer{Pairs: partial}))); g.Right || g.Score != 0 {
 			t.Fatalf("seed %d: one left out graded %+v", seed, g)
 		}
 	}
@@ -617,69 +618,6 @@ func TestMatchGrading(t *testing.T) {
 			t.Errorf("%s was graded", bad)
 		}
 	}
-}
-
-// Luck earns little: a match put down at random is worth next to nothing on average.
-func TestLuckTakenOut(t *testing.T) {
-	perms := [][]int{}
-	var permute func([]int, int)
-	permute = func(a []int, k int) {
-		if k == len(a) {
-			perms = append(perms, slices.Clone(a))
-			return
-		}
-		for i := k; i < len(a); i++ {
-			a[k], a[i] = a[i], a[k]
-			permute(a, k+1)
-			a[k], a[i] = a[i], a[k]
-		}
-	}
-	permute([]int{0, 1, 2, 3}, 0)
-	var match float64
-	for _, p := range perms {
-		right := 0
-		for i, v := range p {
-			if i == v {
-				right++
-			}
-		}
-		match += matchScore(right, 4-right, 4, 4)
-	}
-	match /= float64(len(perms))
-	if math.Abs(match-0.125) > 1e-9 {
-		t.Errorf("at random: a match is worth %v", match)
-	}
-	// With a decoy: the four lefts joined at random to four of five rights.
-	decoy, n := 0.0, 0
-	for _, p := range injections(4, 5) {
-		right := 0
-		for i, v := range p {
-			if i == v {
-				right++
-			}
-		}
-		decoy += matchScore(right, 4-right, 4, 5)
-		n++
-	}
-	if decoy /= float64(n); math.Abs(decoy-53.0/480) > 1e-9 {
-		t.Errorf("at random: a match with a decoy is worth %v", decoy)
-	}
-}
-
-// injections lists every way to give each of k things a different one of n.
-func injections(k, n int) [][]int {
-	if k == 0 {
-		return [][]int{{}}
-	}
-	var out [][]int
-	for _, p := range injections(k-1, n) {
-		for v := range n {
-			if !slices.Contains(p, v) {
-				out = append(out, append(slices.Clone(p), v))
-			}
-		}
-	}
-	return out
 }
 
 func TestMatchDecoy(t *testing.T) {
@@ -709,11 +647,11 @@ func TestMatchDecoy(t *testing.T) {
 		if !slices.Equal(rev.Pairs, right) || rev.Decoy == nil || view.Right[*rev.Decoy] != "Сидни" {
 			t.Fatalf("seed %d: revealed %+v", seed, rev)
 		}
-		// Three right and the fourth on the decoy: three quarters, less a quarter of one.
+		// Three right and the fourth on the decoy: not right, and worth nothing.
 		trap := slices.Clone(right)
 		trap[0] = *rev.Decoy
 		g := grade(t, d, string(mustJSON(MatchAnswer{Pairs: trap})))
-		if g.Right || math.Abs(g.Score-(3-0.25)/4) > 1e-9 {
+		if g.Right || g.Score != 0 {
 			t.Fatalf("seed %d: three and the decoy graded %+v", seed, g)
 		}
 		// The log keeps the decoy as the place past the pairs, whatever the deal.
@@ -731,6 +669,7 @@ func TestMatchDecoy(t *testing.T) {
 	}
 }
 
+// A split is right or not: every item in its group, or nothing.
 func TestSplitGrading(t *testing.T) {
 	q := &Split{Head: Head{Type: "split", Text: "Бозайник ли е?"}, Groups: [2]string{"Бозайник", "Не е бозайник"},
 		Items: []SplitItem{{"Делфин", 0}, {"Прилеп", 0}, {"Кит", 0}, {"Пингвин", 1}, {"Акула", 1}, {"Костенурка", 1}}}
@@ -754,16 +693,16 @@ func TestSplitGrading(t *testing.T) {
 		if !slices.Equal(rev.Sides, right) {
 			t.Fatalf("seed %d: revealed %v, right %v", seed, rev.Sides, right)
 		}
-		// One sent wrong: five right less one; one left where it is: five of six, nothing taken.
+		// One sent wrong, or one left where it is: not right, and worth nothing.
 		wrong := slices.Clone(right)
 		wrong[0] = 1 - wrong[0]
-		if g := grade(t, d, string(mustJSON(SplitAnswer{Sides: wrong}))); g.Right || math.Abs(g.Score-4.0/6) > 1e-9 {
+		if g := grade(t, d, string(mustJSON(SplitAnswer{Sides: wrong}))); g.Right || g.Score != 0 {
 			t.Fatalf("seed %d: one wrong graded %+v", seed, g)
 		}
 		left := slices.Clone(right)
 		left[5] = -1
 		g := grade(t, d, string(mustJSON(SplitAnswer{Sides: left})))
-		if g.Right || math.Abs(g.Score-5.0/6) > 1e-9 {
+		if g.Right || g.Score != 0 {
 			t.Fatalf("seed %d: one left graded %+v", seed, g)
 		}
 		// The log keeps the bank's order, whatever the deal.
@@ -785,20 +724,6 @@ func TestSplitGrading(t *testing.T) {
 	lone.Items[3].Group, lone.Items[4].Group = 0, 0
 	if p := lone.check(); len(p) == 0 {
 		t.Error("a split with one item in a group passed")
-	}
-	// Six items sent at random: worth 5/32 on average.
-	sum := 0.0
-	for mask := range 64 {
-		right := 0
-		for i := range 6 {
-			if mask>>i&1 == 1 {
-				right++
-			}
-		}
-		sum += splitScore(right, 6-right, 6)
-	}
-	if math.Abs(sum/64-5.0/32) > 1e-9 {
-		t.Errorf("at random a split is worth %v", sum/64)
 	}
 }
 

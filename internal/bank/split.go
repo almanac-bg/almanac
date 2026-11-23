@@ -136,27 +136,24 @@ func (d *dealtSplit) Grade(answer json.RawMessage) (Graded, error) {
 		return Graded{}, errors.New("a split sends each item to one side at most")
 	}
 	bank := make([]int, n)
-	right, wrong := 0, 0
+	right := 0
 	for i, side := range a.Sides {
 		if side < -1 || side > 1 {
 			return Graded{}, errors.New("a split sends each item to one side at most")
 		}
 		b := d.order[i]
 		bank[b] = side
-		switch side {
-		case -1:
-		case d.q.Items[b].Group:
+		if side == d.q.Items[b].Group {
 			right++
-		default:
-			wrong++
 		}
 	}
-	return Graded{
-		Score: splitScore(right, wrong, n),
-		Right: right == n,
-		Given: mustJSON(SplitAnswer{Sides: bank}),
-		Shown: mustJSON(SplitAnswer{Sides: a.Sides}),
-	}, nil
+	// Right or not, like an order: every item sent to its group (DECISIONS.md: „близо“ is the number's alone; a puzzle
+	// is all or nothing).
+	g := Graded{Given: mustJSON(SplitAnswer{Sides: bank}), Shown: mustJSON(SplitAnswer{Sides: a.Sides})}
+	if right == n {
+		g.Score, g.Right = 1, true
+	}
+	return g, nil
 }
 
 func (d *dealtSplit) Reveal(c *Crowd) any {
@@ -168,14 +165,4 @@ func (d *dealtSplit) Reveal(c *Crowd) any {
 		Sides []int `json:"sides"`
 		reveal
 	}{sides, revealOf(&d.q.Head, &d.q.Tail, c.view(nil))}
-}
-
-// splitScore is what a split of n items is worth: a share for each item sent right, less as much for each sent
-// wrong, and nothing below 0. An item left where it is costs nothing, so a player who sends only what they know keeps
-// it all; an item sent at random is worth nothing on average (right half the time, and the other half takes it back).
-func splitScore(right, wrong, n int) float64 {
-	if n == 0 {
-		return 0
-	}
-	return max(0, float64(right-wrong)/float64(n))
 }

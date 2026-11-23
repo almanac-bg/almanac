@@ -1,0 +1,39 @@
+[
+  {
+    "id": "lit-9001",
+    "type": "match",
+    "difficulty": "medium",
+    "text": "Свържи българския творец с изкуството, с което е най-известен:",
+    "pairs": [
+      {
+        "left": "Андрей Николов",
+        "right": "Скулптура"
+      },
+      {
+        "left": "Илия Бешков",
+        "right": "Карикатура"
+      },
+      {
+        "left": "Боянският майстор",
+        "right": "Стенопис"
+      },
+      {
+        "left": "Константин Щъркелов",
+        "right": "Акварел"
+      }
+    ],
+    "decoy": "Мозайка",
+    "fact": "Бронзовият лъв пред паметника на Незнайния воин в София е дело на скулптора Андрей Николов.",
+    "added": "TODAY",
+    "updated": "TODAY",
+    "bg": true,
+    "theme": "bg_art",
+    "sources": [
+      "https://bg.wikipedia.org/wiki/Андрей_Николов",
+      "https://bg.wikipedia.org/wiki/Илия_Бешков",
+      "https://bg.wikipedia.org/wiki/Боянски_майстор",
+      "https://bg.wikipedia.org/wiki/Константин_Щъркелов",
+      "https://bg.wikipedia.org/wiki/Паметник_на_Незнайния_воин_(София)"
+    ]
+  }
+]
