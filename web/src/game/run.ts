@@ -878,6 +878,9 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
   const mine = answers instanceof Element ? answers.querySelector("button.option.wrong") : null;
   const key = right ?? (answers instanceof Element ? answers : after);
   const keyWas = key.getBoundingClientRect().top;
+  // The question's sheet, which on a phone shrinks to the question alone: its height as it was.
+  const leafEl = page.querySelector<HTMLElement>(":scope > .q-leaf");
+  const leafWas = leafEl?.getBoundingClientRect().height ?? 0;
   // What has to stay in sight: the right answer, and the player's own beside it.
   const keyBox = () => {
     const a = key.getBoundingClientRect();
@@ -975,6 +978,22 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
     rise = Math.max(rise, dy);
     if (Math.abs(dy) >= 1) el.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], settling);
   });
+  // The sheet made smaller (a phone's: the question alone) shrinks in the same movement, never in one frame: its
+  // colour, drawn behind it from its height then to its height now (app.css, .leaf-ghost), as the answers come up
+  // under it. Nothing is laid out anew meanwhile: the page stays where it was put.
+  const leafNow = leafEl?.getBoundingClientRect().height ?? 0;
+  if (leafEl && leafWas - leafNow >= 1) {
+    const ghost = h("span", { class: "leaf-ghost", "aria-hidden": "true" });
+    leafEl.classList.add("shrinking");
+    leafEl.prepend(ghost);
+    const shrink = ghost.animate([{ height: `${leafWas}px` }, { height: `${leafNow}px` }], settling);
+    const done = () => {
+      ghost.remove();
+      leafEl.classList.remove("shrinking");
+    };
+    shrink.onfinish = done;
+    shrink.oncancel = done;
+  }
   // A head made smaller (stuck) has its count, pips and arrow go from where they were, at their size then.
   headParts.forEach((el, i) => {
     const [a, b] = [headWas[i], el.getBoundingClientRect()];

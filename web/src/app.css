@@ -1862,6 +1862,23 @@
     color: var(--on-sheet);
   }
 
+  /* A question's sheet made smaller as its answer comes (run.ts, settle): its colour drawn behind it from its height
+     then, shrinking to its own; nothing laid out anew. */
+  .leaf.shrinking {
+    isolation: isolate;
+  }
+
+  .leaf-ghost {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: inherit;
+    pointer-events: none;
+  }
+
   /* The issue's cover and the chapters' cards: the corner turned. */
   .leaf.folded {
     clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--fold)), calc(100% - var(--fold)) 100%, 0 100%);
