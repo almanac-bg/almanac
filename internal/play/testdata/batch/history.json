@@ -1,0 +1,62 @@
+[
+  {
+    "id": "his-9001",
+    "type": "choice",
+    "difficulty": "hard",
+    "text": "Кой брат на цар Самуил е екзекутиран по негова заповед, обвинен в заговор с Византия?",
+    "answer": "Арон",
+    "wrong": [
+      "Давид",
+      "Мойсей",
+      "Роман"
+    ],
+    "fact": "Оцелява само синът му Иван Владислав, спасен от Гаврил Радомир, когото според Дуклянската летопис по-късно убива.",
+    "added": "TODAY",
+    "updated": "TODAY",
+    "bg": true,
+    "theme": "bg_medieval",
+    "sources": [
+      "https://bg.wikipedia.org/wiki/Арон_(комитопул)",
+      "https://bg.wikipedia.org/wiki/Комитопули",
+      "https://en.wikipedia.org/wiki/Aron_of_Bulgaria",
+      "https://bg.wikipedia.org/wiki/Иван_Владислав"
+    ]
+  },
+  {
+    "id": "his-9002",
+    "type": "order",
+    "difficulty": "medium",
+    "text": "Подреди възрожденците по годината на раждането им, от най-ранната:",
+    "items": [
+      {
+        "text": "Софроний Врачански",
+        "value": 1739
+      },
+      {
+        "text": "Васил Априлов",
+        "value": 1789
+      },
+      {
+        "text": "Хаджи Димитър",
+        "value": 1840
+      },
+      {
+        "text": "Тодор Каблешков",
+        "value": 1851
+      }
+    ],
+    "direction": "asc",
+    "unit": "",
+    "fact": "Истинското име на Хаджи Димитър е Димитър Николов Асенов, а Софроний Врачански е роден като Стойко Владиславов.",
+    "added": "TODAY",
+    "updated": "TODAY",
+    "bg": true,
+    "theme": "bg_revival",
+    "sources": [
+      "https://bg.wikipedia.org/wiki/Софроний_Врачански",
+      "https://bg.wikipedia.org/wiki/Васил_Априлов",
+      "https://bg.wikipedia.org/wiki/Хаджи_Димитър",
+      "https://bg.wikipedia.org/wiki/Тодор_Каблешков"
+    ]
+  }
+]

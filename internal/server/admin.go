@@ -138,7 +138,11 @@ var questionKinds = map[string]string{"truefalse": "Вярно или не", "ch
 // timedOutRow is a kind of question's answers run out of time (play.TimedOutSince), as „1,4% (12 от 860)“.
 type timedOutRow struct{ Name, Share string }
 
-// adminQuestions is /admin's page of the questions: reports on them, how each goes, and the clock's answers run out.
+// suspectsShown is how many of the questions under doubt /admin lists: the most answered.
+const suspectsShown = 30
+
+// adminQuestions is /admin's page of the questions: reports on them, those whose answers speak against their key
+// (play.Suspects), how each goes, and the clock's answers run out.
 func (s *Server) adminQuestions(w http.ResponseWriter, r *http.Request) {
 	if !s.isAdmin(r) {
 		s.page(w, r) // to anyone else, the game's own page that isn't there
@@ -161,12 +165,31 @@ func (s *Server) adminQuestions(w http.ResponseWriter, r *http.Request) {
 		Answers, Right, Share  int
 		Seconds                float64
 	}
+	type doubted struct {
+		ID, Text, Answer, Says string
+		Answers                int
+	}
 	data := struct {
 		Reported                       []reported
 		ReportsOpen, QuestionsReported int
+		Suspects                       []doubted
+		SuspectsAll                    int // every suspect, those past suspectsShown too
 		Hardest, Easiest               []stat
 		TimedOut                       []timedOutRow
 	}{}
+	// The questions whose players' answers speak against the key (play.Suspects), the most answered first.
+	if suspects, err := s.game.Suspects(ctx); err != nil {
+		slog.Error("admin: the suspects", "err", err)
+	} else {
+		data.SuspectsAll = len(suspects)
+		for _, sp := range suspects[:min(len(suspects), suspectsShown)] {
+			d := doubted{ID: sp.ID, Says: sp.Says, Answers: sp.Answers}
+			if q, ok := b.Get(sp.ID); ok {
+				d.Text, d.Answer = q.Base().Text, bank.KeeperText(q)
+			}
+			data.Suspects = append(data.Suspects, d)
+		}
+	}
 	// The clock: answers run out of time by kind, over 28 days (play.Limit's floors are set so each stays under 2%).
 	if timed, err := s.game.TimedOutSince(ctx, play.DayShift(s.game.Today(), -27)); err == nil {
 		for _, t := range timed {

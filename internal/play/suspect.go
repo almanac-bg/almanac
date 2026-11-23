@@ -13,13 +13,16 @@ import (
 // wrong option draws more of them than the answer, or most say the opposite of a true-or-not, or most typed numbers
 // fall to one side beyond the tolerance (a unit, a misprint), the question is worth checking from a source. Players'
 // answers test every question the game deals, every day, at no cost: the bank's upkeep reads these
-// (.claude/skills/fix-questions), with the players' reports and the questions due for review.
+// (.claude/skills/fix-questions), with the players' reports and the questions due for review, and /admin lists them
+// beside the reports (server: adminQuestions).
 
 // Suspect is a question and what its players' answers say against its key.
 type Suspect struct {
 	ID      string
 	Answers int
 	Why     string
+	// Says is Why in Bulgarian, as /admin shows it.
+	Says string
 }
 
 // SuspectOneSide is the share of a number's typed answers beyond the tolerance on one side that makes it a suspect.
@@ -41,8 +44,8 @@ func (g *Game) Suspects(ctx context.Context) ([]Suspect, error) {
 		if !ok {
 			continue
 		}
-		if why := suspect(q, c.c); why != "" {
-			out = append(out, Suspect{id, c.c.Answers, why})
+		if why, says := suspect(q, c.c); why != "" {
+			out = append(out, Suspect{id, c.c.Answers, why, says})
 		}
 	}
 	slices.SortFunc(out, func(a, b Suspect) int {
@@ -54,13 +57,15 @@ func (g *Game) Suspects(ctx context.Context) ([]Suspect, error) {
 	return out, nil
 }
 
-// suspect says what in a crowd speaks against the key, or "".
-func suspect(q bank.Question, c *bank.Crowd) string {
+// suspect says what in a crowd speaks against the key, or "": why for whoever keeps the bank (the upkeep's worklist),
+// says the same in Bulgarian, as /admin shows it.
+func suspect(q bank.Question, c *bank.Crowd) (why, says string) {
 	pct := func(v float64) string { return fmt.Sprintf("%.0f%%", 100*v) }
+	share := func(v float64) string { return fmt.Sprintf("%.0f\u00a0%%", 100*v) }
 	switch q := q.(type) {
 	case *bank.Choice, *bank.Clues:
 		if len(c.Picks) < 2 {
-			return ""
+			return "", ""
 		}
 		wrong := wrongOptions(q)
 		best := 1
@@ -70,23 +75,28 @@ func suspect(q bank.Question, c *bank.Crowd) string {
 			}
 		}
 		if c.Picks[best] > c.Picks[0] && best-1 < len(wrong) {
-			return fmt.Sprintf("%s picked „%s“, %s the answer", pct(c.Picks[best]), strings.Trim(wrong[best-1], "„“"), pct(c.Picks[0]))
+			option := strings.Trim(wrong[best-1], "„“")
+			return fmt.Sprintf("%s picked „%s“, %s the answer", pct(c.Picks[best]), option, pct(c.Picks[0])),
+				fmt.Sprintf("%s избират „%s“, а %s — отговора", share(c.Picks[best]), option, share(c.Picks[0]))
 		}
 	case *bank.TrueFalse:
 		if c.Right < SuspectTruth {
-			return fmt.Sprintf("%s right: most say it is %s", pct(c.Right), map[bool]string{true: "false", false: "true"}[q.Answer])
+			return fmt.Sprintf("%s right: most say it is %s", pct(c.Right), map[bool]string{true: "false", false: "true"}[q.Answer]),
+				fmt.Sprintf("%s верни: повечето казват „%s“", share(c.Right), map[bool]string{true: "Невярно", false: "Вярно"}[q.Answer])
 		}
 	case *bank.Number:
 		if g := c.Guesses; g != nil {
 			if g.Below >= SuspectOneSide {
-				return fmt.Sprintf("%s typed less than the tolerance allows (under %v)", pct(g.Below), g.Lo)
+				return fmt.Sprintf("%s typed less than the tolerance allows (under %v)", pct(g.Below), g.Lo),
+					fmt.Sprintf("%s пишат число под допустимото отклонение (под %v)", share(g.Below), g.Lo)
 			}
 			if g.Above >= SuspectOneSide {
-				return fmt.Sprintf("%s typed more than the tolerance allows (over %v)", pct(g.Above), g.Hi)
+				return fmt.Sprintf("%s typed more than the tolerance allows (over %v)", pct(g.Above), g.Hi),
+					fmt.Sprintf("%s пишат число над допустимото отклонение (над %v)", share(g.Above), g.Hi)
 			}
 		}
 	}
-	return ""
+	return "", ""
 }
 
 func wrongOptions(q bank.Question) []string {

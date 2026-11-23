@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"log/slog"
 	"net/http"
@@ -22,6 +23,7 @@ import (
 	"time"
 
 	"github.com/almanac-bg/almanac/internal/account"
+	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/bank/banktest"
 	"github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/play"
@@ -678,6 +680,67 @@ func TestReportsAndTheAdminPage(t *testing.T) {
 		!strings.Contains(hardest, "<td class=\"num\">10</td><td class=\"num\">0&nbsp;%</td>") || strings.Contains(body, "geo-001 ·") {
 		t.Fatalf("the hardest and the easiest: %s", body)
 	}
+}
+
+// A question whose players' answers speak against its key (play.Suspects) is on /admin's page of the questions, with
+// what they say: a wrong option that draws more than the answer; not one most only miss.
+func TestSuspectsOnTheAdminPage(t *testing.T) {
+	g := start(t)
+	p := g.player()
+	p.call("POST", "/api/guest", map[string]any{})
+	_, _ = g.db.Write.Exec(`UPDATE users SET admin = 1`)
+	b := g.srv.Bank()
+	var doubted, missed *bank.Choice
+	for _, q := range b.Live("", "choice") {
+		if c := q.(*bank.Choice); doubted == nil {
+			doubted = c
+		} else if missed == nil {
+			missed = c
+		}
+	}
+	res, err := g.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at) SELECT id, 'chapter', '[]', 0 FROM users LIMIT 1`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, _ := res.LastInsertId()
+	now := time.Now().UnixMilli()
+	n := 0
+	answer := func(id string, pick, times int) {
+		for range times {
+			n++
+			if _, err := g.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, given, score, is_right, ms, at)
+				VALUES (?, ?, ?, ?, ?, ?, 3000, ?)`, run, n, id, fmt.Sprintf(`{"pick":%d}`, pick), b2f(pick == 0), pick == 0, now); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	answer(doubted.ID, 2, 24) // most take one wrong option
+	answer(doubted.ID, 0, 8)
+	for pick := range 4 { // hard, but no option ahead of the answer
+		answer(missed.ID, pick, 10)
+	}
+	req, _ := http.NewRequest("GET", g.url+"/admin/questions", nil)
+	page, err := p.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, _ := io.ReadAll(page.Body)
+	page.Body.Close()
+	body := string(data)
+	_, suspects, _ := strings.Cut(body, "Под съмнение (1)")
+	suspects, _, _ = strings.Cut(suspects, "Най-трудните")
+	lure := template.HTMLEscapeString(strings.Trim(doubted.Wrong[1], "„“"))
+	if !strings.Contains(suspects, doubted.ID+" ·") || !strings.Contains(suspects, "75 % избират „"+lure+"“, а 25 % — отговора") ||
+		strings.Contains(suspects, missed.ID+" ·") {
+		t.Fatalf("the suspects on the admin page: %q (of %d bytes)", suspects, len(body))
+	}
+}
+
+func b2f(b bool) float64 {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 // fakePushService takes pushes and counts them, with the chapter of each path's last; or answers a path with its status

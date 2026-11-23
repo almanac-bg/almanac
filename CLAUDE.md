@@ -154,7 +154,10 @@ Fast is the rule: several sessions work at once, and every wait multiplies acros
   passes the server's and the client's checks, one that doesn't (tests, docs, tooling) isn't. The version counts up its minor when the release brings a new migration, its patch
   otherwise: one minor, one schema. A major is the owner's call only (the workflow run by hand). `almanac-deploy` restarts the server at
   once: every game is in the database, answer by answer, so a restart cuts no play. Connections wait in systemd's socket through the restart; a version that brings a migration copies the database before it, and the deploy goes back by itself,
-  program and database copy both, if it isn't healthy. Every run deploys the latest release if it isn't live, so a
+  program and database copy both, if it isn't healthy. A release that can't read the bank the game plays (an older one
+  than a field or a rule the bank has taken since; a newer one with a check the live bank fails: CI tests only the
+  sample) isn't deployed, and nothing restarts: so try a stricter bank check on the private bank before merging it,
+  and never expect to go back below the bank. Every run deploys the latest release if it isn't live, so a
   failed deploy is tried again by the next merge; one that went back isn't, nor (if it never came up after it began
   to migrate) a release that brings that migration unchanged: change what failed. No tags by hand, no ssh to deploy. A change to `deploy/` reaches the
   server only by hand, as root, the way `deploy/setup.sh` installs it (then `systemctl daemon-reload` for a unit; a

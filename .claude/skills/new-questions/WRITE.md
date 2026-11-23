@@ -42,7 +42,8 @@ never edit it), `<batch>` (this batch's folder) and your category.
     says something new, never the date again. A true-or-not never names its date: dealt on it, it would answer
     itself. A story with a Bulgarian or human angle beats a template („Коя държава празнува на …?“): at most one
     template among your dates. Bulgarian events before 1916: the New Style date Bulgaria marks today. If a date truly has nothing worth asking in your category, take the next of your dates and say so in your notes.
-- **`firstId` … `lastId`**: your ids. Number your questions from `firstId` up, one by one, no gaps.
+- **`firstId` … `lastId`**: your ids. Number your questions from `firstId` up, one by one, no gaps, in any order
+  (a cell's spares are questions like its others: nothing marks them).
 - **`avoid`**: subjects your category names too often already. Write away from them; never a question whose answer or
   main subject is one of them.
 - **`themes`**: your chapter's themes, those the batch writes into first (each `write` > 0: the themes furthest short
@@ -61,7 +62,11 @@ never edit it), `<batch>` (this batch's folder) and your category.
   Everyday Bulgaria after 2015 is welcome; never news that goes stale (pin what can change to a date and add
   `reviewBy`: from that day no game deals it until it is checked again).
 - Every question: `added` and `updated` = the plan's `date`, a fact of at most 140 characters about the answer, its
-  `theme`, and a subject that belongs under your category (a player of the category expects it there).
+  `theme`, its `sources` (the https:// pages you confirmed it on: `bank add` refuses a new question without them),
+  and a subject that belongs under your category (a player of the category expects it there). Leave `checked` and
+  `checkedBy` out: the check below and the final `bank add` set them.
+- A number has its `unit` (м, км, души, °C…); only a year, asked as „През коя година…“, and a count the text names
+  („Колко държави…“) go without (the `unit` rule).
 - Spread the difficulty honestly by the rubric: a question is labelled for what Bulgarian players know, not for its
   cell. If a question you wrote is easier or harder than its cell, write another one for the cell.
 
@@ -70,7 +75,10 @@ never edit it), `<batch>` (this batch's folder) and your category.
 - **Grep the bank** (`<bank>/questions/*.json`, case-insensitively, Cyrillic and Latin spellings) for the subject, the
   answer, the key names and numbers. No near-duplicate, no "who or what is this" answer the bank asks already, and
   nothing in the bank that gives yours away or that yours gives away (text, options, items, clues, facts, and the
-  values an order or number question asks). This is where most drops come from.
+  values an order or number question asks). This is where most drops come from. **Grep before you research**, in
+  every category's file, and the facts above all: a number or a year you mean to ask (a height, an order's item) is
+  most often already shown in another question's fact next to the same subject, and the check refuses yours for it.
+  A finding against one of the bank's old clues questions (never dealt, still read) is fixed like any other.
 - **Confirm from a source you have read in this session**: the answer, each wrong option being wrong, every number,
   date and name, and the fact. Reliable: bg.wikipedia.org, en.wikipedia.org, Britannica, official and institutional
   sites, Wikimedia Commons file pages for pictures. Fetch the page itself with WebFetch: it's more reliable than search
@@ -97,15 +105,16 @@ until it is), all three in `<batch>/write/<category>/images/`; `w` and `h` in th
 
 - `<batch>/write/<category>/<category>.json`: one JSON array of complete bank questions, in id order.
 - `<batch>/write/<category>/images/`: the pictures they use, nothing else (no other file in that folder).
-- `<batch>/sources/<category>.json`: `{"<id>": ["<url>", …]}`, the pages you confirmed each question from.
+- `<batch>/sources/<category>.json`: `{"<id>": ["<url>", …]}`, the pages you confirmed each question from (the same
+  as each question's `sources`).
 
 Check it against the real bank before you finish, and fix what it reports for your ids:
 
 ```bash
-cd <repo> && go run ./cmd/almanac bank add -check <batch>/write/<category> <bank>
+cd <repo> && go run ./cmd/almanac bank add -check -checked-by "new-questions" <batch>/write/<category> <bank>
 ```
 
-It writes nothing; it fails on any error, prints the warnings about your questions (fix those too, unless the
+(`-checked-by` stands in for the checker's mark, which a new question must carry.) It writes nothing; it fails on any error, prints the warnings about your questions (fix those too, unless the
 warning is plainly wrong for the question), and says how big each category would be. Every rule of the skill's
 "The rules code checks" is an **error** for a new question: a give-away with a question in the bank, a word of the
 answer in a clue, a small count as a number, a tolerance off the formula, an option that stands out by its form. Fix

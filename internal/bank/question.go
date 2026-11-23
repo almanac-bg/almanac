@@ -162,9 +162,9 @@ type Dealt interface {
 
 // Graded is what an answer was worth.
 type Graded struct {
-	// Score runs from 0 (wrong) to 1 (perfect). Types with partial credit (a close number) land in between, with what
-	// luck alone would get taken out; an order is 1 or 0, right or not. The game counts only Right in a score; a score
-	// short of right but above nothing is „близо“.
+	// Score runs from 0 (wrong) to 1 (perfect). Only a number lands in between (by how close it is); every other kind
+	// is 1 or 0, right or not: an order, a match and a split are all or nothing. The game counts only Right in a
+	// score; a score short of right but above nothing is „близо“, the number's alone (DECISIONS.md).
 	Score float64
 	// Right is whether it counts as a right answer (for streaks and stats).
 	Right bool

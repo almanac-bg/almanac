@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -150,6 +152,49 @@ func TestRunwayReport(t *testing.T) {
 		if !strings.Contains(s, want) {
 			t.Errorf("no %q in\n%s", want, s)
 		}
+	}
+}
+
+// Against the bank the game plays (-live), bank check fails on a question changed into another kind by hand, and on
+// one taken out, before almanac-bank moves the bank in play: bank add refuses both, a hand in the files doesn't ask it.
+func TestCheckAgainstTheLiveBank(t *testing.T) {
+	live, next := t.TempDir(), t.TempDir()
+	for _, dir := range []string{live, next} {
+		if err := os.CopyFS(dir, os.DirFS("../../bank/sample")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := bankCheck([]string{"-sample", "-live", live, next}); err != nil {
+		t.Fatalf("the same bank against itself: %v", err)
+	}
+	file := filepath.Join(next, bank.QuestionsDir, "general.json")
+	data, _ := os.ReadFile(file)
+	var qs []map[string]any
+	if err := json.Unmarshal(data, &qs); err != nil {
+		t.Fatal(err)
+	}
+	write := func(qs []map[string]any) {
+		out, _ := json.Marshal(qs)
+		if err := os.WriteFile(file, out, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The first choice, made a true-or-not under its id.
+	i := slices.IndexFunc(qs, func(q map[string]any) bool { return q["type"] == "choice" && q["image"] == nil && q["pictures"] == nil })
+	was := maps.Clone(qs[i])
+	qs[i] = map[string]any{"id": was["id"], "type": "truefalse", "difficulty": was["difficulty"], "text": "Баба Марта е на 1 март.",
+		"answer": true, "fact": was["fact"], "added": was["added"], "updated": was["updated"], "theme": was["theme"]}
+	write(qs)
+	if err := bankCheck([]string{"-sample", "-live", live, next}); err == nil || !strings.Contains(err.Error(), "1 questions gone, or of another kind") {
+		t.Fatalf("a question of another kind: %v", err)
+	}
+	if err := bankCheck([]string{"-sample", next}); err != nil {
+		t.Fatalf("by itself the bank loads: %v", err)
+	}
+	qs[i] = was
+	write(qs[1:])
+	if err := bankCheck([]string{"-sample", "-live", live, next}); err == nil || !strings.Contains(err.Error(), "1 questions gone, or of another kind") {
+		t.Fatalf("a question taken out: %v", err)
 	}
 }
 

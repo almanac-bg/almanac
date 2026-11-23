@@ -1,0 +1,18 @@
+[
+  {
+    "id": "mus-9001",
+    "type": "truefalse",
+    "difficulty": "easy",
+    "text": "Акордеонът е старинен български народен инструмент.",
+    "answer": false,
+    "fact": "Създаден е едва през XIX век, а в оркестрите за народна музика у нас вече е утвърден през 20-те години на XX век.",
+    "added": "TODAY",
+    "updated": "TODAY",
+    "bg": true,
+    "theme": "bg_folk",
+    "sources": [
+      "https://bg.wikipedia.org/wiki/Акордеон",
+      "https://en.wikipedia.org/wiki/Accordion"
+    ]
+  }
+]

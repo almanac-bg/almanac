@@ -70,10 +70,16 @@ Politics and recent history: facts only, nothing that reads as a judgement. Neve
 - `<batch>/verify/<category>.md`: one line per question: id, OK / FIX / DROP, and for FIX and DROP what was wrong and the source.
   A changed difficulty stands out: **difficulty: medium → hard**.
 
-Check it against the real bank, and fix what it reports:
+A spare that passes stays in the file like any other question (the cross-check cuts to size). Leave `checked` and
+`checkedBy` out (the final `bank add` sets them) and the typography to `bank fmt`; no `images/` folder if nothing
+has a picture.
+
+Check it against the real bank, and fix what it reports. One line with no warnings above it is a clean pass, but only
+of what code can judge: it doesn't find an author, a place or a fact another question asks, given away by this one's
+fact or item (step 6 is yours).
 
 ```bash
-cd <repo> && go run ./cmd/almanac bank add -check <batch>/verify/<category> <bank>
+cd <repo> && go run ./cmd/almanac bank add -check -checked-by "new-questions" <batch>/verify/<category> <bank>
 ```
 
 Your final answer (structured): the counts OK / FIX / DROP, how many you kept in each cell of the plan, and the worst

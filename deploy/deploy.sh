@@ -27,6 +27,14 @@
 # it runs. A release without one (from before signatures) is never taken: only one kept here already (the five used
 # latest are kept in /usr/local/lib/almanac, each checked when it came) can be gone back to.
 #
+# The bank: the new program reads the bank the game plays (the checkout almanac-bank keeps, bank.sh) before anything
+# restarts, as the game's user, and a program that refuses it isn't deployed: the game stays as it is, with no cut in
+# play. That is the floor under going back: the bank is written for the program that was live when it came (a field
+# older programs don't know: `theme`, 23 Nov 2026; a waiver of a rule they don't have), so an older program, which
+# would refuse it and start on an older copy of the bank or not at all, is never put back by hand; and a newer one
+# with a check the bank doesn't pass yet waits for the bank's fix. Going back by itself is to the program that was
+# live, which read this bank: a reload and a deploy never run at once (the lock above).
+#
 # Nothing the game plays lives only in its memory (every game is in the database, step by step), so a restart cuts no
 # play, and the deploy restarts at once. Connections that come during the restart wait in systemd's socket
 # (almanac.socket) for the new server.
@@ -79,6 +87,7 @@ link=/usr/local/bin/almanac
 marks=/var/lib/almanac-deploy
 signers=/etc/almanac/release-signers
 lock=/run/almanac-deploy.lock # bank.sh's too
+bank=/srv/almanac-bank        # the bank's checkout (bank.sh's repo; the game's BANK_DIR)
 
 trap '' PIPE # its output is the journal's; nothing that reads it going away may stop it
 exec 9>"$lock"
@@ -165,6 +174,20 @@ if [ "$mode" = ci ] && [ -s "$work/brings" ]; then
 			exit 1
 		fi
 	done
+fi
+
+# The bank the game plays, read by this program before the restart (above). `almanac bank check` says „the server
+# would not play this bank“ of one it can't load (cmd/almanac/bank.go; deploy_test.go holds the two together); what
+# else it fails on (a category's size, a national day) is the bank's keeper's, not a reason to hold a release. A
+# program too old to check a bank says nothing of the kind, and is taken as before.
+if [ -f "$bank/categories.json" ]; then
+	reads=$(timeout 300 setpriv --reuid=almanac --regid=almanac --clear-groups "$program" bank check "$bank" 2>&1) || true
+	case $reads in *"the server would not play this bank"*)
+		printf '%s\n' "$reads" | grep -v ': warning: ' | head -n 20 >&2
+		echo "not deployed: $tag doesn't read the bank the game plays ($bank), so nothing restarted: an older program than the bank goes no further back (deploy one that reads it), a newer one waits for the bank's fix (almanac-bank)" >&2
+		exit 1
+		;;
+	esac
 fi
 
 # Room for a copy of the database and its migrations: refused here, before the restart.

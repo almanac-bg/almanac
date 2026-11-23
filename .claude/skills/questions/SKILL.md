@@ -35,14 +35,18 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
     questions, changes to existing ones and retirements (`<category>.json` files, `images/`, maybe `retire.json`:
     `[{"id", "why", "by"}]`). It is the one checked way to change the bank, for a fix of one question and a content
     pass over thousands alike:
-    - an id the bank doesn't have is a **new** question: the next free number of its category;
+    - an id the bank doesn't have is a **new** question: the next free number of its category, with `added` today (or
+      the day its batch was planned, at most 7 days back: every rule for a new question is read off that date, so one
+      without it, or with an old one, is refused);
     - an id the bank has (live, in that category's file) is a **change**: the batch's object replaces the question
       whole, in its place. It keeps `added` as the bank has it, sets `updated` to today, and sets `changed` to today
       if what it asks changed (its text, answer, options, items, pairs, decoy, clues, groups, picture, tolerance,
       unit, step, scale or direction, against the bank's version); if only the fact, the day's line or the labels
       (difficulty, `on`, `bg`, `theme`, `sources`, `reviewBy`, a picture's credit) changed, `changed` stays as it was. A
       retired question isn't changed (a new one takes its place), nor one the batch also retires; one the same as
-      the bank's is left out of the batch;
+      the bank's is left out of the batch. **A question never changes its kind** (a number made a choice, a choice a
+      true-or-not): that is another question, and a day drawn already holds this one in a place of its kind; it is
+      refused: retire it (`retire.json`, `by` the new one) and add the new one with a new id;
     - all of it holds and the bank with it in loads with no errors, or nothing is written. It reports how many
       questions it added, changed and retired, and the warnings left on them. `-check` only checks; `-checked-by`
       marks the new and changed questions checked today by that process (where the batch doesn't say otherwise);
@@ -56,7 +60,8 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
     error, while a category is more than 2% off the mean size (`bank.SizeSlack`), and while a national day has no
     question about Bulgaria left (`-sample` lets the small public sample pass these two; with `-live`, the bank the
     game plays, as `almanac-bank` runs it, only a national day this bank emptied fails, one empty there too is warned
-    of, so an urgent fix is never held up by it), and **warns** of every place under 150 days (`play.RunwayWarn`: the 90 days
+    of, so an urgent fix is never held up by it; and a question the live bank has that this one dropped, or has as
+    another kind, fails it: a hand in the files that `bank add` would have refused), and **warns** of every place under 150 days (`play.RunwayWarn`: the 90 days
     drawn ahead and 60 to write) and of every thin date. Then **the subjects that come back** (listed, never failed): the answers and names
     more than 15 live questions name, by category (`*` over 1% of one); the top 20, all of them with
     `go run ./cmd/almanac bank subjects private`. Its last line counts the errors and the warnings by rule;
@@ -143,6 +148,7 @@ enough to be worth a look, not always.
 | `estimate` | A number question is an estimate: a year, or a quantity of more than 20 of its steps (6,5 млн. on a step of 0,1 is 65). A small count, a phone number, a place in a row is a choice |
 | `countable` † | A number doesn't count the items of a list (a composer's works, awards, a text's articles or clauses, seats, spectators, goals, points, the times something was done: `listWords` in estimate.go): nobody has counted them, so it's a guess. Ask it as a choice, or ask what can be placed; a true anchor (a famous total: the Bible's 66 books) is a waiver whose `why` names it. The day's hard number never takes one unwaived |
 | `closing` (hint) | A hard number can close the day: its answer is over 20 (`Bank.Estimate` takes only those for the day's last place, whatever the step), so 6,5 млн. on a step of 0,1 is an estimate but fills no day: say it in a smaller unit (650 мм, not 0,65 м), or ask it at another difficulty |
+| `unit` | A number has its unit; with none it asks a year („През коя година…“) or names its count („Колко държави…“, an octane number, an index). „Каква е височината на…?“ or „Кога е основан…?“ with no unit is refused: the player can't tell what to type, and it is read as a quantity, so a year asked that way gets 3/10 of itself for a tolerance and any guess is right (so does a year asked with „колко“). „няколко“ isn't „колко“: a year's question that says it is still a year's |
 | `anchor` (hint) | An estimate counts what a well-read player can place, not an archive's count: a series' episodes, a hall's seats, a council's members, a dictionary's words, prize money, a fine |
 | `tolerance` | The tolerance follows the formula (below), within half again either way |
 | `offset-scale` † | On a scale with no zero of its own (°C, an angle or a latitude in °, points, a rating such as Elo) the tolerance is judged: under 1/5 of the answer, never the formula's 3/10 (Topalov's Elo of 2 816 with 840 is a gift); linear |
@@ -243,7 +249,8 @@ By type:
   Each `alt` describes its picture without naming it („Три хоризонтални ивици: жълта, зелена, червена“), and the four
   look alike enough that the picture, not a giveaway, decides.
 - **`number`:** an **estimate** (the owner's rule, 16 Nov 2026): a year, or a quantity of more than 20 steps. A
-  small count (4 evangelists, 7 times, the 15th of August) is a choice. `answer`, `unit` (empty for a year), `step`
+  small count (4 evangelists, 7 times, the 15th of August) is a choice. `answer`, `unit` (empty only for a year, asked
+  as „През коя година…“, and for a count the text names: „Колко държави…“; the `unit` rule), `step`
   (1 for whole numbers; 0.1 for one decimal), `scale` (`linear`, or `log` across orders of magnitude) and `tolerance`
   (how far off is no longer „близо“; on a log scale, a factor above 1). It's typed on a pad, and the player isn't
   told a range. Only a temperature (°C) may be below 0. A guess within a fifth of the tolerance is right
@@ -259,7 +266,8 @@ By type:
   `bank check` takes a tolerance within half again of the formula, and says the formula's figure when it isn't.
 - **`order`:** four `items` (`text` at most 45 characters and an exact `value`), `direction` (`asc` or `desc`) and
   `unit`. The text says the direction. A game deals all four (never already in order), and the answer is right or
-  not: one arrangement of 24.
+  not: one arrangement of 24. (So are a match and a split: every pair, every item, or nothing. „Близо“ is the
+  number's alone.)
 - **`truefalse`:** the text is a statement ending with a period, and `answer` is `true` or `false`. Write about as
   many false ones as true, each false by one clear fact, not by a trick of wording. **A false statement's fact starts
   with what is true** („Монако граничи с Италия.“ — „Монако граничи по суша само с Франция…“), then the rest.
@@ -378,7 +386,7 @@ shows with the answer, over the fact: the player learns why the day. (The owner'
   decoy, clues, groups, picture, tolerance, unit, step, scale, direction), set `changed` to today too: the answers
   given before then stop counting. A fix to the fact, the day's line or the labels leaves `changed` as it was.
 - Change it in place when it still asks the same thing, better (a clearer wording, a fairer option). If it would ask
-  something else (another subject or answer), retire it (`"retired": true`, `retiredWhy`, `replacedBy`) and add a new
+  something else (another subject or answer), **or as another kind** (`bank add` refuses a change of `type`), retire it (`"retired": true`, `retiredWhy`, `replacedBy`) and add a new
   one with a new id: answers already given and stats point at the old one.
 - Keep `sources` true: add the page a fix rests on, drop one that no longer supports it. A fix checked again against
   its sources sets `checked` and `checkedBy`. A question without sources gets them with any change, a label's

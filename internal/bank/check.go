@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -256,10 +257,35 @@ func strictJSON(data []byte, v any) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
+		var wrong *json.UnmarshalTypeError
+		if errors.As(err, &wrong) && wrong.Field != "" {
+			return fmt.Errorf("%s is %s, and takes %s", wrong.Field, jsonKinds[wrong.Value], takes(wrong.Type))
+		}
 		return err
 	}
 	if _, err := dec.Token(); !errors.Is(err, io.EOF) {
 		return errors.New("more than one JSON value")
 	}
 	return nil
+}
+
+// jsonKinds are JSON's values as a refusal names them (json.UnmarshalTypeError.Value).
+var jsonKinds = map[string]string{"string": "text", "number": "a number", "bool": "true or false", "array": "a list",
+	"object": "an object"}
+
+// takes names what a field takes, by its type: for whoever wrote „"answer": 5“ where a choice's answer is text.
+func takes(t reflect.Type) string {
+	switch t.Kind() {
+	case reflect.String:
+		return "text"
+	case reflect.Bool:
+		return "true or false"
+	case reflect.Slice, reflect.Array:
+		return "a list"
+	case reflect.Struct, reflect.Map, reflect.Pointer:
+		return "an object"
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return "a whole number"
+	}
+	return "a number"
 }

@@ -1,0 +1,30 @@
+[
+  {
+    "id": "gen-5",
+    "type": "choice",
+    "difficulty": "easy",
+    "text": "Чие е това знаме?",
+    "answer": "Унгария",
+    "wrong": [
+      "Италия",
+      "България",
+      "Иран"
+    ],
+    "fact": "Унгарското знаме е в този вид от 1957 г.",
+    "added": "TODAY",
+    "updated": "TODAY",
+    "theme": "other",
+    "sources": [
+      "https://bg.wikipedia.org/wiki/Витоша"
+    ],
+    "image": {
+      "file": "dc6a9216ca85cb89.webp",
+      "w": 1200,
+      "h": 720,
+      "alt": "Три хоризонтални ивици: червена, бяла и зелена",
+      "credit": "неизвестен автор",
+      "license": "PD",
+      "source": "https://commons.wikimedia.org/wiki/File:Flag_of_Hungary.svg"
+    }
+  }
+]

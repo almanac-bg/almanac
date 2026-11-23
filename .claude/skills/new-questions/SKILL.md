@@ -38,11 +38,18 @@ model isn't available, stop and tell the owner; never run the batch on a weaker 
 in a worktree the main checkout's (`$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/private`).
 `<batch>` is `<scratchpad>/batch-<date>`. Run the `almanac` commands as `go run ./cmd/almanac …` from `<repo>`.
 
+**Whenever you stop before the end** (a step below says to, or something fails), first put things back: `<bank>` as
+it was (`git -C <bank> checkout -- . && git -C <bank> clean -fd -- images`, unless the batch is committed already),
+and the lock removed. A lock left behind holds the next batch up for a day.
+
 1. **Make sure the bank is ready.** Stop and say why if any of these fails:
    - no other batch runs: `<bank>/.git/new-questions.lock` doesn't exist (if it does and is over a day old, it was
      left behind: remove it). Then write the lock: the date, this session's folder;
    - `git -C <bank> status --porcelain` is empty, then `git -C <bank> pull --ff-only`;
-   - `bank check <bank>` has no errors.
+   - `bank check <bank>` has no errors;
+   - `<repo>` has the rules as they are now: `git -C <repo> fetch origin main`, and `git -C <repo> log --oneline
+     HEAD..origin/main -- internal/bank cmd/almanac .claude/skills` prints nothing (else the batch would be checked by
+     old rules, and the server, which has the new ones, would refuse it at the end: update the checkout first).
 2. **Fetch the days' questions** from the server, so that the runway counts what the days have left, not the whole
    bank (only question ids and the last day drawn come back, nothing of a player's):
    `ssh -i ~/.ssh/hetzner -o BatchMode=yes root@2.31.121.12 systemd-run --pipe --wait -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac bank used > <batch>/used.txt`.
@@ -83,7 +90,9 @@ in a worktree the main checkout's (`$(dirname "$(git rev-parse --path-format=abs
    `ssh -i ~/.ssh/hetzner -o BatchMode=yes root@2.31.121.12 almanac-bank`. Its first line must be the bank's count
    (`…: N questions (M live)`, M the new live total), its second the problems counted (`…: 0 errors, W warnings
    (by rule)`: anything but 0 errors stops it before the bank on the server moves, with the errors), and its last `live: <your commit>` (the server confirmed it plays it). If the push
-   or the server step fails, say so; the batch is safe in the commit.
+   or the server step fails, say so; the batch is safe in the commit. `almanac-bank` and a deploy of the game share one
+   lock: if a deploy is under way it says so and waits for it, by itself. Let it wait; never reload the bank another
+   way (a reload during a deploy's health watch sent a healthy release back, 23 Nov 2026).
 10. **Tell the owner,** in a few lines: how many went in, the runway before → after, how many the checks dropped and
    the worst they caught, what was fixed in older questions, a handful of the new questions (question → answer), and
    the report's path.
@@ -95,6 +104,15 @@ in a worktree the main checkout's (`$(dirname "$(git rev-parse --path-format=abs
 - **The bank changed under the batch** (another session committed to it): `bank add` refuses ids that aren't the
   next free ones (an id the bank has now reads as a change to that question, refused with "or, as a new question,
   it takes the next free id"). Renumber the final files from the new `firstId`s (the ids aren't used anywhere yet) and add again.
+- **`bank add` says „its kind changed“:** a question keeps its kind for good. Retire the old one (`retire.json`:
+  `{"id", "why", "by"}`) and add the new one with a new id.
+- **`bank add` says „added is …: a new question is added today“:** the batch took more than 7 days from its plan. Set
+  `added` and `updated` of its questions to today and add again.
+- **`almanac-bank` says „not taken: … has errors“ with an unknown field or „no such rule“,** while `bank check` passes
+  here: the server's program is older than this checkout (a field or a rule it doesn't know yet). Nothing moved on
+  the server and the game plays the bank it had. Get the game's release live first (`https://almanac.bg/api/health` shows the version it runs), then run
+  `almanac-bank` again. Never the other way round: the server never goes back to a program older than its bank
+  (`almanac-deploy` refuses one that can't read it).
 - **A writer or checker ran out of web search:** the brief tells them to fetch pages directly; what they couldn't
   confirm is dropped, and the cross-check fills from spares. A category far short: resume, or run that category again.
 - **Never** skip the checkers or the cross-check, relax a rule to keep a question, or put a dropped question back

@@ -57,7 +57,7 @@ Check the whole batch against the real bank: it must pass (every rule of the ban
 otherwise; a give-away across the ten categories too), with the categories within 2% of their mean after it:
 
 ```bash
-cd <repo> && go run ./cmd/almanac bank add -check <batch>/final <bank>
+cd <repo> && go run ./cmd/almanac bank add -check -checked-by "new-questions" <batch>/final <bank>
 ```
 
 Your final answer (structured): the size each category adds, the number of pairs resolved, how many questions were

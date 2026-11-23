@@ -1,0 +1,22 @@
+[
+  {
+    "id": "gen-5",
+    "type": "choice",
+    "difficulty": "easy",
+    "text": "Кой е най-високият връх в Рила?",
+    "answer": "Мусала",
+    "wrong": [
+      "Мальовица",
+      "Вихрен",
+      "Ботев"
+    ],
+    "fact": "Връх Мусала е висок 2925 м.",
+    "added": "TODAY",
+    "updated": "TODAY",
+    "bg": true,
+    "theme": "places",
+    "sources": [
+      "https://bg.wikipedia.org/wiki/Витоша"
+    ]
+  }
+]
