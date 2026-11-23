@@ -1185,7 +1185,8 @@ function streakNotice(t: Today): StreakSaid | null {
       long: `${missed} До два пропуснати дни на седмица ти се прощават. Серия: ${count(t.streak, "ден", "дни")}.`,
     };
   }
-  const text = t.ended ? `Серията ти прекъсна. ${begins}.` : `Радваме се, че се върна. ${begins}.`;
+  // An ended streak leads with what begins, never with the loss (its being new says the old one ended).
+  const text = t.ended ? `${begins}.` : `Радваме се, че се върна. ${begins}.`;
   return { short: text, long: text };
 }
 

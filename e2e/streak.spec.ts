@@ -1,13 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { daysPlayed, openGame, playRun, startDay } from "./play.ts";
 
-test("a streak that ended is said to have ended, once", async ({ page }) => {
+test("a streak that ended is told as a new one beginning, once, never as the loss", async ({ page }) => {
   await page.goto("/");
   // Five days missed since: two weeks forgive four at most, so one of the last three ends it, whatever today's
   // weekday. Its number is never said (DECISIONS.md, „The direction“).
   await daysPlayed(page, 7, 6);
   await page.reload();
-  await expect(page.locator(".streak-notice")).toContainText("Серията ти прекъсна. Днес започва нова серия.");
+  await expect(page.locator(".streak-notice")).toHaveText("Днес започва нова серия.");
   await expect(page.locator(".streak-notice")).not.toContainText(/\d/);
   await page.reload();
   await expect(page.getByRole("button", { name: "Започни" })).toBeVisible();
