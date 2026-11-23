@@ -382,8 +382,9 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
 - **The tiles** (`tiles()`): the day's ten in their chapters' colours, a glyph on each. Right: filled, the glyph on a
   white rounded tile. Близо: the upper left half in the chapter's colour, cut on the diagonal (◩, never the left half,
   which reads too near a full one), the lower right hollow, the glyph straight over both, a 2.5px outline in the deep
-  colour. Wrong: hollow, a dashed outline, the glyph faded. A void one dashed and empty; one to come a quiet well. They
-  read at 28px. **The small squares** (`mini()`, 10px): a friend's or a board's row, in ink: full, the diagonal half,
+  colour. Wrong: hollow, a dashed outline, the glyph faded. A void one dashed and empty; one to come a quiet well. On
+  the score's sheet a hollow or half one is see-through (a faint wash of white, its line the sheet's ink, faded), never
+  brighter than a right one. They read at 28px. **The small squares** (`mini()`, 10px): a friend's or a board's row, in ink: full, the diagonal half,
   empty; told apart by fill, never by colour, and nothing drawn inside them (unreadable at 10px). A day has one close
   answer at most (the hard number), so one ◩ at most.
 - **The pips** (`.trail`): a run's ten, a bar each: done right filled in ink, близо half, wrong hollow, the one asked in
