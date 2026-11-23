@@ -16,8 +16,8 @@
 // (rules.go): how lines end and are typed (wording.go), the options (options.go), numbers as estimates with one
 // tolerance formula (number.go) that count no list, judge an offset scale and show no number near the answer
 // (estimate.go), orders' gaps (order.go), and give-aways and twins from one question to another (giveaway.go, on the
-// word stems of text.go). Errors for questions added since StrictFrom, warnings for older ones, waivers for
-// the true exceptions.
+// word stems of text.go), near-duplicates that ask one fact in other words (near.go). Errors for questions added
+// since StrictFrom, warnings for older ones, waivers for the true exceptions.
 package bank
 
 import (

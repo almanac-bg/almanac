@@ -521,6 +521,51 @@ func TestTwin(t *testing.T) {
 	}
 }
 
+// Two questions that ask one fact in other words are found, warned of and waived; one frame with two facts, and one
+// subject with two facts, aren't.
+func TestNear(t *testing.T) {
+	statement := func(id, text string, truth bool) *TrueFalse {
+		return &TrueFalse{Head: Head{ID: id, Type: "truefalse", Text: text}, Answer: truth}
+	}
+	near := func(waivers []Waiver, qs ...Question) []string {
+		return slices.DeleteFunc(found(bankOf(qs...), waivers...), func(s string) bool { return !strings.Contains(s, "near ") })
+	}
+	for _, c := range []struct {
+		name string
+		a, b Question
+		want bool
+	}{
+		{"one answers the other", choice("spo-1", "Кое от тези е плувен стил?", "Бруст", "Слалом", "Спринт", "Сабя"),
+			choice("spo-2", "В кой плувен стил Таня Богомилова става олимпийска шампионка в Сеул?", "Бруст", "Кроул", "Бътерфлай", "Гръб"), true},
+		{"one says it all", statement("geo-1", "Хавайските острови са щат на САЩ.", true),
+			statement("his-1", "Хавайските острови са самостоятелно кралство, преди да станат част от САЩ.", true), true},
+		{"a statement and its opposite", statement("nat-1", "Гъбите са растения.", false),
+			statement("nat-2", "Гъбите са по-близки роднини на животните, отколкото на растенията.", true), true},
+		{"a number and a statement of it", number("geo-2", "Колко метра е висок връх Мусала?", 2925, 10, "м"),
+			statement("geo-3", "Връх Мусала е висок 2925 метра.", true), true},
+		{"one subject, two numbers", number("mus-1", "През коя година е застрелян Джон Ленън?", 1980, 2, ""),
+			number("mus-2", "На колко години е Джон Ленън, когато е застрелян?", 40, 10, "години"), false},
+		{"one frame, two names", statement("geo-4", "Норвегия и Русия имат обща сухопътна граница.", true),
+			statement("geo-5", "Норвегия и Германия имат обща сухопътна граница.", false), false},
+		{"one subject, two facts", statement("mus-3", "Китаристът Джими Хендрикс е левичар.", true),
+			statement("mus-4", "Джими Хендрикс е британски китарист.", false), false},
+	} {
+		got := near(nil, c.a, c.b)
+		if (len(got) == 1) != c.want || len(got) > 1 {
+			t.Errorf("%s: %v", c.name, got)
+		}
+	}
+	a := choice("spo-1", "Кое от тези е плувен стил?", "Бруст", "Слалом", "Спринт", "Сабя")
+	b := choice("spo-2", "В кой плувен стил Таня Богомилова става олимпийска шампионка в Сеул?", "Бруст", "Кроул", "Бътерфлай", "Гръб")
+	b.Added = "2026-11-23" // a hint: a warning even for a new question, and the newer one first
+	if got := near(nil, a, b); !slices.Equal(got, []string{"near spo-2"}) {
+		t.Errorf("a new question: %v", got)
+	}
+	if got := near([]Waiver{{ID: "spo-2", Rule: "near", Why: "пита друго"}}, a, b); len(got) != 0 {
+		t.Errorf("waived: %v", got)
+	}
+}
+
 // The answers of choices of numbers sit evenly across the four ranks, or the rule says which to move.
 func TestNumberRank(t *testing.T) {
 	for opts, want := range map[[4]string]int{
