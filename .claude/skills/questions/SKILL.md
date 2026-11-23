@@ -74,8 +74,10 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
   game draws (a run of ten has five choices and one of each other kind), so that no kind runs out long before the
   others. `bank check` shows each category's kinds against it.
 - **The bank grows by the day's runway** (the owner's rule since 15 Nov 2026, in place of "fully balanced, always"):
-  the day spends its places at its own pace — one easy choice with a picture, one hard number, two hard choices, a
-  medium order and match… a day — about three times faster for the hard places than for the easy ones. So
+  the day spends its places at its own pace — one easy choice with a picture, one medium choice with a picture (while
+  any are left: past them a plain choice takes its place, so it never stops the days, but it's written for like any
+  place), one hard number, two hard choices, one medium puzzle (an order, a match or a split, in turn: the three
+  share one place)… a day — about three times faster for the hard places than for the easy ones. So
   `bank check` prints, for each place of a day, how many days from today it has questions for, counted as the day
   takes them: only the questions a day can still take (with `-used`, none the days played or
   drawn ahead have had; without it, the whole bank, which overstates it), never a dated one (it waits for its date;

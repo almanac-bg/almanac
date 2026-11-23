@@ -83,7 +83,10 @@ func TestShapesDiffer(t *testing.T) {
 					t.Fatalf("seed %d: place %d is %s, not %s", seed, i, slots[i].difficulty, shape[i].difficulty)
 				}
 			}
-			for _, typ := range []string{"truefalse", "order", "match", "number"} {
+			for _, typ := range []string{"truefalse", "order", "match", puzzle, "number"} {
+				if where(shape, typ) < 0 {
+					continue // the day's one puzzle stands for the order and the match
+				}
 				if seen[typ] == nil {
 					seen[typ] = map[int]bool{}
 				}
@@ -95,6 +98,64 @@ func TestShapesDiffer(t *testing.T) {
 				t.Errorf("the %s is always in place %v", typ, at)
 			}
 		}
+	}
+}
+
+// A day has one puzzle (an order, a match or a split), the three in turn so that over many days each comes about as
+// often, and two pictures, an easy one and a medium one; once the medium pictures are spent, a plain medium choice
+// takes that place, and the day isn't short for it.
+func TestOnePuzzleTwoPicturesADay(t *testing.T) {
+	b := dayRulesBank(t)
+	used := map[string]bool{}
+	drawn := map[string][]Pick{}
+	kinds := map[string]int{}
+	const days = 30
+	for n := range days {
+		day := DayShift("2026-03-01", n)
+		picks, short := drawDay(b, day, used, nil, recentSubjects(b, drawn, day), rand.New(rand.NewPCG(uint64(n), 3)))
+		if len(short) > 0 || len(picks) != Length {
+			t.Fatalf("%s: %d picks, short %v", day, len(picks), short)
+		}
+		drawn[day] = picks
+		puzzles, pictures := 0, map[bank.Difficulty]int{}
+		for _, p := range picks {
+			q, _ := b.Get(p.ID)
+			if k := q.Base().Type; slices.Contains(puzzleKinds, k) {
+				puzzles++
+				kinds[k]++
+				used[p.ID] = true // the small bank's puzzles and pictures spent; its plain choices dealt again
+			}
+			if bank.HasPictures(q) {
+				pictures[q.Base().Difficulty]++
+				used[p.ID] = true
+			}
+		}
+		if puzzles != 1 || pictures[bank.Easy] != 1 || pictures[bank.Medium] != 1 || len(pictures) != 2 {
+			t.Fatalf("%s: %d puzzles, pictures %v: one puzzle and an easy and a medium picture a day", day, puzzles, pictures)
+		}
+	}
+	for _, k := range puzzleKinds {
+		if kinds[k] < days/len(puzzleKinds)-1 {
+			t.Errorf("puzzles over %d days %v: the %s comes too rarely", days, kinds, k)
+		}
+	}
+	// No medium picture left: a plain medium choice in its place, never short.
+	for _, q := range b.Live("", "choice") {
+		if q.Base().Difficulty == bank.Medium && bank.HasPictures(q) {
+			used[q.Base().ID] = true
+		}
+	}
+	picks, short := drawDay(b, "2026-04-01", used, nil, nil, rand.New(rand.NewPCG(1, 3)))
+	if len(short) > 0 || len(picks) != Length {
+		t.Fatalf("no medium picture left: %d picks, short %v", len(picks), short)
+	}
+	choices := 0
+	for _, p := range picks {
+		q, _ := b.Get(p.ID)
+		choices += b2i(q.Base().Difficulty == bank.Medium && q.Base().Type == "choice")
+	}
+	if choices != 3 {
+		t.Fatalf("no medium picture left: %d medium choices, not 3", choices)
 	}
 }
 

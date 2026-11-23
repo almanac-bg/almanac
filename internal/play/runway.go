@@ -51,8 +51,8 @@ type Runway struct {
 	// Cover is how many days from today the place holds at Supply times the day's need (the days drawn already among
 	// them): what the warning and the batch plan go by.
 	Cover int
-	// Difficulty, Kinds and Picture say what fits the place ("split" and "clues" share theirs, while both are dealt:
-	// newKinds); Questions is how many
+	// Difficulty, Kinds and Picture say what fits the place (the day's puzzle takes an order, a match or a split:
+	// puzzleKinds); Questions is how many
 	// fit it that a day can still take (the days drawn ahead have theirs), PerDay how many a day takes.
 	Difficulty bank.Difficulty
 	Kinds      []string
@@ -97,8 +97,8 @@ func (u Used) left(q bank.Question, start time.Time) bool {
 	return !u.IDs[q.Base().ID] && len(q.Extra().On) == 0 && !overdue(q, start.Format(time.DateOnly))
 }
 
-// DayRunway is the runway of each place of a day, in the day's order (the place the new kinds share counts both), on
-// today.
+// DayRunway is the runway of each place of a day, in the day's order (the puzzle's counts its three kinds: dayPuzzle
+// takes another when one runs out), on today.
 func DayRunway(b *bank.Bank, used Used, today string) []Runway {
 	start := used.start(today)
 	var out []Runway
@@ -115,8 +115,12 @@ func DayRunway(b *bank.Bank, used Used, today string) []Runway {
 			}
 		}
 		kinds := []string{s.typ}
-		if s.typ == sharedKinds[0] {
-			kinds = newKinds
+		if s.typ == puzzle {
+			kinds = puzzleKinds
+		}
+		place := s.place()
+		if s.picture == whileAny { // its pictures: past them it takes a plain choice, never short
+			s.picture = withPicture
 		}
 		n := 0
 		for _, k := range kinds {
@@ -126,7 +130,7 @@ func DayRunway(b *bank.Bank, used Used, today string) []Runway {
 				}
 			}
 		}
-		out = append(out, Runway{Place: slot{s.difficulty, kinds[0], s.picture, ""}.place(), Difficulty: s.difficulty,
+		out = append(out, Runway{Place: place, Difficulty: s.difficulty,
 			Kinds: kinds, Picture: s.picture == withPicture, Questions: n, PerDay: times}.from(start, today))
 	}
 	return out
@@ -142,8 +146,11 @@ func BulgariaRunway(b *bank.Bank, used Used, today string) Runway {
 			continue
 		}
 		if slices.ContainsFunc(daySlots, func(s slot) bool {
-			if s.typ == sharedKinds[0] {
-				return slices.ContainsFunc(newKinds, func(k string) bool { return fitsPlace(b, q, s, k) })
+			if s.picture == whileAny {
+				s.picture = eitherWay
+			}
+			if s.typ == puzzle {
+				return slices.ContainsFunc(puzzleKinds, func(k string) bool { return fitsPlace(b, q, s, k) })
 			}
 			return fitsPlace(b, q, s, s.typ)
 		}) {

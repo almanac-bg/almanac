@@ -58,7 +58,7 @@ import (
 // DayRules names the day's draw as it is, and the days after tomorrow are drawn again whenever it changes. It ends with
 // what drawDay makes of a fixed bank on fixed days and seeds (TestDayRulesNameTheDraw): a change to how a day is drawn
 // fails that test until DayRules says so, rather than reach the days drawn ahead a season late.
-const DayRules = "2026-11-23 no clues (bank.Off), the split their place every day; draw 2140033db20ed44f"
+const DayRules = "2026-11-23 one puzzle a day (order, match, split in turn), a medium picture while any; draw 1d9fecb675e8bec5"
 
 // Ahead is how many days ahead of today the day's questions are drawn.
 const Ahead = 90
@@ -441,8 +441,8 @@ func allLive(b *bank.Bank, picks []Pick) bool {
 	return true
 }
 
-// shaped is whether a day's questions are of the day's kinds (daySlots; a split or clues in the place they share):
-// every day is drawn so, but a question whose kind changed since (a choice made a match again) leaves its day
+// shaped is whether a day's questions are of the day's kinds (daySlots; an order, a match or a split in the puzzle's
+// place): every day is drawn so, but a question whose kind changed since (a choice made a match again) leaves its day
 // misshapen, and that day is drawn again.
 func shaped(b *bank.Bank, picks []Pick) bool {
 	want := map[string]int{}
@@ -455,8 +455,8 @@ func shaped(b *bank.Bank, picks []Pick) bool {
 			return false
 		}
 		k := q.Base().Type
-		if slices.Contains(sharedKinds, k) {
-			k = sharedKinds[0]
+		if slices.Contains(puzzleKinds, k) {
+			k = puzzle
 		}
 		want[k]--
 	}

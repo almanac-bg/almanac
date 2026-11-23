@@ -57,6 +57,10 @@ packages' doc comments; this file holds only what must not drift.
     Clues („Подсказки“) are switched off (2026-11-23, the owner): with only right or wrong, waiting for clues was
     pointless. Their questions stay in the bank, never dealt, and no new one is written (`bank.Off`); match and split,
     converted to choices on 21–22 Nov, came back as they were.
+  - **The issue's shape** (2026-11-23): one puzzle a day (an order, a match or a split, in turn), so that a single
+    slip on an all-or-nothing puzzle can't sink the day as three of them could, and two pictures (an easy one, and a
+    medium one while the bank has them, written for by the runway); the rest plain choices, a true-or-not and the hard
+    number last (`daySlots`).
   - **Ink.** A right answer in the issue, the first time a player meets that question, writes its fact in ink. Every
     other fact a player meets (a miss, or any answer in chapter games and duels) is in the book in grey, as met: never
     counted, never promised to turn into ink. A chapter shows one number, its ink.
