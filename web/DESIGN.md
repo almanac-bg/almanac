@@ -123,8 +123,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      „Още никой от приятелите ти не е играл днес.“). All България: how it spread (eleven bars, 0 to 10, the player's in
      ink with „ти“ over it, the average a thin line with its label in a row over the bars, clear of „ти“; from ten
      players; the ticks no bigger than their columns hold, so „10“ never runs into „9“ with large text), the player's
-     place („В България си на 20-о място от 53.“; with none right only „Днес играха 53 души.“, alone on the board
-     nothing), then the best twenty and the player's own row under them if further down. A row: the place (shared by
+     place („В България си на 20-о място от 53.“; with none right, on a first day or in the lower half only „Днес
+     играха 53 души.“, alone on the board nothing), then the best twenty and the player's own row under them if further down. A row: the place (shared by
      those as many right and as close on the number, never told apart by time: 1, 2, 2, 4; the player first among
      their equals), then the row built as a friend's (`scoreRow()`): the avatar, the name with the row's
      width and „ти“ after it, and on one line under the name the score (a heavy numeral as a friend's, never

@@ -909,15 +909,17 @@ function ofFriends(t: Today): Child {
 
 /** The day among everyone who played it: how they spread (spreadChart), where the player stands, then the best twenty
  * and the player's own place under them if further down. Alone on the board, a place says nothing; with none right,
- * it would only rub the day in: how many played instead. */
+ * on a first day, or in the lower half, it would only rub the day in („34-то място от 35“ to a new player): how many
+ * played instead (the chart and the rows still show where the player is). */
 function everyone(t: Today, run: State): Child {
   const b = t.board;
   const mine = b.mine && b.place && !b.top.some((s) => s.me) ? b.mine : null;
+  const placeSaid = !!b.place && !!b.mine?.rights && !t.firstDay && b.place <= Math.ceil(b.players / 2);
   return [
     spreadChart(b, run),
     b.players < 2
       ? null
-      : b.place && b.mine?.rights
+      : b.place && placeSaid
         ? h(
             "p",
             { class: "board-note" },
