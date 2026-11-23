@@ -934,10 +934,17 @@ function everyone(t: Today, run: State): Child {
           "ol",
           { class: "rows ranks" },
           b.top.map((s, i) => scoreRow(s, s.place ?? i + 1)),
-          mine && b.place ? scoreRow(mine, b.place, b.place > b.top.length + 1) : null,
+          mine && b.place ? ownRow(mine, b.place, b.top.length) : null,
         )
       : null,
   ];
+}
+
+/** The player's own row under the best (`shown` of them), at its place; further down than the next, a quiet „…“
+ * over it, in the places' column: the places between are left out, not missing. */
+function ownRow(mine: Score, place: number, shown: number): Child {
+  const apart = place > shown + 1;
+  return [apart ? h("li", { class: "rank-skip", "aria-hidden": "true" }, "…") : null, scoreRow(mine, place, apart)];
 }
 
 /** How all of България did with the day: how many got each count of right answers, the player's own bar in ink with

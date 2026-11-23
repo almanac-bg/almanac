@@ -6800,9 +6800,20 @@
     border-top-color: transparent;
   }
 
-  /* Further down than the best: a little apart from them. */
+  /* Further down than the best: a little apart from them, a quiet „…“ in the places' column between (today.ts,
+     ownRow). */
   .rank-row.gap {
-    margin-top: var(--space-3);
+    margin-top: var(--space-1);
+  }
+
+  .rank-skip {
+    display: grid;
+    grid-template-columns: 1.5rem;
+    justify-items: center;
+    padding-top: var(--space-2);
+    color: var(--ink-3);
+    font: 900 1.25rem / 1 var(--font-numeral);
+    text-align: center;
   }
 
   .board-note {
