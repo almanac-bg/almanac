@@ -18,6 +18,8 @@ import { duelGroup } from "./duelcards.ts";
 let {
   acceptedLine,
   api,
+  lastOf,
+  setIfNew,
   errorText,
   formatNumber,
   h,
@@ -76,6 +78,8 @@ export function friends(kit: Kit): Child {
   ({
     acceptedLine,
     api,
+    lastOf,
+    setIfNew,
     errorText,
     formatNumber,
     h,
@@ -116,12 +120,19 @@ function page(kit: Kit): Child {
   // lands once (duelcards.ts), with what its game brought under it, asked for once (game/news.ts: it marks the game
   // as told). One that isn't among those listed (older than the last ten) is asked for by itself.
   const named = Number(asked.get("duel")) || 0;
-  const top = signal<DuelView | null>(null);
-  let brought: Child = null;
+  // Come back to (or come to from a duel's game, which asked for them as it ended: screens/duel.ts), the page as it
+  // was last shown, at once, the duel named first in its group, and anew in place where it has changed (api.ts,
+  // lastOf).
+  const data = signal<Friends | null>(lastOf<Friends>("/api/friends") ?? null);
+  const duels = signal<Duels | null>(lastOf<Duels>("/api/duels") ?? null);
+  const had = duels.peek();
+  const top = signal<DuelView | null>(
+    (named && had && [...had.yours, ...had.theirs, ...had.played].find((o) => o.id === named)) || null,
+  );
+  const landing = top.peek();
+  let brought: Child = landing?.runId && landing.state !== "yours" ? news(landing.runId) : null;
   // Brought into sight once this visit, as the page opens (duelcards.ts).
   const sight = { done: false };
-  const data = signal<Friends | null>(null);
-  const duels = signal<Duels | null>(null);
   const error = signal("");
   // The list that couldn't load (with nothing of it shown yet): the failure, and the way to try again.
   const failed = signal<unknown>(null);
@@ -136,7 +147,7 @@ function page(kit: Kit): Child {
         api<Friends>("GET", "/api/friends"),
         api<Duels>("GET", "/api/duels"),
         // The landing's moment needs the game's feel; without it the card is whole, only still.
-        named && !duels.peek() ? loadFeel().catch(() => null) : null,
+        named && !top.peek() ? loadFeel().catch(() => null) : null,
       ]);
       if (named) {
         const first =
@@ -152,8 +163,8 @@ function page(kit: Kit): Child {
       failed.set(null);
       // Drawn anew only when something changed: a look every quarter minute that found the same would otherwise
       // rebuild the lists under the pointer (a tooltip showing, a row hovered, gone).
-      if (JSON.stringify(f) !== JSON.stringify(data.peek())) data.set(f);
-      if (JSON.stringify(d) !== JSON.stringify(duels.peek())) duels.set(d);
+      setIfNew(data, f);
+      setIfNew(duels, d);
       if (f.accepted && !yes.peek()) yes.set(acceptedLine(f.accepted));
     } catch (err) {
       // A look again that failed, with the list on the screen, waits for the next one quietly.

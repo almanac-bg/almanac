@@ -13,6 +13,8 @@ import type { Child } from "../lib/dom.ts";
 // only types.
 let {
   api,
+  lastOf,
+  setIfNew,
   back,
   chapterName,
   failure,
@@ -90,6 +92,8 @@ const searchFrom = 10;
 function setKit(kit: Kit) {
   ({
     api,
+    lastOf,
+    setIfNew,
     back,
     chapterName,
     failure,
@@ -130,17 +134,23 @@ export function almanac(kit: Kit): Child {
   title("Алманах");
   // Not a player yet: the book as it starts, its chapters each a way to play one.
   if (!user.peek()) return book({ facts: [], found: 0, ink: {} });
-  const page = signal<Page | null>(null);
+  // Come back to, the book as it was last shown, at once, and anew in place if it has changed (api.ts, lastOf).
+  const page = signal<Page | null>(lastOf<Page>("/api/almanac") ?? null);
   const failed = signal<unknown>(null);
   // The games of a chapter left half-way today: each with the way to go on (a game's cross comes back here).
-  const left = signal<Left[]>([]);
+  const left = signal<Left[]>(lastOf<{ runs: Left[] }>("/api/runs/left")?.runs ?? []);
   api<{ runs: Left[] }>("GET", "/api/runs/left").then(
-    (r) => left.set(r.runs),
+    (r) => setIfNew(left, r.runs),
     () => {},
   );
   const load = () => {
     failed.set(null);
-    api<Page>("GET", "/api/almanac").then(page.set, failed.set);
+    api<Page>("GET", "/api/almanac").then(
+      (p) => setIfNew(page, p),
+      (err) => {
+        if (!page.peek()) failed.set(err);
+      },
+    );
   };
   load();
   return () => {
@@ -264,11 +274,18 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
   let marked = at.getAll("fact");
   const page = signal(Math.max(0, (Number(at.get("page")) || 1) - 1));
   const query = signal(at.get("q") ?? "");
-  const data = signal<Page | null>(null);
-  const first = signal<Page | null>(null);
+  // Come back to (not to facts to mark), the chapter as it was last shown, at once, and anew in place if it has changed
+  // (api.ts, lastOf).
+  const opening = new URLSearchParams({ chapter: id, page: String(page.peek()) });
+  if (query.peek().trim()) opening.set("q", query.peek().trim());
+  const before = marked.length ? undefined : lastOf<Page>(`/api/almanac?${opening}`);
+  const data = signal<Page | null>(before ?? null);
+  const first = signal<Page | null>(
+    before?.ranks ? before : (lastOf<Page>(`/api/almanac?${new URLSearchParams({ chapter: id })}`) ?? null),
+  );
   const failed = signal<unknown>(null);
   // The chapter's facts in all, unsearched: the search shows from `searchFrom` of them.
-  const total = signal(0);
+  const total = signal(first.peek()?.found ?? 0);
   let asked = "";
   // The words the page shown was found by, marked in its entries (none unsearched).
   let find: string[] = [];
@@ -276,7 +293,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
   const loadFirst = () =>
     api<Page>("GET", `/api/almanac?${new URLSearchParams({ chapter: id })}`).then(
       (p) => {
-        first.set(p);
+        setIfNew(first, p);
         total.set(p.found);
       },
       () => {},
@@ -314,8 +331,8 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
           named();
           void loadFirst();
         }
-        data.set(p);
-        if (p.ranks) first.set(p);
+        setIfNew(data, p);
+        if (p.ranks) setIfNew(first, p);
         if (!ask.includes("q=")) total.set(p.found);
         if (toFacts) requestAnimationFrame(() => document.querySelector(".chapter-facts")?.scrollIntoView());
         toFacts = false;
@@ -341,10 +358,12 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
     load();
   }
   // The chapter's game left half-way today: it goes on from where it stopped (play.Left).
-  const left = signal<{ at: number; total: number } | null>(null);
+  const left = signal<{ at: number; total: number } | null>(
+    lastOf<{ runs: Left[] }>("/api/runs/left")?.runs.find((x) => x.chapter === id) ?? null,
+  );
   if (user.peek())
-    api<{ runs: { chapter: string; at: number; total: number }[] }>("GET", "/api/runs/left").then(
-      (r) => left.set(r.runs.find((x) => x.chapter === id) ?? null),
+    api<{ runs: Left[] }>("GET", "/api/runs/left").then(
+      (r) => setIfNew(left, r.runs.find((x) => x.chapter === id) ?? null),
       () => {},
     );
   let typing = 0;

@@ -22,7 +22,7 @@ import { land, opensReview, perfectHead, reviewSheet } from "../game/results.ts"
 import { getReady, leftLine, playRun, shownHere, starting } from "../game/run.ts";
 import { cardFile, cardPath, type SharedDay, shareCard, shareDay, shareText } from "../game/share.ts";
 import type { Board, Mark, Reviewed, Score, State } from "../game/types.ts";
-import { api, errorText, serverNow } from "../lib/api.ts";
+import { api, errorText, lastOf, serverNow, setIfNew } from "../lib/api.ts";
 import { boot } from "../lib/boot.ts";
 import { dayInBulgaria, hourInBulgaria } from "../lib/day.ts";
 import { type Child, h, onCleanup, type Signal, signal, slot } from "../lib/dom.ts";
@@ -156,11 +156,34 @@ export function today() {
     gone = true;
     clearTimeout(lateEnds);
   });
+  // Днес drawn from what it showed last (come back to it: api.ts, lastOf), until the day comes: then drawn anew only
+  // where it has changed, and only while the player hasn't moved on from it (a count, a game).
+  let before: Today | null = null;
+  // Днес drawn from the day the server gave (not only from what it showed last).
+  let drawn = false;
+  let stats: Promise<Stats> | null = null;
+  const statsAsked = () => stats;
   const load = async () => {
+    // The player's numbers (the streak's week) asked for with the day, not after it.
+    stats = user.peek() ? loadStats() : null;
+    stats?.catch(() => {});
+    // Not with something to say over it once (a notice: drawn twice, it would go with the first), nor a day gone by,
+    // yesterday's offered, or a question with its time running (its seconds as they were).
+    const was = inPage || drawn || bye || notice.peek() ? undefined : lastOf<Today>("/api/day");
+    const now = dayInBulgaria(new Date(serverNow()));
+    if (was && was.day === now && !was.yesterday && !(was.run && !was.run.done && was.run.question)) {
+      before = was;
+      day = was.day;
+      screen.show(() => home(was, was.run, false));
+    }
     try {
       const t = inPage ?? (await api<Today>("GET", "/api/day"));
       inPage = undefined;
       if (gone) return;
+      const was = before;
+      before = null;
+      drawn = true;
+      if (was && (JSON.stringify(t) === JSON.stringify(was) || counting || playing.peek())) return;
       day = t.day;
       // Yesterday's issue left half-way just before midnight, while the game lets it be finished: offered first.
       const view = lateView(t) ?? t;
@@ -171,7 +194,9 @@ export function today() {
         screen.show(() => playRun(run, (s) => home(view, s, true)));
       else screen.show(() => home(view, view.run, false));
     } catch (err) {
-      if (!gone) screen.show(() => failure(err, load, null));
+      // Drawn from what it showed last, it stays so: the line's trouble is said only over nothing.
+      if (gone || before) return;
+      screen.show(() => failure(err, load, null));
     }
   };
   /** Днес for yesterday's issue (`t.yesterday`): its day, issue, chapters and run; nothing of today's (its board, its
@@ -309,8 +334,12 @@ export function today() {
     const streakSaid = !run?.done && t.streak >= streakFrom && endsTonight(t) ? null : streakNotice(t);
     if (run?.done) return result(t, run, just, notices, load);
     // The player's numbers (Профил's): the streak's week, the facts in the book.
-    const stats = signal<Stats | null>(null);
-    if (user.peek()) loadStats().then(stats.set, () => {});
+    const stats = signal<Stats | null>(lastOf<Stats>("/api/me/stats") ?? null);
+    if (user.peek())
+      (statsAsked() ?? loadStats()).then(
+        (now) => setIfNew(stats, now),
+        () => {},
+      );
     const first = !user.peek();
     const marks = run?.trail ?? [];
     // Днес's budget (DESIGN.md): the issue, its action, the streak; on a big screen the issue's contents under them.

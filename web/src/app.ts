@@ -107,6 +107,18 @@ function draw(root: HTMLElement): void {
     ],
     missing,
   );
+  // The places' own code, once the first screen is in and the browser has a moment: a place opened later is drawn at
+  // once, its file already here (later's load comes from memory), never a blank page while it comes.
+  const places = () => {
+    for (const load of [
+      () => import("./screens/almanac.ts"),
+      () => import("./screens/friends.ts"),
+      () => import("./screens/me.ts"),
+    ])
+      load().catch(() => {});
+  };
+  if (typeof requestIdleCallback === "function") requestIdleCallback(places, { timeout: 5000 });
+  else setTimeout(places, 2000);
   // In a game the frame steps aside (app.css): the question gets the screen.
   effect(() => document.documentElement.classList.toggle("playing", playing()));
   // The frame bare, no places: a new visitor's cover (Днес at its own address), and the sign-in page.
