@@ -24,23 +24,49 @@ const (
 	eitherWay picture = iota
 	withPicture
 	noPicture
+	// whileAny is a picture while the bank has one for the place (a day can still take), else none: the day draws
+	// it as one or the other (drawDay), so that a place the bank holds few pictures for never stops the days.
+	whileAny
 )
 
 // daySlots is the day's shape: one question from each topic, easy to hard; a picture and a true-or-not among the easy
-// ones, an order, a split and a match among the medium ones, and a number among the hard ones. Where each sits in its
-// band is drawn with the day (inBands), the same for everyone who plays it, so that the days don't all have one shape.
-// A slot whose type a topic lacks takes a choice instead (choose).
+// ones, a picture (while the bank has medium ones: whileAny) and the day's one puzzle (an order, a match or a split:
+// dayPuzzle) among the medium ones, and a number among the hard ones; the rest plain choices. One puzzle a day, not
+// three: a puzzle is all or nothing, the easiest question to slip on, and three of them could sink a day on slips
+// alone. Where each sits in its band is drawn with the day (inBands), the same for everyone who plays it, so that the
+// days don't all have one shape. A slot whose type a topic lacks takes the nearest it has instead (choose).
 var daySlots = []slot{
 	{bank.Easy, "choice", noPicture, ""},
 	{bank.Easy, "choice", withPicture, ""},
 	{bank.Easy, "truefalse", noPicture, ""},
 	{bank.Medium, "choice", noPicture, ""},
-	{bank.Medium, "order", noPicture, ""},
-	{bank.Medium, "split", noPicture, "choice"},
-	{bank.Medium, "match", noPicture, ""},
+	{bank.Medium, "choice", noPicture, ""},
+	{bank.Medium, "choice", whileAny, ""},
+	{bank.Medium, puzzle, noPicture, ""},
 	{bank.Hard, "choice", noPicture, ""},
 	{bank.Hard, "choice", noPicture, ""},
 	{bank.Hard, "number", noPicture, ""},
+}
+
+// puzzle is the type of the day's puzzle place in daySlots: a day draws it as one of puzzleKinds (dayPuzzle).
+const puzzle = "puzzle"
+
+// puzzleKinds are the kinds the day's puzzle place takes in turn: those of order, match and split the game deals
+// (bank.KindOn).
+var puzzleKinds = slices.DeleteFunc([]string{"order", "match", "split"}, func(k string) bool { return !bank.KindOn(k) })
+
+// dayPuzzle is the kind of a day's puzzle: puzzleKinds in turn, day by day, so that any three days in a row have one
+// of each, the same for everyone; past that, the next in turn that has a question left (has), so that a kind run short
+// spends the others rather than stop the days.
+func dayPuzzle(day string, has func(kind string) bool) string {
+	t, _ := time.Parse(time.DateOnly, day)
+	n := int(t.Unix() / (24 * 60 * 60))
+	for i := range puzzleKinds {
+		if k := puzzleKinds[(n+i)%len(puzzleKinds)]; has(k) {
+			return k
+		}
+	}
+	return puzzleKinds[n%len(puzzleKinds)]
 }
 
 // BGFloor is how many of a day's questions are about Bulgaria, at least, where the bank has them.
@@ -60,7 +86,28 @@ const BGFloor = 3
 // had no question fitting them just so, never a day's before (the number's: an estimate, or the date's own question):
 // a day ahead is drawn only with none short (ahead.go).
 func drawDay(b *bank.Bank, day string, used, answered, recent map[string]bool, r *rand.Rand) (picks []Pick, short []string) {
-	slots := lastNumber(inBands(newKind(slices.Clone(daySlots), r), r))
+	slots := lastNumber(inBands(slices.Clone(daySlots), r))
+	// The day's puzzle takes its kind, and a picture while any is its picture (whileAny), from what the day can still
+	// take: a question no day has had, dealable, of no date.
+	left := func(s slot, k string) bool {
+		return slices.ContainsFunc(b.Live("", k), func(q bank.Question) bool {
+			return !used[q.Base().ID] && !overdue(q, day) && len(q.Extra().On) == 0 && fitsPlace(b, q, s, k)
+		})
+	}
+	soft := -1 // the place of the picture while any: without one it's a plain choice, never short
+	for i, s := range slots {
+		if s.typ == puzzle {
+			slots[i].typ = dayPuzzle(day, func(k string) bool { return left(s, k) })
+		}
+		if s.picture == whileAny {
+			soft = i
+			s.picture = withPicture
+			if !left(s, s.typ) {
+				s.picture = noPicture
+			}
+			slots[i].picture = s.picture
+		}
+	}
 	var topics []string
 	next := func(wants ...func(string) bool) string {
 		if len(topics) == 0 { // more slots than topics: round again
@@ -287,6 +334,9 @@ func drawDay(b *bank.Bank, day string, used, answered, recent map[string]bool, r
 	}
 	for i, q := range chosen {
 		s := slots[i]
+		if i == soft {
+			s.picture = eitherWay
+		}
 		if q == nil || !fresh(q) || !matches(q, s, true, true) || (s.typ == "number" && !b.Estimate(q) && !kept[i]) {
 			short = append(short, s.place())
 		}
@@ -316,20 +366,22 @@ func Overdue(b *bank.Bank, day string) []string {
 	return out
 }
 
-// place names the place of a day a slot is (Runway.Place): "medium split" for the new kinds' place, whichever of them
-// it has that the game deals (newKinds: "medium split/clues" with clues on); "hard number (estimate)", for the day
-// finishes on one.
+// place names the place of a day a slot is (Runway.Place): "medium order/match/split" for the day's puzzle, whichever
+// kind it took; "hard number (estimate)", for the day finishes on one.
 func (s slot) place() string {
 	kinds := s.typ
-	if slices.Contains(newKinds, s.typ) {
-		kinds = strings.Join(newKinds, "/")
+	if s.typ == puzzle || slices.Contains(puzzleKinds, s.typ) {
+		kinds = strings.Join(puzzleKinds, "/")
 	}
 	name := string(s.difficulty) + " " + kinds
 	if s.typ == "number" {
 		name += " (estimate)"
 	}
-	if s.picture == withPicture {
+	switch s.picture {
+	case withPicture:
 		name += " with a picture"
+	case whileAny:
+		name += ", a picture if any"
 	}
 	return name
 }
@@ -358,9 +410,9 @@ func metFirst(wishes []func(bank.Question) bool, met map[string]bool) []func(ban
 	return append(out, isMet)
 }
 
-// sharedKinds are the kinds that take turns at the run's one slot for them ("split" in a run's shape), and newKinds
-// those of them the game deals (bank.KindOn): one or the other in each run. „Подсказки“ are off (bank.Off), so the
-// slot is a split's in every run; a day drawn before with clues there has a split in their place (mendDay).
+// sharedKinds are the kinds that take turns at a chapter's game's one slot for them ("split" in topicSlots), and
+// newKinds those of them the game deals (bank.KindOn): one or the other in each run. „Подсказки“ are off (bank.Off), so
+// the slot is a split's in every run; a day drawn before with clues has a split in their place (mendDay).
 var (
 	sharedKinds = []string{"split", "clues"}
 	newKinds    = slices.DeleteFunc(slices.Clone(sharedKinds), func(k string) bool { return !bank.KindOn(k) })

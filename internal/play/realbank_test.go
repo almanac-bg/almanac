@@ -32,11 +32,21 @@ func TestAYearOfDays(t *testing.T) {
 		runway = min(runway, p.Days)
 	}
 	r := rand.New(rand.NewPCG(1, 2))
+	// as is a place as q would fit it: the puzzle's as any of its kinds, the picture while any's with one or without.
+	as := func(s slot, q bank.Question) slot {
+		if s.typ == puzzle && slices.Contains(puzzleKinds, q.Base().Type) {
+			s.typ = q.Base().Type
+		}
+		if s.picture == whileAny {
+			s.picture = eitherWay
+		}
+		return s
+	}
 	// left is how many questions not yet dealt fit a place.
 	left := func(s slot) int {
 		n := 0
 		for _, q := range b.Live("", "") {
-			if !used[q.Base().ID] && matches(q, s, true, true) {
+			if !used[q.Base().ID] && matches(q, as(s, q), true, true) {
 				n++
 			}
 		}
@@ -70,10 +80,7 @@ func TestAYearOfDays(t *testing.T) {
 				if taken[j] || s.difficulty != daySlots[i].difficulty || (i == 0) != (j == 0) {
 					continue // the first place stays first; the others move within their band
 				}
-				if s.typ == newKinds[0] && slices.Contains(newKinds, q.Base().Type) {
-					s.typ = q.Base().Type // the new kinds' place: either of them
-				}
-				if matches(q, s, true, true) {
+				if matches(q, as(s, q), true, true) {
 					fits = j
 					break
 				}

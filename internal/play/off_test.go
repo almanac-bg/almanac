@@ -58,9 +58,6 @@ func TestCluesNeverDealt(t *testing.T) {
 	}
 	for day, picks := range days {
 		dealt("the day "+day, picks)
-		if !slices.ContainsFunc(picks, func(p Pick) bool { q, _ := b.Get(p.ID); return q.Base().Type == "split" }) {
-			t.Errorf("the day %s has no split in the place clues shared", day)
-		}
 	}
 	// A chapter's game, in every chapter, for players new to it and for those who know it well.
 	for _, c := range b.Categories {
@@ -83,21 +80,21 @@ func TestCluesNeverDealt(t *testing.T) {
 		dealt("a duel", w.picks(w.playSide(a, id, nil)))
 	}
 
-	// Tomorrow, drawn while clues were dealt, has one in its split's place: a split of its topic and difficulty takes
+	// Tomorrow, drawn while clues were dealt, has one in its puzzle's place: a split of its topic and difficulty takes
 	// it, the rest of the day stays.
 	today := w.g.Today()
 	tomorrow := DayShift(today, 1)
 	was := days[tomorrow]
-	i := slices.IndexFunc(was, func(p Pick) bool { q, _ := b.Get(p.ID); return q.Base().Type == "split" })
-	split, _ := b.Get(was[i].ID)
+	i := slices.IndexFunc(was, func(p Pick) bool { q, _ := b.Get(p.ID); return slices.Contains(puzzleKinds, q.Base().Type) })
+	held, _ := b.Get(was[i].ID) // the day's puzzle
 	var clue bank.Question
-	for _, q := range b.InCategory(split.Base().Category) {
+	for _, q := range b.InCategory(held.Base().Category) {
 		if clues[q.Base().ID] {
 			clue = q
 			break
 		}
 	}
-	clue.Base().Difficulty = split.Base().Difficulty
+	clue.Base().Difficulty = held.Base().Difficulty
 	then := slices.Clone(was)
 	then[i] = Pick{ID: clue.Base().ID, Seed: 7}
 	if _, err := w.db.Write.Exec(`UPDATE days SET questions = ? WHERE day = ?`, string(mustJSON(t, then)), tomorrow); err != nil {
@@ -113,8 +110,8 @@ func TestCluesNeverDealt(t *testing.T) {
 		switch {
 		case n != i && p != was[n]:
 			t.Errorf("tomorrow's question %d changed: %v, was %v", n, p, was[n])
-		case n == i && (q.Base().Type != "split" || q.Base().Category != split.Base().Category ||
-			q.Base().Difficulty != split.Base().Difficulty):
+		case n == i && (q.Base().Type != "split" || q.Base().Category != held.Base().Category ||
+			q.Base().Difficulty != held.Base().Difficulty):
 			t.Errorf("tomorrow's clues are %s (%s, %s, %s) in a split's place", p.ID, q.Base().Category,
 				q.Base().Type, q.Base().Difficulty)
 		}
