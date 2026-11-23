@@ -260,7 +260,11 @@ function allPlayed(): void {
                 "nav",
                 { class: "pages", "aria-label": "Страници" },
                 h("button", { class: "btn inline", type: "button", disabled: p.page <= 1, onclick: go(-1) }, "По-нови"),
-                h("span", { class: "pages-at" }, `Страница ${formatNumber(p.page)} от ${formatNumber(p.pages)}`),
+                h(
+                  "span",
+                  { class: "pages-at" },
+                  `Страница ${formatNumber(p.page)}\u00a0от\u00a0${formatNumber(p.pages)}`,
+                ),
                 h(
                   "button",
                   { class: "btn inline", type: "button", disabled: p.page >= p.pages, onclick: go(1) },
