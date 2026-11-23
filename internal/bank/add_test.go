@@ -29,8 +29,8 @@ func TestAddPutsABatchIn(t *testing.T) {
 	batch := t.TempDir()
 	id := "gen-" + strconv.Itoa(next)
 	write(t, filepath.Join(batch, "general.json"), `[
-  {"id": "`+id+`", "type": "choice", "difficulty": "easy", "text": "Коя е най-високата планина в България?", "answer": "Рила",
-   "wrong": ["Пирин", "Витоша", "Странджа"], "fact": "Връх Мусала е висок 2925 м — най-високият на Балканския полуостров.",
+  {"id": "`+id+`", "type": "choice", "difficulty": "easy", "text": "В коя планина извира река Искър?", "answer": "Рила",
+   "wrong": ["Пирин", "Витоша", "Странджа"], "fact": "Рила е най-старият национален парк в България, обявен през 1992 г.",
    "added": "`+today+`", "updated": "`+today+`", "bg": true, "theme": "other", "sources": ["https://bg.wikipedia.org/wiki/Рила"]}
 ]`)
 	write(t, filepath.Join(batch, RetireFile), `[{"id": "`+old+`", "why": "twin", "by": "`+id+`"}]`)
@@ -193,8 +193,8 @@ func TestAddChangesQuestions(t *testing.T) {
 	})
 	batch := t.TempDir()
 	write(t, filepath.Join(batch, "general.json"), "["+strings.Trim(first, "[]")+", "+strings.Trim(second, "[]")+`,
-  {"id": "`+added+`", "type": "choice", "difficulty": "easy", "text": "Коя е най-високата планина в България?", "answer": "Рила",
-   "wrong": ["Пирин", "Витоша", "Странджа"], "fact": "Връх Мусала е висок 2925 м — най-високият на Балканския полуостров.",
+  {"id": "`+added+`", "type": "choice", "difficulty": "easy", "text": "В коя планина извира река Искър?", "answer": "Рила",
+   "wrong": ["Пирин", "Витоша", "Странджа"], "fact": "Рила е най-старият национален парк в България, обявен през 1992 г.",
    "added": "`+today+`", "updated": "`+today+`", "bg": true, "theme": "other", "sources": ["https://bg.wikipedia.org/wiki/Рила"]}]`)
 
 	before, _ := os.ReadFile(filepath.Join(dir, QuestionsDir, "general.json"))

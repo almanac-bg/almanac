@@ -14,7 +14,7 @@ import (
 // (testdata/refused/<case>: a batch, and want.txt, what the refusal says), against one small bank
 // (testdata/refused/bank): broken JSON and a field of the wrong type; a kind the game doesn't know, and one switched
 // off; a theme missing or not the chapter's; no sources; the same question again, and its twin; an answer its own text
-// gives away, and one another question's fact does; a number with no unit, and a tolerance wide enough for any guess;
+// gives away, and one another question's fact does; a fact the bank tells already; a number with no unit, and a tolerance wide enough for any guess;
 // a question changed into another kind; a picture that isn't there, or has no credit; a new question dated to pass
 // under the rules. A want.txt that starts with "warning: " is a hint (near: a person reads the pair): the batch goes
 // in, told of it. The good batches go in clean: each bad one is theirs with one thing wrong, so it's refused for that
@@ -91,7 +91,7 @@ func TestRefused(t *testing.T) {
 			}
 		})
 	}
-	if tried < 22 {
+	if tried < 23 {
 		t.Fatalf("%d fixtures in %s: some have gone", tried, root)
 	}
 }

@@ -104,7 +104,10 @@ another subject — then `echo '<chunk> <answer> | <subject>' >> <work>/claims.t
 **Every word you write can give another question away**, and `bank add -check` sees only a few kinds of it: in round
 1 most of what the checkers caught was a new fact, `day` line, item or option that named another question's answer
 or showed a value it asks. For each name, year and number you write, grep the bank, and if it's another question's
-answer, or the value it asks next to its subject, write something else.
+answer, or the value it asks next to its subject, write something else. Then read your changed and new questions
+against the questions most like them: `cd <repo> && go run ./cmd/almanac bank related -from <work>/fix/<chunk> <bank>`
+(each with the ten that share the most rare words, their text, answer and fact): none may give another away, or tell
+the fact another tells (the `retold` rule).
 
 Before you change anything, **grep the bank** for the subject, the answer and the key names and numbers (no new
 give-away, no near-duplicate), and **confirm every claim from a page you read in this session** (bg/en Wikipedia,

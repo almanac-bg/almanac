@@ -360,7 +360,8 @@ func TestGiveawayOfASmallNumber(t *testing.T) {
 		"На 28 години Кристиан Бейл отслабва за ролята си в „Механикът“.":         false,
 		"Кристиан Бейл е роден в Уелс, а Батман играе в три филма.":               false,
 	} {
-		got := found(bankOf(append([]Question{asks, shows(fact)}, qs...)...))
+		// The fact tells what mov-1 asks: the retold rule's too, which this test doesn't judge.
+		got := slices.DeleteFunc(found(bankOf(append([]Question{asks, shows(fact)}, qs...)...)), func(s string) bool { return strings.HasPrefix(s, "retold ") })
 		if (len(got) == 1 && strings.HasPrefix(got[0], "giveaway ")) != want || len(got) > 1 {
 			t.Errorf("%q: found %v", fact, got)
 		}
@@ -688,5 +689,94 @@ func TestTypographyOfShares(t *testing.T) {
 	q.Fact = "Романът „18% сиво“ е за един фотограф."
 	if got := ruleTypography(q); len(got) != 0 {
 		t.Errorf("a quoted title keeps its spelling: %v", got)
+	}
+}
+
+// One fact told twice, or a fact that tells what another question asks, is found; one frame with two facts isn't.
+func TestRetold(t *testing.T) {
+	statement := func(id, text string, truth bool, fact string) *TrueFalse {
+		return &TrueFalse{Head: Head{ID: id, Type: "truefalse", Text: text}, Answer: truth, Tail: Tail{Fact: fact, Added: "2026-11-01"}}
+	}
+	withFact := func(q *Choice, fact string) *Choice { q.Fact = fact; return q }
+	retold := func(qs ...Question) []string {
+		return slices.DeleteFunc(found(bankOf(qs...)), func(s string) bool { return !strings.Contains(s, "retold ") })
+	}
+	for _, c := range []struct {
+		name string
+		a, b Question
+		want bool
+	}{
+		{"one fact twice",
+			withFact(choice("geo-1", "Коя е столицата на Азербайджан?", "Баку", "Ереван", "Тбилиси", "Ашхабад"),
+				"Баку е на около 28 м под морското равнище — най-ниско разположената столица в света."),
+			withFact(choice("geo-2", "Край кое море е Баку?", "Каспийско", "Черно", "Азовско", "Аралско"),
+				"Баку е на около 28 м под морското равнище: най-ниско разположената столица в света."), true},
+		{"a fact that answers a true-or-not",
+			withFact(choice("lit-1", "Къде е роден Димчо Дебелянов?", "Копривщица", "Пловдив", "Сопот", "Карлово"),
+				"На гроба на Дебелянов в Копривщица стои скулптурата „Майка“ на Иван Лазаров — жена, която чака сина си."),
+			statement("lit-2", "Над гроба на Димчо Дебелянов стои скулптура на майка, която чака сина си.", true,
+				"Скулптурата е дело на Иван Лазаров."), true},
+		{"one subject, two facts",
+			withFact(choice("geo-3", "Коя е столицата на Азербайджан?", "Баку", "Ереван", "Тбилиси", "Ашхабад"),
+				"Баку е на около 28 м под морското равнище — най-ниско разположената столица в света."),
+			withFact(choice("geo-4", "Край кое море е Баку?", "Каспийско", "Черно", "Азовско", "Аралско"),
+				"Каспийско море е всъщност езеро — най-голямото на Земята."), false},
+	} {
+		got := retold(c.a, c.b)
+		if (len(got) == 1) != c.want || len(got) > 1 {
+			t.Errorf("%s: %v", c.name, got)
+		}
+	}
+	a := withFact(choice("geo-1", "Коя е столицата на Азербайджан?", "Баку", "Ереван", "Тбилиси", "Ашхабад"),
+		"Баку е на около 28 м под морското равнище — най-ниско разположената столица в света.")
+	b := withFact(choice("geo-2", "Край кое море е Баку?", "Каспийско", "Черно", "Азовско", "Аралско"),
+		"Баку е на около 28 м под морското равнище: най-ниско разположената столица в света.")
+	b.Added = RetoldSince // new: an error, and the new one first
+	if got := retold(a, b); !slices.Equal(got, []string{"!retold geo-2"}) {
+		t.Errorf("a new question: %v", got)
+	}
+}
+
+// A question's most related questions are those that share its rare words, the most first; a batch's questions are
+// read as if added.
+func TestRelated(t *testing.T) {
+	b := bankOf(
+		withFactQ(choice("his-1", "Коя е първата жена, полетяла в космоса?", "Валентина Терешкова", "Светлана Савицка", "Сали Райд", "Елена Кондакова"), "Позивната ѝ е „Чайка“."),
+		withFactQ(number("sci-1", "През коя година Валентина Терешкова става първата жена, полетяла в космоса?", 1963, 6, ""), "Полетът трае почти три дни."),
+		withFactQ(choice("geo-1", "Коя е столицата на Франция?", "Париж", "Лион", "Марсилия", "Ница"), "Париж е на Сена."),
+	)
+	got, err := b.Related([]string{"his-1"}, 2)
+	if err != nil || len(got["his-1"]) == 0 || got["his-1"][0].ID != "sci-1" {
+		t.Fatalf("Related = %v, %v", got, err)
+	}
+	if _, err := b.Related([]string{"his-9"}, 2); err == nil {
+		t.Error("an unknown id: no error")
+	}
+}
+
+func withFactQ[Q interface{ Extra() *Tail }](q Q, fact string) Question {
+	q.Extra().Fact = fact
+	return any(q).(Question)
+}
+
+// An easy number that asks a year is flagged, an error for a new question; a medium one, or an easy quantity, isn't.
+func TestEasyYear(t *testing.T) {
+	year := number("mus-1", "През коя година умира Франк Синатра?", 1998, 8, "")
+	year.Difficulty = Easy
+	qty := number("geo-1", "Колко метра е висок връх Мусала?", 2925, 878, "м")
+	qty.Difficulty = Easy
+	medium := number("mus-2", "През коя година умира Джони Кеш?", 2003, 8, "")
+	easyYear := func(qs ...Question) []string {
+		return slices.DeleteFunc(found(bankOf(qs...)), func(s string) bool { return !strings.Contains(s, "easy-year ") })
+	}
+	if got := easyYear(year, qty, medium); !slices.Equal(got, []string{"easy-year mus-1"}) {
+		t.Errorf("found %v", got)
+	}
+	year.Added = EasyYearSince
+	if got := easyYear(year); !slices.Equal(got, []string{"!easy-year mus-1"}) {
+		t.Errorf("a new question: %v", got)
+	}
+	if got := found(bankOf(year), Waiver{ID: "mus-1", Rule: "easy-year", Why: "дата от учебниците"}); slices.ContainsFunc(got, func(s string) bool { return strings.Contains(s, "easy-year") }) {
+		t.Errorf("waived: %v", got)
 	}
 }

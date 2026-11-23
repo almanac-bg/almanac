@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -47,6 +49,19 @@ func bankCommand(args []string) error {
 			into = fs.Arg(0)
 		}
 		return bankLint(into, *rules, *short)
+	case "related":
+		fs := flag.NewFlagSet("bank related", flag.ContinueOnError)
+		n := fs.Int("n", 10, "how many related questions for each")
+		from := fs.String("from", "", "batches (bank add's), comma-separated: their questions, read as if added")
+		asJSON := fs.Bool("json", false, "JSON lines: {id, related: [{id, score, shared}]}")
+		if err := fs.Parse(rest); err != nil {
+			return usage()
+		}
+		into, ids := defaultBankDir(), fs.Args()
+		if len(ids) > 0 && isDir(ids[len(ids)-1]) {
+			into, ids = ids[len(ids)-1], ids[:len(ids)-1]
+		}
+		return bankRelated(into, *from, ids, *n, *asJSON)
 	case "subjects":
 		return bankSubjects(dir())
 	case "calibrate":
@@ -653,4 +668,83 @@ func themes(b *bank.Bank) string {
 		}
 	}
 	return strings.TrimSuffix(s.String(), "\n")
+}
+
+// isDir is whether path is a directory.
+func isDir(path string) bool {
+	st, err := os.Stat(path)
+	return err == nil && st.IsDir()
+}
+
+// bankRelated prints, for each question (ids; the batches' with -from; every live one with neither), the questions most
+// related to it (bank.Related), each with its kind, text, answer and fact: what a checker reads to see that it gives
+// none of them away, and tells nothing one of them tells.
+func bankRelated(dir, from string, ids []string, n int, asJSON bool) error {
+	b, problems := bank.Load(dir)
+	if b == nil {
+		for _, p := range problems {
+			fmt.Fprintln(os.Stderr, p)
+		}
+		return errors.New(dir + ": the bank has errors")
+	}
+	var batches []string
+	for _, f := range strings.Split(from, ",") {
+		if f = strings.TrimSpace(f); f == "" {
+			continue
+		}
+		withBatch, batch, err := b.WithBatch(f)
+		if err != nil {
+			return err
+		}
+		b, batches = withBatch, append(batches, batch...)
+	}
+	ids = append(batches, ids...)
+	related, err := b.Related(ids, n)
+	if err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		for id := range related {
+			ids = append(ids, id)
+		}
+		slices.Sort(ids)
+	}
+	out := bufio.NewWriter(os.Stdout)
+	defer out.Flush()
+	for _, id := range ids {
+		if asJSON {
+			line, err := json.Marshal(struct {
+				ID      string           `json:"id"`
+				Related []bank.Neighbour `json:"related"`
+			}{id, related[id]})
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(out, "%s\n", line)
+			continue
+		}
+		q, _ := b.Get(id)
+		fmt.Fprintf(out, "%s\n", describe(q))
+		for _, nb := range related[id] {
+			o, _ := b.Get(nb.ID)
+			fmt.Fprintf(out, "    %5.1f %s\n", nb.Score, describe(o))
+		}
+		fmt.Fprintln(out)
+	}
+	return nil
+}
+
+// describe is a question on one line, as a reader checks it against another: its id and kind, its text, its options,
+// items or pairs, its answer and its fact (and day's line).
+func describe(q bank.Question) string {
+	h, t := q.Base(), q.Extra()
+	line := fmt.Sprintf("%s %s: %s → %s", h.ID, h.Type, h.Text, bank.AnswerText(q))
+	if c, ok := q.(*bank.Choice); ok && len(c.Wrong) > 0 {
+		line += " (не: " + strings.Join(c.Wrong, ", ") + ")"
+	}
+	line += " | " + t.Fact
+	if t.Day != "" {
+		line += " | " + t.Day
+	}
+	return line
 }

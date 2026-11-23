@@ -22,7 +22,10 @@ Your prompt gives you: `<skill>` (this folder), `<repo>` (the game's code), `<ba
    argued to be; nothing is outdated (or it is pinned to a date, with `reviewBy`).
 2. **The fact:** true, about the answer (not about something else the question mentions), says something the
    question didn't, claims no more than the sources (their hedges kept: „около“, „според преданието“), at most 140
-   characters.
+   characters. **Every claim in it, one by one, the side details too:** a place, a count, a date or a name beside the
+   main claim is where the audit of 24 Nov 2026 found facts wrong (an office put in the university that is in БАН; „the
+   other find“ where there are three); a superlative with the scope its source gives. A Bulgarian name or term is
+   confirmed on a Bulgarian page (bg.wikipedia, РБЕ, rechnik.chitanka.info), never on an English one only.
 3. **Dates (`on`):** the date is exactly the day of what the question is about; the `day` line is true, names that
    date and says what happened on it, in one short sentence; the text names the date only if the date is what's
    asked; a true-or-not never names it (dealt on its date, it would answer itself); the fact says something new, not
@@ -39,7 +42,10 @@ Your prompt gives you: `<skill>` (this folder), `<repo>` (the game's code), `<ba
 5. **The difficulty** fits the rubric for players in Bulgaria. Relabel only within the plan's cells: a question that
    doesn't fit its cell is a FIX (reword or change options) or a DROP, not a relabel into a cell the plan didn't ask
    for.
-6. **No giveaways, no near-duplicates:** grep the bank (`<bank>/questions/*.json`, case-insensitively) and the rest
+6. **No giveaways, no near-duplicates, no fact told twice:** run
+   `cd <repo> && go run ./cmd/almanac bank related -from <batch>/write/<category> <bank>` and read each question against
+   the ten listed under it (text, answer, fact, from the bank and the batch): neither may state the other's answer or
+   its statement, nor tell the fact the other tells. Then grep the bank (`<bank>/questions/*.json`, case-insensitively) and the rest
    of this file for the answer, the key names, years and numbers. Another question or fact that gives this one away,
    or that this one gives away (at the reveal too: every value of an order, every option's name), is a DROP or a FIX
    that removes the leak. No "who or what is this" answer the bank asks already. This is the commonest flaw.

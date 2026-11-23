@@ -16,8 +16,10 @@
 // Besides its format (check.go), a loaded bank is held to every rule of the questions skill a program can judge
 // (rules.go): how lines end and are typed (wording.go), the options (options.go), numbers as estimates with one
 // tolerance formula (number.go) that count no list, judge an offset scale and show no number near the answer
-// (estimate.go), orders' gaps (order.go), and give-aways and twins from one question to another (giveaway.go, on the
-// word stems of text.go), near-duplicates that ask one fact in other words (near.go). Errors for questions added
+// (estimate.go; an easy number never a year but a date everyone knows), orders' gaps (order.go), and give-aways and twins from one question to another (giveaway.go, on the
+// word stems of text.go), near-duplicates that ask one fact in other words (near.go), a fact told twice or telling
+// what another asks (retold.go). For a person to read what no rule matches, related.go ranks the questions most like
+// one (`bank related`). Errors for questions added
 // since StrictFrom, warnings for older ones, waivers for the true exceptions. Each chapter's themes (themes.go), with
 // the share of it each aims for, are what a batch is planned by: every question names its own, and the draw never
 // reads them.

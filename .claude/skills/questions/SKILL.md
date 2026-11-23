@@ -65,6 +65,10 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
     drawn ahead and 60 to write) and of every thin date. Then **the subjects that come back** (listed, never failed): the answers and names
     more than 15 live questions name, by category (`*` over 1% of one); the top 20, all of them with
     `go run ./cmd/almanac bank subjects private`. Its last line counts the errors and the warnings by rule;
+  - `go run ./cmd/almanac bank related [-n 10] [-from <batch>,…] [ids…] private` lists, for each question (a batch's, or
+    those named), the questions most like it (the most rare words shared, in every field and the fact), each with its
+    text, answer and fact: what a writer, a fixer and a checker read to see that it gives none of them away and tells
+    none of their facts again;
   - `go run ./cmd/almanac bank lint [-rule giveaway,stale] [-summary] private` lists every problem by rule, with
     the question's id and what's wrong: what a content pass works through.
 
@@ -150,6 +154,7 @@ enough to be worth a look, not always.
 | `closing` (hint) | A hard number can close the day: its answer is over 20 (`Bank.Estimate` takes only those for the day's last place, whatever the step), so 6,5 млн. on a step of 0,1 is an estimate but fills no day: say it in a smaller unit (650 мм, not 0,65 м), or ask it at another difficulty |
 | `unit` | A number has its unit; with none it asks a year („През коя година…“) or names its count („Колко държави…“, an octane number, an index). „Каква е височината на…?“ or „Кога е основан…?“ with no unit is refused: the player can't tell what to type, and it is read as a quantity, so a year asked that way gets 3/10 of itself for a tolerance and any guess is right (so does a year asked with „колко“). „няколко“ isn't „колко“: a year's question that says it is still a year's |
 | `anchor` (hint) | An estimate counts what a well-read player can place, not an archive's count: a series' episodes, a hall's seats, a council's members, a dictionary's words, prize money, a fine |
+| `easy-year` | An easy number doesn't ask a year: right only within a fifth of its tolerance (±2 for 1990), so only a date everyone is taught or lived through (1878, 1944, 1989) is easy, and a waiver names it. The year a film came out or a singer died is medium at best, or a choice of years far apart. An error from `bank.EasyYearSince` (2026-11-24) |
 | `tolerance` | The tolerance follows the formula (below), within half again either way |
 | `offset-scale` † | On a scale with no zero of its own (°C, an angle or a latitude in °, points, a rating such as Elo) the tolerance is judged: under 1/5 of the answer, never the formula's 3/10 (Topalov's Elo of 2 816 with 840 is a gift); linear |
 | `own-number` † | A number question's text, and a name it quotes, shows no number (in figures or words) within the tolerance of its answer: „Стоте дни“ asked as 110 with 33 answers itself |
@@ -169,6 +174,7 @@ enough to be worth a look, not always.
 | `theme` | A question names one of its chapter's themes (`themes.json`): an error for a question added since `bank.ThemesFrom` (2026-11-24), a warning for an older one without (a theme the chapter doesn't have is always an error) |
 | `same-identity` | A "who or what is this" answer (a picture choice, clues) is asked once |
 | `twin` † | Two choices (or clues) over one set of options — three of four shared, each offered by few questions — ask one thing twice: the same answer, or mirrored (Карлоф or Лугоши, each the other's wrong option). Give one other options, or keep the better one |
+| `retold` | A fact doesn't tell what another question's fact tells, nor what another question asks (its text with its answer, a true-or-not's statement): one thing told twice. Weighted likeness of their words from 45%, with two rare words shared (`internal/bank/retold.go`; the audit of 24 Nov 2026 found it the commonest fault). Tell another fact about the answer, or ask another thing; a waiver only for two facts that truly differ. An error from `bank.RetoldSince` (2026-11-24) |
 | `near` (hint) | Two questions don't ask one fact in other words: a choice reworded with other options, a true-or-not of a choice's fact, two numbers of one quantity, one whose words answer another („Кой италиански град е люлка на Ренесанса?“ for „В коя държава е Флоренция?“). Read by their words (`internal/bank/near.go`): alike enough, each one's answer in the other, and one says nothing the other doesn't. About half its pairs are real: keep the better one or ask another fact; waive a false one with the two facts as its `why` |
 
 **A true exception** (a proverb to finish ends without „?“; a question about the word „таг“ itself) goes into the
@@ -198,7 +204,8 @@ By kind:
   point teaches nothing; the days' audit found a third of the easy ones were). Hard is a plausible detail (true or
   false) that only an enthusiast can tell. Never hard by a trick of wording.
 - **Number:** easy is a number everyone has met (1878, the height of Мусала); hard is a figure only an enthusiast
-  can place. The tolerance doesn't follow the label: it is one formula at every difficulty (see the format).
+  can place. A year is right only within a fifth of its tolerance (±2 for 1990), so the year of a film, an album, a
+  death or a launch is never easy (the `easy-year` rule). The tolerance doesn't follow the label: it is one formula at every difficulty (see the format).
 - **Order:** easy has familiar things with values far apart (centuries); hard has values close together, or
   unfamiliar things.
 - **Clues** (off: none is written): the label is for the first clue's answer only if the last clue makes it easy: easy is a famous answer
@@ -295,7 +302,12 @@ By type:
 - **One right answer,** defensible under every reliable source. The wrong options are plausible and of the same
   kind and form as the answer (all cities, all years; no odd one out by length, quotes or wording).
 - **Nothing gives the answer away:** not in the text, not in the picture, and not in another question or fact
-  (games mix chapters). Grep the bank for the answer and the key words before adding.
+  (games mix chapters). Grep the bank for the answer and the key words before adding, and once it's written read it
+  against the questions most like it: `almanac bank related -from <batch> <bank>` lists, for each question of a batch, the
+  ten in the bank (and the batch) that share the most rare words with it, each with its text, answer and fact. A grep
+  finds the words you thought of; the list finds the ones you didn't („пет години след Чарлз Линдберг“ in a fact about
+  Amelia Earhart, which answers who flew the Atlantic first). The audit of 24 Nov 2026 found two in three of its faults
+  were one question giving another away, or telling its fact again.
 - **Nothing goes stale.** No „сегашният“, „последният“ or „най-новият“ unless pinned to a date („към 2026 г.“), and
   add `reviewBy` for anything that can change (the `stale` rule finds the wording that needs it).
 - **No near-duplicates.** Grep the bank for the subject first. The checker catches identical texts, the same
@@ -336,7 +348,11 @@ By type:
   answer** that the question didn't say: a cause, a consequence, a number that gives scale, or a misconception put
   right. Not the answer restated, not a fact about something else the question merely mentions (a camel's nostrils
   under „Има ли животното рога?“), and not „Интересно е, че…“.
-- It must not answer another question in the bank: grep its names and numbers.
+- It must not answer another question in the bank, nor tell a fact another question tells (the `retold` rule): grep its
+  names and numbers, and read the question's `bank related` list.
+- **Every claim in it is checked, the side details too:** the place, the count, the date beside the main claim (an
+  office „в Софийския университет“ that is in БАН; „другата находка“ where there are three). A superlative keeps the
+  scope its source gives („най-високият действащ вулкан в Европа“ isn't Etna without one).
 - Claim only what the sources claim, and keep their hedges („според преданието“, „около“).
 
 ## A question for a day
