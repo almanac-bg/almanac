@@ -922,6 +922,19 @@ test("Настройки' three-way switch: every choice on one line, on a 320px
   }
 });
 
+test.describe("on a laptop, Настройки and Вход", () => {
+  test.use({ viewport: { width: 1366, height: 900 }, isMobile: false, hasTouch: false });
+
+  test("are Профил's width: a field, a switch no further from its words", async ({ page }) => {
+    for (const path of ["/signin", "/settings"]) {
+      await page.goto(path);
+      await expect(page.locator("main :is(h1, h2)").first()).toBeVisible();
+      const wide = await page.locator("main .screen").evaluate((s) => s.getBoundingClientRect().width);
+      expect(wide, path).toBeLessThanOrEqual(40 * 16 + 1);
+    }
+  });
+});
+
 /** Controls on their own (not a link inside a sentence) whose tap reaches them less than 44px high: tried by
  * elementFromPoint 21px above and below each one's middle, so a target drawn smaller with room around it to tap
  * (a pill's padding, a row's height) counts as what a finger has. */

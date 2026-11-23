@@ -93,7 +93,7 @@ export function settings(kit: Kit) {
   signedIn = signal("");
   return h(
     "section",
-    { class: "screen" },
+    { class: "screen narrow" },
     h("div", { class: "intro" }, () => (user() ? back("/me", "Профил") : null), h("h1", null, "Настройки")),
     // What's this device's (sounds, less motion) is there with a profile or without one.
     when(

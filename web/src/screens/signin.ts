@@ -49,7 +49,7 @@ export function signInPage(): Child {
   const from = entry().from ?? "/";
   return h(
     "section",
-    { class: "screen" },
+    { class: "screen narrow" },
     h("div", { class: "intro" }, back(from, "Назад"), h("h1", null, "Влез в профила си")),
     signIn({
       form: "signin",

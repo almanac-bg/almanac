@@ -4905,9 +4905,9 @@
   }
 
   /* On a big screen, one column read top to bottom, as on a phone: a page of its own (no spread: a second page would
-     hold only Настройки). */
+     hold only Настройки). Настройки and Вход the same width (.narrow): a field or a switch no further from its words. */
   @media (min-width: 56.25rem) {
-    .screen.me {
+    .screen:is(.me, .narrow) {
       width: 100%;
       max-width: 40rem;
       margin-inline: auto;
