@@ -197,7 +197,7 @@ export function duelOne(params: string[]) {
       startScreen(
         name,
         lead,
-        s?.at ? { at: s.at, total: s.total, marks: s.trail } : null,
+        s?.at ? { at: s.at, total: s.total, marks: s.trail, leftMs: s.question?.leftMs } : null,
         () => (s?.at ? void start(d) : begin()),
         undefined,
         "",

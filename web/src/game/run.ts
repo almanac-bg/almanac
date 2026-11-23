@@ -30,7 +30,7 @@ import {
   verdict,
   verdictSays,
 } from "../ui.ts";
-import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
+import { answering, countdown, liveRegion, type Say, spokenVerdict } from "./answering.ts";
 import {
   answered,
   answerWords,
@@ -278,7 +278,7 @@ export function starting(): Child {
 export function startScreen(
   what: string,
   lead: string,
-  left: { at: number; total: number; marks?: Mark[] } | null,
+  left: { at: number; total: number; marks?: Mark[]; leftMs?: number } | null,
   start: () => void,
   button = left ? "Продължи" : "Започни",
   chapter = "",
@@ -287,7 +287,7 @@ export function startScreen(
   const go = h("button", { class: "btn primary big", type: "button", onclick: start }, button);
   const words = [
     h("h1", null, what),
-    h("p", { class: "lead" }, left ? `Следва въпрос ${left.at + 1}\u00a0от\u00a0${left.total}.` : lead),
+    h("p", { class: "lead" }, left ? leftLine(left.at, left.total, left.leftMs) : lead),
   ];
   return h(
     "div",
@@ -301,6 +301,19 @@ export function startScreen(
     left?.marks ? trail(left.marks, left.total, left.at, chapter) : null,
     h("div", { class: "actions" }, go),
   );
+}
+
+/** Where a game left half-way stands, in a line: the question that comes next, or, while its time runs (shown on
+ * another device or tab, or left: the clock is the server's), that it does and how long it has, counting down, so
+ * that „Продължи“ comes as no surprise: „Времето на въпрос 8 тече: остават 5 с.“ */
+export function leftLine(at: number, total: number, leftMs = 0): Child {
+  if (leftMs <= 0) return `Следва въпрос ${at + 1} от ${total}.`;
+  const left = countdown(leftMs);
+  return () => {
+    const s = left();
+    if (s <= 0) return `Времето на въпрос ${at + 1} изтече.`;
+    return `Времето на въпрос ${at + 1} тече: ${s === 1 ? "остава" : "остават"} ${s} с.`;
+  };
 }
 
 /** The seconds before a start, big, in a ring that runs out with them (in CSS, over the same time, like a question's

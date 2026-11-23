@@ -151,7 +151,8 @@ test("a chapter left half-way says so on its tile; another tab waits for „Пр
   const other = await context.newPage();
   await other.goto("/play/history");
   await expect(other.getByRole("button", { name: "Продължи" })).toBeVisible();
-  await expect(other.locator(".start-screen")).toContainText("Следва въпрос 2 от 10.");
+  // Its time running there, the line says so, counting down: „Продължи“ comes into a question with what time it has.
+  await expect(other.locator(".start-screen")).toContainText(/Времето на въпрос 2 тече: остав(а|ат) \d+\u00a0с\./);
   await other.goto("/almanac/history");
   await expect(other.locator(".chapter-play")).toContainText("Следва въпрос 2 от 10.");
   await other.close();

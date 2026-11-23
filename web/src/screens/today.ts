@@ -19,7 +19,7 @@ import { news } from "../game/news.ts";
 import { closeLine, count, percent, withOwn } from "../game/numbers.ts";
 import { answerWords } from "../game/questions.ts";
 import { land, opensReview, perfectHead, reviewSheet } from "../game/results.ts";
-import { getReady, playRun, shownHere, starting } from "../game/run.ts";
+import { getReady, leftLine, playRun, shownHere, starting } from "../game/run.ts";
 import { cardFile, cardPath, type SharedDay, shareCard, shareDay, shareText } from "../game/share.ts";
 import type { Board, Mark, Reviewed, Score, State } from "../game/types.ts";
 import { api, errorText, serverNow } from "../lib/api.ts";
@@ -344,6 +344,8 @@ export function today() {
 function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): Child {
   const players = t.board.players;
   const at = marks.length;
+  // A question of it with its time running (shown on another device, or left): the line says so (leftLine).
+  const running = t.run && !t.run.done && t.run.question?.n === at ? t.run.question.leftMs : 0;
   const lead = shared && !at ? shared : null;
   const order = t.chapters?.length ? t.chapters : [];
   const [, , date = 1] = t.day.split("-").map(Number);
@@ -394,7 +396,7 @@ function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): 
                 : "Десет въпроса за днес",
           ),
           at
-            ? [h("p", { class: "issue-deck" }, `Следва въпрос ${at + 1}\u00a0от\u00a010.`), tiles(marks, order)]
+            ? [h("p", { class: "issue-deck" }, leftLine(at, 10, running)), tiles(marks, order)]
             : lead
               ? h("div", { class: "shared-score" }, tiles(sharedMarks, order, sharedMarks.length))
               : order.length
