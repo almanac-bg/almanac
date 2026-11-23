@@ -6524,11 +6524,19 @@
     padding: var(--space-2) 0;
   }
 
+  /* The avatar level with the name, at the row's top however tall the row grows (a name on two lines, a line more
+     under it), never centred on the whole row below the name; „Дуел“ in the row's middle. */
   .friend {
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
       "pic name act"
       "pic day act";
+    align-content: center;
+    align-items: start;
+  }
+
+  .friend > .friend-act {
+    align-self: center;
   }
 
   /* A board's: its place before the avatar; under the name the score, the day's small squares after it (under it only

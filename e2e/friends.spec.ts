@@ -201,6 +201,12 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   // One friend of that name: the name alone, the @username left to her profile.
   await expect.poll(() => readText(b.locator(".friend .friend-name"))).toMatch(/^Ана Петрова/);
   await expect(b.locator(".friend .friend-tag")).toBeHidden();
+  // The avatar level with the name, however tall the row: never centred on the row, below the name.
+  const [face, name] = await Promise.all([
+    b.locator(".friend > .avatar").boundingBox(),
+    b.locator(".friend .friend-text").boundingBox(),
+  ]);
+  expect(Math.abs((face?.y ?? 0) - (name?.y ?? 99))).toBeLessThanOrEqual(6);
 
   // Bo hears of her yes in Приятели, once, over his friends; nothing over the day (Днес is the issue and the streak).
   const yes = b.locator(".friends .accepted-notice");
