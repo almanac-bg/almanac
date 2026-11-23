@@ -94,6 +94,17 @@ What the rules ask (the questions skill has the details):
   `<work>/fix/<chunk>/images/`. A photograph of a thing (a sculpture, an egg, a tablet) needs a free licence for the
   photograph itself: PD-old covers the work, not someone's photo of it (a museum's CC0 does). Grep the bank's `image`
   sources and alt texts first: the same picture, or the same subject, must not be in another question.
+- **retold** (one thing told twice): two facts that tell one thing, or a fact that tells what another question asks
+  (its answer, or its statement as true or false). Rewrite the fact that is less about its own answer into another
+  fact about that answer, true, sourced and new to the bank (a fact-only change: `changed` stays); read its `bank
+  related` list so the new one doesn't tell another's. If the two facts truly say different things (one subject,
+  two facts), waive it on the newer one, the `why` saying the two facts.
+- **easy-year** (an easy number asks a year): judge it by the rubric. A date three adults in four know within ±2
+  years (one taught in school or lived through: 1878, 1944, 1989, the euro in 2026) is waived, the `why` saying why
+  everyone knows it; any other is relabelled medium or hard (a label: `changed` stays).
+- **judge: audit** (what an independent audit found, with its evidence and sources): a lead, not a verdict. Confirm
+  it from pages you read yourself; fix what holds by the rule it breaks (a give-away, a fact that overclaims, a label),
+  keep what doesn't, and say which.
 - **decoy, order-gap, fact, spelling, typography, ending, address, language**: as the rule's message says.
 
 **Other chunks run beside yours.** Change a question outside your chunk only if `<work>/owners.json` doesn't list it

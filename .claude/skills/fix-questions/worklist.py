@@ -4,7 +4,7 @@ judge, by question, in chunks of a category, each with free ids for its replacem
   python3 -I worklist.py <repo> <bank> <work> [--rules R,…] [--judge J,…] [--categories C,…] [--size N]
 
 --rules: only these lint rules (default: all); --judge: false-fact, easy-picture, blind (what blind.py compare
-found), signals (what upkeep.py gathered); default: none; --size: items a chunk (default 40). Writes
+found), signals (what upkeep.py gathered, or an audit put in <work>/signals.json: {id: {"signals": [...]}}); default: none; --size: items a chunk (default 40). Writes
 <work>/chunks/<category>-<n>.json, and <work>/owners.json (each listed id: its chunk, so a fixer leaves another chunk's
 questions alone), and prints the chunk names, one a line. A question judged earlier in this pass (<work>/judged.json,
 kept by merge.py) isn't judged again. Make the list again after each run is in the bank: the lint, and the free ids,
