@@ -177,7 +177,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   links in a line: „Още десет въпроса“, „Прегледай въпросите“, „Към темата“. On a big screen the result is a spread, as the day's: the sheet on the left page, the
   action, the ways on and that line on the right. „Прегледай въпросите“, the sheet and each tile open the questions'
   dialog, as the day's do. Its start
-  (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name.
+  (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name; a duel's (`/duel/<id>`) on a card of that shape,
+  the two players' avatars over its name.
 - **Приятели:** the people and the duels (the day's board is Днес's), on one page with no tabs (owner, 2026-11-22),
   one column on a big screen too; the page's „Приятели“ is a screen reader's only, each section headed in sight
   (`.sect-head`), a list's count in brackets after its name. Top to bottom: who asks to be friends (a row each,

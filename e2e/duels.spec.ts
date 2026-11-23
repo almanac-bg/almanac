@@ -196,6 +196,8 @@ test("a duel opened from its link (a notification, a chat) ends on its card in �
   // game's end goes back from its own entry once, not twice (bug hunt 2026-11-23: „…“ for good, or the page before).
   const link = await b.context().newPage();
   await link.goto(`/duel/${id}`);
+  // Its start on a card, the two face to face over its words, as a chapter's game has its glyph.
+  await expect(link.locator(".start-card .start-faces .avatar")).toHaveCount(2);
   await link.getByRole("button", { name: "Започни", exact: true }).click();
   await countIn(link);
   await playSecond(link, "Ана");

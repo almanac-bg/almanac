@@ -3504,6 +3504,18 @@
     color: var(--on-sheet);
   }
 
+  /* A duel before it starts: a card of the chapter's sheet's shape, the two face to face over what it is. */
+  .start-card {
+    justify-items: center;
+    width: min(100%, 26rem);
+    padding: 24px 20px 28px;
+  }
+
+  .start-faces {
+    display: flex;
+    gap: var(--space-3);
+  }
+
   /* Tabs that switch what a screen shows: a well, the chosen one a raised surface, both pills; a setting's few choices
      the same, as radios. */
   /* Its choices of one width, unless one's longest word needs more („Като устройството“): that one wider, its words

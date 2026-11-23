@@ -14,7 +14,7 @@ import { backOut, byTap, go, hold, title } from "../lib/router.ts";
 import { loadFeel } from "../lib/sound.ts";
 import { withWord } from "../lib/words.ts";
 import { player, user } from "../state.ts";
-import { failure, type Look } from "../ui.ts";
+import { avatar, failure, type Look } from "../ui.ts";
 import { missing } from "./missing.ts";
 import { nameFirst } from "./name.ts";
 import { signIn } from "./signin.ts";
@@ -186,9 +186,22 @@ export function duelOne(params: string[]) {
     const lead = d.first
       ? `Десет въпроса. После ${d.opponent?.name ?? "приятелят ти"} ще изиграе същите.`
       : `Същите десет въпроса, които изигра ${d.opponent?.name ?? "приятелят ти"}. След всеки отговор виждаш отговора на ${d.opponent?.name ?? "приятеля ти"}.`;
+    // On a card, the two face to face over its words, as a chapter's game has its glyph.
+    const faces = h(
+      "span",
+      { class: "start-faces", "aria-hidden": "true" },
+      avatar(d.you?.look?.avatar, { size: "l", name: d.you?.name ?? "" }),
+      avatar(d.opponent?.look?.avatar, { size: "l", name: d.opponent?.name ?? "" }),
+    );
     screen.show(() =>
-      startScreen(name, lead, s?.at ? { at: s.at, total: s.total, marks: s.trail } : null, () =>
-        s?.at ? void start(d) : begin(),
+      startScreen(
+        name,
+        lead,
+        s?.at ? { at: s.at, total: s.total, marks: s.trail } : null,
+        () => (s?.at ? void start(d) : begin()),
+        undefined,
+        "",
+        faces,
       ),
     );
   };

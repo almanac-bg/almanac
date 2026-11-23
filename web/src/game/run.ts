@@ -273,7 +273,8 @@ export function starting(): Child {
 
 /** A game come to without a tap (a reload, back or forward, a link from outside): nothing starts by itself. What it is
  * (`what`, `lead`), where it stopped if it was left half-way (`left`: its pips, and the next question), and the gold
- * button that starts it (its count) or goes on with it (`button`, if it says another word). */
+ * button that starts it (its count) or goes on with it (`button`, if it says another word). A chapter's game on the
+ * chapter's sheet; a duel on a card, the two players' faces (`faces`) over its words, as the chapter's glyph is. */
 export function startScreen(
   what: string,
   lead: string,
@@ -281,6 +282,7 @@ export function startScreen(
   start: () => void,
   button = left ? "Продължи" : "Започни",
   chapter = "",
+  faces: Child = null,
 ): Child {
   const go = h("button", { class: "btn primary big", type: "button", onclick: start }, button);
   const words = [
@@ -293,7 +295,9 @@ export function startScreen(
     // A chapter's game on its sheet, with its glyph, as the chapter's page has it.
     chapter
       ? leaf(chapter, [glyph(chapter, 72), h("div", { class: "intro" }, words)], "start-leaf")
-      : h("div", { class: "intro" }, words),
+      : faces
+        ? h("div", { class: "card start-card" }, faces, h("div", { class: "intro" }, words))
+        : h("div", { class: "intro" }, words),
     left?.marks ? trail(left.marks, left.total, left.at, chapter) : null,
     h("div", { class: "actions" }, go),
   );
