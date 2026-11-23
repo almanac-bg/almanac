@@ -352,7 +352,7 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands, gap = 
           delay: lands + 200 + i * 40,
         }),
       );
-    const head = hero.querySelector(".perfect-head .kicker");
+    const head = hero.querySelector(".perfect-words");
     if (head)
       moving.push(
         head.animate([{ opacity: 0, transform: "translateY(6px)" }, {}], {

@@ -18,7 +18,7 @@ import type { FriendDay } from "../game/knew.ts";
 import { news } from "../game/news.ts";
 import { closeLine, count, percent, withOwn } from "../game/numbers.ts";
 import { answerWords } from "../game/questions.ts";
-import { land, opensReview, reviewSheet } from "../game/results.ts";
+import { land, opensReview, perfectHead, reviewSheet } from "../game/results.ts";
 import { getReady, playRun, shownHere, starting } from "../game/run.ts";
 import { cardFile, cardPath, type SharedDay, shareCard, shareDay, shareText } from "../game/share.ts";
 import type { Board, Mark, Reviewed, Score, State } from "../game/types.ts";
@@ -600,7 +600,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[], reload: (
   const hero = leaf(
     order[0] ?? "general",
     [
-      perfect ? h("div", { class: "perfect-head" }, perfectMark(), h("p", { class: "kicker" }, "Всички верни")) : null,
+      perfect ? perfectHead() : null,
       h(
         "p",
         { class: "kicker score-kicker" },
@@ -1162,26 +1162,6 @@ function streakNotice(t: Today): StreakSaid | null {
 interface StreakSaid {
   short: string;
   long: string;
-}
-
-/** The logo's rosette over ten of ten: four petals, the gold one last (feel.ts draws them in). */
-function perfectMark(): SVGElement {
-  const ns = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(ns, "svg");
-  svg.setAttribute("viewBox", "0 0 64 64");
-  svg.setAttribute("class", "perfect-mark");
-  svg.setAttribute("aria-hidden", "true");
-  for (const turn of [45, 135, 225, -45]) {
-    const group = document.createElementNS(ns, "g");
-    group.setAttribute("transform", `rotate(${turn} 32 32)`);
-    const petal = document.createElementNS(ns, "path");
-    petal.setAttribute("d", "M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z");
-    petal.setAttribute("class", turn < 0 ? "petal gold" : "petal");
-    petal.style.transformOrigin = "32px 32px";
-    group.append(petal);
-    svg.append(group);
-  }
-  return svg;
 }
 
 /** A moment's time of day in Bulgaria: „00:15“. */

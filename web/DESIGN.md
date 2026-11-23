@@ -88,7 +88,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   1. The score on a sheet of the issue's first chapter: „Брой 9 · 20 ноември“, the score as the hero numeral „7 от
      10“, the tiles, „На десетия въпрос вярно отговарят 14 %“ (nothing before a crowd: the tenth is
      always the hardest), and with a crowd „България днес: средно 6,2“ (the average always to one decimal: „6,0“). Ten of ten:
-     „Всички верни“ and the mark drawn over it. The card opens the day's questions (below): a tap anywhere on it,
+     the game's mark drawn large beside the score (64–128px, as much as the score leaves room for), „Всички
+     верни“ under it at the date's size. The card opens the day's questions (below): a tap anywhere on it,
      and each tile at its own question. None right: right under the score, „Въпросите“ open
      (`.missed-day`): the first four, each its dashed tile, the question, the right answer (an order, a match, a split
      in lines) and its fact, and „Прегледай въпросите“ under them; no word of praise. A best rank risen, the big moment, right

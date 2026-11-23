@@ -76,8 +76,8 @@ export function scoreCard(s: State, line: Child) {
   return h(
     "div",
     { class: "card hero" },
-    // Ten of ten: the logo's rosette as a seal, and the words.
-    perfect ? h("div", { class: "perfect-head" }, seal(), h("p", { class: "kicker" }, "Всички верни")) : null,
+    // Ten of ten: the mark drawn large beside the score, and the words.
+    perfect ? perfectHead() : null,
     h(
       "div",
       { class: "score-row" },
@@ -106,7 +106,7 @@ export function chapterCard(s: State, chapter: string, open?: (at: number) => vo
   return leaf(
     chapter,
     [
-      perfect ? h("div", { class: "perfect-head" }, seal(), h("p", { class: "kicker" }, "Всички верни")) : null,
+      perfect ? perfectHead() : null,
       h("div", { class: "score-kicker" }, chip(chapter)),
       h(
         "h1",
@@ -161,8 +161,14 @@ export function land(hero: HTMLElement, run: number, perfect: boolean, day: bool
   );
 }
 
-/** The logo's rosette as a seal: four petals, the gold one last. */
-function seal(): SVGElement {
+/** Ten of ten, the result's one big moment besides a rank risen: the game's mark drawn large beside the score (feel.ts
+ * draws it in petal by petal as the result lands), „Всички верни“ under it. */
+export function perfectHead(): HTMLElement {
+  return h("div", { class: "perfect" }, perfectMark(), h("p", { class: "kicker perfect-words" }, "Всички верни"));
+}
+
+/** The logo's rosette: four petals, the gold one last, on the sheet in its ink in both themes. */
+function perfectMark(): SVGElement {
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", "0 0 64 64");
@@ -174,7 +180,7 @@ function seal(): SVGElement {
     group.setAttribute("transform", `rotate(${turn} 32 32)`);
     const petal = document.createElementNS(ns, "path");
     petal.setAttribute("d", "M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z");
-    petal.style.fill = turn < 0 ? "var(--gold)" : "var(--ink)";
+    petal.setAttribute("class", turn < 0 ? "petal gold" : "petal");
     petal.style.transformOrigin = "32px 32px";
     group.append(petal);
     svg.append(group);

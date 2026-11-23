@@ -6023,22 +6023,40 @@
     color: var(--on-sheet);
   }
 
-  /* Ten of ten: the mark drawn over the score, petal by petal (feel.ts), and „Всички верни“. */
-  .perfect-head {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  /* Ten of ten: the game's mark drawn large beside the score, petal by petal (feel.ts), „Всички верни“ under it at the
+     date's size. The sheet takes a second column for it, beside the date and the score; the rest runs the whole
+     width under them. */
+  .score-leaf:has(> .perfect) {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .perfect-head .kicker {
+  .score-leaf:has(> .perfect) > * {
+    grid-column: 1 / -1;
+  }
+
+  .score-leaf:has(> .perfect) > :is(.score-kicker, .score) {
+    grid-column: 1;
+  }
+
+  .score-leaf > .perfect {
+    display: grid;
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    justify-items: center;
+    gap: 6px;
+  }
+
+  .perfect-words {
     color: var(--on-sheet);
-    font-size: 0.875rem;
+    white-space: nowrap;
   }
 
-  /* Ten of ten: the rosette over the score, on the sheet (the same in both themes), its last petal gold. */
+  /* The rosette on the sheet (the same in both themes), its last petal gold: as large as the score leaves room for. */
   .perfect-mark {
-    width: 40px;
-    height: 40px;
+    width: clamp(64px, 24vw, 128px);
+    height: auto;
+    aspect-ratio: 1;
   }
 
   .perfect-mark .petal {
