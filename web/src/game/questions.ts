@@ -170,7 +170,8 @@ export function spokenAnswer(view: View, reveal: Reveal): string {
   if (view.type === "truefalse") return reveal.truth ? "Твърдението е вярно." : "Твърдението е невярно.";
   const name = answerWords(view, reveal);
   if (!name) return "";
-  return `Верният отговор е ${view.type === "number" ? name : quoted(name)}.`;
+  const words = `Верният отговор е ${view.type === "number" ? name : quoted(name)}`;
+  return words.endsWith(".") ? words : `${words}.`;
 }
 
 /** The right answer in a few words, where a few words hold it: a choice's or clues' option, a number with its unit,
@@ -505,7 +506,14 @@ function number(view: NumberView, submit: (a: Answer) => void, locked: Signal<bo
         // Spot on, what was said is the answer: said once.
         mine === answer
           ? null
-          : h("p", { class: "number-answer" }, "Верният отговор: ", h("strong", null, `${said(answer)}${unit}`), "."),
+          : h(
+              "p",
+              { class: "number-answer" },
+              "Верният отговор: ",
+              h("strong", null, `${said(answer)}${unit}`),
+              // A unit that ends a sentence itself („лв.“) ends it once.
+              unit.endsWith(".") ? null : ".",
+            ),
       ]);
       // Everyone's guesses, gone over (a review's): they take their room at once, and show on their beat. In a game
       // the scale is enough, and how everyone did is said under the verdict (DESIGN.md, Play).
