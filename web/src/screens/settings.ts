@@ -568,7 +568,7 @@ function deleteAccount(): Child {
           h("button", { class: "link tap", onclick: () => asking.set(false) }, "Отказ"),
           error() && h("p", { class: "bad", role: "alert" }, error()),
         )
-      : h("button", { class: "link tap", onclick: () => asking.set(true) }, "Изтрий профила");
+      : h("button", { class: "link tap danger", onclick: () => asking.set(true) }, "Изтрий профила");
 }
 
 async function signOut() {
