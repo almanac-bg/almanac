@@ -6,7 +6,7 @@
 // (play.Game: Show, Start, Answer), and duels with their friends (sent, played back, some let lapse: DuelFriend,
 // PlayDuel); they ask each other to be friends, accept, say no, choose their
 // avatar. Whatever follows from that, the game works out itself: scores, streaks, duels' results and records, the
-// facts of Моят Алманах and the notes in it.
+// facts in each player's Алманах.
 // Only what no game function
 // writes is written directly: when a player came and was last seen, their email, their mail and notification
 // preferences, the players' sessions (each guest's from the day they came, as their browser keeps it; the personas'
