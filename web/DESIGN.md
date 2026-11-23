@@ -147,7 +147,9 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
 - **Алманах:** its head (whose book it is and what ink and grey mean, nothing to play there: a game is a chapter's, from its page; no lifetime totals), then the chapters, each a folded
   card in its colour with its seal as the badge (40px), its ink („180 с мастило“), its rank over its bar and what's left to
   the next under it („Тетрадка“, the bar, „още 15 до „Книга““: a card has no room for both under the bar); a counter at zero is hidden, and the head says once how ink is written; a
-  chapter's card with no ink yet is its glyph over its name, as tall as the row it stands in.
+  chapter's card before its first rank has its glyph for the badge and the same foot as the others, „Още без печат“
+  over its bar, empty, and „още 1 до „Бележка““ under it (never a blank block of colour), as tall as the row it stands
+  in, the foot at the card's foot.
   Two across on a phone, five on a big screen (the page's whole width, the head a reading width).
   The chapters in their numbers' order (Глава 1, 2, …), always: a book's contents, never resorted. A chapter's game left
   half-way today shows under the head, where it stopped, with „Продължи“ (its cross comes back here).

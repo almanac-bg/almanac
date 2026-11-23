@@ -5077,6 +5077,15 @@
     font: 900 0.8125rem / 1.25 var(--font-sans);
   }
 
+  /* Before a first rank, with no ink to stand over it, the foot at the card's foot as on the others. */
+  .card-top + .card-rank {
+    margin-top: auto;
+  }
+
+  .card-rank .none {
+    font-weight: 700;
+  }
+
   @media (hover: hover) and (pointer: fine) {
     .chapter-card:hover .card-name {
       text-decoration: underline;

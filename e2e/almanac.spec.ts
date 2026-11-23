@@ -30,6 +30,8 @@ test("the book's contents: a chapter a row with its ink, and no count of it all"
   await expect(movies).toContainText(/7\s*с\sмастило/);
   // A counter at zero is hidden: the book's head says how ink is written.
   await expect(cards.filter({ hasText: "География" })).not.toContainText("с мастило");
+  // A chapter before its first rank has the foot the others have: no seal yet, and how far the first is.
+  await expect(cards.filter({ hasText: "География" })).toContainText(/Още\sбез\sпечат\s*още\s1\sдо\s„Бележка“/);
   await expect(page.locator(".book-head a")).toHaveCount(0);
   // The chapters in their numbers' order, whatever their ink: a book's contents.
   await expect(cards.first()).toContainText("Обща култура");

@@ -199,11 +199,14 @@ function book(p: Page, left: () => Left[] = () => []): Child {
 
 /** A chapter's card: its colour, its seal as the badge (or its glyph, before a rank) over its name, its ink, and its
  * rank over its bar, and under the bar what's left to the next („Тетрадка“, the bar, „още 15 до „Книга““: ui.ts,
- * standing). The corner turned, as a page of the book. */
+ * standing; before a rank, „Още без печат“, the bar empty, „още 1 до „Бележка““). The corner turned, as a page of the
+ * book. */
 function card(id: string, ink: number, r: Rank | undefined): Child {
   // The rank as counted when the last issue was over, what's left to the next from the ink shown (written answer by
   // answer, an issue under way too), as Профил has it.
   const ranked = r && r.level > 0 ? { ...r, ink } : null;
+  // Before its first rank, the same foot: „Още без печат“ over an empty bar, and what's left to „Бележка“ under it.
+  const way = ranked ?? { chapter: id, level: 0, ink, from: 0, nextAt: r?.nextAt || 1 };
   return h(
     "a",
     { class: "chapter-card", href: `/almanac/${id}` },
@@ -221,7 +224,12 @@ function card(id: string, ink: number, r: Rank | undefined): Child {
           ? h("span", { class: "card-ink" }, h("b", { class: "num" }, formatNumber(ink)), h("span", null, "с мастило"))
           : null,
         // A card is too narrow for both ends' words under the bar: the rank goes over it, what's left under it.
-        ranked ? h("span", { class: "card-rank" }, h("b", null, ranked.name), standing(ranked, false)) : null,
+        h(
+          "span",
+          { class: "card-rank" },
+          ranked ? h("b", null, ranked.name) : h("b", { class: "none" }, "Още без печат"),
+          standing(way, false),
+        ),
       ],
       "card-leaf",
       { next: "" },
