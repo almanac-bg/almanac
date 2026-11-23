@@ -147,7 +147,7 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await aDot.click();
   await expect(a).toHaveURL(/\/friends$/);
   await expect(aDot).not.toHaveClass(/news/);
-  await expect(a.locator(".duels-played h2")).toHaveText("Изиграни дуели");
+  await expect(a.locator(".duels-played h2")).toHaveText("Завършени дуели");
   await expect(a.locator(".duels-open")).toHaveCount(0);
   const done = a.locator(".duels-played .duel-card").first();
   await expect(done).toHaveClass(/s-(won|lost|draw)/);
@@ -166,9 +166,7 @@ test("a duel with a friend: played first and sent, played back when they can, it
   // Her friend's row: the duels between the two in words (not the friend's day: that's the day's board's), and „Дуел“,
   // a button.
   await a.goto("/friends");
-  await expect(a.locator(".friend .friend-record")).toHaveText(
-    /^Дуели помежду ви: (1 победа, 0 загуби|0 победи, 1 загуба|0 победи, 0 загуби, 1 равенство)$/,
-  );
+  await expect(a.locator(".friend .friend-record")).toHaveText(/^Дуели помежду ви: (печелиш 1|губиш 1|1 равенство)$/);
   await expect(a.locator(".friend").getByRole("button", { name: /^Дуел/ })).toHaveClass(/\bbtn\b/);
 
   // Days later the duel is still in Приятели, and its questions still open from it (a duel's alone: play.Review).
@@ -258,7 +256,7 @@ test("every duel to play is in one stack, the first challenged on top, played fr
   const playedOnes = b.locator(".duels-played");
   await expect(waiting.getByRole("heading")).toHaveText("Чакащи дуели (3)");
   await expect(waiting.locator(".duel-pile .duel-card")).toHaveAttribute("id", `duel-${sentIds[1]}`);
-  await expect(playedOnes.getByRole("heading")).toHaveText("Изиграни дуели");
+  await expect(playedOnes.getByRole("heading")).toHaveText("Завършени дуели");
   const landed = playedOnes.locator(".duel-card").first();
   await expect(landed).toHaveAttribute("id", `duel-${sentIds[0]}`);
   await expect(landed).toHaveClass(/\blanded\b/);
@@ -337,12 +335,12 @@ test("every duel played, beyond the ten listed, in a dialog a page at a time", a
   const played = page.locator(".duels-played");
   await expect(played.locator(".duel-card")).toHaveCount(10);
   // Under the last, the way to all of them.
-  const all = played.getByRole("button", { name: "Всички изиграни дуели (23)" });
+  const all = played.getByRole("button", { name: "Всички завършени дуели (23)" });
   expect(
     await played.locator(".duel-cards, .duels-all-open").evaluateAll((els) => els.map((e) => e.className)),
   ).toEqual(["duel-cards", "btn duels-all-open"]);
   await all.click();
-  const box = page.getByRole("dialog", { name: "Изиграни дуели" });
+  const box = page.getByRole("dialog", { name: "Завършени дуели" });
   await expect(box.locator(".duel-card")).toHaveCount(10);
   await expect(box.locator(".pages-at")).toHaveText("Страница 1\u00a0от\u00a03");
   await expect(box.getByRole("button", { name: "По-нови" })).toBeDisabled();

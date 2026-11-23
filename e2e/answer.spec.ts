@@ -297,3 +297,37 @@ test.describe("on a laptop", () => {
     });
   });
 });
+
+test("the answers' shares add up: those that ran out of time are said under them, and only when there are some", async ({
+  page,
+}) => {
+  // Shares are of every answer, the ones that ran out too (bank.Crowd): here a tenth of them ran out.
+  await page.route(/\/api\/runs\/\d+\/answer/, async (route) => {
+    const res = await route.fetch();
+    const s = await res.json();
+    if (s?.reveal) {
+      const n = route.request().postDataJSON()?.n;
+      s.reveal.crowd =
+        n === 0
+          ? { answers: 40, right: 0.3, picks: [0.3, 0.3, 0.2, 0.1], today: true }
+          : {
+              answers: 40,
+              right: 0.5,
+              picks: [0.5, 0.5, 0, 0].slice(0, s.reveal.truth === undefined ? 4 : 2),
+              today: true,
+            };
+    }
+    await route.fulfill({ response: res, json: s });
+  });
+  await page.goto("/");
+  await startDay(page);
+  await answer(page);
+  // With the player's own answer among them (40 + 1): 4 of 41 gave none.
+  await expect(page.locator(".crowd-none")).toHaveText("Без отговор: 10 %");
+  await moveOn(page);
+  await expect(page.locator(".question-head")).toContainText("2 от 10");
+  await answer(page);
+  await expect(page.locator(".verdict")).toBeVisible();
+  await expect(page.locator(".crowd-share").first()).toBeVisible();
+  await expect(page.locator(".crowd-none")).toHaveCount(0);
+});

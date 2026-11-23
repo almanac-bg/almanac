@@ -242,7 +242,7 @@ function allPlayed(): void {
       h(
         "div",
         { class: "sheet-head" },
-        h("h2", { id: "duels-all-title" }, "Изиграни дуели"),
+        h("h2", { id: "duels-all-title" }, "Завършени дуели"),
         h("button", { class: "link", type: "button", onclick: () => box.close() }, "Затвори"),
       ),
       () => {
@@ -337,7 +337,7 @@ function land(card: HTMLElement, d: DuelView): void {
 /** One of the player's two groups of duels in Приятели (`which`), under its heading, or nothing while it's empty. The
  * open ones („Чакащи дуели (N)“, at the page's top: a duel to play stays first there until it's played): the duels to
  * play, all in one stack, in the order they were challenged (the first on top, its „Играй“ the page's one action),
- * then those waiting for a friend, each card saying whose turn it is. Those played („Изиграни дуели“, under the
+ * then those waiting for a friend, each card saying whose turn it is. Those played („Завършени дуели“, under the
  * friends), the last ten, which the heading says once there are that many. The one named in the address (`top`: just
  * played, or an old link to it) is first in its own: a result first of the played, one sent first of those waiting
  * for a friend; what its game brought under it (`under`: game/news.ts), its result landing once, brought into sight
@@ -403,12 +403,12 @@ export function duelGroup(
       ? h(
           "button",
           { class: "btn duels-all-open", type: "button", "aria-haspopup": "dialog", onclick: allPlayed },
-          `Всички изиграни дуели (${formatNumber(d.playedAll)})`,
+          `Всички завършени дуели (${formatNumber(d.playedAll)})`,
         )
       : null;
   return played.length
     ? group(
-        d.played.length >= playedShown ? `Последните ${playedShown} изиграни дуела` : "Изиграни дуели",
+        d.played.length >= playedShown ? `Последните ${playedShown} завършени дуела` : "Завършени дуели",
         played.map((p) => card(p)),
         more,
       )

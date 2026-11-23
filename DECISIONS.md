@@ -89,20 +89,21 @@ packages' doc comments; this file holds only what must not drift.
     profile, the only ways (2026-11-22, the owner: the duel against a recording of another's game is gone, and „Нов
     дуел“, its picker, with it). The friend has 7 days. Three sent to one friend wait at most: no fourth until they play
     one, and their row says so, „Дуел“ off (2026-11-22, the owner). A friend's record against you stays: the
-    one count kept between two players. A friend's row says it in words under the name („Дуели помежду ви: 3 победи,
-    1 загуба“, „Още нямате дуели“), and „Дуел“ as a button at its end; not the friend's day, which is the day's board's
+    one count kept between two players. A friend's row says it in words under the name („Дуели помежду ви: печелиш 3,
+    губиш 1“, by verbs so whose wins they are is never in doubt: 2026-11-23, the owner's go; „Още нямате дуели“), and „Дуел“ as a button at its end; not the friend's day, which is the day's board's
     (2026-11-22, the owner).
   - **A duel has no result page** (2026-11-22, the owner): everything about a duel is in Приятели: the two, the
     score, the two rows of marks, one quiet line, and „Въпросите“, its questions in their dialog, on any day (2026-11-22, the owner: the other side plays when they can, so a duel's result often comes
     on another day, and its questions are what the two talk over). Every duel is a card,
-    „Чакащи дуели“ and „Изиграни дуели“ (2026-11-22, the owner: the cards read better than compact rows): one the
+    „Чакащи дуели“ and „Завършени дуели“ (2026-11-22, the owner: the cards read better than compact rows): one the
     player's to play acts only by its „Играй“; every duel they have to play is in one stack, whoever sent it, the first
     challenged on top, opened in a dialog in that order to choose which to play (2026-11-22, the owner); one whose side
     they've played opens its questions; no name on a duel is a link to a profile, which opens from the friends'
     list (2026-11-22, the owner). Nothing else: „Реванш“ is
     gone (2026-11-22, the owner), a new duel starts from the friend's row or profile. A duel's game ends on Приятели,
     first in its group, the score counting up once; `/duel/<id>` only starts and plays one, and an old link to a
-    finished duel comes to it there. The played list is the last ten, and says so („Последните 10 изиграни дуела“); all
+    finished duel comes to it there. The finished list is the last ten, and says so („Последните 10 завършени дуела“: „завършени“, not „изиграни“,
+    since one run out unplayed is in it, 2026-11-23); all
     of them open from under it in a dialog, a page at a time (2026-11-22, the owner). A duel the player sent and the
     friend hasn't played isn't listed: it's the friend's to do (2026-11-22, the owner: it only muddled the list).
   - **Friends** are added by username or email, a request the other says yes to. The personal invite link was removed

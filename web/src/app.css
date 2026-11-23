@@ -2603,9 +2603,18 @@
     animation: shown 240ms ease-out;
   }
 
-  .crowd-share.unseen {
+  .crowd-share.unseen,
+  .crowd-none.unseen {
     visibility: hidden;
     animation: none;
+  }
+
+  /* The share that gave no answer (ran out of time), under the answers, so that the shares add up. */
+  .crowd-none {
+    margin: var(--space-2) 0 0 4px;
+    color: var(--ink-3);
+    font: var(--t-note);
+    animation: shown 240ms ease-out;
   }
 
   .option.tf .crowd-share {
@@ -5208,12 +5217,6 @@
 
   .search input::-webkit-search-cancel-button {
     -webkit-appearance: none;
-  }
-
-  /* What grey is, where it first shows. */
-  .grey-note {
-    color: var(--ink-3);
-    font: var(--t-note);
   }
 
   /* The facts: ink a card with an ink edge, grey a thin solid outline and lighter words. An entry reads in the order

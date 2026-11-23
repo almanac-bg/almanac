@@ -447,16 +447,9 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
               ? "Нищо не е намерено. Опитай с друга дума."
               : "Тук още няма факти. Всеки въпрос от тази тема, който срещнеш, записва тук своя факт.",
           );
-        // Where grey first shows, what it is: once, over the list.
-        const grey = p.facts.some((f) => !f.ink);
+        // What ink and grey are is said once, at the book's head, not again over each chapter's facts (each entry
+        // says which it is on its chip).
         return [
-          grey
-            ? h(
-                "p",
-                { class: "grey-note" },
-                "С мастило са фактите от верните ти отговори в броя на деня. Всички други, които срещнеш, са в сиво.",
-              )
-            : null,
           h(
             "ol",
             { class: "entries" },
