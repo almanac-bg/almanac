@@ -605,7 +605,8 @@ function question(
       taken(res.state);
       const wait = held - performance.now();
       if (wait > 0 && !calm.peek()) await new Promise((on) => at(wait, () => on(null)));
-      reveal(res, answer);
+      // The answer the server has: another tab's, given first, if so.
+      reveal(res, res.taken === undefined ? answer : res.taken);
     },
   });
   const asked = ans.asked;

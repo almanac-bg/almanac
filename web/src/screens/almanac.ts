@@ -201,7 +201,9 @@ function book(p: Page, left: () => Left[] = () => []): Child {
  * rank over its bar, and under the bar what's left to the next („Тетрадка“, the bar, „още 15 до „Книга““: ui.ts,
  * standing). The corner turned, as a page of the book. */
 function card(id: string, ink: number, r: Rank | undefined): Child {
-  const ranked = r && r.level > 0 ? r : null;
+  // The rank as counted when the last issue was over, what's left to the next from the ink shown (written answer by
+  // answer, an issue under way too), as Профил has it.
+  const ranked = r && r.level > 0 ? { ...r, ink } : null;
   return h(
     "a",
     { class: "chapter-card", href: `/almanac/${id}` },
@@ -471,7 +473,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
  * head, its bar with the rank under its left end and the ink still to come under its right (ui.ts, standing). Before a
  * rank, what writes its first: a right answer in the day's issue. */
 function stand(id: string, r: Rank | undefined, ink: number): Child {
-  const ranked = r && r.level > 0 ? r : null;
+  const ranked = r && r.level > 0 ? { ...r, ink } : null; // what's left counted from the ink shown (card)
   return h(
     "div",
     { class: "chapter-stand" },

@@ -302,7 +302,7 @@ export function today() {
     // the streak, so there it's only kept as told. On an evening the streak ends at midnight without the day, the
     // streak's line says that, and what came of the days missed waits, untold, for another visit.
     const streakSaid = !run?.done && t.streak >= 3 && endsTonight(t) ? null : streakNotice(t);
-    if (run?.done) return result(t, run, just, notices);
+    if (run?.done) return result(t, run, just, notices, load);
     // The player's numbers (Профил's): the streak's week, the facts in the book.
     const stats = signal<Stats | null>(null);
     if (user.peek()) loadStats().then(stats.set, () => {});
@@ -533,7 +533,7 @@ const outOf = (s: State) => s.total - (s.void ?? 0);
  * „Прегледай въпросите“, by a tap on the score's card, and by a tile, at its question. As it's
  * played (`just`), it lands (feel.ts) and what it brought is told; on a later visit it is as it is. A wrong game is
  * never celebrated; ten of ten is a big moment. */
-function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
+function result(t: Today, run: State, just: boolean, notices: Child[], reload: () => void): Child {
   const fresh = signal<Today>(t);
   // The day as it stands with the game just played (its streak, its friends): until it's here, the streak with today's
   // isn't known, and the share (which says it) waits for it.
@@ -579,7 +579,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
   const away = !!app && guest;
   // A first day: as the server says, or, for a visitor who had no game at all when Днес came, this one.
   const askFirst = !away && guest && (handedIn.peek() || t.firstDay !== false);
-  const ask = away || t.late ? null : remindAsk(t.day, stake, askFirst);
+  const ask = away || t.late ? null : remindAsk(t.day, stake, reload, askFirst);
   const first = away || askFirst;
   // While the action is another (the ask, the way out), sharing stays a quiet link beside the tiles.
   const shareQuiet = () =>
@@ -647,7 +647,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
       // 3. The action, once the first results are past.
       first ? null : action,
       // 4. Yesterday's issue finished after midnight: on to today's. Otherwise the asks, if any.
-      t.late ? onToToday(t, t.late.today) : asks(stake, first ? null : ask),
+      t.late ? onToToday(t, t.late.today) : asks(stake, first ? null : ask, reload),
     ),
     h(
       "div",
@@ -1052,9 +1052,13 @@ function onToToday(t: Today, today: () => void): Child {
 /** Under the result, the asks that come with it: a guest's to keep the game (keep.ts: what it risks till then,
  * `stake`) and, where it isn't on yet, the reminder's (`ask`; null where the result's action is the ask, or the way
  * out of an app's browser): nothing else, and nothing at all when neither is asked (`.asks:empty`). */
-function asks(stake: () => string | null, ask: { view: Child; mailing: () => boolean } | null): Child {
+function asks(
+  stake: () => string | null,
+  ask: { view: Child; mailing: () => boolean } | null,
+  signedIn: () => void,
+): Child {
   // The ask by mail asks a guest for the email itself: the line to keep the game steps aside for it.
-  return ask ? h("section", { class: "sect asks" }, keepLine(stake, ask.mailing), ask.view) : null;
+  return ask ? h("section", { class: "sect asks" }, keepLine(stake, ask.mailing, signedIn), ask.view) : null;
 }
 
 /** The news of a game whose result was never on screen (`t.untold`; of `run` only, if given: the day's, under its
@@ -1147,6 +1151,7 @@ const remindKey = "almanac.remind-ask";
 function remindAsk(
   day: string,
   stake: () => string | null,
+  signedIn: () => void,
   primary = false,
 ): { view: Child; mailing: () => boolean; showing: () => boolean; deciding: () => boolean } {
   let asked = remindAsks(null);
@@ -1220,6 +1225,7 @@ function remindAsk(
           stake,
           no,
           primary,
+          signedIn,
           yes: () => save(remindAnswered(asked, "mail", day, true)),
         }),
       ];

@@ -435,7 +435,7 @@ func TestAnswerAgain(t *testing.T) {
 		return w.g.Answer(ctx, u, s.ID, n, a)
 	}
 	plain := func(r Result) string {
-		r.Reveal = nil
+		r.Reveal, r.Taken = nil, nil
 		out, _ := json.Marshal(r)
 		return string(out)
 	}
@@ -451,6 +451,14 @@ func TestAnswerAgain(t *testing.T) {
 	again, err := w.g.Answer(ctx, u, s.ID, 1, w.wrong(s.ID, 1)) // what's sent again changes nothing either
 	if err != nil || again.Reveal == nil || plain(again) != plain(first) {
 		t.Fatalf("sent again:\n%s\n%s\n%v", plain(again), plain(first), err)
+	}
+	// With the answer taken the first time, which its screen shows in place of the one sent now (the same question
+	// answered in another tab first); a first reply has none to say.
+	var taken, given any
+	if first.Taken != nil || json.Unmarshal(again.Taken, &taken) != nil ||
+		json.Unmarshal(w.right(s.ID, 1), &given) != nil || !reflect.DeepEqual(taken, given) {
+		t.Fatalf("the answer taken: %s, the first time %s; the one given then: %s", again.Taken, first.Taken,
+			w.right(s.ID, 1))
 	}
 	st, _ := w.g.State(ctx, u, s.ID)
 	if st.At != 2 || st.Rights != first.State.Rights || len(st.Trail) != 2 {

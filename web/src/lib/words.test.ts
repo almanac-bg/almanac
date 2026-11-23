@@ -144,11 +144,15 @@ test("an order's value with every digit it has: a nanometre isn't 0, π's approx
   assert.equal(formatValue(-570), "−570");
 });
 
-test("how long a duel has left, rounded up, as it reads after „Иво има“ and „има време“", () => {
+test("how long a duel has left, never a day more than there is, as it reads after „Иво има“ and „има време“", () => {
   const now = Date.UTC(2026, 10, 20, 12);
   const hour = 3_600_000;
   assert.equal(leftWords(now + 7 * 24 * hour, now), "още 7 дни");
-  assert.equal(leftWords(now + 24 * hour + 1, now), "още 2 дни");
+  assert.equal(leftWords(now + 7 * 24 * hour - 60_000, now), "още 7 дни", "a duel just sent");
+  assert.equal(leftWords(now + 24 * hour + 1, now), "още 1 ден");
+  assert.equal(leftWords(now + 29.3 * hour, now), "още 1 ден", "not two, five hours before it lapses");
+  assert.equal(leftWords(now + 48 * hour, now), "още 2 дни");
+  assert.equal(leftWords(now + 82.5 * hour, now), "още 3 дни");
   assert.equal(leftWords(now + 24 * hour, now), "още 24 часа");
   assert.equal(leftWords(now + 5 * hour - 1, now), "още 5 часа");
   assert.equal(leftWords(now + hour, now), "още 1 час");

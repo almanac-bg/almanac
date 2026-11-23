@@ -3,6 +3,7 @@ package play
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"strconv"
 )
 
@@ -170,4 +171,38 @@ func forgetDaysUncounted(tx *sql.Tx, id int64) error {
 		SELECT a.day FROM b JOIN active_days a ON a.day = b.day WHERE a.user_id = ?2 AND `+personDay+`)`,
 		dayBoundsJSON(first.String, last.String), id)
 	return err
+}
+
+// DayRuns are the ids of a player's games of the day, any day: what a sign-in's merge may leave behind (DaysLeft).
+func (g *Game) DayRuns(ctx context.Context, userID int64) ([]int64, error) {
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT id FROM runs WHERE user_id = ? AND kind = 'day'`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// DaysLeft is how many of a guest's games of the day (`runs`: DayRuns, before the sign-in) didn't come to the account
+// `to` with the rest (Merge): the account had played those days itself, so they went with the guest.
+func (g *Game) DaysLeft(ctx context.Context, to int64, runs []int64) (int, error) {
+	if len(runs) == 0 {
+		return 0, nil
+	}
+	ids, err := json.Marshal(runs)
+	if err != nil {
+		return 0, err
+	}
+	var carried int
+	err = g.DB.Read.QueryRowContext(ctx, `SELECT count(*) FROM runs WHERE user_id = ?
+		AND id IN (SELECT value FROM json_each(?))`, to, string(ids)).Scan(&carried)
+	return len(runs) - carried, err
 }

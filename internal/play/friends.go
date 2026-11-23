@@ -117,20 +117,17 @@ func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool)
 		if _, err := g.Friend(ctx, from, other); err == nil {
 			return Sent{Friends: true, Name: name}, nil
 		}
-		var asked bool // the other asked first: friends now
-		if err := g.DB.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM friend_requests WHERE from_id = ?
-			AND (to_id = ? OR to_email = ?))`, other, from, mine.String).Scan(&asked); err != nil {
-			return Sent{}, err
-		}
-		if asked {
-			if err := g.befriend(ctx, other, from); err != nil {
-				return Sent{}, err
-			}
-			return Sent{Friends: true, Name: name}, nil
-		}
 	}
 	var waiting bool // sent before, and waiting still
+	// The other asked first, or at the same moment (asked in this transaction, every write's in turn): friends now.
+	crossed := false
 	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		if other != 0 {
+			if err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM friend_requests WHERE from_id = ?
+				AND (to_id = ? OR to_email = ?))`, other, from, mine.String).Scan(&crossed); err != nil || crossed {
+				return err
+			}
+		}
 		var n int
 		if err := tx.QueryRow(`SELECT count(*), coalesce(sum(to_id = ?2), 0) > 0 FROM friend_requests WHERE from_id = ?1`,
 			from, other).Scan(&n, &waiting); err != nil {
@@ -149,6 +146,12 @@ func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool)
 			ON CONFLICT (from_id, to_id) WHERE to_id IS NOT NULL DO UPDATE SET at = excluded.at`, from, other, now)
 		return err
 	})
+	if err == nil && crossed {
+		if err := g.befriend(ctx, other, from); err != nil {
+			return Sent{}, err
+		}
+		return Sent{Friends: true, Name: name}, nil
+	}
 	if byEmail {
 		return Sent{}, err
 	}

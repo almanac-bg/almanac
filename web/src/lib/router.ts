@@ -270,6 +270,12 @@ function open(to: string, replace: boolean, tap: boolean, under = false): void {
     queueMicrotask(() => open(to, replace, tap, under));
     return;
   }
+  // Asked while a move through the history is under way (a game's end going back from its own entry: release): from
+  // where it arrives, or the entry it leaves (still the game's) would be gone back from twice, a step too far.
+  if (moves.length) {
+    settled(() => open(to, replace, tap, under));
+    return;
+  }
   const s = entry();
   if (s.game) {
     travel(-1, () => (!replace && s.from === to ? arrive() : open(to, replace, tap, true)));

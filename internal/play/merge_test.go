@@ -314,7 +314,11 @@ func TestMergeShadowsAGuestsDay(t *testing.T) {
 	w.dayGame(scout, nil, repeat(w.wrong, Length)...)
 	run := w.dayGame(best, nil)
 	w.dayGame(rival, nil, repeat(w.wrong, Length)...)
+	brought, _ := w.g.DayRuns(ctx, best)
 	w.fold(best, owner)
+	if n, err := w.g.DaysLeft(ctx, owner, brought); err != nil || n != 0 {
+		t.Fatalf("the guest's day brought: %d left behind, %v", n, err)
+	}
 	if w.shadow(run) != ShadowGuest {
 		t.Fatalf("the guest's day brought to the account: shadow %d", w.shadow(run))
 	}
@@ -327,7 +331,12 @@ func TestMergeShadowsAGuestsDay(t *testing.T) {
 	if s, err := w.g.Streak(ctx, owner); err != nil || s != 1 {
 		t.Fatalf("the account's streak: %d %v", s, err)
 	}
+	scouted, _ := w.g.DayRuns(ctx, scout)
 	w.fold(scout, owner)
+	// Said to the player as they sign in (server.verify): the game here came along, but not that day.
+	if n, err := w.g.DaysLeft(ctx, owner, scouted); err != nil || n != 1 {
+		t.Fatalf("a day the account had already: %d left behind, %v", n, err)
+	}
 	if n := w.count(`SELECT count(*) FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, owner, day); n != 1 {
 		t.Fatalf("the account has %d games of the day", n)
 	}

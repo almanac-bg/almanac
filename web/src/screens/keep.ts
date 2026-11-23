@@ -15,7 +15,7 @@ import { type Child, computed, h, onCleanup, signal, slot, when } from "../lib/d
 import { embedded, handMark, handToken, outsideLink } from "../lib/embedded.ts";
 import { askToKeep } from "../lib/keep.ts";
 import { fragment } from "../lib/router.ts";
-import { notice, type User, user } from "../state.ts";
+import { notice, setLook, type User, user } from "../state.ts";
 import { emailWords } from "../ui.ts";
 import { noEmail, noEmailLine, signIn } from "./signin.ts";
 
@@ -40,8 +40,9 @@ export function keepStake(days: () => number, streak: () => number): () => strin
 
 /** The line under the day's result that asks a guest to keep their game (keepStake), with the form a tap away; none in an app's
  * browser, where the way out is the result's action (exitWay). Quiet while the reminder by mail asks for the email
- * (`quiet`). Kept, it says so in its place. */
-export function keepLine(stake: () => string | null, quiet: () => boolean): Child {
+ * (`quiet`). Kept, it says so in its place; signed in to another profile, `signedIn` draws the page again as theirs,
+ * and the notice says so. */
+export function keepLine(stake: () => string | null, quiet: () => boolean, signedIn: () => void): Child {
   const open = signal(false);
   const said = signal("");
   const keep = (label: string) => h("button", { class: "link", type: "button", onclick: () => open.set(true) }, label);
@@ -61,7 +62,7 @@ export function keepLine(stake: () => string | null, quiet: () => boolean): Chil
                 form: "keep-line",
                 primary: false,
                 note: keepNote,
-                done: (s) => said.set(s),
+                done: (s, now) => (now.id === user.peek()?.id ? said.set(s) : told(signedIn)(s)),
               }),
             ),
           () => h("p", { class: "muted keep-line" }, stake, " ", keep("Запази я с имейл"), "."),
@@ -80,7 +81,8 @@ export interface MailPrefs {
 
 /** The day's reminder by mail (server/daymail.go), asked for where no notification can come here. A player with an
  * email turns it on with a tap; a guest gives one, and the code sent to it, which keeps their game too (`stake`,
- * said first, is what it risks till then). What came of it is said in its place. `no`: a „Не сега“ under it
+ * said first, is what it risks till then). What came of it is said in its place, or, the code signing in to another
+ * profile, by the notice as `signedIn` draws the page again as theirs (none: in place). `no`: a „Не сега“ under it
  * (Днес's ask); `folded`: the guest's form a tap away (Настройки, where the profile's own is further down);
  * `turning`: told as it's being turned on (before a guest's email is set as theirs); `yes`: told once it's on, with
  * the mail as it is now; `primary`: it's the page's one action (the first results'). */
@@ -91,7 +93,9 @@ export function mailAsk({
   turning,
   yes,
   primary = false,
+  signedIn,
 }: {
+  signedIn?: () => void;
   stake?: () => string | null;
   no?: () => void;
   folded?: boolean;
@@ -105,16 +109,16 @@ export function mailAsk({
   const saving = signal(false);
   const open = signal(!folded);
   const email = computed(() => user()?.email ?? "");
-  const turnOn = async (kept: string) => {
+  const turnOn = async (kept: string, other = false) => {
     saving.set(true);
     error.set("");
     turning?.();
     try {
       const r = await api<MailPrefs>("PATCH", "/api/mail/prefs", { kind: "day", on: true });
-      said.set(
-        `${kept || "Готово."} ${r.can ? "Ще ти напомняме по имейл, ако броят още те чака." : "Напомнянията ще идват като известия, както досега."}`,
-      );
+      const words = `${kept || "Готово."} ${r.can ? "Ще ти напомняме по имейл, ако броят още те чака." : "Напомнянията ще идват като известия, както досега."}`;
       yes?.(r);
+      if (other && signedIn) told(signedIn)(words);
+      else said.set(words);
     } catch (err) {
       error.set(errorText(err));
     } finally {
@@ -158,7 +162,7 @@ export function mailAsk({
               primary,
               send: "Напомняй ми по имейл",
               note: keepNote,
-              done: turnOn,
+              done: (kept, now) => void turnOn(kept, now.id !== user.peek()?.id),
             }),
             no ? h("div", { class: "remind-actions" }, nope()) : null,
           ],
@@ -350,8 +354,9 @@ export function takeHand(token: string, done: () => void): Child {
   };
   const take = async () => {
     const before = user.peek();
-    const r = await api<{ user: User }>("POST", "/api/auth/hand", { token });
+    const r = await api<{ user: User; avatar?: string }>("POST", "/api/auth/hand", { token });
     const same = before?.id === r.user.id;
+    setLook(r.avatar ?? "", r.user.id);
     user.set(r.user);
     if (!same) handedIn.set(true);
     finish(same ? "" : "Готово: играта ти е тук.");

@@ -560,8 +560,11 @@ func TestUnfriendEndsTheirDuels(t *testing.T) {
 			t.Fatalf("open duels left for %d: %+v", who, d)
 		}
 	}
-	if d, _ := w.g.DuelOf(ctx, bo, sent); d.State != DuelExpired {
-		t.Fatalf("the duel sent: %+v", d)
+	// Ended with the friendship, not let lapse: no one is said not to have played it in time.
+	for _, who := range []int64{ana, bo} {
+		if d, _ := w.g.DuelOf(ctx, who, sent); d.State != DuelExpired || d.Lapsed != "" {
+			t.Fatalf("the duel sent, as %d sees it: %+v", who, d)
+		}
 	}
 	if _, err := w.g.PlayDuel(ctx, bo, sent); !errors.Is(err, ErrDuelOver) {
 		t.Fatalf("a duel played after unfriending: %v", err)
