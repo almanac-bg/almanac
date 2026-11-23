@@ -211,7 +211,7 @@ export function today() {
     };
   };
   // The day's ten (or the rest of them) start after the count every game has, which „Отказ“ backs out of: nothing
-  // is sent before it runs out or „Започни сега“, so a tap by mistake costs nothing. What went wrong starting shows
+  // is sent before it runs out or „Веднага“, so a tap by mistake costs nothing. What went wrong starting shows
   // on the issue, back on Днес. They're played over Днес in an entry of their own (router.ts, hold): back,
   // mid-game, asks first, then comes to Днес, not out of the game.
   let counting = false;

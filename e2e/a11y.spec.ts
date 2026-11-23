@@ -51,7 +51,7 @@ for (const scheme of ["light", "dark"] as const) {
         // A chapter opened by its address: „Започни“ first, its count, then a question.
         if (path === "/play/geography") {
           await page.getByRole("button", { name: "Започни", exact: true }).click();
-          await page.getByRole("button", { name: "Започни сега" }).click();
+          await page.getByRole("button", { name: "Веднага" }).click();
           await expect(page.locator(".split, .options, .keypad, .tf-options, .match").first()).toBeVisible();
           await check();
         }

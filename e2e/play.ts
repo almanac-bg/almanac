@@ -132,14 +132,14 @@ export async function openGame(page: Page, path: string): Promise<void> {
   await page.goto(path);
   await page.getByRole("button", { name: "Започни", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await page.getByRole("button", { name: "Веднага" }).click();
 }
 
 /** Starts the day's ten from Днес (or the rest of them: „Продължи“), cutting its count short. */
 export async function startDay(page: Page, button = "Започни"): Promise<void> {
   await page.getByRole("button", { name: button, exact: true }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await page.getByRole("button", { name: "Веднага" }).click();
 }
 
 /** Plays a run's ten questions, solo: answer, see the answer (and its fact), and move on. Each question opens at the

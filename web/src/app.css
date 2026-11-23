@@ -7285,10 +7285,24 @@
       display: grid;
     }
 
-    /* The count before a run: in the middle of the screen it has to itself. */
+    /* The count before a run: its ring in the middle of the screen it has to itself, what it is over it, the ways on
+       under it. */
     .playing .get-ready {
       min-height: calc(100dvh - var(--app-top) - var(--app-foot));
       align-content: center;
+    }
+
+    .playing .get-ready:not(.start-screen) {
+      grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-content: stretch;
+    }
+
+    .playing .get-ready:not(.start-screen) > .intro {
+      align-self: end;
+    }
+
+    .playing .get-ready:not(.start-screen) > .actions {
+      align-self: start;
     }
 
     /* A run's question is a column the screen's height (run.ts): the head, the pips and the clock at the top, the

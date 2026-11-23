@@ -548,7 +548,7 @@ for (const size of sizes)
           );
           await page.goto("/play/history");
           await page.getByRole("button", { name: "Продължи", exact: true }).click();
-          await page.getByRole("button", { name: "Започни сега" }).click();
+          await page.getByRole("button", { name: "Веднага" }).click();
           const shot = async (name: string) => {
             const dir = process.env.FIT_SHOTS;
             if (dir)
@@ -834,7 +834,7 @@ test.describe("every kind of question at a phone's own large text, 24 and 32px, 
       await dealt(page, "history", ids);
       await page.goto("/play/history");
       await page.getByRole("button", { name: "Продължи", exact: true }).click();
-      await page.getByRole("button", { name: "Започни сега" }).click();
+      await page.getByRole("button", { name: "Веднага" }).click();
       for (let n = 0; n < ids.length; n++) {
         await expect(page.locator(".question-head")).toContainText(`${n + 1} от ${ids.length}`, { timeout: 10_000 });
         await each(`question ${n + 1}`);
@@ -862,7 +862,7 @@ test.describe("on a laptop, 1366 × 650", () => {
       );
       await page.goto("/play/history");
       await page.getByRole("button", { name: "Продължи", exact: true }).click();
-      await page.getByRole("button", { name: "Започни сега" }).click();
+      await page.getByRole("button", { name: "Веднага" }).click();
       for (const [n, { name, q }] of all.entries()) {
         const where = `${name} (${q.id})`;
         await expect(page.locator(".question-head")).toContainText(`${n + 1} от ${all.length}`, { timeout: 10_000 });
@@ -1146,7 +1146,7 @@ test.describe("the questions gone over, twice the text, 320 × 568", () => {
     );
     await page.goto("/play/history");
     await page.getByRole("button", { name: "Продължи", exact: true }).click();
-    await page.getByRole("button", { name: "Започни сега" }).click();
+    await page.getByRole("button", { name: "Веднага" }).click();
     for (const [n, { q }] of all.entries()) {
       await expect(page.locator(".question-head")).toContainText(`${n + 1} от ${all.length}`, { timeout: 10_000 });
       await expect(page.locator("article.question .answering")).toBeVisible();

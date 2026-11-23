@@ -186,7 +186,7 @@ test("a chapter's count can be backed out of, or cut short", async ({ page }) =>
   await expect(page).toHaveURL(/\/almanac\/history$/);
 
   await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await page.getByRole("button", { name: "Веднага" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10", { timeout: 1500 });
 });
 
@@ -278,7 +278,7 @@ test("a question left while its time runs: asked first, given up, and the chapte
   await expect(left).toContainText("История");
   await expect(left).toContainText(/Следва въпрос \d+\u00a0от\u00a010\./);
   await left.getByRole("link", { name: "Продължи" }).click();
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await page.getByRole("button", { name: "Веднага" }).click();
   // First, once, what the question given up was: its answer, without points; then on.
   const missed = page.locator(".given-up");
   await expect(missed).toContainText("Въпрос 2 от 10");

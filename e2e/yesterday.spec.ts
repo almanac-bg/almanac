@@ -42,7 +42,7 @@ test("yesterday's issue finished: the way on to today's asks for the day again",
   await yesterdayWaits(page, Date.now() + 10 * 60_000);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Десет въпроса от вчера");
   await page.getByRole("button", { name: /^(Започни|Продължи)$/ }).click();
-  const now = page.getByRole("button", { name: "Започни сега" });
+  const now = page.getByRole("button", { name: "Веднага" });
   if (await now.isVisible().catch(() => false)) await now.click();
   await playRun(page);
   const on = page.locator(".tomorrow");

@@ -34,7 +34,7 @@ test("Esc mid-question asks as the arrow out does, „Остани“ first; Esc
 }) => {
   await page.goto("/almanac/history");
   await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await page.getByRole("button", { name: "Веднага" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10");
   await expect(page.locator("article.question .answering")).toBeVisible();
   await page.keyboard.press("Escape");
@@ -53,7 +53,7 @@ test("the browser's back in a chapter asks, its address kept while it does; „�
 }) => {
   await page.goto("/almanac/history");
   await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await page.getByRole("button", { name: "Веднага" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10");
   // Back once, then again while it asks: the game's address stays, the question with it.
   for (let i = 0; i < 2; i++) {
@@ -81,7 +81,7 @@ test("a chapter counts in only after a tap; a reload goes back to its question, 
   await page.waitForTimeout(3500);
   await expect(page.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
   await page.getByRole("button", { name: "Започни", exact: true }).click();
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await page.getByRole("button", { name: "Веднага" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10");
   // A reload mid-question: straight back to it, its time still running (no count first): never more of it than before.
   const secsLeft = async () =>
@@ -124,6 +124,12 @@ test("„Отказ“ on the count of a chapter opened from outside comes back 
   for (const out of ["click", "Escape"]) {
     await begin.click();
     await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
+    // On a phone the count's ring is in the middle of the screen it has to itself.
+    if (out === "click") {
+      const ring = await page.locator(".ready-clock").boundingBox();
+      const height = page.viewportSize()?.height ?? 0;
+      expect(Math.abs((ring?.y ?? 0) + (ring?.height ?? 0) / 2 - height / 2)).toBeLessThan(24);
+    }
     if (out === "click") await page.getByRole("button", { name: "Отказ", exact: true }).click();
     else await page.keyboard.press("Escape");
     await expect(begin).toBeVisible();

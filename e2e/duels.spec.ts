@@ -7,7 +7,7 @@ import { answer, befriend, endedBefore, meetAs, moveOn, playRun, startDay } from
 /** A game opened by a tap: its count, cut short. */
 async function countIn(page: Page): Promise<void> {
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await page.getByRole("button", { name: "Веднага" }).click();
 }
 
 /** Does what loads a page, and waits until it has asked whether something has come to Приятели (the dot). */

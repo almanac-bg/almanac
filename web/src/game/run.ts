@@ -258,7 +258,7 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
     h(
       "div",
       { class: "actions" },
-      h("button", { class: "btn primary big", onclick: begin }, "Започни сега"),
+      h("button", { class: "btn primary big", onclick: begin }, "Веднага"),
       h("button", { class: "btn", onclick: () => leave(cancel) }, "Отказ"),
     ),
   );
