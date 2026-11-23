@@ -156,8 +156,13 @@ export function ask(
 export function answered(view: View, reveal: Reveal, given: Answer | null, how?: VerdictKind): Child {
   const a = ask(view, () => {}, signal(true), undefined, true);
   a.reveal(reveal, given, undefined, how);
-  if (a.node instanceof Element)
+  if (a.node instanceof Element) {
     a.node.querySelector(".option.tf.right")?.append(h("small", { class: "tf-right" }, "верният отговор"));
+    // Shown, not answered: its options, rows and keys do nothing, so the keyboard passes them by (ten questions' worth
+    // were some forty stops on the way through the questions' dialog); a screen reader still reads them. A link (a
+    // picture's credit) stays one.
+    for (const el of a.node.querySelectorAll<HTMLElement>("button, [tabindex]")) el.tabIndex = -1;
+  }
   return a.node;
 }
 

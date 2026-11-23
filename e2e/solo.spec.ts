@@ -24,6 +24,15 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(review.locator(".reviewed")).toHaveCount(10);
   await expect(review.locator(".review-of")).toHaveText(/^Брой\s\d+ · \d+ \S+ · \d+ от 10$/);
   await expect(review.locator(".lit")).toHaveCount(0);
+  // Shown, not answered: no answer, row or key in it is a stop for the keyboard (they do nothing).
+  const stops = await review.evaluate(
+    (d) =>
+      [...d.querySelectorAll<HTMLElement>("button, a[href], input, [tabindex]")].filter(
+        (e) =>
+          e.tabIndex >= 0 && e.closest(".options, .tf-options, .sortable-list, .match, .split, .split-board, .keypad"),
+      ).length,
+  );
+  expect(stops, "the answers gone over as stops for the keyboard").toBe(0);
   await review.getByRole("button", { name: "Затвори" }).click();
   await expect(review).toHaveCount(0);
   await expect(page.locator(".result .reviewed")).toHaveCount(0);
