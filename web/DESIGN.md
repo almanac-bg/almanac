@@ -65,17 +65,21 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   - On a phone the cover is under half the screen (its date sized by the height), so that „Започни“ is whole by 500px
     on 320 × 568 and 540px on 375 × 600 (`layout.spec.ts`). With large text its display type stays near its usual size
     (the date by the height) and „Около три минути“ gives way (`.issue-time`), so the cover never fills the screen.
-  - The streak (`.streak-chip`): the flame, the number and „дни без прекъсване“ (one: „ден“), from three days; under it one line: what
-    came of the days just missed (told once), a day the week forgave, or while the day waits what it makes of the
-    streak (`stakeLine`). Below three days, what came of the days just missed is that line on its own, in the
-    streak's place (`.streak-notice`).
+  - The streak (`.streak-chip`): the flame, the number and „дни без прекъсване“ (one: „ден“), from its first day (owner,
+    2026-11-23: a player's second day showed nothing of the first; now „1 ден без прекъсване · С днешния брой серията
+    ти става 2.“); under it one line: what came of the days just missed (told once), a day the week forgave, or while
+    the day waits what it makes of the streak (`stakeLine`). With no streak running, what came of the days just missed
+    is that line on its own, in the streak's place (`.streak-notice`).
+  - A friend's duel waiting (`.duel-waiting`, owner, 2026-11-23), under the streak: the sender's avatar, „Иво ти
+    изпрати дуел.“ („Още 2 те чакат.“, a link to Приятели, while more do) and „Играй“ at its end, an outlined button to
+    the first sent (`/duel/<id>`): never the cover's action, which is the day's ten.
   - On a big screen, under them, „В броя“: the ten chapters in their order.
   - A new visitor: the cover, „Започни“, and under it „Едни и същи за цяла България.“ In an app's own browser, one
     line under „Започни“: on Android „Имаш игра в браузъра? Отвори я там“, a tap that opens it; on an iPhone, where no
     link can, „Имаш игра в браузъра? Отвори я там: ··· → Отвори в Safari“, no button (`coverExit`).
   - Nothing over the issue but what came of the player's own step (a profile signed in to, a game brought here).
-    Others' news is Приятели's: its dot for a request, a duel or a duel's result since the last look, its line for a
-    friend's yes.
+    Others' news is Приятели's (its dot for a request, a duel or a duel's result since the last look, its line for a
+    friend's yes), but for a friend's duel waiting, under the streak.
 - **The day's result** (Днес once the day is played). On a big screen the player's own day (1–5) is the left page and
   the day's board (6) the right one, the room to itself:
   1. The score on a sheet of the issue's first chapter: „Брой 9 · 20 ноември“, the score as the hero numeral „7 от
@@ -99,7 +103,9 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      links („Нови печати: „Страница“ в География и в Технологии и игри.“; one chapter's: its ladder under it). No
      single question picked out of the ten (the day's ten are all a tap away, in their dialog), and no one chapter's
      bar beside the day's whole ink: next to it, either reads as the day's ink.
-  4. The action, past the first results: „Сподели“.
+  4. The action, past the first results: „Сподели“; while a friend's duel waits, that duel („Играй дуела с Иво“, the
+     first sent), sharing then the quiet link beside the tiles (owner, 2026-11-23). Over it, the streak as the cover has
+     it, lit, with today's in it („30 дни без прекъсване“; owner, 2026-11-23: it grew out of sight).
   5. Nothing of tomorrow (no „Утре“ card: the result is the day's). Past the first results, a guest's ask to keep the
      game and the reminder's ask while reminders are off, a player with a profile's too (a plain button, never a second
      action; three times at most, once a day), in a card of their own with no heading, none when neither is asked.

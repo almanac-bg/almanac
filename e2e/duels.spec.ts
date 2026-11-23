@@ -2,7 +2,7 @@
 // sent, played back when the friend can, its end on its row in Приятели (there is no page of a duel's result), with
 // its questions in their dialog, on any day. Приятели is one page: the duels waiting, the friends, the duels played.
 import { expect, type Page, test } from "@playwright/test";
-import { answer, befriend, endedBefore, meetAs, moveOn, playRun } from "./play.ts";
+import { answer, befriend, endedBefore, meetAs, moveOn, playRun, startDay } from "./play.ts";
 
 /** A game opened by a tap: its count, cut short. */
 async function countIn(page: Page): Promise<void> {
@@ -234,6 +234,14 @@ test("every duel to play is in one stack, the first challenged on top, played fr
   await expect(a.locator(".duel-pile")).toHaveCount(0);
   await send(c, "Цвети", 0);
 
+  // Днес says so too, under the streak: the first sent, from whom, how many more; never the cover's action.
+  await b.goto("/");
+  const onDay = b.locator(".duel-waiting");
+  await expect(onDay).toContainText("Ана ти изпрати дуел. Още 3 те чакат.");
+  await expect(onDay.getByRole("link", { name: /^Играй/ })).toHaveAttribute("href", `/duel/${sentIds[0]}`);
+  await expect(onDay.getByRole("link", { name: /^Играй/ })).not.toHaveClass(/primary/);
+  await expect(b.getByRole("button", { name: "Започни" })).toHaveClass(/primary/);
+
   // Bo: all four in one stack, whoever sent them, the first challenged on top with „Играй“, the edges of more under it.
   await b.goto("/friends");
   const pile = b.locator(".duels-open .duel-pile");
@@ -264,6 +272,15 @@ test("every duel to play is in one stack, the first challenged on top, played fr
   await expect(landed).toHaveClass(/\blanded\b/);
   await expect(landed).toHaveClass(/s-(won|lost|draw)/);
   await expect(landed).toBeInViewport();
+
+  // His day played: the result's action is the next duel waiting, sharing a quiet link beside the tiles.
+  await b.goto("/");
+  await startDay(b);
+  await playRun(b);
+  await expect(b.getByRole("link", { name: "Играй дуела с Ана" })).toHaveClass(/primary/);
+  await expect(b.getByRole("link", { name: "Играй дуела с Ана" })).toHaveAttribute("href", `/duel/${sentIds[1]}`);
+  await expect(b.locator(".result-share-link")).toBeVisible();
+  await expect(b.locator(".result-share-go")).toHaveCount(0);
 });
 
 test("a duel left before its first question isn't „Твой ред“; one begun goes on with its own run from „Играй“", async ({

@@ -84,7 +84,8 @@ packages' doc comments; this file holds only what must not drift.
     Профил names the book's whole ink beside „Печати“ (2026-11-22): it is ink, summed, earned only by the day's issue,
     so it adds no second score.
   - **The streak counts days the issue was played** and forgives up to two missed days a week by itself; an ended
-    streak's number is never named.
+    streak's number is never named. Днес shows it from its first day (2026-11-23, the owner: a player's second day,
+    the one that decides whether they stay, showed nothing of the first), and on the result too.
   - **Duels on one's own time, with a friend,** challenged directly: „Дуел“ on their row in Приятели or on their
     profile, the only ways (2026-11-22, the owner: the duel against a recording of another's game is gone, and „Нов
     дуел“, its picker, with it). The friend has 7 days. Three sent to one friend wait at most: no fourth until they play
@@ -105,6 +106,9 @@ packages' doc comments; this file holds only what must not drift.
     finished duel comes to it there. The played list is the last ten, and says so („Последните 10 изиграни дуела“); all
     of them open from under it in a dialog, a page at a time (2026-11-22, the owner). A duel the player sent and the
     friend hasn't played isn't listed: it's the friend's to do (2026-11-22, the owner: it only muddled the list).
+    A friend's duel waiting for the player is on Днес too (2026-11-23, the owner): under the streak on the cover,
+    „Играй“ beside it; once the day is played, it is the result's action, „Сподели“ then a quiet link. It's the one
+    piece of others' news on Днес: a duel waits on the player, and asks for the same few minutes the day does.
   - **Friends** are added by username or email, a request the other says yes to. The personal invite link was removed
     (21 Nov): little use, much machinery; friends come by username or email.
   - **Приятели's dot is news since the player last looked there** (2026-11-21), on any device: a friend request, a
@@ -113,7 +117,9 @@ packages' doc comments; this file holds only what must not drift.
     a result never lit it. A duel to play stays first in Приятели until it's played; the ping is for news arriving.
   - **Sharing:** the score and its tiles, never the answers, unsigned, with a way into the same ten.
   - **A result has a budget:** the score and tiles, what the day wrote in the book (its ink by chapter, a rank risen:
-    2026-11-22, no single question picked out of the ten), one action, the
+    2026-11-22, no single question picked out of the ten), the streak with today's in it (2026-11-23, the owner: it
+    grew out of sight once the „Утре“ card went), one action (a friend's duel waiting, else „Сподели“: 2026-11-23, the
+    owner), the
     day's board (no „Утре“ card, nothing of tomorrow's issue: 2026-11-22, the owner: superfluous) (Всички · Приятели); with a crowd, how Bulgaria did that day („средно 6,2“). Everything else is in the
     questions' dialog, off the page: one dialog for every game's questions (the day's, a chapter's game's, a
     duel's), opened by „Прегледай въпросите“, by the score's card, and by a tile at its question (2026-11-22, the

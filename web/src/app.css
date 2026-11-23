@@ -5718,6 +5718,27 @@
     font: var(--t-note);
   }
 
+  /* A friend's duel waiting, under the streak: the sender's face, the line, „Играй“ at its end (never the cover's
+     action: an outlined button). */
+  .duel-waiting {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--r-3);
+    background: var(--surface);
+  }
+
+  .duel-waiting-text {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+  }
+
+  .duel-waiting-text a {
+    color: var(--ink-2);
+  }
+
   /* ---- The day's result, in its budget's order: the score on its sheet, what the day wrote in the book, the friends,
      the action, tomorrow; the questions and their facts a tap away, in their dialog ---- */
 

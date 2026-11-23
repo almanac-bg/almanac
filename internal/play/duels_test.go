@@ -637,3 +637,54 @@ func TestDuelsPlayedByPage(t *testing.T) {
 		t.Fatalf("none: %+v", p)
 	}
 }
+
+// Днес names a friend's duel waiting for the player (DuelsWaiting): none before it's sent, the earliest sent while
+// several wait and how many more, and none once played, whether it waits for the friend or has a result.
+func TestDuelsWaiting(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo, cy := w.user(), w.user(), w.user()
+	w.befriend(ana, bo)
+	w.befriend(cy, bo)
+	waiting := func(user int64) *Waiting {
+		t.Helper()
+		got, err := w.g.DuelsWaiting(ctx, user)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+	first, err := w.g.DuelFriend(ctx, ana, bo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, err := w.g.PlayDuel(ctx, ana, first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := waiting(bo); got != nil {
+		t.Fatalf("waiting before it's sent: %+v", got)
+	}
+	w.play(ana, run, repeat(w.right, Length)...)
+	w.wait(time.Minute)
+	later, err := w.g.DuelFriend(ctx, cy, bo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.playSide(cy, later, repeat(w.right, Length))
+	got := waiting(bo)
+	if got == nil || got.ID != first || got.More != 1 || got.From == nil || got.From.ID != ana {
+		t.Fatalf("waiting for Bo: %+v, want duel %d from Ana and one more", got, first)
+	}
+	if got := waiting(ana); got != nil {
+		t.Fatalf("Ana's sent duel waits for her: %+v", got)
+	}
+	w.playSide(bo, first, repeat(w.wrong, Length))
+	if got := waiting(bo); got == nil || got.ID != later || got.More != 0 {
+		t.Fatalf("after playing Ana's, waiting: %+v, want Cy's %d alone", got, later)
+	}
+	w.playSide(bo, later, repeat(w.wrong, Length))
+	if got := waiting(bo); got != nil {
+		t.Fatalf("all played, still waiting: %+v", got)
+	}
+}
