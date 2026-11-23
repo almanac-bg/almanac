@@ -549,6 +549,20 @@ export function upNext(ms: number, label: string): Child {
   );
 }
 
+/** The game held from moving on by itself (a touch of the answer's panel): its line stops where it is, and says the
+ * way on instead. */
+function stayOn(panel: HTMLElement): void {
+  const line = panel.querySelector<HTMLElement>(".up-next");
+  const fill = line?.querySelector<HTMLElement>(".up-next-fill");
+  if (!line || !fill) return;
+  const now = getComputedStyle(fill).transform;
+  fill.style.transition = "none";
+  fill.style.transform = now === "none" ? "" : now;
+  line.classList.add("held");
+  const label = line.querySelector(".up-next-label");
+  if (label) label.textContent = "Продължаваш с „Напред“.";
+}
+
 /** A question of a run, asked and answered; `taken` hears where the run stands once its answer is in. */
 function question(
   s: State,
@@ -582,11 +596,17 @@ function question(
     due = null;
     go();
   };
-  document.addEventListener("visibilitychange", moveOn);
+  // On by itself, unless the player has taken hold of the answer (a touch, a scroll of its panel): then it waits for
+  // „Напред“.
+  let waits = false;
+  const onItsOwn = () => {
+    if (!waits) moveOn();
+  };
+  document.addEventListener("visibilitychange", onItsOwn);
   onCleanup(() => {
     clearTimeout(advance);
     for (const t of shown) clearTimeout(t);
-    document.removeEventListener("visibilitychange", moveOn);
+    document.removeEventListener("visibilitychange", onItsOwn);
   });
 
   // A step of the answer's showing, `ms` after its first; with less motion, at once.
@@ -710,7 +730,16 @@ function question(
         ans.heading.dispatchEvent(new Event("refit"));
       });
       say(spokenVerdict(kind, q.view, res.reveal));
-      advance = window.setTimeout(moveOn, lasts);
+      advance = window.setTimeout(onItsOwn, lasts);
+      // The first touch or scroll of the panel (but „Напред“'s own) holds it: the line stops, and says the way on.
+      const holdIt = (e: Event) => {
+        if ((e.target as Element | null)?.closest?.(".up-next-go")) return;
+        for (const type of ["pointerdown", "wheel"]) after.removeEventListener(type, holdIt);
+        waits = true;
+        clearTimeout(advance);
+        stayOn(after);
+      };
+      for (const type of ["pointerdown", "wheel"]) after.addEventListener(type, holdIt, { passive: true });
     });
     at(beats.crowd, () => shows(crowd));
     at(beats.fact, () => {

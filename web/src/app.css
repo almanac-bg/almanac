@@ -7424,7 +7424,12 @@
       display: inline;
     }
 
-    /* The line that fills while the answer shows runs along the panel's top edge; „Напред“ says the rest. */
+    /* The line that fills while the answer shows runs along the panel's top edge, what it does said in small words
+       under its end (held, the way on instead: run.ts, stayOn), over the verdict's row. */
+    .run-question .after:has(> .up-next) {
+      padding-top: calc(var(--space-4) + 1.0625rem);
+    }
+
     .run-question .after .up-next {
       position: absolute;
       top: 0;
@@ -7434,10 +7439,12 @@
 
     .run-question .after .up-next-label {
       position: absolute;
-      width: 1px;
-      height: 1px;
+      top: 6px;
+      right: 0;
+      max-width: 100%;
       overflow: hidden;
-      clip-path: inset(50%);
+      font: var(--t-fine);
+      text-overflow: ellipsis;
       white-space: nowrap;
     }
 

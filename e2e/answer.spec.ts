@@ -331,3 +331,26 @@ test("the answers' shares add up: those that ran out of time are said under them
   await expect(page.locator(".crowd-share").first()).toBeVisible();
   await expect(page.locator(".crowd-none")).toHaveCount(0);
 });
+
+test("a touch of the answer's panel holds the game there, its line saying so: it waits for „Напред“", async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  await page.goto("/");
+  await startDay(page);
+  await expect(page.locator(".question-head")).toContainText("1 от 10");
+  await answer(page);
+  const go = page.locator(".after .up-next-go");
+  await expect(go).toBeVisible({ timeout: 10_000 });
+  // On a phone too, the line says what it does.
+  const label = page.locator(".after .up-next-label");
+  await expect(label).toBeVisible();
+  await expect(label).toContainText("след малко");
+  await page.locator(".after .verdict").dispatchEvent("pointerdown");
+  await expect(label).toHaveText("Продължаваш с „Напред“.");
+  // Past the longest it would wait on its own (a choice's: 3 s and a fact's 9 s at most, from its beat).
+  await page.waitForTimeout(13_000);
+  await expect(page.locator(".question-head")).toContainText("1 от 10");
+  await go.click();
+  await expect(page.locator(".question-head")).toContainText("2 от 10", { timeout: 10_000 });
+});
