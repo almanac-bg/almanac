@@ -5,8 +5,8 @@
 // (the card itself leads nowhere); and, once the player's own game is played, a tap anywhere on it but a name opens its
 // questions in their dialog (results.ts, reviewSheet), on any day (play.Review). A new duel starts from a friend's row
 // (or their profile), never from a card. Every duel the player has to play is in one stack (owner, 2026-11-22), in the
-// order they were challenged: the first on top, the rest under it as the edges of sheets, and „Виж всички“ on it
-// opens them all in a dialog, in the same order, each with its own „Играй“. The duel just played, or named by an old
+// order they were challenged: the first on top, its „Играй“ the way in, the rest under it as the edges of sheets
+// (no list of them: one is played at a time, the next comes up). The duel just played, or named by an old
 // link to it (`top`), comes first in its own group (a result first of the played, one sent first of those waiting for a
 // friend), in sight, and its score counts up once as it lands (feel.ts: duel), never again.
 //
@@ -34,7 +34,6 @@ let {
   play,
   reviewSheet,
   signal,
-  playerRow,
   withWord,
 } = {} as Kit;
 
@@ -163,11 +162,11 @@ function questions(d: DuelView): void {
 }
 
 /** „Играй“, a link to a duel's game (`first`: the page's one action, filled; else outlined). */
-const playLink = (d: DuelView, first: boolean, cls = ""): Child =>
+const playLink = (d: DuelView, first: boolean): Child =>
   h(
     "a",
     {
-      class: `btn${first ? " primary" : ""} duel-card-go${cls ? ` ${cls}` : ""}`,
+      class: `btn${first ? " primary" : ""} duel-card-go`,
       href: `/duel/${d.id}`,
       "aria-label": `Играй дуела ${withWord(d.opponent?.name ?? "")}`,
     },
@@ -179,8 +178,7 @@ const playLink = (d: DuelView, first: boolean, cls = ""): Child =>
  * line (noteLine). Theirs to play, „Играй“ at its foot, the card's one way to its game (`play`: the first, filled; the
  * card itself leads nowhere). Once the player's own game in it is played, a button laid over the whole card opens its
  * questions, nothing on it to say so but its light under a pointer. `stack`: the duels to play
- * (all of them, it the first), the edges of sheets under the card and „Виж всички (3)“ under its „Играй“, which opens
- * them in a dialog. `top`: the duel named in the address, shown in sight, its result landing as a moment, once. */
+ * (all of them, it the first), the edges of sheets under the card. `top`: the duel named in the address, shown in sight, its result landing as a moment, once. */
 function duelCard(d: DuelView, play = false, stack: DuelView[] = [], top = false): Child {
   const them = d.opponent;
   const note = noteLine(d);
@@ -196,25 +194,7 @@ function duelCard(d: DuelView, play = false, stack: DuelView[] = [], top = false
     ),
     marksRows(d),
     note ? h("span", { class: "duel-card-note" }, note) : null,
-    d.state === "yours"
-      ? h(
-          "span",
-          { class: "duel-card-acts" },
-          playLink(d, play),
-          stack.length > 1
-            ? h(
-                "button",
-                {
-                  class: "btn duel-stack-open",
-                  type: "button",
-                  "aria-haspopup": "dialog",
-                  onclick: () => choose(stack),
-                },
-                `Виж всички (${formatNumber(stack.length)})`,
-              )
-            : null,
-        )
-      : null,
+    d.state === "yours" ? playLink(d, play) : null,
     d.state !== "yours" && d.you?.done && d.runId
       ? h(
           "button",
@@ -226,50 +206,6 @@ function duelCard(d: DuelView, play = false, stack: DuelView[] = [], top = false
   if (top) shownNamed(card, d);
   const more = stack.length - 1;
   return h("li", more > 0 ? { class: "duel-pile", "data-more": Math.min(more, 2) } : null, card);
-}
-
-/** The duels to play, in a dialog over the page, to choose which: in the stack's order (the first challenged first),
- * each who it's with (the name, no link), how long is left, and its own „Играй“. */
-function choose(stack: DuelView[]): void {
-  const box = h(
-    "dialog",
-    { class: "sheet duel-stack", "aria-labelledby": "duel-stack-title" },
-    h(
-      "div",
-      { class: "sheet-panel" },
-      // Its head as every sheet's that's gone through (the questions', the avatars'): the title, „Затвори“ beside it.
-      h(
-        "div",
-        { class: "sheet-head" },
-        h("h2", { id: "duel-stack-title" }, `Чакат те ${formatNumber(stack.length)} дуела`),
-        h("button", { class: "link", type: "button", onclick: () => box.close() }, "Затвори"),
-      ),
-      h(
-        "ol",
-        { class: "rows duel-stack-list" },
-        // Each a row as a friend's in Приятели (ui.ts, playerRow): the avatar, the name (no link), how
-        // long is left on the line under it, „Играй“ at its end.
-        stack.map((d) =>
-          playerRow(
-            "friend duel-stack-row",
-            { name: d.opponent?.name ?? "", avatar: d.opponent?.look?.avatar },
-            undefined,
-            nameWords(d.opponent?.name ?? "Съперник"),
-            d.first ? `Довърши своята игра · ${leftWords(d.until ?? 0)}` : leftWords(d.until ?? 0),
-            null,
-            playLink(d, false, "inline friend-act"),
-          ),
-        ),
-      ),
-    ),
-  ) as HTMLDialogElement;
-  // A tap beside the sheet puts it away, as Esc does; put away, it goes (the router closes it with the screen).
-  box.addEventListener("click", (e) => {
-    if (e.target === box) box.close();
-  });
-  box.addEventListener("close", () => box.remove());
-  document.body.append(box);
-  box.showModal();
 }
 
 /** Every duel the player has played, in a dialog over the page, a page of ten at a time (play.DuelsPlayed), the latest
@@ -424,7 +360,6 @@ export function duelGroup(
     play,
     reviewSheet,
     signal,
-    playerRow,
     withWord,
   } = kit);
   sighted = sight;

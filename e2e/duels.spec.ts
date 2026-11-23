@@ -179,7 +179,7 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await expect(sheet.getByRole("alert")).toHaveCount(0);
 });
 
-test("every duel to play is in one stack, the first challenged on top, chosen from in a dialog; played back, first of the played", async ({
+test("every duel to play is in one stack, the first challenged on top, played from it; played back, first of the played", async ({
   browser,
 }) => {
   test.setTimeout(420_000);
@@ -218,31 +218,12 @@ test("every duel to play is in one stack, the first challenged on top, chosen fr
   await expect(b.locator(".duels-open h2")).toHaveText("Чакащи дуели (4)");
   await expect(pile.locator(".duel-card")).toHaveClass(/\bturn\b/);
   await expect(pile.locator(".duel-card-go")).toHaveText("Играй");
-  // „Виж всички“, under „Играй“, opens them all in a dialog, in the stack's order, each with who sent it and its own „Играй“.
-  await pile.getByRole("button", { name: "Виж всички (4)" }).click();
-  const choose = b.getByRole("dialog", { name: "Чакат те 4 дуела" });
-  const rows = choose.locator(".duel-stack-row");
-  await expect(rows).toHaveCount(4);
-  // Their links read by CSS: evaluateAll under a dialog found by its name crashes Firefox's page (its name worked out
-  // in the page's own world), though the same count, or the same links by CSS, don't.
-  expect(
-    await b
-      .locator("dialog.duel-stack .duel-stack-row .duel-card-go")
-      .evaluateAll((els) => els.map((el) => el.getAttribute("href"))),
-  ).toEqual(sentIds.map((id) => `/duel/${id}`));
-  await expect(rows.locator(".friend-name")).toHaveText(["Ана", "Ана", "Ана", "Цвети"]);
-  await expect(rows.locator("a.friend-name")).toHaveCount(0);
-  await choose.locator(".sheet-head").getByRole("button", { name: "Затвори" }).click();
-  await expect(choose).toHaveCount(0);
-  // He chooses Cy's, the last.
-  await pile.getByRole("button", { name: "Виж всички (4)" }).click();
-  await rows
-    .last()
-    .getByRole("link", { name: /^Играй/ })
-    .click();
-  await expect(b).toHaveURL(new RegExp(`/duel/${sentIds[3]}$`));
+  // No list of them: one is played at a time, the top one.
+  await expect(pile.getByRole("button", { name: /Виж всички/ })).toHaveCount(0);
+  await pile.getByRole("link", { name: /^Играй/ }).click();
+  await expect(b).toHaveURL(new RegExp(`/duel/${sentIds[0]}$`));
   await countIn(b);
-  await playSecond(b, "Цвети");
+  await playSecond(b, "Ана");
 
   // Its end: first of the played, at the page's foot, under the three still waiting (the stack) and the friends, and
   // brought into sight.
@@ -250,11 +231,10 @@ test("every duel to play is in one stack, the first challenged on top, chosen fr
   const waiting = b.locator(".duels-open");
   const playedOnes = b.locator(".duels-played");
   await expect(waiting.getByRole("heading")).toHaveText("Чакащи дуели (3)");
-  await expect(waiting.locator(".duel-pile .duel-card")).toHaveAttribute("id", `duel-${sentIds[0]}`);
-  await expect(waiting.getByRole("button", { name: "Виж всички (3)" })).toBeVisible();
+  await expect(waiting.locator(".duel-pile .duel-card")).toHaveAttribute("id", `duel-${sentIds[1]}`);
   await expect(playedOnes.getByRole("heading")).toHaveText("Изиграни дуели");
   const landed = playedOnes.locator(".duel-card").first();
-  await expect(landed).toHaveAttribute("id", `duel-${sentIds[3]}`);
+  await expect(landed).toHaveAttribute("id", `duel-${sentIds[0]}`);
   await expect(landed).toHaveClass(/\blanded\b/);
   await expect(landed).toHaveClass(/s-(won|lost|draw)/);
   await expect(landed).toBeInViewport();
