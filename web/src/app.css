@@ -3761,6 +3761,17 @@
     .segmented button {
       padding-inline: 8px;
     }
+
+    /* „Като устройството“ whole (a few px short with Linux's fonts broke it in two); with large text the switch
+       wraps its choices instead (.tight, below). */
+    :root:not(.tight) .segmented button {
+      white-space: nowrap;
+    }
+
+    .segmented {
+      gap: 2px;
+      padding: 3px;
+    }
   }
 
   .segmented button:is([aria-selected="true"], [aria-checked="true"]) {
@@ -4106,6 +4117,7 @@
     opacity: 0;
     pointer-events: none;
     animation: lit 1.8s ease-out;
+    animation-delay: var(--lit-from, 0s); /* drawn anew mid-fade: on from where it was (duelcards.ts) */
   }
 
   @keyframes lit {

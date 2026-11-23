@@ -287,7 +287,10 @@ function allPlayed(): void {
 
 /** Whether the duel named in the address was brought into sight on this visit to the page (duelGroup's `sight`): once,
  * as the page opens, never as the lists are drawn anew under the player. */
-let sighted: { done: boolean } = { done: true };
+let sighted: { done: boolean; at?: number } = { done: true };
+
+/** How long a card's mark lasts (app.css, .lit). */
+const litMs = 1800;
 
 /** The duel named in the address, as its card is drawn: brought into sight once (a result may be under those
  * waiting, out of a phone's screen), then its result landing (land). */
@@ -295,8 +298,17 @@ function shownNamed(card: HTMLElement, d: DuelView): void {
   const sight = sighted;
   requestAnimationFrame(() => {
     if (!card.isConnected) return;
-    if (!sight.done) {
+    if (sight.done) {
+      // Drawn anew while it's still marked (the page drawn from what it showed last, then from the server's answer):
+      // marked on, its fade where it was, not lost with the card it was on.
+      const since = sight.at === undefined ? Number.POSITIVE_INFINITY : performance.now() - sight.at;
+      if (since < litMs) {
+        card.style.setProperty("--lit-from", `-${Math.round(since)}ms`);
+        card.classList.add("lit");
+      }
+    } else {
       sight.done = true;
+      sight.at = performance.now();
       // One just finished: the finished ones from their head at the screen's top, it first among them, marked for a
       // moment (as a fact the day wrote is in its chapter: app.css, .lit); one waiting, in sight.
       const finished = card.closest<HTMLElement>(".duels-played");
@@ -354,7 +366,7 @@ export function duelGroup(
   d: Duels,
   top: DuelView | null,
   under: Child = null,
-  sight: { done: boolean } = { done: true },
+  sight: { done: boolean; at?: number } = { done: true },
 ): Child {
   ({
     api,
