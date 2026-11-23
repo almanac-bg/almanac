@@ -178,6 +178,9 @@ func checkQuestion(q Question, today string) (errs []string, warnings []Problem)
 	if m, ok := q.(*Match); ok && m.Decoy == "" && !t.Retired && t.Added >= DecoysFrom {
 		errs = append(errs, "a match added since "+DecoysFrom+" needs a decoy")
 	}
+	if off, ok := Off[h.Type]; ok && t.Added >= off && !t.Retired {
+		errs = append(errs, "no new "+h.Type+" question is written: the kind is off since "+off+" (bank.Off)")
+	}
 	if t.ReviewBy != "" && t.ReviewBy <= today && !t.Retired {
 		warnings = append(warnings, Problem{Rule: RuleReview, Msg: "due for review since " + t.ReviewBy})
 	}

@@ -2,6 +2,7 @@ package bank
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -22,13 +23,33 @@ func loadSample(t *testing.T) *Bank {
 	return b
 }
 
+// ofType are a bank's questions of a kind, not retired, of a kind Off too (Live leaves those out): what a play already
+// dealt one still shows.
+func ofType(b *Bank, typ string) []Question {
+	var out []Question
+	for _, q := range b.Questions {
+		if q.Base().Type == typ && !q.Extra().Retired {
+			out = append(out, q)
+		}
+	}
+	return out
+}
+
+// allOn deals every kind for the rest of a test, those Off too: a test of what the rules make of a kind while it's
+// dealt. Not in a parallel test: Off is the package's.
+func allOn(t *testing.T) {
+	off := Off
+	Off = map[string]string{}
+	t.Cleanup(func() { Off = off })
+}
+
 func TestSampleLoads(t *testing.T) {
 	b := loadSample(t)
 	if len(b.Categories) == 0 || len(b.Questions) < 100 {
 		t.Fatalf("a thin sample: %d categories, %d questions", len(b.Categories), len(b.Questions))
 	}
 	for _, typ := range Types() {
-		if len(b.Live("", typ)) == 0 {
+		if len(ofType(b, typ)) == 0 {
 			t.Errorf("the sample has no %s question: every type needs one to develop and test with", typ)
 		}
 	}
@@ -113,7 +134,7 @@ func TestDealsAreStableAndShuffled(t *testing.T) {
 func TestKeepersFieldsStayInTheBank(t *testing.T) {
 	b := loadSample(t)
 	for _, typ := range Types() {
-		q := b.Live("", typ)[0]
+		q := ofType(b, typ)[0]
 		tail := q.Extra()
 		tail.Sources, tail.Checked, tail.CheckedBy = []string{"https://example.org/source"}, "2026-11-17", "keepers-only"
 		d := q.Deal(1)
@@ -134,7 +155,7 @@ func TestDaysLineOnlyOnItsDay(t *testing.T) {
 	b := loadSample(t)
 	const line = "На 16 декември 1982 г. умира Колин Чапман."
 	for _, typ := range Types() {
-		q := b.Live("", typ)[0]
+		q := ofType(b, typ)[0]
 		tail := q.Extra()
 		on, day := tail.On, tail.Day
 		tail.On, tail.Day = []string{"12-16"}, line
@@ -221,7 +242,7 @@ func TestNumberGrading(t *testing.T) {
 	}
 }
 
-// An order deals three of its four items, never in their right order, and is right or not: no „близо“.
+// An order deals all four of its items, never in their right order, and is right or not: no „близо“.
 func TestOrderGrading(t *testing.T) {
 	q := &Order{Head: Head{Type: "order"}, Direction: "asc", Items: []OrderItem{
 		{"Съединението", 1885}, {"Априлското въстание", 1876}, {"Балканската война", 1912}, {"Независимостта", 1908},
@@ -229,18 +250,14 @@ func TestOrderGrading(t *testing.T) {
 	year := func(text string) float64 {
 		return q.Items[slices.IndexFunc(q.Items, func(it OrderItem) bool { return it.Text == text })].Value
 	}
-	left := map[string]int{} // how often each item is the one not dealt
+	deals := map[string]bool{} // the arrangements dealt
 	for seed := range uint64(400) {
 		d := q.Deal(seed)
 		items := shown(t, d, "items")
-		if len(items) != OrderDealt {
+		if len(items) != OrderItems {
 			t.Fatalf("seed %d dealt %d items", seed, len(items))
 		}
-		for _, it := range q.Items {
-			if !slices.Contains(items, it.Text) {
-				left[it.Text]++
-			}
-		}
+		deals[strings.Join(items, "|")] = true
 		r := revealed(t, d)
 		var order []int
 		for _, v := range r["order"].([]any) {
@@ -265,8 +282,10 @@ func TestOrderGrading(t *testing.T) {
 				t.Fatalf("%s shown with %v", items[i], v)
 			}
 		}
-		// Every other order is wrong, and worth nothing: an order is never „близо“.
-		for _, other := range [][]int{{0, 1, 2}, {0, 2, 1}, {1, 0, 2}, {1, 2, 0}, {2, 0, 1}, {2, 1, 0}} {
+		// Every other order is wrong, and worth nothing: an order is never „близо“, not even with one pair swapped.
+		swapped := slices.Clone(order)
+		swapped[0], swapped[1] = swapped[1], swapped[0]
+		for _, other := range [][]int{swapped, {3, 2, 1, 0}, {0, 1, 2, 3}, {1, 0, 3, 2}} {
 			if slices.Equal(other, order) {
 				continue
 			}
@@ -276,22 +295,16 @@ func TestOrderGrading(t *testing.T) {
 			}
 		}
 		// Left as dealt, it's never right: the deal is never in order already.
-		if slices.Equal(order, []int{0, 1, 2}) {
+		if slices.Equal(order, []int{0, 1, 2, 3}) {
 			t.Fatalf("seed %d dealt the right order", seed)
 		}
-		// The book's lines are the three dealt, in their right order.
-		_, lines := DealtAnswer(d)
-		if len(lines) != OrderDealt || !strings.HasPrefix(lines[0], items[order[0]]+" (") {
-			t.Fatalf("seed %d: lines %q", seed, lines)
-		}
 	}
-	for _, it := range q.Items {
-		if left[it.Text] < 400/8 {
-			t.Errorf("%s left out %d times of 400", it.Text, left[it.Text])
-		}
+	// Every arrangement but the right one comes up: 23 of 24.
+	if len(deals) != 23 {
+		t.Errorf("400 seeds dealt %d arrangements", len(deals))
 	}
 	d := q.Deal(3)
-	for _, bad := range []string{`{"order":[0,1]}`, `{"order":[0,1,2,3]}`, `{"order":[0,1,1]}`, `{"order":[0,1,3]}`, `{}`} {
+	for _, bad := range []string{`{"order":[0,1]}`, `{"order":[0,1,2]}`, `{"order":[0,1,2,3,4]}`, `{"order":[0,1,1,2]}`, `{"order":[0,1,2,4]}`, `{}`} {
 		if _, err := d.Grade(json.RawMessage(bad)); err == nil {
 			t.Errorf("%s was graded", bad)
 		}
@@ -442,8 +455,84 @@ func TestBalance(t *testing.T) {
 	for _, share := range TypeMix {
 		sum += share
 	}
-	if math.Abs(sum-1) > 1e-9 || len(TypeMix) != len(Types()) {
-		t.Fatalf("the kinds' aim adds up to %v over %d kinds (of %d)", sum, len(TypeMix), len(Types()))
+	dealt := slices.DeleteFunc(Types(), func(k string) bool { return !KindOn(k) })
+	if math.Abs(sum-1) > 1e-9 || len(TypeMix) != len(dealt) || len(TypeOrder) != len(dealt) {
+		t.Fatalf("the kinds' aim adds up to %v over %d kinds (%d in the reports, of %d dealt)", sum, len(TypeMix),
+			len(TypeOrder), len(dealt))
+	}
+	// With every kind on, the aim is the owner's, every kind in it.
+	if len(typeAim) != len(Types()) {
+		t.Fatalf("the aim has %d kinds of %d", len(typeAim), len(Types()))
+	}
+	if _, ok := TypeMix["clues"]; ok {
+		t.Error("clues are off (bank.Off), yet the bank aims for them")
+	}
+}
+
+// „Подсказки“ are off (the owner, 2026-11-23): their questions stay in the bank as they are, but nothing deals them
+// (Live), and no new one is written: bank add refuses one, and so does the check of a question added since.
+func TestCluesOff(t *testing.T) {
+	if KindOn("clues") || !KindOn("split") || !KindOn("match") || !KindOn("order") {
+		t.Fatal("the kinds dealt aren't choice, true-or-not, number, order, match and split")
+	}
+	b := loadSample(t)
+	if len(ofType(b, "clues")) == 0 {
+		t.Fatal("the sample has no clues to keep")
+	}
+	if n := len(b.Live("", "clues")); n != 0 {
+		t.Errorf("%d clues are live", n)
+	}
+	if slices.ContainsFunc(b.Live("", ""), func(q Question) bool { return q.Base().Type == "clues" }) {
+		t.Error("clues among the live questions")
+	}
+	if Playable(ofType(b, "clues")[0]) {
+		t.Error("a clues question is playable")
+	}
+
+	// A question added since the day clues went off is an error; one from before loads as it is.
+	clues := func(added string) *Clues {
+		return &Clues{Head: Head{ID: "gen-900", Type: "clues", Difficulty: Medium, Text: "Кой е този човек?"},
+			Clues: []string{"Първо.", "Второ.", "Трето."}, Answer: "А", Wrong: []string{"Б", "В", "Г"},
+			Tail: Tail{Fact: "Факт.", Added: added, Updated: added}}
+	}
+	off := func(errs []string) bool {
+		return slices.ContainsFunc(errs, func(e string) bool { return strings.Contains(e, "no new clues question") })
+	}
+	if errs, _ := checkQuestion(clues(Off["clues"]), "2026-12-01"); !off(errs) {
+		t.Errorf("a clues question added on the day they went off: %v", errs)
+	}
+	if errs, _ := checkQuestion(clues("2026-11-14"), "2026-12-01"); off(errs) {
+		t.Errorf("an old clues question refused: %v", errs)
+	}
+
+	// bank add refuses a new clues question, and a change of a question into one.
+	dir := t.TempDir()
+	if err := os.CopyFS(dir, os.DirFS(sample)); err != nil {
+		t.Fatal(err)
+	}
+	batch := t.TempDir()
+	q := ofType(b, "clues")[0]
+	_, last := lastID(b.InCategory(q.Base().Category))
+	prefix, _, _ := splitID(q.Base().ID)
+	fresh := clues(time.Now().Format(time.DateOnly))
+	fresh.ID, fresh.Category = fmt.Sprintf("%s-%d", prefix, last+1), q.Base().Category
+	data, _ := Format([]Question{fresh})
+	if err := os.WriteFile(filepath.Join(batch, q.Base().Category+".json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Add(dir, batch, "test", true); err == nil || !strings.Contains(err.Error(), "no new clues question") {
+		t.Errorf("bank add took a new clues question: %v", err)
+	}
+	choice := ofType(b, "choice")[0]
+	into := clues("2026-11-14")
+	into.ID, into.Category = choice.Base().ID, choice.Base().Category
+	data, _ = Format([]Question{into})
+	batch = t.TempDir()
+	if err := os.WriteFile(filepath.Join(batch, into.Category+".json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Add(dir, batch, "test", true); err == nil || !strings.Contains(err.Error(), "no new clues question") {
+		t.Errorf("bank add turned a choice into clues: %v", err)
 	}
 }
 

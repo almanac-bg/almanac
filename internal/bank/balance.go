@@ -13,13 +13,30 @@ import (
 // Difficulties in order, easy first.
 var Difficulties = []Difficulty{Easy, Medium, Hard}
 
-// TypeMix is the share of each kind of question the bank aims for, in every category (the owner's call, 2026-11-13;
-// splits and clues since 2026-11-14), close to what the game draws: a run of ten has five choices, one of each other
-// kind, and a split or clues. So that no kind runs out long before the others.
-var TypeMix = map[string]float64{"choice": 0.50, "truefalse": 0.15, "number": 0.10, "order": 0.075, "match": 0.075, "split": 0.05, "clues": 0.05}
+// typeAim is the share of each kind of question the bank aims for, in every category, with every kind dealt (the
+// owner's call, 2026-11-13; splits and clues since 2026-11-14), close to what the game draws: a run of ten has five
+// choices, one of each other kind, and a split or clues. So that no kind runs out long before the others.
+var typeAim = map[string]float64{"choice": 0.50, "truefalse": 0.15, "number": 0.10, "order": 0.075, "match": 0.075, "split": 0.05, "clues": 0.05}
 
-// TypeOrder is the kinds in the order a report shows them.
-var TypeOrder = []string{"choice", "truefalse", "number", "order", "match", "split", "clues"}
+// TypeMix is typeAim of the kinds the game deals (KindOn), scaled to add up to 1 again: a kind Off is neither written
+// nor counted.
+var TypeMix = func() map[string]float64 {
+	out, sum := map[string]float64{}, 0.0
+	for k, share := range typeAim {
+		if KindOn(k) {
+			out[k] = share
+			sum += share
+		}
+	}
+	for k := range out {
+		out[k] /= sum
+	}
+	return out
+}()
+
+// TypeOrder is the kinds the game deals (KindOn), in the order a report shows them.
+var TypeOrder = slices.DeleteFunc([]string{"choice", "truefalse", "number", "order", "match", "split", "clues"},
+	func(k string) bool { return !KindOn(k) })
 
 // SizeSlack is how far a category's live size may stand from the mean of all of them, as a share of the mean: about
 // the same size, not exactly (a batch whose checks drop a question here and there still goes in).

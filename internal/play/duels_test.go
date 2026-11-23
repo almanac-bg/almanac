@@ -180,6 +180,15 @@ func TestFriendDuel(t *testing.T) {
 	if r, err := w.g.Review(ctx, ana, d.RunID); err != nil || len(r) != Length || r[0].Right {
 		t.Fatalf("a duel's questions two days later: %d, %v", len(r), err)
 	}
+	// A question whose kind or deal changed under an answer already given (a choice made a match again; an order of
+	// three, dealt four now) can't show that answer: the review passes over it, and shows the rest.
+	if _, err := w.db.Write.Exec(`UPDATE answers SET shown = '{"order":[2,0,1]}' WHERE run_id = ? AND n = 0`,
+		d.RunID); err != nil {
+		t.Fatal(err)
+	}
+	if r, err := w.g.Review(ctx, ana, d.RunID); err != nil || len(r) != Length-1 || r[0].N != 1 {
+		t.Fatalf("a duel's review with an answer its question can't take: %d, %v", len(r), err)
+	}
 	if _, err := w.g.Review(ctx, cy, d.RunID); !errors.Is(err, ErrNoRun) {
 		t.Fatalf("Cy went over Ana's game: %v", err)
 	}

@@ -61,6 +61,7 @@ func TestNamed(t *testing.T) {
 // Repeats lists the subjects more than so many live questions name (a question once however often it names one),
 // the most first; SameIdentity the "who is this" questions (a picture choice, clues) that share an answer.
 func TestRepeatsAndIdentities(t *testing.T) {
+	allOn(t) // clues, as while they're dealt
 	pic := &Image{File: "a.webp"}
 	qs := []Question{
 		&Choice{Head: Head{ID: "his-1", Type: "choice", Text: "Кой е този човек?", Category: "history"}, Answer: "Наполеон",

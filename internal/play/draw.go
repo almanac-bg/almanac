@@ -316,8 +316,9 @@ func Overdue(b *bank.Bank, day string) []string {
 	return out
 }
 
-// place names the place of a day a slot is (Runway.Place): "medium split/clues" for the new kinds' place, whichever
-// it has; "hard number (estimate)", for the day finishes on one.
+// place names the place of a day a slot is (Runway.Place): "medium split" for the new kinds' place, whichever of them
+// it has that the game deals (newKinds: "medium split/clues" with clues on); "hard number (estimate)", for the day
+// finishes on one.
 func (s slot) place() string {
 	kinds := s.typ
 	if slices.Contains(newKinds, s.typ) {
@@ -357,9 +358,13 @@ func metFirst(wishes []func(bank.Question) bool, met map[string]bool) []func(ban
 	return append(out, isMet)
 }
 
-// newKinds are the kinds that take turns at the run's one slot for them ("split" in a run's shape): one or the other
-// in each run.
-var newKinds = []string{"split", "clues"}
+// sharedKinds are the kinds that take turns at the run's one slot for them ("split" in a run's shape), and newKinds
+// those of them the game deals (bank.KindOn): one or the other in each run. „Подсказки“ are off (bank.Off), so the
+// slot is a split's in every run; a day drawn before with clues there has a split in their place (mendDay).
+var (
+	sharedKinds = []string{"split", "clues"}
+	newKinds    = slices.DeleteFunc(slices.Clone(sharedKinds), func(k string) bool { return !bank.KindOn(k) })
+)
 
 // inBands shuffles a run's slots within their difficulty: the run still goes from easy to hard, but where its special
 // questions sit (the true-or-not, the order, the match, the number) changes from run to run, so that no two games
@@ -424,7 +429,7 @@ func recentSubjects(b *bank.Bank, days map[string][]Pick, day string) map[string
 // newKind gives a run's slot for the new kinds one of them, at random.
 func newKind(slots []slot, r *rand.Rand) []slot {
 	for i := range slots {
-		if slots[i].typ == newKinds[0] {
+		if slots[i].typ == sharedKinds[0] {
 			slots[i].typ = newKinds[r.IntN(len(newKinds))]
 		}
 	}

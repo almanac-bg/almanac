@@ -474,13 +474,14 @@ to show it whole; nothing over the question.
   line with them, or together on the line under them, at the row's end, where they'd squeeze the words (with large
   text, in the row's foot). An order's value and its ✓ or ✕ are such a box too, never broken.
 - **Each kind:** true-or-not, two side by side, answered with the ✓ or ✕ beside the word and „ти“ under the player's
-  wrong one; order, rows of 48px picked up and put down or dragged by their grip, answered as the right order — a row
+  wrong one; order, its four rows of 48px picked up and put down or dragged by their grip, answered as the right order — a row
   in place with a solid ✓, one out of place hollow and dashed with „при теб: 3-то“ under its words, its value and ✕
   at its end; match, two columns from their tops, the left lettered А–Г and a right one joined taking its left one's
   letter (never colour), each letter on its cell's edge where the line joins it (with few words to a line, one column
   over the other, the letters beside the words, no lines); split, a card sent left or right, each group's arrow beside
-  its name; clues, coming out as their time does, those still to come in one line („Още 2 подсказки: след 10 с и
-  20 с“); number, typed on the game's own pad (keys
+  its name; clues (switched off since 2026-11-23: no game deals new ones, and none is written; the screen stays for a
+  game that dealt one before), coming out as their time does, those still to come in one line („Още 2 подсказки: след
+  10 с и 20 с“); number, typed on the game's own pad (keys
   44px at the least; with large text what's typed stays in sight under the head), answered as what was said, the
   answer (not again where it was spot on), and both on a scale with its key (the answer a filled square; „ти,
   вярно“ a filled disc, „ти, близо“ half filled, „ти“ hollow), nothing else (how everyone guessed is said under the verdict; its chart is the review's). Pairs or groups

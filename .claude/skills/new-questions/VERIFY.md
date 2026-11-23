@@ -35,7 +35,7 @@ Your prompt gives you: `<skill>` (this folder), `<repo>` (the game's code), `<ba
    a FIX. An easy true-or-not that nobody could miss (a truism, not a misconception) is a FIX. **The topic:** it belongs under its category
    (a player of the topic expects it there). Orders: exact values, measured ones
    10% apart. Matches: one right per left, a tempting decoy that fits no left. Splits: every item in its group only,
-   under every source. Clues: hardest to easiest, each true of the answer only, none giving it away by a word.
+   under every source. Clues are off (2026-11-23): a new clues question is a DROP.
 5. **The difficulty** fits the rubric for players in Bulgaria. Relabel only within the plan's cells: a question that
    doesn't fit its cell is a FIX (reword or change options) or a DROP, not a relabel into a cell the plan didn't ask
    for.

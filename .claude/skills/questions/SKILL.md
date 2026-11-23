@@ -64,9 +64,15 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 
 - **Difficulty is the rubric's, not a quota.** Since 16 Nov 2026 there is no mix to aim for (it was 50/35/15): a
   question is labelled for what Bulgarian players know (below), and batches are written by the day's runway.
-- **Kinds: 50% choice, 15% true-or-not, 10% number, 7.5% order, 7.5% match, 5% split, 5% clues**, in every category
-  (`bank.TypeMix`), close to what the game draws (a run of ten has five choices, one of each other kind, and a split
-  or clues), so that no kind runs out long before the others. `bank check` shows each category's kinds against it.
+- **The kinds are choice (with pictures), true-or-not, number, order (four items, all dealt), match and split.**
+  **„Подсказки“ (clues) are switched off** (the owner, 2026-11-23: with only right or wrong, waiting for clues was
+  pointless): the bank keeps its clues questions as they are, no game deals one (`bank.Off`), and **no new one is
+  written**: `bank add` refuses a new clues question, or a change into one, and the check refuses one added since.
+  Nothing counts them (the balance, the runway, the plan); `bank lint` still reads them, kept ready to come back.
+- **Kinds: 50% choice, 15% true-or-not, 10% number, 7.5% order, 7.5% match, 5% split** of the kinds dealt, scaled to
+  add up to all (`bank.TypeMix`: about 52.6 / 15.8 / 10.5 / 7.9 / 7.9 / 5.3%), in every category, close to what the
+  game draws (a run of ten has five choices and one of each other kind), so that no kind runs out long before the
+  others. `bank check` shows each category's kinds against it.
 - **The bank grows by the day's runway** (the owner's rule since 15 Nov 2026, in place of "fully balanced, always"):
   the day spends its places at its own pace — one easy choice with a picture, one hard number, two hard choices, a
   medium order and match… a day — about three times faster for the hard places than for the easy ones. So
@@ -171,7 +177,7 @@ By kind:
   can place. The tolerance doesn't follow the label: it is one formula at every difficulty (see the format).
 - **Order:** easy has familiar things with values far apart (centuries); hard has values close together, or
   unfamiliar things.
-- **Clues:** the label is for the first clue's answer only if the last clue makes it easy: easy is a famous answer
+- **Clues** (off: none is written): the label is for the first clue's answer only if the last clue makes it easy: easy is a famous answer
   whose last clue gives it to anyone; hard is one whose last clue still needs knowing the topic.
 - **Split:** easy groups are what most people tell apart already (a mammal or not); hard ones need the detail
   (Ботев or Вазов by a lesser poem), with items that look alike across the groups.
@@ -191,7 +197,7 @@ Every question is one JSON object in its category's file:
 | Field                | What                                                                                     |
 | -------------------- | ---------------------------------------------------------------------------------------- |
 | `id`                 | The category's prefix and a number (`his-412`). Next free number; never reuse or change one |
-| `type`               | `choice`, `number`, `order`, `truefalse`, `match`, `split` or `clues`                    |
+| `type`               | `choice`, `number`, `order`, `truefalse`, `match` or `split` (`clues` only for the old ones: off) |
 | `difficulty`         | `easy`, `medium` or `hard`                                                               |
 | `text`               | The question: at most 160 characters (60 with a picture), ending in „?“ or „:“           |
 | `fact`               | One or two sentences, at most 140 characters for a question added since `ShortFactsFrom` (2026-11-19: on a phone it shows whole, under the answer), 200 for the older ones (see below) |
@@ -228,12 +234,14 @@ By type:
 
   `bank check` takes a tolerance within half again of the formula, and says the formula's figure when it isn't.
 - **`order`:** four `items` (`text` at most 45 characters and an exact `value`), `direction` (`asc` or `desc`) and
-  `unit`. The text says the direction.
+  `unit`. The text says the direction. A game deals all four (never already in order), and the answer is right or
+  not: one arrangement of 24.
 - **`truefalse`:** the text is a statement ending with a period, and `answer` is `true` or `false`. Write about as
   many false ones as true, each false by one clear fact, not by a trick of wording. **A false statement's fact starts
   with what is true** („Монако граничи с Италия.“ — „Монако граничи по суша само с Франция…“), then the rest. 10
   seconds to answer.
-- **`clues`:** „Подсказки“. The text asks what to name („Кой е този човек?“, „Коя е тази държава?“), three `clues`
+- **`clues`:** „Подсказки“, **switched off since 2026-11-23: never write a new one** (the format below is for the
+  old ones the bank keeps). The text asks what to name („Кой е този човек?“, „Коя е тази държава?“), three `clues`
   (each at most 110 characters, a sentence ending with a period), `answer` and three `wrong` like a choice. The clues
   go from the hardest to the easiest: the first one only an expert knows, the second narrows it to a well-read
   person, the third gives it to almost anyone who knows the topic at all. Every clue is true of the answer only, and

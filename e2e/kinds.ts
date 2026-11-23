@@ -113,16 +113,14 @@ export async function answerAs(page: Page, q: Q, how: How): Promise<void> {
       return;
     }
     case "order": {
-      // Three of the bank's four are dealt (bank.OrderDealt): the ones shown, put in their right order.
+      // All four are dealt, put here in their right order (or turned round: an order is right or not, never „близо“).
       const rows = ask.locator(".sortable-list > .option");
-      const dealt = await rows.evaluateAll((els) =>
-        els.map((e) => (e.children[1]?.textContent ?? "").replaceAll("­", "")),
+      await expect(rows).toHaveCount(q.items?.length ?? 4);
+      const items = [...(q.items ?? [])].sort((a, b) =>
+        q.direction === "desc" ? (b.value ?? 0) - (a.value ?? 0) : (a.value ?? 0) - (b.value ?? 0),
       );
-      const items = (q.items ?? [])
-        .filter((i) => dealt.includes(i.text))
-        .sort((a, b) => (q.direction === "desc" ? (b.value ?? 0) - (a.value ?? 0) : (a.value ?? 0) - (b.value ?? 0)));
       const want = items.map((i) => i.text);
-      if (how !== "right") want.reverse(); // never „близо“: an order is right or not
+      if (how !== "right") want.reverse();
       for (const [place, text] of want.entries()) {
         const now = await rows.evaluateAll((els) =>
           els.map((e) => (e.children[1]?.textContent ?? "").replaceAll("\u00ad", "")),

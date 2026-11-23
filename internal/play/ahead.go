@@ -35,7 +35,9 @@ import (
 // questions) warns RunwayWarn days before a place runs out: Ahead of them before the stop, and 60 more to write the
 // batch. Of the questions that fit, those nobody has answered come first. A day ahead whose question has left the
 // bank, or is due for review by its day (overdue), has that question replaced in its own place, the rest kept as drawn
-// (mendDay); drawn again only if a place has no question that fits it so. All the days after tomorrow are drawn again
+// (mendDay); drawn again only if a place has no question that fits it so. One of a kind the game no longer deals
+// (bank.Off) is replaced the same way, and a day after tomorrow whose question changed its kind is drawn again
+// (shaped). All the days after tomorrow are drawn again
 // when the draw's rules change (DayRules) or the bank's days and Bulgarian questions do (bank.Tail.On, BG): a day
 // drawn ahead is drawn by today's rules, never an older version's.
 //
@@ -56,7 +58,7 @@ import (
 // DayRules names the day's draw as it is, and the days after tomorrow are drawn again whenever it changes. It ends with
 // what drawDay makes of a fixed bank on fixed days and seeds (TestDayRulesNameTheDraw): a change to how a day is drawn
 // fails that test until DayRules says so, rather than reach the days drawn ahead a season late.
-const DayRules = "2026-11-20 the number last, a week apart (recent subjects), estimates count no list; draw 23ab9debaea5283c"
+const DayRules = "2026-11-23 no clues (bank.Off), the split their place every day; draw 2140033db20ed44f"
 
 // Ahead is how many days ahead of today the day's questions are drawn.
 const Ahead = 90
@@ -152,8 +154,9 @@ func (g *Game) EnsureDays(ctx context.Context) error {
 
 // drawAhead draws today if it isn't yet, voids today's questions the bank no longer plays as the day began (day.go),
 // draws the days after tomorrow again if the rules or the bank's dated and Bulgarian questions changed since they were
-// drawn, mends a day ahead if a question of it left the bank or is due for review by then (mendDay: drawn again if it
-// can't be), and draws the days missing up to
+// drawn, draws a day after tomorrow again if its kinds aren't the day's (shaped: a question's kind changed since), mends
+// a day ahead if a question of it left the bank, is of a kind the game no longer deals, or is due for review by then
+// (mendDay: drawn again if it can't be), and draws the days missing up to
 // Ahead (while none is short, else it warns in the log); it says what today and the days ahead hold. Of the questions
 // that fit, those not answered (by anyone) come first.
 func (g *Game) drawAhead(tx *sql.Tx, today string, b *bank.Bank, answered map[string]bool) (dayBars, error) {
@@ -192,7 +195,18 @@ func (g *Game) drawAhead(tx *sql.Tx, today string, b *bank.Bank, answered map[st
 	r := mrand.New(mrand.NewPCG(newSeed(), newSeed()))
 	for _, day := range slices.Sorted(maps.Keys(all)) {
 		// A day ahead with a question the bank no longer has, or one due for review by then, has it replaced in its
-		// place, else is drawn again; nobody has played it.
+		// place, else is drawn again; nobody has played it. So is one after tomorrow whose kinds aren't the day's any
+		// more (shaped), its question's kind changed since.
+		if picks := all[day]; day > tomorrow && !shaped(b, picks) {
+			if _, err := tx.Exec(`DELETE FROM days WHERE day = ?`, day); err != nil {
+				return dayBars{}, err
+			}
+			delete(all, day)
+			for _, p := range picks { // its questions are free for it, drawn again, or another day
+				delete(used, p.ID)
+			}
+			continue
+		}
 		if picks := all[day]; day > today && !dealsOn(b, picks, day) {
 			if mended, ok := mendDay(b, day, picks, used, answered, recentSubjects(b, all, day), r); ok {
 				data, _ := json.Marshal(mended)
@@ -344,7 +358,6 @@ func drawnBy(b *bank.Bank) string {
 	return DayRules + " " + hex.EncodeToString(h.Sum(nil))[:16]
 }
 
-// allLive is whether the bank has each of the picks, live.
 // dealsOn is whether a day's questions can all be dealt on it: each live (allLive), none due for review by then.
 func dealsOn(b *bank.Bank, picks []Pick, day string) bool {
 	return allLive(b, picks) && !slices.ContainsFunc(picks, func(p Pick) bool {
@@ -353,15 +366,16 @@ func dealsOn(b *bank.Bank, picks []Pick, day string) bool {
 	})
 }
 
-// mendDay replaces each question of a day drawn ahead that can't be dealt on it (dealsOn: retired, or due for review
-// by then) with another in its own place: of the same topic, difficulty, kind and picture (fitsPlace: an estimate for
-// the number), about Bulgaria if it was, dealable on the day, never a question another day has, naming no subject the
+// mendDay replaces each question of a day drawn ahead that can't be dealt on it (dealsOn: retired, of a kind the game
+// no longer deals, or due for review by then) with another in its own place: of the same topic, difficulty, kind (a
+// split for clues, which share its place: newKinds) and picture (fitsPlace: an estimate for the number), about
+// Bulgaria if it was, dealable on the day, never a question another day has, naming no subject the
 // day's other questions do; those nobody has answered first, then those apart from the days before (recent). The rest
 // of the day stays as drawn, its shape and its topics too. Not mended (false) if a question has gone from the bank
 // altogether (its place is unknown) or a place has none that fits: the day is drawn again.
 func mendDay(b *bank.Bank, day string, picks []Pick, used, answered, recent map[string]bool,
 	r *mrand.Rand) ([]Pick, bool) {
-	bad := func(q bank.Question) bool { return q.Extra().Retired || overdue(q, day) }
+	bad := func(q bank.Question) bool { return !bank.Playable(q) || overdue(q, day) }
 	named := map[string]bool{}
 	for _, p := range picks {
 		q, ok := b.Get(p.ID)
@@ -383,11 +397,14 @@ func mendDay(b *bank.Bank, day string, picks []Pick, used, answered, recent map[
 		}
 		h := old.Base()
 		s := slot{difficulty: h.Difficulty, typ: h.Type, picture: noPicture}
+		if !bank.KindOn(s.typ) && slices.Contains(sharedKinds, s.typ) && len(newKinds) > 0 {
+			s.typ = newKinds[0]
+		}
 		if bank.HasPictures(old) {
 			s.picture = withPicture
 		}
 		var found []bank.Question
-		for _, q := range b.Live(h.Category, h.Type) {
+		for _, q := range b.Live(h.Category, s.typ) {
 			t, id := q.Extra(), q.Base().ID
 			if !used[id] && !taken[id] && !bad(q) && (len(t.On) == 0 || t.OnDay(day)) && fitsPlace(b, q, s, s.typ) &&
 				(t.BG || !old.Extra().BG) && !slices.ContainsFunc(bank.Subjects(q), func(k string) bool { return named[k] }) {
@@ -414,9 +431,37 @@ func mendDay(b *bank.Bank, day string, picks []Pick, used, answered, recent map[
 	return out, true
 }
 
+// allLive is whether the bank has each of the picks, live: not retired, and of a kind the game deals (bank.Playable).
 func allLive(b *bank.Bank, picks []Pick) bool {
 	for _, p := range picks {
-		if q, ok := b.Get(p.ID); !ok || q.Extra().Retired {
+		if q, ok := b.Get(p.ID); !ok || !bank.Playable(q) {
+			return false
+		}
+	}
+	return true
+}
+
+// shaped is whether a day's questions are of the day's kinds (daySlots; a split or clues in the place they share):
+// every day is drawn so, but a question whose kind changed since (a choice made a match again) leaves its day
+// misshapen, and that day is drawn again.
+func shaped(b *bank.Bank, picks []Pick) bool {
+	want := map[string]int{}
+	for _, s := range daySlots {
+		want[s.typ]++
+	}
+	for _, p := range picks {
+		q, ok := b.Get(p.ID)
+		if !ok {
+			return false
+		}
+		k := q.Base().Type
+		if slices.Contains(sharedKinds, k) {
+			k = sharedKinds[0]
+		}
+		want[k]--
+	}
+	for _, n := range want {
+		if n != 0 {
 			return false
 		}
 	}

@@ -49,10 +49,14 @@ packages' doc comments; this file holds only what must not drift.
     after its day opens today's issue.
   - **Time never counts:** not in the score, not in a tie (board places are shared; a duel even in right answers and
     the hard number's closeness is a draw), not in a duel's play (nothing says when the other side answered).
-  - **Right or not** (owner, 2026-11-21, the direction audit): „близо“ is the number's alone. An order is dealt three
-    of its four items (one chronology still, six arrangements, not 24 all or nothing) and is right or wrong; a hard
-    question and a player's mastery count right answers, never a partial score. Every right answer
-    sounds the same: nothing counts a row of them.
+  - **Right or not** (owner, 2026-11-21, the direction audit): „близо“ is the number's alone. An order is right or
+    wrong (dealt all four of its items again since 2026-11-23, the owner; three from 21 Nov); a hard question and a
+    player's mastery count right answers, never a partial score. Every right answer sounds the same: nothing counts a
+    row of them.
+  - **The kinds** (owner, 2026-11-23): choice (with pictures), true-or-not, number, order (4 items), match and split.
+    Clues („Подсказки“) are switched off (2026-11-23, the owner): with only right or wrong, waiting for clues was
+    pointless. Their questions stay in the bank, never dealt, and no new one is written (`bank.Off`); match and split,
+    converted to choices on 21–22 Nov, came back as they were.
   - **Ink.** A right answer in the issue, the first time a player meets that question, writes its fact in ink. Every
     other fact a player meets (a miss, or any answer in chapter games and duels) is in the book in grey, as met: never
     counted, never promised to turn into ink. A chapter shows one number, its ink.

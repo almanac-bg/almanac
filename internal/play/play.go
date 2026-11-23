@@ -762,6 +762,13 @@ func (g *Game) Review(ctx context.Context, userID, runID int64) ([]Reviewed, err
 		if !ok {
 			continue // gone from the bank since
 		}
+		// An answer the question as dealt now can't take (its kind or its deal changed under it: an order of three
+		// before all four were dealt again) would show a question with an answer it never had: passed over too.
+		if string(it.Given) != "null" {
+			if _, err := d.Grade(it.Given); err != nil {
+				continue
+			}
+		}
 		crowd, err := g.crowdOf(ctx, g.DB.Read, r, d.Question())
 		if err != nil {
 			return nil, err
