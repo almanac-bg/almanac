@@ -156,7 +156,9 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   biggest file, the headword its title and its credit under it (no zoom, no gallery). One
   column on a big screen too, 44rem at most, the head at the left: a book reads top to bottom, the latest first
   exactly, and one column leaves no hole beside a tall entry (two across did; columns or masonry would read down then
-  across, and reshuffle as a page comes in). From ten facts, a search over them („Търси факт“); fewer are read at a
+  across, and reshuffle as a page comes in). Thirty a page, turned as the duels played are: „По-нови“ and „По-стари“
+  either side of „Страница 2 от 4“, each off at its end, each page a link of its own (back is the page before;
+  owner, 2026-11-23). From ten facts, a search over them („Търси факт“); fewer are read at a
   glance. What a search found is marked in each entry (its question, headword and fact) in a soft tone of the
   chapter's colour under the full ink, never split by a soft hyphen. Where grey first shows: „С мастило са фактите от верните ти отговори в броя на деня. Всички други, които срещнеш, са в сиво.“
   Its game's result: on the chapter's sheet its chip, the score and its tiles; under it, with no number (grey is never

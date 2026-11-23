@@ -338,16 +338,16 @@ test("every duel played, beyond the ten listed, in a dialog a page at a time", a
   await all.click();
   const box = page.getByRole("dialog", { name: "Изиграни дуели" });
   await expect(box.locator(".duel-card")).toHaveCount(10);
-  await expect(box.locator(".pages-at")).toHaveText("Страница 1 от 3");
+  await expect(box.locator(".pages-at")).toHaveText("Страница 1\u00a0от\u00a03");
   await expect(box.getByRole("button", { name: "По-нови" })).toBeDisabled();
   await box.getByRole("button", { name: "По-стари" }).click();
-  await expect(box.locator(".pages-at")).toHaveText("Страница 2 от 3");
+  await expect(box.locator(".pages-at")).toHaveText("Страница 2\u00a0от\u00a03");
   await expect(box.locator(".duel-card").first()).toHaveAttribute("id", "duel-13");
   await box.getByRole("button", { name: "По-стари" }).click();
   await expect(box.locator(".duel-card")).toHaveCount(3);
   await expect(box.getByRole("button", { name: "По-стари" })).toBeDisabled();
   await box.getByRole("button", { name: "По-нови" }).click();
-  await expect(box.locator(".pages-at")).toHaveText("Страница 2 от 3");
+  await expect(box.locator(".pages-at")).toHaveText("Страница 2\u00a0от\u00a03");
   // A card there as in the list: the whole of it its questions, no name a link.
   await expect(box.locator(".duel-card").first().getByRole("link")).toHaveCount(0);
   await expect(box.locator(".duel-card").first().locator(".duel-card-open")).toHaveAccessibleName(

@@ -68,22 +68,24 @@ test("a chapter comes a page at a time, by its numbers", async ({ page }) => {
   const entries = page.locator(".entry");
   await expect(entries).toHaveCount(30);
   await expect(page.locator(".chapter-facts .sect-note")).toHaveText(`${found} факта, най-новите първи`);
-  await page.locator(".pager").getByRole("link", { name: "По-стари" }).click();
+  await page.locator(".pages").getByRole("link", { name: "По-стари" }).click();
   await expect(page).toHaveURL(/\/almanac\/geography\?page=2$/);
-  await expect(page.locator('.pager-n[aria-current="page"]')).toHaveText("2");
+  await expect(page.locator(".pages-at")).toHaveText("Страница 2\u00a0от\u00a04");
   // The page in the address: a reload opens it again.
   await page.reload();
-  await expect(page.locator('.pager-n[aria-current="page"]')).toHaveText("2");
+  await expect(page.locator(".pages-at")).toHaveText("Страница 2\u00a0от\u00a04");
   await expect(entries).toHaveCount(30);
   // A page is an entry of the history: back is the page before, still in the chapter.
   await page.goBack();
   await expect(page).toHaveURL(/\/almanac\/geography$/);
-  await expect(page.locator('.pager-n[aria-current="page"]')).toHaveText("1");
+  await expect(page.locator(".pages-at")).toHaveText("Страница 1\u00a0от\u00a04");
+  await expect(page.locator(".pages").getByRole("button", { name: "По-нови" })).toBeDisabled();
   await page.goForward();
-  await expect(page.locator('.pager-n[aria-current="page"]')).toHaveText("2");
+  await expect(page.locator(".pages-at")).toHaveText("Страница 2\u00a0от\u00a04");
   // A page past the last is the last.
   await page.goto("/almanac/geography?page=99");
-  await expect(page.locator('.pager-n[aria-current="page"]')).toHaveText("4");
+  await expect(page.locator(".pages-at")).toHaveText("Страница 4\u00a0от\u00a04");
+  await expect(page.locator(".pages").getByRole("button", { name: "По-стари" })).toBeDisabled();
   await expect(page).toHaveURL(/\/almanac\/geography\?page=4$/);
   await expect(entries).toHaveCount(5);
 });

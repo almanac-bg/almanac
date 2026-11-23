@@ -606,41 +606,34 @@ function showPicture(f: Learned, im: Picture): void {
 /** Whether the chapter drawn next is come to by a turn of its pages (pager). */
 let turned = false;
 
-/** The chapter's pages: newer and older, and each by its number (a few around the one open, and the first and the
- * last), each a link to its page. */
+/** The chapter's pages, as the duels played turn theirs (duelcards.ts, allPlayed): „По-нови“ and „По-стари“ either side
+ * of where the page is („Страница 2 от 4“), each off at its end; each a link to its page, so a page is an entry of the
+ * history. */
 function pager(now: number, pages: number, href: (to: number) => string): Child {
   if (pages < 2) return null;
-  const shown = [...new Set([0, now - 1, now, now + 1, pages - 1])].filter((n) => n >= 0 && n < pages);
-  const go = (to: number, label: Child, cls: string, aria?: string) =>
-    h(
-      "a",
-      {
-        class: cls,
-        href: href(to),
-        "aria-label": aria,
-        onclick: () => {
-          turned = true;
-        },
-      },
-      label,
-    );
+  const go = (to: number, label: string) =>
+    to < 0 || to >= pages
+      ? h("button", { class: "btn inline", type: "button", disabled: true }, label)
+      : h(
+          "a",
+          {
+            class: "btn inline",
+            href: href(to),
+            onclick: () => {
+              turned = true;
+            },
+          },
+          label,
+        );
   return h(
     "nav",
-    { class: "pager", "aria-label": "Страници" },
-    now > 0
-      ? go(now - 1, ["← ", "По-нови"], "pager-way")
-      : h("span", { class: "pager-way off", "aria-hidden": "true" }, "← По-нови"),
+    { class: "pages", "aria-label": "Страници" },
+    go(now - 1, "По-нови"),
     h(
       "span",
-      { class: "pager-pages" },
-      shown.map((n) =>
-        n === now
-          ? h("span", { class: "pager-n", "aria-current": "page" }, String(n + 1))
-          : go(n, String(n + 1), "pager-n", `Страница ${n + 1}`),
-      ),
+      { class: "pages-at", "aria-current": "page" },
+      `Страница ${formatNumber(now + 1)}\u00a0от\u00a0${formatNumber(pages)}`,
     ),
-    now < pages - 1
-      ? go(now + 1, ["По-стари", " →"], "pager-way older")
-      : h("span", { class: "pager-way older off", "aria-hidden": "true" }, "По-стари →"),
+    go(now + 1, "По-стари"),
   );
 }
