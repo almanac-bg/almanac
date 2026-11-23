@@ -238,6 +238,9 @@ test("a picture question's entry shows its picture, credited; a choice of pictur
     await expect(e.locator(".credit")).toContainText("Снимка:");
     const [p, word] = [await pic.boundingBox(), await e.locator(".entry-word").boundingBox()];
     expect(p && word && p.x > word.x).toBe(true);
+    // The fact right under the headword, beside a picture taller than both: no hole between them.
+    const fact = await e.locator(".entry-fact").boundingBox();
+    expect(fact && word && fact.y - (word.y + word.height)).toBeLessThanOrEqual(16);
   }
   await page.goto("/");
   await knows(page, ["his-002"]);

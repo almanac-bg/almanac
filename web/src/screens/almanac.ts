@@ -538,36 +538,34 @@ function entry(f: Learned, find: string[]): Child {
           textWords(f.answer, find),
         ),
   ];
+  // The picture first, at the entry's right: its words run beside it and on under it, the fact too, with no hole
+  // between the headword and the fact however tall the picture is.
   return h(
     "li",
-    { class: `entry ${f.ink ? "ink" : "met"} ch-${f.chapter}`, "data-fact": f.id },
+    { class: `entry ${f.ink ? "ink" : "met"}${im ? " pictured" : ""} ch-${f.chapter}`, "data-fact": f.id },
     im
       ? h(
-          "div",
-          { class: "entry-top" },
-          h("div", { class: "entry-head" }, head),
-          h(
-            "button",
-            {
-              class: "entry-zoom",
-              type: "button",
-              "aria-label": "Виж снимката голяма",
-              onclick: () => showPicture(f, im),
-            },
-            h("img", {
-              class: "entry-pic",
-              src: im.src,
-              srcset: im.srcset,
-              sizes: entryPicSizes,
-              width: im.w,
-              height: im.h,
-              alt: im.alt,
-              loading: "lazy",
-              decoding: "async",
-            }),
-          ),
+          "button",
+          {
+            class: "entry-zoom",
+            type: "button",
+            "aria-label": "Виж снимката голяма",
+            onclick: () => showPicture(f, im),
+          },
+          h("img", {
+            class: "entry-pic",
+            src: im.src,
+            srcset: im.srcset,
+            sizes: entryPicSizes,
+            width: im.w,
+            height: im.h,
+            alt: im.alt,
+            loading: "lazy",
+            decoding: "async",
+          }),
         )
-      : head,
+      : null,
+    head,
     h("p", { class: "entry-fact" }, textWords(f.fact, find)),
     f.credit ? pictureCredit(f.credit) : null,
   );

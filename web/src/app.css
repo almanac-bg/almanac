@@ -5339,18 +5339,27 @@
   }
 
   /* A picture question's picture, beside its dateline, question and headword: a thumbnail at the entry's right, its
-     whole shape (a flag is never cut). */
-  .entry-top {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: 14px;
+     whole shape (a flag is never cut), the words running beside it and on under it, the fact too: no hole between the
+     headword and the fact under a tall picture. The entry's words in a flow, spaced as its grid spaces them. */
+  .entry.pictured {
+    display: flow-root;
   }
 
-  .entry-head {
-    display: grid;
-    align-content: start;
-    gap: 6px;
+  .entry.pictured > :is(.entry-word, .entry-lines, .credit) {
+    margin-top: 6px;
+  }
+
+  .entry.pictured > .entry-q {
+    margin-top: 8px;
+  }
+
+  .entry.pictured > .entry-fact {
+    margin-top: 10px;
+  }
+
+  .entry.pictured > .entry-zoom {
+    float: right;
+    margin: 0 0 8px 14px;
   }
 
   .entry-pic {

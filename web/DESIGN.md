@@ -160,7 +160,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   the dateline, the question small and muted (a kicker), the answer as the headword (big, bold) between it and the
   fact, then the fact in body text; a statement has no question, its headword right under the dateline; an answer of
   parts a line each. A picture question shows its picture (a choice of pictures, its answer's) beside the question and
-  headword, its whole shape (88px wide on a phone, 112px on a big screen), credited in the entry's small text; a tap
+  headword, its whole shape (88px wide on a phone, 112px on a big screen), the fact running on beside it (no hole
+  under the headword), credited in the entry's small text; a tap
   („Виж снимката голяма“, a magnifier for a pointer) shows it on a sheet as large as the screen holds it, whole, its
   biggest file, the headword its title and its credit under it (no zoom, no gallery). One
   column on a big screen too, 44rem at most, the head at the left: a book reads top to bottom, the latest first
