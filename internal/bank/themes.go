@@ -118,10 +118,10 @@ func (b *Bank) themeOf(category, id string) (Theme, bool) {
 }
 
 // checkTheme: a question's theme is one of its chapter's (a retired one's isn't held to it: themes may change after
-// it left).
+// it left). Nothing while the bank's ThemesFile itself has errors: those say it once.
 func (b *Bank) checkTheme(q Question) []string {
 	theme := q.Extra().Theme
-	if theme == "" || q.Extra().Retired {
+	if theme == "" || q.Extra().Retired || b.themesBroken {
 		return nil
 	}
 	if b.Themes == nil {
@@ -171,7 +171,8 @@ type ThemeCount struct {
 // ChapterThemes is a chapter's themes against their targets.
 type ChapterThemes struct {
 	Category, Name string
-	// Live counts the chapter's live questions (Bank.Live), Untagged those of them without a theme.
+	// Live counts the chapter's live questions (Bank.Live), Untagged those of them without a theme. The shares, the
+	// gaps and Off are of the others (Tagged): an untagged question is in no theme yet, not in a theme short.
 	Live, Untagged int
 	// Off is how far the chapter stands from its targets: half the sum of every theme's distance from its target, in
 	// points (the share of the chapter that would have to move to meet them all; 0 is on target).
@@ -179,6 +180,9 @@ type ChapterThemes struct {
 	// Themes are the chapter's themes, the furthest short first, the catch-alls (Planned) last.
 	Themes []ThemeCount
 }
+
+// Tagged counts the chapter's live questions that name a theme.
+func (ch ChapterThemes) Tagged() int { return ch.Live - ch.Untagged }
 
 // ThemesOf is each chapter's themes against their targets (none in a bank without themes): what `bank check` shows,
 // and what `bank plan` writes for.
@@ -198,12 +202,13 @@ func (b *Bank) ThemesOf() []ChapterThemes {
 				n[t]++
 			}
 		}
+		tagged := ch.Tagged()
 		for _, t := range b.Themes[c.ID] {
 			tc := ThemeCount{Theme: t, N: n[t.ID]}
-			if ch.Live > 0 {
-				tc.Share = 100 * float64(tc.N) / float64(ch.Live)
+			if tagged > 0 {
+				tc.Share = 100 * float64(tc.N) / float64(tagged)
 			}
-			tc.Short = int(math.Round(t.Target/100*float64(ch.Live))) - tc.N
+			tc.Short = int(math.Round(t.Target/100*float64(tagged))) - tc.N
 			ch.Off += math.Abs(tc.Share-t.Target) / 2
 			ch.Themes = append(ch.Themes, tc)
 		}
@@ -222,12 +227,13 @@ func (b *Bank) ThemesOf() []ChapterThemes {
 func (t Theme) Planned() bool { return t.ID != OtherTheme && t.ID != MixedTheme }
 
 // PlanThemes gives a batch's n questions in a chapter to its themes, never to a catch-all: to those short of their
-// target in the chapter as it will be (its live questions and the batch), each by how short it is; what is left once
+// target in the chapter as it will be (its tagged questions and the batch), each by how short it is; what is left once
 // every gap is filled (a batch larger than the gaps), by the targets. Shares are whole questions, the largest remainders
 // rounding up. The themes come back the ones written for first: those about Bulgaria (Theme.BG), then the rest, each by
 // how many it takes; the themes it gives none to after, as ThemesOf has them.
 func PlanThemes(ch ChapterThemes, n int) []PlannedTheme {
-	size := float64(ch.Live + n)
+	n = max(n, 0)
+	size := float64(ch.Tagged() + n)
 	out := make([]PlannedTheme, len(ch.Themes))
 	short, targets := make([]float64, len(ch.Themes)), 0.0
 	gaps := 0.0
@@ -242,7 +248,7 @@ func PlanThemes(ch ChapterThemes, n int) []PlannedTheme {
 	weights := make([]float64, len(out))
 	for i, t := range ch.Themes {
 		switch {
-		case !t.Planned():
+		case !t.Planned() || n == 0:
 		case gaps >= float64(n):
 			weights[i] = short[i] / gaps * float64(n)
 		default:

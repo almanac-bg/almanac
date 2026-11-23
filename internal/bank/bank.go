@@ -46,8 +46,9 @@ type Bank struct {
 	// Questions are every question, retired ones too, by category in the order of Categories, then as in its file.
 	Questions []Question
 	byID      map[string]Question
-	// Themes are each category's themes (ThemesFile; nil for a bank without them).
-	Themes map[string][]Theme
+	// Themes are each category's themes (ThemesFile; nil for a bank without them). themesBroken: the file has errors.
+	Themes       map[string][]Theme
+	themesBroken bool
 	// waived are the rules the bank's waivers lift, by question: [id, rule].
 	waived map[[2]string]bool
 }
@@ -161,7 +162,7 @@ func Load(dir string) (*Bank, []Problem) {
 	for _, e := range errs {
 		fail(ThemesFile, 0, "", e)
 	}
-	b.Themes = themes
+	b.Themes, b.themesBroken = themes, len(errs) > 0
 
 	files, err := os.ReadDir(filepath.Join(dir, QuestionsDir))
 	if err != nil {

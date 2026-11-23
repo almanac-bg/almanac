@@ -107,26 +107,28 @@ func themed(n map[string]int) *Bank {
 	return b
 }
 
-// Each chapter's themes against their targets: the furthest short first, the catch-all last.
+// Each chapter's themes against their targets: the furthest short first, the catch-all last; the untagged in none of
+// them, counted apart.
 func TestThemesOf(t *testing.T) {
 	b := themed(map[string]int{"food": 50, "bg_customs": 10, "language": 20, OtherTheme: 15, "": 5})
+	if ch := b.ThemesOf()[0]; ch.Live != 100 || ch.Untagged != 5 || ch.Tagged() != 95 || ch.Themes[0].Share != 100*10.0/95 {
+		t.Errorf("live %d, untagged %d, %s %g%%", ch.Live, ch.Untagged, ch.Themes[0].ID, ch.Themes[0].Share)
+	}
+	b = themed(map[string]int{"food": 50, "bg_customs": 10, "language": 20, OtherTheme: 20})
 	chs := b.ThemesOf()
 	if len(chs) != 1 {
 		t.Fatalf("%d chapters", len(chs))
 	}
 	ch := chs[0]
-	if ch.Live != 100 || ch.Untagged != 5 {
-		t.Errorf("live %d, untagged %d", ch.Live, ch.Untagged)
-	}
 	var got []string
 	for _, tc := range ch.Themes {
 		got = append(got, fmt.Sprintf("%s %d", tc.ID, tc.Short))
 	}
-	if want := []string{"bg_customs 20", "language 0", "food -10", "other -5"}; !slices.Equal(got, want) {
+	if want := []string{"bg_customs 20", "language 0", "food -10", "other -10"}; !slices.Equal(got, want) {
 		t.Errorf("themes %v, want %v", got, want)
 	}
-	// Off: half the distances from the targets, 10, 20, 0 and 5 points (the untagged count in none).
-	if ch.Off != 17.5 {
+	// Off: half the distances from the targets, 10, 20, 0 and 10 points.
+	if ch.Off != 20 {
 		t.Errorf("off %g", ch.Off)
 	}
 	if Of(b.Categories, nil).ThemesOf() != nil {
@@ -169,6 +171,16 @@ func TestPlanThemes(t *testing.T) {
 	// other 3 by the targets (40, 30, 20 of 90): food 3.33, bg_customs 5, language 1.67.
 	if want := []string{"bg_customs 5", "food 3", "language 2", "other 0"}; !slices.Equal(got, want) {
 		t.Errorf("a batch over the gaps: %v, want %v", got, want)
+	}
+	for _, p := range PlanThemes(b.ThemesOf()[0], 0) {
+		if p.Write != 0 {
+			t.Errorf("an empty batch writes %d for %s", p.Write, p.ID)
+		}
+	}
+	// A chapter with nothing but its catch-all: nothing to write for.
+	only := ChapterThemes{Live: 3, Themes: []ThemeCount{{Theme: Theme{ID: OtherTheme, Target: 100}, N: 3}}}
+	if p := PlanThemes(only, 5); p[0].Write != 0 {
+		t.Errorf("the catch-all takes %d", p[0].Write)
 	}
 }
 
