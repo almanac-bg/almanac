@@ -271,13 +271,18 @@ export function picturesIn(view: View, ms: number): Promise<void> {
 /** What marks each answer, on every screen: a letter, so that everyone at a table (saying „Б“) names the same answer. */
 const letters = ["А", "Б", "В", "Г"];
 
-/** Keys 1–4 press the answer they mark, while the question waits for one (never in a field, never with a modifier). */
+/** Keys 1–4 press the answer they mark, and so do its letter's keys, А–Г (a Bulgarian keyboard), while the question
+ * waits for one (never in a field, never with a modifier). */
 function answerKeys(buttons: HTMLElement[], locked: Signal<boolean>): void {
   listen(document, "keydown", (e: KeyboardEvent) => {
     if (locked.peek() || e.metaKey || e.ctrlKey || e.altKey || e.repeat || e.target instanceof HTMLInputElement) return;
-    buttons[Number(e.key) - 1]?.click();
+    const i = /^[1-4]$/.test(e.key) ? Number(e.key) - 1 : letters.indexOf(e.key.toUpperCase());
+    if (i >= 0) buttons[i]?.click();
   });
 }
+
+/** Whether the player points with a mouse (a computer): its hints say „Щракни“, not „Докосни“, and name the keys. */
+const mouse = () => typeof matchMedia === "function" && matchMedia("(hover: hover) and (pointer: fine)").matches;
 
 /** The ✓ or ✕ on a revealed answer (its colour and words say the same). */
 const sign = () => h("span", { class: "sign", "aria-hidden": "true" });
@@ -723,7 +728,7 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
     } else {
       picked.set(item);
       play("tap");
-      said.textContent = `Взе „${view.items[item]}“. Докосни мястото, където да отиде.`;
+      said.textContent = `Взе „${view.items[item]}“. ${mouse() ? "Щракни" : "Докосни"} мястото, където да отиде.`;
     }
   };
   rows.forEach((row, item) => {
@@ -850,8 +855,12 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
     : h(
         "p",
         { class: "hint", id: how },
-        "Докосни ред, после новото му място, или го плъзни.",
-        h("span", { class: "sr" }, " Стрелките нагоре и надолу също го местят."),
+        mouse()
+          ? "Щракни ред, после новото му място, или го плъзни. Стрелките ↑ ↓ също го местят."
+          : [
+              "Докосни ред, после новото му място, или го плъзни.",
+              h("span", { class: "sr" }, " Стрелките нагоре и надолу също го местят."),
+            ],
       );
   return {
     node: h("div", { class: "stack" }, hint, list, said, display ? null : done),
@@ -1074,7 +1083,7 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
   const hint = h(
     "p",
     { class: "hint", hidden: display },
-    "Докосни нещо вляво, после двойката му вдясно.",
+    mouse() ? "Щракни нещо вляво, после двойката му вдясно." : "Докосни нещо вляво, после двойката му вдясно.",
     spare ? " Едно вдясно остава без двойка." : null,
   );
   const result = h("ol", { class: "options match-result", hidden: true });
@@ -1240,9 +1249,9 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
   const hint = h(
     "p",
     { class: "hint" },
-    "Плъзни всяка карта наляво или надясно",
-    h("span", { class: "sr" }, " или натисни групата ѝ отдолу"),
-    ".",
+    mouse()
+      ? "Прати всяка карта наляво или надясно: плъзни я или натисни стрелките ← →."
+      : ["Плъзни всяка карта наляво или надясно", h("span", { class: "sr" }, " или натисни групата ѝ отдолу"), "."],
   );
   // Looked at, not answered: the two groups and every thing to put in them, all at once.
   const board = display

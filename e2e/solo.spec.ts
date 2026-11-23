@@ -321,23 +321,30 @@ test.describe("on a computer", () => {
     // The keys still play, unsaid (no key is drawn on a button): Enter starts at once.
     await expect(page.locator(".key-hint")).toHaveCount(0);
     await page.keyboard.press("Enter");
-    // 1–4 answer by the letters' order, and Enter goes on at once.
-    let keyed = false;
+    // 1–4 answer by the letters' order, and so do the letters' own keys (a Bulgarian keyboard); Enter goes on at once.
+    const keys = [
+      { key: "2", at: 1 },
+      { key: "в", at: 2 },
+    ];
+    let keyed = 0;
     for (let n = 0; n < 10; n++) {
       await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
       const options = page.locator("article.question .options:not(.pic-options, .sortable-list) > button.option");
-      if (!keyed && (await options.count()) === 4) {
+      const k = keys[keyed];
+      if (k && (await options.count()) === 4) {
         await expect(options.locator(".letter")).toHaveText(["А", "Б", "В", "Г"]);
-        await page.keyboard.press("2");
-        await expect(options.nth(1)).toHaveClass(/right|wrong/);
+        // (A letter of a Bulgarian keyboard as its keydown has it: Playwright's keyboard has only the US one.)
+        if (/\d/.test(k.key)) await page.keyboard.press(k.key);
+        else await page.evaluate((key) => document.dispatchEvent(new KeyboardEvent("keydown", { key })), k.key);
+        await expect(options.nth(k.at)).toHaveClass(/right|wrong/);
         await page.keyboard.press("Enter");
-        keyed = true;
+        keyed++;
         continue;
       }
       await answer(page);
       await moveOn(page);
     }
-    expect(keyed).toBe(true);
+    expect(keyed).toBe(keys.length);
     await expect(page.locator(".summary")).toBeVisible({ timeout: 10_000 });
     // A player's Днес is a spread: the issue, and beside it its action, the streak and its contents.
     await page.goto("/");
