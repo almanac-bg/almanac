@@ -6653,8 +6653,8 @@
       grid-column: 8 / span 5;
     }
 
+    /* The cover as tall as what's on it: a height of its own left its lower quarter empty colour. */
     .issue-leaf {
-      min-height: 32.5rem;
       padding: 32px;
     }
 
