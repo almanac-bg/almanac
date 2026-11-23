@@ -708,8 +708,9 @@
   }
 
   /* The places in the bar at the top: on a big screen, and on any short wide one (a phone on its side, a laptop at
-     200 % zoom), where a bar at the foot took a fifth of the height and covered „Започни“. */
-  @media (min-width: 56.25rem), (orientation: landscape) and (max-height: 30rem) {
+     200 % zoom), where a bar at the foot took a fifth of the height and covered „Започни“. Not narrower than the smallest
+     phone on its side (568 px): the name, the three places and the face don't fit side by side below that. */
+  @media (min-width: 56.25rem), (orientation: landscape) and (max-height: 30rem) and (min-width: 35rem) {
     .bar {
       gap: var(--space-3);
       min-height: 72px;
@@ -772,7 +773,7 @@
   }
 
   /* A phone on its side, narrower than a big screen: the places closer together, so that they fit beside the name. */
-  @media (orientation: landscape) and (max-height: 30rem) and (max-width: 56.24rem) {
+  @media (orientation: landscape) and (max-height: 30rem) and (min-width: 35rem) and (max-width: 56.24rem) {
     .bar .places {
       gap: 2px;
       margin-left: auto;
