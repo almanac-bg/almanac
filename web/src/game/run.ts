@@ -65,11 +65,18 @@ function showing(run: number): void {
   }
 }
 
-/** Plays a run from where it stands; `done` draws what comes after its last answer. A duel is named over each
- * question as its page names it (`versus`: „Дуел с Мария“); played second (the run's
+/** Plays a run from where it stands; `done` draws what comes after its last answer, and `ending` hears that answer is
+ * in (while it shows: what comes after can be asked for meanwhile). A duel is named over each question as its page
+ * names it (`versus`: „Дуел с Мария“); played second (the run's
  * `against`), how the other's answer went (`them`, their name) shows once the player's own is in, never when they gave
  * it: a duel isn't a race. */
-export function playRun(initial: State, done: (s: State) => Child, versus = "", them = ""): Child {
+export function playRun(
+  initial: State,
+  done: (s: State) => Child,
+  versus = "",
+  them = "",
+  ending: () => void = () => {},
+): Child {
   const screen = slot();
   hold();
 
@@ -149,6 +156,7 @@ export function playRun(initial: State, done: (s: State) => Child, versus = "", 
       screen.show(() =>
         question(s, q, next, reload, versus, say, them, (now) => {
           last = now;
+          if (now.done) ending();
         }),
       );
       scrollTo(0, 0);
@@ -703,7 +711,15 @@ function question(
         inkable(fact(res.reveal.fact, res.reveal.day), s.kind === "day" && !!res.reveal.fact, !!res.ink),
         res.reveal.credit ? pictureCredit(res.reveal.credit) : null,
         res.reveal.credits?.length ? h("p", { class: "credit" }, creditsWords(res.reveal.credits)) : null,
-        upNext(lasts, res.state.done ? "Резултатът идва след малко…" : `Въпрос ${q.n + 2} идва след малко…`),
+        upNext(
+          lasts,
+          // A duel has no result page: its end is on its card in Приятели (DECISIONS.md).
+          res.state.done
+            ? versus
+              ? "Към дуела след малко…"
+              : "Резултатът идва след малко…"
+            : `Въпрос ${q.n + 2} идва след малко…`,
+        ),
         // „Напред“ on a foot of its own, opaque to the panel's edge: what scrolls in the panel never shows under it.
         h(
           "div",
@@ -718,7 +734,7 @@ function question(
                 moveOn();
               },
             },
-            res.state.done ? "Към резултата" : "Напред",
+            res.state.done ? (versus ? "Към дуела" : "Към резултата") : "Напред",
           ),
         ),
       ].map(waiting);

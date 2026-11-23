@@ -21,6 +21,8 @@ async function playSecond(page: Page, other: string): Promise<void> {
     await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
     await answer(page);
     await expect(page.locator(".their-line")).toContainText(`${other}:`);
+    // A duel has no result page: its last answer's way on goes to it, in Приятели.
+    if (n === 9) await expect(page.locator(".after .up-next-go")).toHaveText("Към дуела");
     await moveOn(page);
   }
 }
@@ -99,6 +101,14 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await expect(b).toHaveURL(/\/friends\?duel=\d+$/, { timeout: 10_000 });
   const result = b.locator(".duel-card.landed");
   await expect(result).toHaveClass(/s-(won|lost|draw)/);
+  // In one draw, the finished duels from their head at the screen's top (as far as the page goes), the new one marked.
+  await expect(result).toHaveClass(/\blit\b/);
+  expect(
+    await b.locator(".duels-played").evaluate((el) => {
+      const top = el.getBoundingClientRect().top;
+      return top >= 0 && (top <= 40 || scrollY >= document.documentElement.scrollHeight - innerHeight - 1);
+    }),
+  ).toBe(true);
   await b.keyboard.press("Shift"); // the moment, to its end
   await expect(result.locator(".duel-card-score")).toHaveText(/^\d+:\d+$/);
   await expect(result.locator(".duel-card-row")).toHaveCount(2);

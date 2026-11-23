@@ -163,7 +163,7 @@ export async function moveOn(page: Page): Promise<void> {
   // This answer's own button, and only it: the game moves on by itself a few seconds after it shows, and a tap that
   // comes later (a busy machine) must not wait for the next question's button and press that one, which would skip
   // the next question unanswered.
-  const go = page.locator(".after").getByRole("button", { name: /^(Напред|Към резултата)$/ });
+  const go = page.locator(".after").getByRole("button", { name: /^(Напред|Към резултата|Към дуела)$/ });
   const button = (await go.count()) ? await go.elementHandle({ timeout: 1000 }).catch(() => null) : null;
   await button?.click({ timeout: 5000 }).catch(() => {}); // gone already: the game moved on
   await button?.dispose();
