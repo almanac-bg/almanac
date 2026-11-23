@@ -157,8 +157,8 @@ test("a player's profile: asked to be friends from it, and friends there", async
   await expect(b.getByRole("button", { name: /^Дуел (с|със) / })).toBeVisible();
   // The duels between them so far, as numerals with their words under them: wins and losses, draws only where any.
   for (const [rec, want] of [
-    [{ won: 3, lost: 0, drawn: 0 }, ["3победи", "0загуби"]],
-    [{ won: 1, lost: 2, drawn: 1 }, ["1победа", "2загуби", "1равенство"]],
+    [{ won: 3, lost: 0, drawn: 0 }, ["3твои победи", "0твои загуби"]],
+    [{ won: 1, lost: 2, drawn: 1 }, ["1твоя победа", "2твои загуби", "1равенство"]],
   ] as const) {
     await b.route(`**/api/players/${ana.tag}`, async (route) => {
       const res = await route.fetch();

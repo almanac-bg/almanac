@@ -103,12 +103,20 @@ function crowdOnAll(buttons: HTMLElement[], crowd: Crowd | undefined, mine: numb
     else (b.querySelector(".pic-frame") ?? b).append(share);
     return [{ b, share, x }];
   });
+  // The shares are of every answer, the ones that ran out of time too (bank.Crowd: so that the right one's is the share
+  // right), so where some ran out they don't add up to 100 %: what's missing said under the answers, in its room now
+  // and unseen as the shares are, never „72 % + 22 %“ left to puzzle over.
+  const rest = c?.picks && shares.length ? 1 - c.picks.reduce((a, x) => a + x, 0) : 0;
+  const none =
+    Math.round(rest * 100) >= 1 ? h("p", { class: "crowd-none unseen" }, `Без отговор: ${percent(rest)}`) : null;
+  if (none) buttons[0]?.parentElement?.after(none);
   return () => {
     for (const { b, share, x } of shares) {
       b.classList.add("crowd");
       share.classList.remove("unseen");
       requestAnimationFrame(() => b.style.setProperty("--share", `${Math.round(x * 1000) / 10}%`));
     }
+    none?.classList.remove("unseen");
   };
 }
 

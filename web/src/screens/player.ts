@@ -154,8 +154,8 @@ function relation(p: Profile, reload: () => Promise<unknown>): Child {
         ? h(
             "p",
             { class: "player-record" },
-            tally(r.won, "победа", "победи"),
-            tally(r.lost, "загуба", "загуби"),
+            tally(r.won, "твоя победа", "твои победи"),
+            tally(r.lost, "твоя загуба", "твои загуби"),
             r.drawn ? tally(r.drawn, "равенство", "равенства") : null,
           )
         : line("Още нямате дуели.");

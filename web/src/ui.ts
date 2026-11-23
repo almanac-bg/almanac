@@ -507,10 +507,17 @@ export function stakeLine(days: number, spare: boolean): Child {
 export const games = (n: number) => `${n} ${n === 1 ? "игра" : "игри"}`;
 /** A count of questions: 1 въпрос, 2 въпроса. */
 export const questions = (n: number) => `${n} ${n === 1 ? "въпрос" : "въпроса"}`;
-/** Duels between two players, the way it's said: „2 победи, 1 загуба, 1 равенство“ (draws only when there are some). */
+/** Duels between two players, the way it's said to one of them: „печелиш 2, губиш 1, 1 равенство“, by verbs, so whose
+ * wins they are is never in doubt (each part only when there are some; „2 победи“ under a friend's name read as
+ * theirs as well as one's own). */
 export const record = (won: number, lost: number, drawn: number) =>
-  `${won} ${won === 1 ? "победа" : "победи"}, ${lost} ${lost === 1 ? "загуба" : "загуби"}` +
-  (drawn ? `, ${drawn} ${drawn === 1 ? "равенство" : "равенства"}` : "");
+  [
+    won ? `печелиш ${won}` : "",
+    lost ? `губиш ${lost}` : "",
+    drawn ? `${drawn} ${drawn === 1 ? "равенство" : "равенства"}` : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
 
 /** How a player shows to others: their avatar (a shape). */
 export interface Look {

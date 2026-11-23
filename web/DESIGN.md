@@ -166,7 +166,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   either side of „Страница 2 от 4“, each off at its end, each page a link of its own (back is the page before;
   owner, 2026-11-23). From ten facts, a search over them („Търси факт“); fewer are read at a
   glance. What a search found is marked in each entry (its question, headword and fact) in a soft tone of the
-  chapter's colour under the full ink, never split by a soft hyphen. Where grey first shows: „С мастило са фактите от верните ти отговори в броя на деня. Всички други, които срещнеш, са в сиво.“
+  chapter's colour under the full ink, never split by a soft hyphen. What ink and grey are is said at the book's head only, never again over a chapter's facts (each entry's chip says which it is).
   Its game's result: on the chapter's sheet its chip, the score and its tiles; under it, with no number (grey is never
   counted), „Фактите от играта са в твоя Алманах, в сиво.“ While the day's issue waits, „Към днешния брой“ is the
   action, the streak's stake under it; once it's played, „Още десет въпроса“ the action. The other ways on are quiet
@@ -181,7 +181,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   to play stays first on the page until it's played); one the player sent, the friend's to play, isn't listed
   (owner, 2026-11-22: it only muddled the list), but for the one just played, as it lands, once; „Приятели (5)“, „Премахни приятел“ at the right, a friend's yes to a request one line over the friends,
   told once, then a row each friend: avatar, the name across the row, never cut, and under it the duels
-  between the two in words, quiet, the record heavier („Дуели помежду ви: 3 победи, 1 загуба“, with „равенства“ if
+  between the two in words, quiet, the record heavier („Дуели помежду ви: печелиш 3, губиш 1“, with „равенства“ if
   any; „Още нямате дуели“ before the first): never the friend's day, which is the board's (owner, 2026-11-22);
   „Дуел“ at the row's end, a button (`.btn.inline`, 44px high), the one way to start a duel here (the other is the
   friend's profile): there is no „Нов дуел“ and no picker. While three duels the player sent wait for the friend
@@ -191,8 +191,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   ги играе, когато може. И всеки ден ще виждате как сте изиграли днешния брой. Добави приятел по потребителско име
   или имейл.“ A friend removed only after a sheet asks „Премахваш ли Иво от приятелите си?“, „Премахни“ in red and
   „Отказ“, then at once, the duels open between them ending as if their time were up; then adding, with the player's
-  own name to be added by under the field („Твоето потребителско име е @ivo.“), and the requests sent; last, the duels played, under „Последните 10 изиграни дуела“ („Изиграни дуели“ while there are fewer: the
-  list is the last ten and says so); under the last, while there are more, „Всички изиграни дуели (37)“ opens them
+  own name to be added by under the field („Твоето потребителско име е @ivo.“), and the requests sent; last, the duels played, under „Последните 10 завършени дуела“ („Завършени дуели“ while there are fewer: the
+  list is the last ten and says so); under the last, while there are more, „Всички завършени дуели (37)“ opens them
   all in a dialog (`.duels-all`, as the questions' sheet: its head stays as the cards scroll under it), ten at a
   time, the latest first, each a card as in the list, and under them „По-нови“ and „По-стари“ either side of
   „Страница 2 от 4“, each off at its end (owner, 2026-11-22). All there is of a duel is in Приятели: there is no page of its result
@@ -252,7 +252,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   от 58 дни без прекъсване“; only as it is now: never the
   longest nor an ended one's, nothing while none runs, and not what the week forgives: that's theirs), right under
   the head a card of how you stand: its kicker („Приятели“, „Покана за приятелство“, „Не сте приятели“); as
-  friends the duels between you as heavy numerals with their words under them („3 / победи“, „0 / загуби“, and
+  friends the duels between you as heavy numerals with their words under them („3 / твои победи“, „0 / твои загуби“, and
   „равенства“ only where there are any; „Още нямате дуели.“ before any) and „Дуел“ its one primary button, the row's
   width on a phone; else a line and its buttons (ask to be friends, answer their asking, call it off); the same seals; nothing of one's own
   (Смени, Настройки). A link to oneself, wherever one's name is (a board, the friends, a duel), goes to Профил

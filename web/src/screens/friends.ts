@@ -2,7 +2,8 @@
 // once): who asks to be friends; the duels open („Чакащи дуели“: a friend's waiting for you first, yours waiting for
 // them), first while there are any, for a duel to play stays first here until it's played; the friends, each with
 // their day, the duels between you and „Дуел“ (the one way to start one here), and the one way to make more (by
-// потребителско име or email, one's own said under it); and the last ten duels played („Изиграни дуели“, compact rows). Each duel holds all
+// потребителско име or email, one's own said under it); and the last ten duels played („Завършени дуели“, compact rows). Each duel holds all
+
 // there is of it (screens/duelcards.ts). A duel named in the address (`?duel=<id>`: one just played, or an old link
 // to it: screens/duel.ts) is first in its group. The day's board is on Днес's result (today.ts, dayBoard).
 
@@ -440,7 +441,7 @@ function addFriend(reload: () => Promise<void>): Child {
 }
 
 /** A friend: their name (with their @username only where another friend has the same name: `same`); under it the
- * duels between the two in words, the one count kept between two players („Дуели помежду ви: 3 победи, 1 загуба“;
+ * duels between the two in words, the one count kept between two players („Дуели помежду ви: печелиш 3, губиш 1“;
  * „Още нямате дуели“ before the first: owner, 2026-11-22, the words the new duel picker had; how they did today is
  * the day's board's); while three duels the player sent wait for them (`full`), a line that says so, and „Дуел“ off
  * until they play one; and „Дуел“, a button, at its end (while changing the list, „Премахни“ instead). */
