@@ -146,6 +146,7 @@ enough to be worth a look, not always.
 | `length` (hint) | A question reads no longer than its kind's usual allows: `bank.Reading` (the letters and digits it shows, a picture as 24) past the kind's third quartile by twice the spread of its middle half. The clock gives time by length (`play.Limit`), so a long one runs long for everyone: say it shorter, drop a clause the answer doesn't need |
 | `same-identity` | A "who or what is this" answer (a picture choice, clues) is asked once |
 | `twin` † | Two choices (or clues) over one set of options — three of four shared, each offered by few questions — ask one thing twice: the same answer, or mirrored (Карлоф or Лугоши, each the other's wrong option). Give one other options, or keep the better one |
+| `near` (hint) | Two questions don't ask one fact in other words: a choice reworded with other options, a true-or-not of a choice's fact, two numbers of one quantity, one whose words answer another („Кой италиански град е люлка на Ренесанса?“ for „В коя държава е Флоренция?“). Read by their words (`internal/bank/near.go`): alike enough, each one's answer in the other, and one says nothing the other doesn't. About half its pairs are real: keep the better one or ask another fact; waive a false one with the two facts as its `why` |
 
 **A true exception** (a proverb to finish ends without „?“; a question about the word „таг“ itself) goes into the
 bank's `waivers.json`, with its reason: `[{"id": "gen-085", "rule": "ending", "why": "поговорка за довършване"}]`.
@@ -268,8 +269,8 @@ By type:
   (games mix topics). Grep the bank for the answer and the key words before adding.
 - **Nothing goes stale.** No „сегашният“, „последният“ or „най-новият“ unless pinned to a date („към 2026 г.“), and
   add `reviewBy` for anything that can change (the `stale` rule finds the wording that needs it).
-- **No near-duplicates.** Grep the bank for the subject first. The checker catches identical texts, and the same
-  options asked twice (`twin`); the rest is yours.
+- **No near-duplicates.** Grep the bank for the subject first. The checker catches identical texts, the same
+  options asked twice (`twin`), and points at one fact asked in other words (`near`, a hint); the rest is yours.
 - **No subject everywhere.** A subject (Наполеон, „Титаник“, „Дисни“) stays under 1% of a category: past that, a
   player who plays daily meets it again and again. Write away from the subjects `bank subjects` marks with `*`, and
   never a second "who or what is this" question with an answer one already has (the `same-identity` rule): keep the

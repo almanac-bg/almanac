@@ -59,6 +59,9 @@ What the rules ask (the questions skill has the details):
   if it is still so and may change.
 - **twin**: give one of the two other options of the same kind (or replace the weaker, `why`: twin): the change goes
   to the newer one unless the older is the weaker.
+- **near** (a hint, about half of its pairs real): read both. If meeting one answers the other, replace the weaker
+  (`why`: twin) or make one ask another fact about its subject; if they ask two facts, waive it on the newer one
+  (`why` says the two facts).
 - **number-rank** (the answer of a choice of numbers mostly second or third): move the wrong options, not the
   answer, so the answer becomes the smallest or the largest of the four where the bank lacks those; each new wrong
   number plausible and wrong under every source, never another question's value next to the same subject.
