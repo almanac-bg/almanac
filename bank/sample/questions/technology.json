@@ -149,7 +149,10 @@
     "answer": true,
     "fact": "Стив Джобс го показва на 9 януари 2007 г. в Сан Франциско.",
     "added": "2026-11-13",
-    "updated": "2026-11-13",
+    "updated": "2026-11-23",
+    "retired": true,
+    "retiredWhy": "twin",
+    "replacedBy": "tec-965",
     "theme": "devices"
   },
   {
@@ -214,5 +217,19 @@
     "fact": "Първият уебсайт, пуснат през 1991 г., и днес може да се види на адрес info.cern.ch.",
     "added": "2026-11-14",
     "updated": "2026-11-14"
+  },
+  {
+    "id": "tec-965",
+    "type": "truefalse",
+    "difficulty": "easy",
+    "text": "Телефонът е изобретен от Томас Едисон.",
+    "answer": false,
+    "fact": "Първия патент за телефон получава Александър Греъм Бел през 1876 г. Едисон по-късно го подобрява с въгленов микрофон.",
+    "added": "2026-11-23",
+    "updated": "2026-11-23",
+    "checked": "2026-11-23",
+    "checkedBy": "twins fable-5.2",
+    "theme": "inventions",
+    "sources": ["https://en.wikipedia.org/wiki/Invention_of_the_telephone"]
   }
 ]

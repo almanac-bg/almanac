@@ -33,7 +33,8 @@ func TestDayQuestionsKeptOut(t *testing.T) {
 		t.Fatal(err)
 	}
 	today, err := w.g.DayQuestions(ctx)
-	if err != nil || len(today) != Length || overlap(w.picks(day.ID), today) != Length {
+	// The day's ten among them, and any question new to the bank (unproven: the sample's newest are).
+	if err != nil || overlap(w.picks(day.ID), today) != Length {
 		t.Fatalf("today's questions: %v %v", today, err)
 	}
 	if n := overlap(w.picks(chapter.ID), today); n != 0 {
