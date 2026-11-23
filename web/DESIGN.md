@@ -228,8 +228,9 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   title, as every sheet that's gone through has it.
   A duel named in the address (`?duel=<id>`: its game just ended, or an old link to its page) is first in its group,
   brought into sight, and its result lands there once (`feel.duel`: the marks fill pair by pair, the score counts
-  up, the chip lands with the end's sound), never again. The record between two is the friend's row's, never a duel's. Friends are added in one field, „име или
-  имейл“; requests sent wait under „Изпратени покани“. Only two friends of one name show their @username. The
+  up, the chip lands with the end's sound), never again. The record between two is the friend's row's, never a duel's. Friends are added in one field under „Добави приятел“, „име или
+  имейл“; requests sent wait under „Изпратени покани (2)“, each section headed alike (`.sect-head`). A request to the
+  player is a card as every card is, no frame of its own, „Приеми“ and „Откажи“ under the name, on its edge. Only two friends of one name show their @username. The
   questions' dialog (above) says under its head whose duel it is and its score, each question with how it went for
   the two.
 - **Профил:** one column, on a big screen too: the avatar with a pencil on its top corner (a phone: always; a big screen: as the pointer

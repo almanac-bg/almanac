@@ -179,6 +179,8 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await b.getByRole("button", { name: "Добави", exact: true }).click();
   await expect(b.getByText("Поканата до Ана Петрова е изпратена.")).toBeVisible();
   await expect(b.locator(".waiting")).toContainText("Ана Петрова");
+  // Adding and the requests sent each a section, headed as every section of the page is.
+  await expect(b.locator(".sect-head h2")).toContainText(["Добави приятел", "Изпратени покани (1)"]);
   // Its name a link as every player's name is: one rule for all of them, never underlined only in part.
   expect(await linkedNames(b)).toEqual([]);
 

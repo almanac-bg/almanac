@@ -231,7 +231,7 @@ function page(kit: Kit): Child {
     return d ? duelGroup(kit, which, d, top(), brought, sight) : null;
   };
 
-  return [invitations(), group("open"), friendsList(), group("played")];
+  return [invitations(), group("open"), friendsList(), adding(), group("played")];
 
   /** Who asks to be friends, at the page's top: each as every row of players has them (their avatar and name, a way
    * to their profile), what they ask on a line of its own under the name, and the two answers. */
@@ -332,14 +332,22 @@ function page(kit: Kit): Child {
             );
       },
       // Outside the parts drawn again on each look (every 15 s): drawn again, its field would lose the focus mid-word.
-      when(data, () => adder),
+      () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    );
+  }
+
+  /** Adding a friend, a section of its own headed as every other („Добави приятел“), and under it the requests sent
+   * that wait for an answer („Изпратени покани (2)“), each with „Отмени“. */
+  function adding(): Child {
+    return when(data, () => [
+      h("section", { class: "sect friends-add" }, h("div", { class: "sect-head" }, h("h2", null, "Добави приятел")), adder),
       () => {
         const out = data()?.requests.out ?? [];
         return out.length
           ? h(
-              "div",
-              { class: "waiting-for" },
-              h("p", { class: "kicker" }, "Изпратени покани"),
+              "section",
+              { class: "sect waiting-for" },
+              h("div", { class: "sect-head" }, h("h2", null, `Изпратени покани (${formatNumber(out.length)})`)),
               h(
                 "ul",
                 { class: "rows waiting" },
@@ -357,8 +365,7 @@ function page(kit: Kit): Child {
             )
           : null;
       },
-      () => error() && h("p", { class: "bad", role: "alert" }, error()),
-    );
+    ]);
   }
 }
 

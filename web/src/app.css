@@ -6732,12 +6732,6 @@
     flex: 1 0 auto;
   }
 
-  .waiting-for {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-2);
-  }
-
   .waiting li {
     display: flex;
     align-items: center;
@@ -6752,24 +6746,21 @@
     overflow-wrap: anywhere;
   }
 
-  /* Someone asks to be friends: their line, „Приеми“ and „Откажи“, on a card over the list. */
+  /* Someone asks to be friends: their line, and under it „Приеми“ and „Откажи“, on a card over the list as every card
+     is (no frame of its own). */
   .invitation {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2) var(--space-3);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
     padding: var(--space-4);
-    border-radius: var(--r-2);
+    border-radius: var(--r-3);
     background: var(--surface);
-    box-shadow: inset 0 0 0 2px var(--line);
   }
 
   /* Who asks, a row of players' look, and what they ask under the name, on the name's edge (the avatar's 28px and
-     the row's 10px gap in). */
+     the row's 10px gap in); the answers on that edge too. */
   .invitation-who {
     display: grid;
-    flex: 1 1 12rem;
     gap: 2px;
     min-width: 0;
   }
@@ -6786,6 +6777,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2) var(--space-4);
+    padding-left: 38px;
   }
 
   /* Read by screen readers, not shown. */
