@@ -4298,7 +4298,6 @@
   /* A question gone over: a card of its own, a band in its verdict's colour on top; its number, chapter and how it went
      over the question (the strongest line), the answers, and the fact a quiet note under them. */
   .reviewed {
-    --v-ink: var(--ink-3);
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-3);
@@ -4308,27 +4307,41 @@
     box-shadow: none;
   }
 
-  .reviewed.right {
-    --v-ink: var(--ink);
-  }
-
-  .reviewed.close {
-    --v-ink: var(--ink);
-  }
-
   .reviewed-head {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: var(--space-1) var(--space-3);
     margin: 0;
   }
 
+  /* The question's number, then its chapter's chip. */
+  .reviewed-at {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .reviewed-n {
+    min-width: 1.25rem;
+    color: var(--ink-3);
+    font: 900 1.25rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* How it went, as a duel's side says it: the sign and the word, right in ink, the rest quieter. */
   .reviewed-says {
-    color: var(--v-ink);
-    font-size: 0.8125rem;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--ink-3);
+    font-size: 0.9375rem;
     font-weight: 800;
+  }
+
+  .reviewed-says.right {
+    color: var(--ink);
   }
 
   .reviewed .ask {

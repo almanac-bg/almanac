@@ -37,7 +37,8 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await page.getByRole("button", { name: /^7\. / }).click();
   const seventh = review.locator(".reviewed").nth(6);
   await expect(seventh).toHaveClass(/\blit\b/);
-  await expect(seventh.locator(".kicker")).toHaveText(/^7 · /);
+  await expect(seventh.locator(".reviewed-n")).toHaveText("7");
+  await expect(seventh.locator(".reviewed-head .chip")).toBeVisible();
   const [head, at] = [await review.locator(".sheet-head").boundingBox(), await seventh.boundingBox()];
   expect(Math.abs((at?.y ?? 0) - ((head?.y ?? 0) + (head?.height ?? 0)))).toBeLessThan(32);
   await page.keyboard.press("Escape");

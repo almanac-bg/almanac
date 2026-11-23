@@ -6,7 +6,6 @@ import { api, errorText } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { calm } from "../lib/prefs.ts";
 import { feelKit, play } from "../lib/sound.ts";
-import { chapters } from "../state.ts";
 import { avatar, chapterName, chip, fact, type Look, leaf, tiles, who } from "../ui.ts";
 import { type FriendDay, fewFriends, friendsLine, groupWords, markAt, shortName } from "./knew.ts";
 import { closeLine, closeWords } from "./numbers.ts";
@@ -326,11 +325,20 @@ function reviewed(all: Reviewed[], versus?: Versus, friends: FriendDay[] = []): 
       return h(
         "article",
         { class: `reviewed ${kind === "missed" ? "wrong" : kind} ch-${it.chapter}`, "data-n": it.n },
+        // Its number and its chapter's chip (the glyph and the name: wherever a chapter is, its glyph is), and how
+        // it went with its sign, as a duel's sides say it.
         h(
           "p",
           { class: "reviewed-head" },
-          h("span", { class: "kicker" }, `${it.n + 1} · ${chapters.find((c) => c.id === it.chapter)?.name ?? ""}`),
-          versus ? null : h("span", { class: "reviewed-says" }, verdicts[kind][1]),
+          h("span", { class: "reviewed-at" }, h("span", { class: "reviewed-n" }, String(it.n + 1)), chip(it.chapter)),
+          versus
+            ? null
+            : h(
+                "span",
+                { class: kind === "right" ? "reviewed-says right" : "reviewed-says" },
+                h("span", { class: "duel-q-sign", "aria-hidden": "true" }, verdicts[kind][0]),
+                verdicts[kind][1],
+              ),
         ),
         h("h3", { class: "ask" }, it.view.text),
         versus

@@ -140,8 +140,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
 - **The questions gone over** (`reviewSheet()`, `.review-sheet`): one dialog for every game (the day's issue, a
   chapter's game, a duel), on the game's sheet: „Въпросите“ and „Затвори“ at its head, which stays as the questions
   scroll under it; under it whose they are („Брой 11 · 22 ноември · 7 от 10“, „История · 6 от 10“, „Дуел с Иво ·
-  8:6“); then a card a question: its number and chapter, how it went (never a true-or-not's answer: „Точно“,
-  „Грешно“, „Близо“, „Без отговор“), the question, the answers as given with the right one, how others answered, the
+  8:6“); then a card a question: its number and its chapter's chip (`chip()`), how it went with its sign, as a duel's
+  sides say it (never a true-or-not's answer: „✓ Точно“ in ink, „✕ Грешно“, „◩ Близо“, „– Без отговор“ quieter), the question, the answers as given with the right one, how others answered, the
   fact, and „Нещо не е наред с въпроса?“. In a duel, in place of the one word, how it went for the two side by side
   under the question, each half the row (the small avatar, „✓ Точно“ in ink, „✕ Грешно“, „◩ Близо“, „– Без отговор“
   quieter: a question that parted them shows at a glance). On a phone it never takes the whole height: the page shows
