@@ -4,7 +4,7 @@
 import { append, type Child, effect, h, listen, onCleanup, type Signal, signal } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { play } from "../lib/sound.ts";
-import { hyphenate, listWords, withWord } from "../lib/words.ts";
+import { hyphenate, keepShort, listWords, withWord } from "../lib/words.ts";
 import { formatNumber, formatValue, type VerdictKind } from "../ui.ts";
 import { percent, rare, withOwn } from "./numbers.ts";
 import { optionSizes, overSizes } from "./sizes.ts";
@@ -49,10 +49,12 @@ export interface Asked {
 
 /** A cell's words (a pair, a thing to sort, a group): each that may break (hyphenate) held whole in a `.word`, so that
  * it goes to the next line whole where it fits there („Ангел / Каралийчев“, not „Ангел Каралий-/чев“), and breaks, at
- * its syllables, only where it's wider than the cell itself. */
-export function wholeWords(text: string): Child {
-  return hyphenate(text)
-    .split(/(\S*­\S*)/)
+ * its syllables, only where it's wider than the cell itself. A one-letter word goes with the word after it
+ * (keepShort), in its `.word` too, so that the two never part: in a question (`asked`, a line wide enough) always, in
+ * a narrow cell only where that word is too short to break (else „В / България“ beats „В Бълга-/рия“). */
+export function wholeWords(text: string, asked = false): Child {
+  return hyphenate(keepShort(text, !asked))
+    .split(/([^ \t\n\r]*­[^ \t\n\r]*)/)
     .map((part, i) => (i % 2 ? h("span", { class: "word" }, part) : part));
 }
 

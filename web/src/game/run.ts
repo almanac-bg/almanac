@@ -209,7 +209,7 @@ function givenUp(g: GivenUp, total: number, on: () => void): Child {
     { class: "question given-up" },
     h("p", { class: "kicker" }, `Въпрос ${g.n + 1} от ${total} · ${chapterName(g.chapter)}`),
     h("p", { class: "muted" }, "Излезе, без да отговориш. Ето верния отговор."),
-    h("h1", { class: "ask" }, wholeWords(g.view.text)),
+    h("h1", { class: "ask" }, wholeWords(g.view.text, true)),
     picture(g.view),
     answered(g.view, g.reveal, null),
     fact(g.reveal.fact, g.reveal.day),

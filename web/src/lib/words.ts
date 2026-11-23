@@ -142,6 +142,17 @@ export function keepNumbers(text: string): string {
     .replace(/(\d)[ \t]+(?=(?:[°%‰]\S*|\p{L}{1,4}\.?)(?=[\s,;:.!?)“”»]|$))/gu, "$1 ");
 }
 
+/** A one-letter word (в, с, к, у, о, а, и) never left at a line's end: a no-break space between it and the word after
+ * it („в\u00a0България“), as Bulgarian typesetting has it. Only the line keeps them together, as keepNumbers. */
+export function keepShort(text: string, short = false): string {
+  return text.replace(short ? shortBefore : anyBefore, "$1\u00a0");
+}
+
+const anyBefore = /(?<![\p{L}\p{N}])([вскуоаи])[ \t]+(?=\S)/giu;
+/** Before a word too short to break (hyphenate: under seven letters): in a narrow cell, a one-letter word kept with a
+ * longer one would break that word in two, which is worse than the one-letter word at a line's end. */
+const shortBefore = /(?<![\p{L}\p{N}])([вскуоаи])[ \t]+(?=[^\s\p{L}]*\p{L}{1,6}(?!\p{L}))/giu;
+
 /** How long a search of the book may be, in letters (play.AlmanacSearch). */
 const searchLetters = 60;
 

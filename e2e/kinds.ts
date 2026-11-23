@@ -65,8 +65,8 @@ function longestOf(qs: Q[], suffix = ""): { name: string; q: Q }[] {
   return out;
 }
 
-/** A cell's words as a player reads them (the soft hyphens a long word may break at left out). */
-const bare = (s: string | null) => (s ?? "").replaceAll("­", "").trim();
+/** A cell's words as a player reads them (the soft hyphens a long word may break at left out, a no-break space a space). */
+const bare = (s: string | null) => (s ?? "").replaceAll("­", "").replaceAll("\u00a0", " ").trim();
 
 /** Taps what `cells` shows `text` in (its words, its letter or key aside), by a click that needs no room on the
  * screen: at twice the text „Готово“ may be over it, as it is over what scrolls under it. */
@@ -74,8 +74,10 @@ async function tapText(page: Page, cells: string, text: string, part = ":scope >
   const all = page.locator(cells);
   const i = await all.evaluateAll(
     (els, [text, part]) =>
-      els.findIndex((e) => (e.querySelector(part)?.textContent ?? "").replaceAll("­", "").trim() === text),
-    [text, part] as const,
+      els.findIndex(
+        (e) => (e.querySelector(part)?.textContent ?? "").replaceAll("­", "").replaceAll("\u00a0", " ").trim() === text,
+      ),
+    [bare(text), part] as const,
   );
   if (i < 0) throw new Error(`no „${text}“ in ${cells}`);
   await all.nth(i).dispatchEvent("click");
@@ -119,11 +121,11 @@ export async function answerAs(page: Page, q: Q, how: How): Promise<void> {
       const items = [...(q.items ?? [])].sort((a, b) =>
         q.direction === "desc" ? (b.value ?? 0) - (a.value ?? 0) : (a.value ?? 0) - (b.value ?? 0),
       );
-      const want = items.map((i) => i.text);
+      const want = items.map((i) => bare(i.text));
       if (how !== "right") want.reverse();
       for (const [place, text] of want.entries()) {
         const now = await rows.evaluateAll((els) =>
-          els.map((e) => (e.children[1]?.textContent ?? "").replaceAll("\u00ad", "")),
+          els.map((e) => (e.children[1]?.textContent ?? "").replaceAll("\u00ad", "").replaceAll("\u00a0", " ")),
         );
         const at = now.indexOf(text);
         if (at === place) continue;

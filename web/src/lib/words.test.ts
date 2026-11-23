@@ -9,6 +9,7 @@ import {
   issueOf,
   issueWords,
   keepNumbers,
+  keepShort,
   leftWords,
   searchWords,
   stakeWords,
@@ -168,6 +169,20 @@ test("a number stays with its unit, a short word after it, and its own thousands
   assert.equal(keepNumbers("около 3 млн. души, 45 % от тях"), `около 3${nb}млн. души, 45${nb}% от тях`);
   assert.equal(keepNumbers("13 000 реда"), `13${nb}000${nb}реда`);
   assert.equal(keepNumbers("през 2010 година"), "през 2010 година");
+});
+
+test("a one-letter word stays with the word after it at a line's end", () => {
+  const nb = "\u00a0";
+  assert.equal(keepShort("Роден в България"), `Роден в${nb}България`);
+  assert.equal(keepShort("В Пловдив и в София"), `В${nb}Пловдив и${nb}в${nb}София`);
+  assert.equal(keepShort("Кафе с мляко, а не чай"), `Кафе с${nb}мляко, а${nb}не чай`);
+  // Not a word's last letter, nor a letter with a point after it.
+  assert.equal(keepShort("Дунав и о. Крит"), `Дунав и${nb}о. Крит`);
+  assert.equal(keepShort("река Дунав"), "река Дунав");
+  // In a cell, only with a word too short to break.
+  assert.equal(keepShort("В България", true), "В България");
+  assert.equal(keepShort("С лък", true), `С${nb}лък`);
+  assert.equal(keepShort("в „Тракия“", true), `в${nb}„Тракия“`);
 });
 
 test("a search's words as the server takes them: in lower case, between spaces, its first 60 letters", () => {
