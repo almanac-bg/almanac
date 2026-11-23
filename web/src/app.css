@@ -5887,14 +5887,27 @@
     height: 44px;
   }
 
-  .streak-chip.unlit .streak-flame {
-    filter: grayscale(0.4);
-    opacity: 0.85;
+  /* Unlit, while the day's ten wait: the flame's outline alone, hollow, in a quiet ink (its art greyed read as faded,
+     broken); the day played lights it. Its silhouette is the art's second path (art/pictures.ts, flame). */
+  .streak-chip.unlit .streak-flame path {
+    display: none;
   }
 
+  .streak-chip.unlit .streak-flame path:nth-child(2) {
+    display: inline;
+    fill: none;
+    stroke: var(--ink-3);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+  }
+
+  /* As wide as two digits whatever the number, so its words start in one place from day to day. */
   .status-n {
+    flex: none;
+    min-width: 0.95em;
     font: 900 3.25rem / 0.82 var(--font-numeral);
     font-variant-numeric: tabular-nums;
+    text-align: center;
   }
 
   .status-text {

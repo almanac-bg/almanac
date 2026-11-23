@@ -68,7 +68,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   - On a phone the cover is under half the screen (its date sized by the height), so that „Започни“ is whole by 500px
     on 320 × 568 and 540px on 375 × 600 (`layout.spec.ts`). With large text its display type stays near its usual size
     (the date by the height) and „Около три минути“ gives way (`.issue-time`), so the cover never fills the screen.
-  - The streak (`.streak-chip`): the flame, the number and „дни без прекъсване“ (one: „ден“), from its first day (owner,
+  - The streak (`.streak-chip`): the flame (unlit while the day waits: its outline alone, hollow, in `--ink-3`), the
+    number (two digits wide, so the words stay put) and „дни без прекъсване“ (one: „ден“), from its first day (owner,
     2026-11-23: a player's second day showed nothing of the first; now „1 ден без прекъсване · С днешния брой серията
     ти става 2.“); under it one line: what came of the days just missed (told once), a day the week forgave, or while
     the day waits what it makes of the streak (`stakeLine`). With no streak running, what came of the days just missed
