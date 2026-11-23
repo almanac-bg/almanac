@@ -2373,7 +2373,8 @@
     display: grid;
     place-items: center;
     min-height: 3.375rem;
-    border: 2px solid var(--line);
+    /* The answers' frame: a key that answers looks as live as an answer does. */
+    border: 2px solid var(--line-2);
     border-radius: 14px;
     background: var(--surface);
     color: var(--ink);
@@ -8120,6 +8121,11 @@
 
     .run-question .chip {
       justify-self: start;
+    }
+
+    /* A number's pad the column's width, as the answer that takes its place: the column doesn't jump. */
+    .run-question .number {
+      max-width: none;
     }
 
     .playing main > :is(.run-question, :has(.run-question)) {
