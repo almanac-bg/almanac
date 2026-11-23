@@ -892,6 +892,34 @@ test.describe("on a laptop, 1366 × 650", () => {
     });
 });
 
+// A number's pad has the most to fit under its question: on a phone of a usual height, the longest number question
+// the bank has (the real bank's too, where it's here) leaves the pad and „Отговори“ whole in sight under it.
+test.describe("a number's pad on a 375 × 812 phone", () => {
+  test.use({ viewport: { width: 375, height: 812 }, hasTouch: true });
+
+  test("the longest number questions: every key and „Отговори“ in sight", async ({ page }) => {
+    const all = kinds().filter((k) => k.q.type === "number");
+    await page.goto("/");
+    await dealt(
+      page,
+      "history",
+      all.map((k) => k.q.id),
+    );
+    await page.goto("/play/history");
+    await page.getByRole("button", { name: "Продължи", exact: true }).click();
+    await page.locator(".get-ready .btn.primary").click();
+    for (const [n, { name, q }] of all.entries()) {
+      await expect(page.locator(".question-head")).toContainText(`${n + 1} от ${all.length}`, { timeout: 10_000 });
+      await expect(page.locator("article.question .keypad")).toBeVisible();
+      await settled(page);
+      expect.soft(await unseenAnswers(page), `${name} (${q.id})`).toEqual([]);
+      await answerAs(page, q, "right");
+      await expect(page.locator(".after .up-next-go")).toBeVisible({ timeout: 40_000 });
+      await next(page);
+    }
+  });
+});
+
 test.describe("turned", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
   test.skip(({ browserName }) => browserName === "firefox", "a computer's Firefox has no touch screen");

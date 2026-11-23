@@ -7857,6 +7857,36 @@
     }
   }
 
+  /* A phone of a usual height (a short one has all this already, below), a number's pad asked (the most there is to
+     fit under a question): the sheet as tall as its words, its chip folded to its glyph, the question a size smaller,
+     as an order's or pairs' are, so that every key and „Отговори“ show under the longest question. */
+  @media (max-width: 47.99rem) and (min-height: 43.76rem) {
+    .run-question:not(.answered):has(.keypad) .q-leaf {
+      gap: 10px;
+      min-height: 0;
+      padding: 14px 16px 18px;
+    }
+
+    .run-question:not(.answered):has(.keypad) .chip {
+      padding-right: 3px;
+    }
+
+    .run-question:not(.answered):has(.keypad) .chip-name {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .run-question:not(.answered):has(.keypad) .ask {
+      padding-right: 0;
+      font-size: calc(10px + 0.625rem);
+      line-height: 1.22;
+    }
+  }
+
   /* A short phone (Safari's 664px and 600px of a 390px and a 375px one): the sheet, the question, the answers and the
      pad a little smaller, so that all of it fits over the action at the foot. */
   @media (max-width: 47.99rem) and (max-height: 43.75rem) {
