@@ -134,6 +134,8 @@ function page(kit: Kit): Child {
   // Brought into sight once this visit, as the page opens (duelcards.ts).
   const sight = { done: false };
   const error = signal("");
+  // Where the error is said: by the list (most of what fails), or by the requests sent, whose „Отмени“ is below it.
+  const errorAt = signal<"list" | "sent">("list");
   // The list that couldn't load (with nothing of it shown yet): the failure, and the way to try again.
   const failed = signal<unknown>(null);
   const editing = signal(false);
@@ -179,8 +181,9 @@ function page(kit: Kit): Child {
   }, 15_000);
   onCleanup(() => clearInterval(every));
 
-  const act = async (fn: () => Promise<unknown>) => {
+  const act = async (fn: () => Promise<unknown>, at: "list" | "sent" = "list") => {
     error.set("");
+    errorAt.set(at);
     try {
       await fn();
     } catch (err) {
@@ -222,11 +225,11 @@ function page(kit: Kit): Child {
       await api("POST", `/api/friends/requests/${r.id}/accept`, {});
       await load();
     });
-  const drop = (r: Request) =>
+  const drop = (r: Request, at: "list" | "sent" = "list") =>
     act(async () => {
       await api("DELETE", `/api/friends/requests/${r.id}`);
       await load();
-    });
+    }, at);
   // A duel with a friend: started (theirs to play once the player has), and played on its page.
   const challenge = (f: Friend) =>
     act(async () => {
@@ -345,7 +348,7 @@ function page(kit: Kit): Child {
             );
       },
       // Outside the parts drawn again on each look (every 15 s): drawn again, its field would lose the focus mid-word.
-      () => error() && h("p", { class: "bad", role: "alert" }, error()),
+      () => error() && errorAt() === "list" && h("p", { class: "bad", role: "alert" }, error()),
     );
   }
 
@@ -376,13 +379,14 @@ function page(kit: Kit): Child {
                     r.email
                       ? h("span", null, emailWords(r.email))
                       : h("a", { href: profileHref(r.tag ?? "") }, nameWords(r.name ?? "")),
-                    h("button", { class: "link muted tap", type: "button", onclick: () => drop(r) }, "Отмени"),
+                    h("button", { class: "link muted tap", type: "button", onclick: () => drop(r, "sent") }, "Отмени"),
                   ),
                 ),
               ),
             )
           : null;
       },
+      () => error() && errorAt() === "sent" && h("p", { class: "bad", role: "alert" }, error()),
     ]);
   }
 }

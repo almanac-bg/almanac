@@ -337,6 +337,9 @@ test.describe("on a computer", () => {
         if (/\d/.test(k.key)) await page.keyboard.press(k.key);
         else await page.evaluate((key) => document.dispatchEvent(new KeyboardEvent("keydown", { key })), k.key);
         await expect(options.nth(k.at)).toHaveClass(/right|wrong/);
+        // Enter goes on once the way on shows (with the fact, a moment after the verdict), as a player sees it; one
+        // pressed sooner is nothing, and the game would move on by itself only some ten seconds later.
+        await expect(page.locator(".after .up-next-go")).toBeVisible();
         await page.keyboard.press("Enter");
         keyed++;
         continue;
