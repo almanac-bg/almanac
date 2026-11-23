@@ -973,3 +973,42 @@ func (g *Game) recordsOf(ctx context.Context, userID int64) (map[int64]Record, e
 	}
 	return out, rows.Err()
 }
+
+// Waiting is the duels friends have sent a player and they haven't played yet, as Днес shows them (owner,
+// 2026-11-23): the first challenged, from whom, and how many more wait. On the cover, under the streak; once the day
+// is played, the result's action.
+type Waiting struct {
+	// ID is the first of them to play: the earliest sent (the first to lapse), as Приятели stacks them.
+	ID   int64     `json:"id"`
+	From *DuelSide `json:"from"`
+	// More is how many others wait besides it.
+	More int `json:"more"`
+}
+
+// DuelsWaiting is a player's Waiting: nil when no friend's duel waits for them. A light read (one row and its sender),
+// for it's asked with every look at Днес; Приятели's whole list is DuelsOf.
+func (g *Game) DuelsWaiting(ctx context.Context, userID int64) (*Waiting, error) {
+	var w Waiting
+	var from sql.NullInt64
+	var all int
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT d.id, d.a_id, count(*) OVER () FROM duels d
+		LEFT JOIN runs r ON r.id = d.b_run
+		WHERE d.b_id = ? AND d.sent_at IS NOT NULL AND d.ended_at IS NULL AND r.finished_at IS NULL
+		ORDER BY d.expires_at, d.id LIMIT 1`, userID).Scan(&w.ID, &from, &all)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	w.More = all - 1
+	if from.Valid {
+		if w.From, err = g.duelSide(ctx, from.Int64, 0); err != nil {
+			return nil, err
+		}
+	}
+	if w.From == nil {
+		w.From = &DuelSide{Name: GoneName, Gone: true}
+	}
+	return &w, nil
+}

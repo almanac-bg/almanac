@@ -1,13 +1,13 @@
 // Днес, the first of the three places: the day's issue. Its dateline („Брой 9“ · „Петък, 20 ноември“), the date set
 // large, „Десет въпроса за днес.“ and „Започни“ (left half-way, where the player stopped and „Продължи“; come by a
 // shared day's link, the score shared over the same ten). A new visitor has the cover alone; a player has beside it
-// the streak and this week, the friends' day, and the way to their book. Once the day is played, the issue is its
+// the streak and this week, a friend's duel waiting, and the way to their book. Once the day is played, the issue is its
 // result (as it lands, and on every later visit): the score and its shape, how it went among everyone, sharing it
 // (game/share.ts, in a sheet with its card and its text), what its right answers wrote in the book (its ink, by
-// chapter, and a rank risen: game/news.ts), tomorrow (when the next issue comes, the streak it makes, the reminder's ask),
+// chapter, and a rank risen: game/news.ts), the streak with today's in it, the reminder's ask,
 // and the day's board, among friends and of all България (dayBoard). A wrong game is
-// never celebrated. A chapter is played from its page in the Алманах, duels from Приятели (a friend's duel waiting
-// is its dot, a friend's yes its line). Once, under the streak: what came of the days just missed. Once, over the day:
+// never celebrated. A chapter is played from its page in the Алманах, duels from Приятели (a friend's yes is its line);
+// a friend's duel waiting is on Днес too, under the streak, and the result's action once the day is played. Once, under the streak: what came of the days just missed. Once, over the day:
 // what came of a step just taken (a profile signed in to, a game brought here). In an app's own browser the result's action
 // is the way out to the phone's browser with the game (keep.ts, exitWay), and the cover has a line for a game kept
 // there; a game brought here by it (its token in the address's fragment: takeHand) lands on the result, whose action
@@ -32,14 +32,16 @@ import { type RemindAsks, remindAnswered, remindAsks } from "../lib/keep.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { pushable, pushOn, turnOn } from "../lib/push.ts";
 import { go, goBack, hold, release, title } from "../lib/router.ts";
-import { dateWords, issueOf, onDay, stakeHour, weekday } from "../lib/words.ts";
+import { dateWords, issueOf, onDay, stakeHour, weekday, withWord } from "../lib/words.ts";
 import { cover, notice, player, playing, user } from "../state.ts";
 import {
+  avatar,
   chapterName,
   failure,
   formatNumber,
   glyph,
   leaf,
+  nameWords,
   scoreRow,
   segmented,
   stakeLine,
@@ -82,6 +84,9 @@ export interface Today {
   /** Yesterday's issue left half-way before midnight, while it can still be finished (play.Unfinished, DayGrace): its
    * day, issue, chapters and run, and until when (ms). Днес offers it first. */
   yesterday?: { day: string; issue: number; national?: string; chapters: string[] | null; run: State; until: number };
+  /** A friend's duel waiting for the player (play.DuelsWaiting): the first sent, from whom, how many more. On the
+   * cover under the streak; once the day is played, the result's action. */
+  duel?: { id: number; from: { name: string; look?: { avatar?: string } }; more: number };
   /** Днес drawn for yesterday's issue (lateView): until when it can be finished, and the way on to today's. */
   late?: { until: number; today: () => void };
 }
@@ -298,10 +303,10 @@ export function today() {
       // Come from the streak's mail to a browser signed out: the way in comes first, open.
       fromMail && !user.peek()?.email ? haveProfile(load) : null,
     ];
-    // What came of the days just missed, once: under the streak, before the day is played. The result says nothing of
-    // the streak, so there it's only kept as told. On an evening the streak ends at midnight without the day, the
+    // What came of the days just missed, once: under the streak, before the day is played. The result has the streak
+    // lit, with today's, and nothing of the days missed, so there it's only kept as told. On an evening the streak ends at midnight without the day, the
     // streak's line says that, and what came of the days missed waits, untold, for another visit.
-    const streakSaid = !run?.done && t.streak >= 3 && endsTonight(t) ? null : streakNotice(t);
+    const streakSaid = !run?.done && t.streak >= streakFrom && endsTonight(t) ? null : streakNotice(t);
     if (run?.done) return result(t, run, just, notices, load);
     // The player's numbers (Профил's): the streak's week, the facts in the book.
     const stats = signal<Stats | null>(null);
@@ -319,9 +324,10 @@ export function today() {
         { class: "today-side page-2" },
         issueGo(start(t), marks.length, failed, first),
         first ? null : streakSection(t, stats, false, streakSaid),
-        first || t.streak >= 3 || !streakSaid
+        first || t.streak >= streakFrom || !streakSaid
           ? null
           : h("p", { class: "streak-notice", role: "status" }, streakSaid.long),
+        first ? null : duelWaiting(t),
         first ? null : untold(t),
         // A new visitor's cover says once what the ten are (issueGo): no list of them again beside it.
         first ? null : contents(t),
@@ -474,14 +480,18 @@ function contents(t: Today): Child {
 /** Whether the streak ends at midnight without today's issue, and it's the evening (stakeWords): no day left to forgive. */
 const endsTonight = (t: Today) => t.streak >= 1 && !(t.spare ?? true) && hourInBulgaria() >= stakeHour;
 
+/** The streak shows from its first day (owner, 2026-11-23: on a player's second day, the one that decides whether they
+ * stay, Днес had nothing to show they'd been here, „1 ден без прекъсване · С днешния брой серията ти става 2.“). */
+const streakFrom = 1;
+
 /** The streak: its number and „дни без прекъсване“, and its one line under it: what came of the days just missed (`said`,
  * once), or a day the week forgave; while the day's ten wait (`done` false), it is at stake, unlit, and from the
- * evening, if it ends at midnight, that's said, before anything else. Nothing below three days (direction: the streak
- * shows from 3). */
+ * evening, if it ends at midnight, that's said, before anything else. Played (`done`), lit, with today's in it, on the
+ * result too. */
 function streakSection(t: Today, stats: () => Stats | null, done: boolean, said?: StreakSaid | null): Child {
   return () => {
     const days = t.streak;
-    if (days < 3) return null;
+    if (days < streakFrom) return null;
     const s = stats();
     const forgiven = !done && endsTonight(t) ? 0 : (s?.forgiven?.filter(Boolean).length ?? 0);
     return h(
@@ -581,9 +591,12 @@ function result(t: Today, run: State, just: boolean, notices: Child[], reload: (
   const askFirst = !away && guest && (handedIn.peek() || t.firstDay !== false);
   const ask = away || t.late ? null : remindAsk(t.day, stake, reload, askFirst);
   const first = away || askFirst;
-  // While the action is another (the ask, the way out), sharing stays a quiet link beside the tiles.
+  // A friend's duel waiting: the result's action, once the first results are past (owner, 2026-11-23); none for
+  // yesterday's issue finished late, whose way on is today's.
+  const duel = () => (first || t.late ? null : (fresh().duel ?? null));
+  // While the action is another (the ask, the way out, a duel), sharing stays a quiet link beside the tiles.
   const shareQuiet = () =>
-    away || (askFirst && (ask?.deciding() || ask?.showing())) ? shareLink(run, t, streak, known) : null;
+    away || duel() || (askFirst && (ask?.deciding() || ask?.showing())) ? shareLink(run, t, streak, known) : null;
   // 1. The score, the cover's heavy numeral on the sheet of the issue's first chapter.
   const hero = leaf(
     order[0] ?? "general",
@@ -625,7 +638,12 @@ function result(t: Today, run: State, just: boolean, notices: Child[], reload: (
       : askFirst
         ? () => (ask?.deciding() ? null : ask?.showing() ? ask.view : shareButton(run, t, streak, known))
         : null,
-    first ? null : shareButton(run, t, streak, known),
+    first
+      ? null
+      : () => {
+          const d = duel();
+          return d ? duelGo(d) : shareButton(run, t, streak, known);
+        },
   );
   // The left page is the player's own day: the score, what it wrote in the book, the action, tomorrow; the right page
   // is everyone's, the day's board, with the room to itself. On a phone, one column in that order.
@@ -644,6 +662,9 @@ function result(t: Today, run: State, just: boolean, notices: Child[], reload: (
       // 2. What the day wrote in the book. Asked on every visit: the ink is counted again; a rank risen is told once
       // (play.NewsOf).
       news(run.id, 0, undefined, best.set, "Днес в Алманаха"),
+      // The streak with today's in it, lit: the day just played is what made it (owner, 2026-11-23: it grew out of
+      // sight). Once the day as it stands has come.
+      () => (known() && !t.late ? streakSection(fresh(), () => null, true) : null),
       // 3. The action, once the first results are past.
       first ? null : action,
       // The day's questions, the player's own day's: on its page, never under the board (a phone had it after twenty
@@ -661,6 +682,37 @@ function result(t: Today, run: State, just: boolean, notices: Child[], reload: (
     ),
   );
   return page;
+}
+
+/** A friend's duel waiting, on the cover under the streak: who sent it, how many more wait, and „Играй“, the first
+ * sent (Приятели's stack has them all). Never the cover's action: that's the day's ten. */
+function duelWaiting(t: Today): Child {
+  const d = t.duel;
+  if (!d) return null;
+  return h(
+    "div",
+    { class: "duel-waiting" },
+    avatar(d.from.look?.avatar, { name: d.from.name }),
+    h(
+      "p",
+      { class: "duel-waiting-text" },
+      h("b", null, nameWords(d.from.name)),
+      " ти изпрати дуел.",
+      d.more
+        ? [" ", h("a", { href: "/friends" }, d.more === 1 ? "Още един те чака." : `Още ${d.more} те чакат.`)]
+        : null,
+    ),
+    h(
+      "a",
+      { class: "btn inline", href: `/duel/${d.id}`, "aria-label": `Играй дуела ${withWord(d.from.name)}` },
+      "Играй",
+    ),
+  );
+}
+
+/** The result's action while a friend's duel waits: that duel, „Играй дуела с Иво“. */
+function duelGo(d: NonNullable<Today["duel"]>): Child {
+  return h("a", { class: "btn primary result-duel-go", href: `/duel/${d.id}` }, `Играй дуела ${withWord(d.from.name)}`);
 }
 
 /** „Прегледай въпросите“: the day's questions and their facts, a tap away in their dialog. */

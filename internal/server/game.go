@@ -139,6 +139,15 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 			}
 			out["befriended"] = any
 		}
+		// A friend's duel waiting for the player: on the cover under the streak, and the result's action once the day
+		// is played (DECISIONS.md, owner 2026-11-23).
+		waiting, err := s.game.DuelsWaiting(ctx, u.ID)
+		if err != nil {
+			return nil, err
+		}
+		if waiting != nil {
+			out["duel"] = waiting
+		}
 	}
 	return out, nil
 }

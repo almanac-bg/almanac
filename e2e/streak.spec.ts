@@ -76,8 +76,18 @@ test("a week's streak on Днес, and the day played: no sheet over the result,
   await startDay(page);
   await playRun(page);
   await expect(page.locator(".summary .score-n")).toBeVisible();
+  // The streak on the result, lit, with today's in it: what the day just played made it.
+  await expect(page.locator(".summary .streak-chip:not(.unlit)")).toContainText("7дни без прекъсване");
   await expect(page.locator(".summary")).not.toContainText("Отбелязано");
   // Never a sheet over the result, whatever the game was.
   await page.waitForTimeout(1500);
   await expect(page.locator("dialog[open]")).toHaveCount(0);
+});
+
+test("a second day shows the first: the streak from its first day, and what today makes of it", async ({ page }) => {
+  await page.goto("/");
+  await daysPlayed(page, 1);
+  await page.reload();
+  await expect(page.locator(".streak-chip.unlit")).toContainText("1ден без прекъсване");
+  await expect(page.locator(".today-streak .day-stake")).toHaveText("С днешния брой серията ти става 2.");
 });
