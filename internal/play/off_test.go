@@ -9,7 +9,7 @@ import (
 
 // „Подсказки“ are off (bank.Off, the owner, 2026-11-23): the bank keeps them, but no game deals one: not the day's
 // issue nor the days drawn ahead, not a chapter's game, not a duel. A day drawn before with clues in it has a split of
-// its topic and difficulty in their place, the rest of it as drawn; today's, being played, stays as it is.
+// its chapter and difficulty in their place, the rest of it as drawn; today's, being played, stays as it is.
 func TestCluesNeverDealt(t *testing.T) {
 	w := setup(t)
 	w.use(biggerSample(t, 20))
@@ -62,7 +62,7 @@ func TestCluesNeverDealt(t *testing.T) {
 	// A chapter's game, in every chapter, for players new to it and for those who know it well.
 	for _, c := range b.Categories {
 		for range 4 {
-			s, err := w.g.StartTopic(ctx, w.user(), c.ID)
+			s, err := w.g.StartChapter(ctx, w.user(), c.ID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -80,7 +80,7 @@ func TestCluesNeverDealt(t *testing.T) {
 		dealt("a duel", w.picks(w.playSide(a, id, nil)))
 	}
 
-	// Tomorrow, drawn while clues were dealt, has one in its puzzle's place: a split of its topic and difficulty takes
+	// Tomorrow, drawn while clues were dealt, has one in its puzzle's place: a split of its chapter and difficulty takes
 	// it, the rest of the day stays.
 	today := w.g.Today()
 	tomorrow := DayShift(today, 1)

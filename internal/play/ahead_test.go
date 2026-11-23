@@ -54,12 +54,12 @@ func TestDaysAhead(t *testing.T) {
 			seen[p.ID] = true
 		}
 	}
-	// A topic game deals none of them.
+	// A chapter game deals none of them.
 	ana := w.user()
 	for _, c := range w.b.Categories {
-		s, err := w.g.StartTopic(ctx, ana, c.ID)
+		s, err := w.g.StartChapter(ctx, ana, c.ID)
 		if err != nil {
-			continue // a topic with too few questions left
+			continue // a chapter with too few questions left
 		}
 		for _, p := range w.picks(s.ID) {
 			if barred[p.ID] {
@@ -69,7 +69,7 @@ func TestDaysAhead(t *testing.T) {
 	}
 	// Two questions of tomorrow can't be dealt on it, its first and a hard one (due for review by then: as a question
 	// retired, but the bank's Bulgarian questions stay as they were, and so the days after tomorrow): each is replaced
-	// in its own place, by another of its topic and kind, the rest of the day as it was; the days after stay too.
+	// in its own place, by another of its chapter and kind, the rest of the day as it was; the days after stay too.
 	var ahead string
 	for day := range days {
 		if day > today && (ahead == "" || day < ahead) {
@@ -142,8 +142,8 @@ func TestDaysAhead(t *testing.T) {
 }
 
 // biggerSample is the sample bank with each question copied n times more (new ids, the text marked), each copy in
-// the next topic round, so that every topic has every kind; its splits made medium too: enough of every place of a
-// day for days ahead, whichever topics a day gives them.
+// the next chapter round, so that every chapter has every kind; its splits made medium too: enough of every place of a
+// day for days ahead, whichever chapters a day gives them.
 func biggerSample(t *testing.T, n int) *bank.Bank {
 	t.Helper()
 	dir := t.TempDir()
@@ -252,7 +252,7 @@ func mustPicks(t *testing.T, s string) []Pick {
 }
 
 // A question due for review is dealt by no game from its date on: the days ahead drawn before it was due are drawn
-// again without it, and it is barred from every other game (DayQuestions: topics, duels). DaysUsed gives
+// again without it, and it is barred from every other game (DayQuestions: chapters, duels). DaysUsed gives
 // the days' questions, and the last day drawn.
 func TestNoGameDealsAQuestionDueForReview(t *testing.T) {
 	w := setup(t)
@@ -316,7 +316,7 @@ func TestNoGameDealsAQuestionDueForReview(t *testing.T) {
 	}
 	ana := w.user()
 	for range 5 {
-		s, err := w.g.StartTopic(ctx, ana, "history")
+		s, err := w.g.StartChapter(ctx, ana, "history")
 		if err != nil {
 			t.Fatal(err)
 		}

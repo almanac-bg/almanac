@@ -119,7 +119,7 @@ func bankPlan(args []string) error {
 const Spares = 0.2
 
 // PlaceShare is the most of a batch one place of the day takes, however short its runway: fifteen hard numbers from
-// one topic in one go are forced, and an honest question beats a filled cell.
+// one category in one go are forced, and an honest question beats a filled cell.
 const PlaceShare = 1.0 / 3
 
 // DatedShare is the share of a batch that belongs to a date: the days come back every year, and each needs a question

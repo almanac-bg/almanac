@@ -152,7 +152,7 @@ func ruleDecoy(q Question) []string {
 }
 
 // NumberRankAt is how many choices of numbers the rank rule judges at the least (ruleNumberRank), in the bank or a
-// topic: fewer say nothing about where the answers sit.
+// category: fewer say nothing about where the answers sit.
 const NumberRankAt = 40
 
 // numberRank is where a choice's answer stands among its four options when they are numbers and nothing else tells
@@ -181,27 +181,27 @@ func numberRank(q Question) int {
 	return slices.Index(s, vals[0]) + 1
 }
 
-// ruleNumberRank: across the bank, and within a topic, the answer of a choice of numbers sits about as often at
+// ruleNumberRank: across the bank, and within a category, the answer of a choice of numbers sits about as often at
 // each of the four ranks. Writers put the right number between plausible ones, so it ends up second or third, and a
 // player who picks a middle number wins. A group is skewed when a rank's share is off a quarter by more than three
 // standard deviations of chance; the finding names the questions at the rank that has the most, the newest first:
 // the ones whose wrong options to move.
 func ruleNumberRank(l *lintBank) []finding {
 	groups := map[string][]Question{}
-	topics := []string{""}
+	categories := []string{""}
 	for _, q := range l.live {
 		if numberRank(q) == 0 {
 			continue
 		}
 		c := q.Base().Category
 		if _, ok := groups[c]; !ok {
-			topics = append(topics, c)
+			categories = append(categories, c)
 		}
 		groups[""] = append(groups[""], q)
 		groups[c] = append(groups[c], q)
 	}
 	var out []finding
-	for _, g := range topics {
+	for _, g := range categories {
 		qs := groups[g]
 		if len(qs) < NumberRankAt {
 			continue

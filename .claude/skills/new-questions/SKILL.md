@@ -1,6 +1,6 @@
 ---
 name: new-questions
-description: Add a batch of new questions to АЛМАНАХ's bank, start to finish — the plan from the day's runway, a writer and an independent checker per topic on pinned models, a cross-check, the bank check, the commit and the questions live on the server. Run as /new-questions [questions per topic] [focus].
+description: Add a batch of new questions to АЛМАНАХ's bank, start to finish — the plan from the day's runway, a writer and an independent checker per category on pinned models, a cross-check, the bank check, the commit and the questions live on the server. Run as /new-questions [questions per category] [focus].
 argument-hint: "[брой на тема, 30] [насока]"
 disable-model-invocation: true
 model: opus
@@ -9,7 +9,7 @@ effort: high
 
 # A batch of new questions
 
-`/new-questions` adds a batch to the bank and puts it live: 30 questions a topic by default (300 in all), or the number
+`/new-questions` adds a batch to the bank and puts it live: 30 questions a category by default (300 in all), or the number
 given first (`/new-questions 50`). Any words after it are the owner's focus for the writers („повече за България след
 2015“). Run it through without asking: the plan, the models and every check are fixed here, and the owner reads the
 report at the end. Stop and say why only when a step below says to.
@@ -24,8 +24,8 @@ Fixed for every batch, never a session's default:
 | Who | Model | Why |
 | --- | --- | --- |
 | This session (plan, merge, report) | Claude Opus 5.5 (`model: opus` above) | |
-| Writers, one per topic | Claude Opus 5.5 (`opus`, effort high) | strong writer, half Fable's price for the longest stage |
-| Checkers, one per topic, and the cross-check | Claude Fable 5.2 (`fable`, effort high) | the most capable model, on the gate that matters, and not the writers' model: a mistake one model is prone to doesn't pass its own blind spot |
+| Writers, one per category | Claude Opus 5.5 (`opus`, effort high) | strong writer, half Fable's price for the longest stage |
+| Checkers, one per category, and the cross-check | Claude Fable 5.2 (`fable`, effort high) | the most capable model, on the gate that matters, and not the writers' model: a mistake one model is prone to doesn't pass its own blind spot |
 | Blind answerers, after the checkers | Claude Sonnet 5.5 (`sonnet`, effort medium) | a third model answers the checked questions without the key; where it's sure of something else, the cross-check settles it from sources |
 
 They are pinned in `batch.js`, per agent, so a subagent setting or another session model doesn't change them (this
@@ -55,9 +55,9 @@ in a worktree the main checkout's (`$(dirname "$(git rev-parse --path-format=abs
 4. **Write and check.** Run the workflow, and wait for its notification (don't poll):
    `Workflow({scriptPath: "<repo>/.claude/skills/new-questions/batch.js", args: {plan: <plan.json's content, as an
    object>, batch: "<batch>", repo: "<repo>", bank: "<bank>", skill: "<repo>/.claude/skills/new-questions"}})`.
-   It runs ten writers, each topic's checker as soon as its writer is done, then the blind answers, then the
+   It runs ten writers, each category's checker as soon as its writer is done, then the blind answers, then the
    cross-check over all ten. If it
-   returns `done: false` (an agent died, a topic missing, or the final batch didn't pass), resume it with the same
+   returns `done: false` (an agent died, a category missing, or the final batch didn't pass), resume it with the same
    `scriptPath`, `args` and `resumeFromRunId`: what finished is kept. Two failed resumes: stop and tell the owner.
 5. **Read what came back:** the cross-check's result and `<batch>/final/REPORT.md`. Every category adds the same
    number; if it's less than N, the report says why, and you say so to the owner. If more than a fifth of the batch was
@@ -70,14 +70,14 @@ in a worktree the main checkout's (`$(dirname "$(git rev-parse --path-format=abs
    each yourself from a source, and fix the real ones by the `questions` skill (set `updated`; a change in what a
    question asks retires it, and its replacement goes in the same cell). Keep these in a commit of their own.
 8. **Report.** Write `<bank>/reports/<date>-<slug>.md` in Bulgarian, in the form of the newest report there: a title,
-   a short paragraph (what the batch is for, how many, the runway before → after, live per topic), one line on the
+   a short paragraph (what the batch is for, how many, the runway before → after, live per category), one line on the
    process with the models (писатели: Claude Opus 5.5; проверка и обща проверка: Claude Fable 5.2) and how many were
-   fixed and dropped; then by topic, each question: id · kind/difficulty · flags (дата, България, с картинка) — text →
+   fixed and dropped; then by category, each question: id · kind/difficulty · flags (дата, България, с картинка) — text →
    answer, and its fact in italics.
    Keep the batch's record beside it: `<batch>/plan.json`, `final/REPORT.md` and the checkers' `verify/<cat>.md` into
    `<bank>/reports/<date>-<slug>/` (each question's sources are in the question itself).
 9. **Commit and put it live.** In `<bank>`: `git add -A`, commit `feat: <count> questions …` (what they are for, the
-   bank's size per topic after; the body lists the ids by topic), `git push`. Then on the server:
+   bank's size per category after; the body lists the ids by category), `git push`. Then on the server:
    `ssh -i ~/.ssh/hetzner -o BatchMode=yes root@2.31.121.12 almanac-bank`. Its first line must be the bank's count
    (`…: N questions (M live)`, M the new live total), its second the problems counted (`…: 0 errors, W warnings
    (by rule)`: anything but 0 errors stops it before the bank on the server moves, with the errors), and its last `live: <your commit>` (the server confirmed it plays it). If the push
@@ -94,6 +94,6 @@ in a worktree the main checkout's (`$(dirname "$(git rev-parse --path-format=abs
   next free ones (an id the bank has now reads as a change to that question, refused with "or, as a new question,
   it takes the next free id"). Renumber the final files from the new `firstId`s (the ids aren't used anywhere yet) and add again.
 - **A writer or checker ran out of web search:** the brief tells them to fetch pages directly; what they couldn't
-  confirm is dropped, and the cross-check fills from spares. A topic far short: resume, or run that topic again.
+  confirm is dropped, and the cross-check fills from spares. A category far short: resume, or run that category again.
 - **Never** skip the checkers or the cross-check, relax a rule to keep a question, or put a dropped question back
   without a source.

@@ -243,18 +243,18 @@ func TestTheDay(t *testing.T) {
 		t.Fatalf("the day: %+v", s)
 	}
 	picks := w.picks(s.ID)
-	topics := map[string]bool{}
+	chapters := map[string]bool{}
 	types := map[string]bank.Difficulty{}
 	for i, p := range picks {
 		q, _ := w.b.Get(p.ID)
-		topics[q.Base().Category] = true
+		chapters[q.Base().Category] = true
 		types[q.Base().Type] = daySlots[i].difficulty // where in the day it is: its places are drawn within their band
 	}
 	if types["order"] != bank.Medium || types["number"] != bank.Hard {
 		t.Errorf("the day's order and number are in the %q and %q places", types["order"], types["number"])
 	}
-	if len(topics) != Length {
-		t.Errorf("the day's questions come from %d topics", len(topics))
+	if len(chapters) != Length {
+		t.Errorf("the day's questions come from %d chapters", len(chapters))
 	}
 	other, _ := w.g.StartDay(ctx, bo)
 	if p := w.picks(other.ID); p[0] != picks[0] || p[9] != picks[9] {
@@ -274,7 +274,7 @@ func TestTheDay(t *testing.T) {
 }
 
 // A question that belongs to the day is „На този ден“ in the day's ten, its day's line in the answer (and the review),
-// never before; the same question in a topic's game, or on another day, has neither.
+// never before; the same question in a chapter's game, or on another day, has neither.
 func TestOnThisDay(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -330,12 +330,12 @@ func TestOnThisDay(t *testing.T) {
 		t.Errorf("the review: %q, %q", dayOf(review[0].Reveal), dayOf(review[1].Reveal))
 	}
 
-	// A topic's game, today: the question it deals is no day's.
-	topic, _ := w.g.startTopic(ctx, u, MixTopic)
-	q, _ := w.b.Get(w.picks(topic.ID)[0].ID)
+	// A chapter's game, today: the question it deals is no day's.
+	chapter, _ := w.g.startChapter(ctx, u, MixChapter)
+	q, _ := w.b.Get(w.picks(chapter.ID)[0].ID)
 	date(q, "11-12")
-	if on, res := answer(topic.ID, 0); on || dayOf(res.Reveal) != "" {
-		t.Errorf("a topic's game: on this day %v, its line %q", on, dayOf(res.Reveal))
+	if on, res := answer(chapter.ID, 0); on || dayOf(res.Reveal) != "" {
+		t.Errorf("a chapter's game: on this day %v, its line %q", on, dayOf(res.Reveal))
 	}
 }
 
@@ -346,7 +346,7 @@ func TestReviewOnItsDay(t *testing.T) {
 	ctx := t.Context()
 	ana := w.user()
 	w.at(15, 23, 50, 0)
-	s, err := w.g.StartTopic(ctx, ana, "history")
+	s, err := w.g.StartChapter(ctx, ana, "history")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -686,14 +686,14 @@ func TestStreakForgives(t *testing.T) {
 	}
 }
 
-func TestTopics(t *testing.T) {
+func TestChapters(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	u := w.user()
-	if _, err := w.g.StartTopic(ctx, u, "astrology"); !errors.Is(err, ErrNoTopic) {
-		t.Fatalf("an unknown topic: %v", err)
+	if _, err := w.g.StartChapter(ctx, u, "astrology"); !errors.Is(err, ErrNoChapter) {
+		t.Fatalf("an unknown chapter: %v", err)
 	}
-	first, err := w.g.StartTopic(ctx, u, "history")
+	first, err := w.g.StartChapter(ctx, u, "history")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -706,7 +706,7 @@ func TestTopics(t *testing.T) {
 		firstPicks[p.ID] = true
 	}
 	// The next run starts with what the player hasn't seen (and isn't today's).
-	second, _ := w.g.StartTopic(ctx, u, "history")
+	second, _ := w.g.StartChapter(ctx, u, "history")
 	today, _ := w.g.DayQuestions(ctx)
 	unseen := 0
 	for _, q := range w.b.Live("history", "") {
@@ -723,17 +723,17 @@ func TestTopics(t *testing.T) {
 	if fresh < min(unseen, Length) {
 		t.Fatalf("%d fresh questions of %d unseen", fresh, unseen)
 	}
-	mix, err := w.g.startTopic(ctx, u, MixTopic)
+	mix, err := w.g.startChapter(ctx, u, MixChapter)
 	if err != nil || mix.Total != Length {
 		t.Fatalf("„Микс“: %+v %v", mix, err)
 	}
 }
 
-func TestTopicLeftHalfWay(t *testing.T) {
+func TestChapterLeftHalfWay(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	u := w.user()
-	first, _ := w.g.StartTopic(ctx, u, "history")
+	first, _ := w.g.StartChapter(ctx, u, "history")
 	w.play(u, first.ID, w.right, w.wrong, w.right)
 	// Left with the fourth showing, and back once its time is up: the same run, the fourth counted unanswered, the
 	// fifth next.
@@ -741,32 +741,32 @@ func TestTopicLeftHalfWay(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.wait(pastLimit)
-	back, err := w.g.StartTopic(ctx, u, "history")
+	back, err := w.g.StartChapter(ctx, u, "history")
 	if err != nil || back.ID != first.ID || back.At != 4 || len(back.Trail) != 4 || back.Question != nil {
-		t.Fatalf("back to the topic: %+v %v", back, err)
+		t.Fatalf("back to the chapter: %+v %v", back, err)
 	}
 	if m := back.Trail[3]; m.Right || m.Close {
 		t.Fatalf("the question left showing: %+v", m)
 	}
-	// Another topic is a run of its own.
-	other, _ := w.g.StartTopic(ctx, u, "science")
+	// Another chapter is a run of its own.
+	other, _ := w.g.StartChapter(ctx, u, "science")
 	if other.ID == first.ID {
-		t.Fatal("another topic went on with history's run")
+		t.Fatal("another chapter went on with history's run")
 	}
-	// A game of every topic, kept from before, is never one to come back to: no way plays it now.
-	mix, _ := w.g.startTopic(ctx, u, MixTopic)
+	// A game of every chapter, kept from before, is never one to come back to: no way plays it now.
+	mix, _ := w.g.startChapter(ctx, u, MixChapter)
 	if _, err := w.g.Show(ctx, u, other.ID); err != nil {
 		t.Fatal(err)
 	}
-	// The games left, to come back to: each topic's latest, the latest first; one with its question showing is open.
+	// The games left, to come back to: each chapter's latest, the latest first; one with its question showing is open.
 	left, err := w.g.Left(ctx, u)
 	if err != nil || len(left) != 2 {
-		t.Fatalf("left: %+v %v (a game of every topic: %d)", left, err, mix.ID)
+		t.Fatalf("left: %+v %v (a game of every chapter: %d)", left, err, mix.ID)
 	}
-	if l := left[0]; l.ID != other.ID || l.Category != "science" || l.At != 0 || l.Total != Length || !l.Open {
+	if l := left[0]; l.ID != other.ID || l.Chapter != "science" || l.At != 0 || l.Total != Length || !l.Open {
 		t.Errorf("science, left: %+v", l)
 	}
-	if l := left[1]; l.ID != first.ID || l.Category != "history" || l.At != 4 || l.Open {
+	if l := left[1]; l.ID != first.ID || l.Chapter != "history" || l.At != 4 || l.Open {
 		t.Errorf("history, left: %+v", l)
 	}
 	// Finished, the next is new.
@@ -781,12 +781,12 @@ func TestTopicLeftHalfWay(t *testing.T) {
 			t.Fatalf("answer %d: %v", n, err)
 		}
 	}
-	if again, _ := w.g.StartTopic(ctx, u, "history"); again.ID == first.ID || again.At != 0 {
+	if again, _ := w.g.StartChapter(ctx, u, "history"); again.ID == first.ID || again.At != 0 {
 		t.Fatalf("after the end: %+v", again)
 	}
 	// Left on an earlier day, it isn't taken up again.
 	w.wait(24 * time.Hour)
-	if next, _ := w.g.StartTopic(ctx, u, "history"); next.At != 0 {
+	if next, _ := w.g.StartChapter(ctx, u, "history"); next.At != 0 {
 		t.Fatalf("a run of yesterday went on: %+v", next)
 	}
 }
@@ -796,7 +796,7 @@ func TestMergeKeepsTheAccountsDay(t *testing.T) {
 	ctx := t.Context()
 	guest, owner := w.user(), w.user()
 	gs, _ := w.g.StartDay(ctx, guest)
-	topic, _ := w.g.StartTopic(ctx, guest, "science")
+	chapter, _ := w.g.StartChapter(ctx, guest, "science")
 	os, _ := w.g.StartDay(ctx, owner)
 	// The guest chose no word from friends.
 	_, _ = w.db.Write.Exec(`INSERT INTO push_prefs (user_id, kind, wanted) VALUES (?, 'friends', 0)`, guest)
@@ -808,8 +808,8 @@ func TestMergeKeepsTheAccountsDay(t *testing.T) {
 	if err := w.db.Read.QueryRow(`SELECT wanted FROM push_prefs WHERE user_id = ? AND kind = 'friends'`, owner).Scan(&wanted); err != nil || wanted != 0 {
 		t.Fatalf("the guest's choice of notifications: %d %v", wanted, err)
 	}
-	if _, err := w.g.State(ctx, owner, topic.ID); err != nil {
-		t.Fatal("the guest's topic run didn't move")
+	if _, err := w.g.State(ctx, owner, chapter.ID); err != nil {
+		t.Fatal("the guest's chapter run didn't move")
 	}
 	if _, err := w.g.State(ctx, owner, gs.ID); !errors.Is(err, ErrNoRun) {
 		t.Fatal("the guest's day replaced the account's")
@@ -829,8 +829,8 @@ func TestStats(t *testing.T) {
 	}
 	day, _ := w.g.StartDay(ctx, u)
 	w.play(u, day.ID, append(repeat(w.right, 6), repeat(w.wrong, 4)...)...)
-	topic, _ := w.g.StartTopic(ctx, u, "music")
-	w.play(u, topic.ID, repeat(w.right, Length)...)
+	chapter, _ := w.g.StartChapter(ctx, u, "music")
+	w.play(u, chapter.ID, repeat(w.right, Length)...)
 	s, err := w.g.StatsOf(ctx, u)
 	if err != nil {
 		t.Fatal(err)
@@ -1041,11 +1041,11 @@ func TestAlmanac(t *testing.T) {
 	if err != nil || len(a.Facts) != 0 || a.Found != 0 || len(a.Ink) != 0 || a.Next != "" {
 		t.Fatalf("an empty almanac: %+v %v", a, err)
 	}
-	s, _ := w.g.StartTopic(ctx, ana, "general")
+	s, _ := w.g.StartChapter(ctx, ana, "general")
 	w.play(ana, s.ID, repeat(w.right, Length)...)
 	a, _ = w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: AlmanacPage})
 	for _, f := range a.Facts {
-		if f.Fact == "" || f.Answer == "" || f.Category == "" {
+		if f.Fact == "" || f.Answer == "" || f.Chapter == "" {
 			t.Fatalf("a learned fact: %+v", f)
 		}
 	}
@@ -1072,20 +1072,20 @@ func TestAlmanacPages(t *testing.T) {
 	ctx := t.Context()
 	ana := w.user()
 	var ids []string
-	for _, topic := range []string{"movies", "history"} {
+	for _, chapter := range []string{"movies", "history"} {
 		n := 0
-		for _, q := range w.b.Live(topic, "") {
+		for _, q := range w.b.Live(chapter, "") {
 			if q.Extra().Fact != "" && n < 8 {
 				ids, n = append(ids, q.Base().ID), n+1
 			}
 		}
 	}
-	w.knows(ana, ids...) // one after another, the last the newest; two topics
-	all := func(topic string, size int, between func()) []string {
+	w.knows(ana, ids...) // one after another, the last the newest; two chapters
+	all := func(chapter string, size int, between func()) []string {
 		var got []string
 		from := ""
 		for range len(ids) + 1 {
-			a, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Topic: topic, From: from, Limit: size})
+			a, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Chapter: chapter, From: from, Limit: size})
 			if err != nil || len(a.Facts) > size {
 				t.Fatalf("a page of %d: %d facts of %d (%v)", size, len(a.Facts), a.Found, err)
 			}
@@ -1154,20 +1154,20 @@ func TestAlmanacPages(t *testing.T) {
 		t.Fatalf("pages with a fact learned between them: %v", got)
 	}
 	if a, _ := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: 1}); len(a.Facts) != 1 || a.Facts[0].ID != fresh ||
-		a.Found != len(ids)+1 || a.Facts[0].Ink || a.Facts[0].Kind != "topic" {
+		a.Found != len(ids)+1 || a.Facts[0].Ink || a.Facts[0].Kind != "chapter" {
 		t.Fatalf("the latest fact first: %+v", a)
 	}
 	// Found by its words, as they're written or not: a word of its answer finds it, in its chapter and in all; „Микс“ is
 	// no chapter of the book, and finds nothing.
 	f := mustQuestion(t, w, ids[0])
 	word := strings.ToUpper(strings.Fields(bank.AnswerText(f))[0])
-	if a, _ := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Topic: MixTopic, Search: word, Limit: AlmanacPage}); a.Found != 0 {
+	if a, _ := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Chapter: MixChapter, Search: word, Limit: AlmanacPage}); a.Found != 0 {
 		t.Fatalf("„Микс“ as a chapter: %+v", a)
 	}
-	for _, topic := range []string{"", f.Base().Category} {
-		a, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Topic: topic, Search: word, Limit: AlmanacPage})
+	for _, chapter := range []string{"", f.Base().Category} {
+		a, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Chapter: chapter, Search: word, Limit: AlmanacPage})
 		if err != nil || !slices.ContainsFunc(a.Facts, func(l Learned) bool { return l.ID == ids[0] }) {
-			t.Fatalf("searched %q in %q: %+v %v", word, topic, a.Facts, err)
+			t.Fatalf("searched %q in %q: %+v %v", word, chapter, a.Facts, err)
 		}
 		for _, l := range a.Facts {
 			if !strings.Contains(strings.ToLower(l.Question+" "+l.Answer+" "+l.Fact), strings.ToLower(word)) {
@@ -1319,9 +1319,9 @@ func TestDayCrowd(t *testing.T) {
 		}
 		w.play(p, s.ID, first, second)
 	}
-	// Other days and other games don't count: a topic's answer to the same question today, and a day's yesterday.
+	// Other days and other games don't count: a chapter's answer to the same question today, and a day's yesterday.
 	noise := w.user()
-	for _, run := range []struct{ kind, day string }{{"topic", ""}, {"day", "2026-11-11"}} {
+	for _, run := range []struct{ kind, day string }{{"chapter", ""}, {"day", "2026-11-11"}} {
 		res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, day, questions, started_at) VALUES (?, ?, nullif(?, ''), '[]', 0)`,
 			noise, run.kind, run.day)
 		if err != nil {

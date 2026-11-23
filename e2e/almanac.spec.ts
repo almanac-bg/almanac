@@ -23,7 +23,7 @@ test("the book's contents: a chapter a row with its ink, and no count of it all"
 
   await page.goto("/almanac");
   await expect(page.locator(".book")).not.toContainText("факта");
-  // Ten topics, each a chapter's card with its ink, and nothing else to play at the book's head.
+  // Ten chapters, each a chapter's card with its ink, and nothing else to play at the book's head.
   const cards = page.locator(".chapter-card");
   await expect(cards).toHaveCount(10);
   const movies = cards.filter({ hasText: "Кино и телевизия" });
@@ -52,7 +52,7 @@ test("a chapter comes a page at a time, by its numbers", async ({ page }) => {
     const n = Math.max(0, Math.min(30, found - at * 30));
     const facts = Array.from({ length: Number(q.get("page") ?? 0) > at ? 0 : n }, (_, i) => ({
       id: `geo-${at * 30 + i}`,
-      category: "geography",
+      chapter: "geography",
       question: `Въпрос ${at * 30 + i + 1}`,
       answer: `Отговор ${at * 30 + i + 1}`,
       fact: "Факт.",
@@ -122,7 +122,7 @@ test("a chapter finds its facts by their words", async ({ page }) => {
   await expect(page.getByText("Нищо не е намерено. Опитай с друга дума.")).toBeVisible();
 });
 
-test("a game is a chapter's: every topic at once and Bulgaria's are no page and no game", async ({ page }) => {
+test("a game is of one chapter: every chapter at once and Bulgaria's are no page and no game", async ({ page }) => {
   await page.goto("/");
   await knows(page, ["his-002", "geo-961"]);
   for (const path of ["/almanac/mix", "/almanac/bulgaria", "/play/mix", "/play/bulgaria"]) {

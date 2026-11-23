@@ -193,7 +193,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/auth/hand/look", s.lookHandoff)
 	api("GET /api/day", s.today)
 	api("POST /api/day", s.startDay)
-	api("POST /api/topic", s.startTopic)
+	api("POST /api/chapter", s.startChapter)
 	api("GET /api/runs/left", s.left)
 	api("GET /api/runs/{id}", s.runState)
 	api("POST /api/runs/{id}/show", s.show)

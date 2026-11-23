@@ -20,10 +20,10 @@ func quickPace(n int) func(int) time.Duration {
 	}
 }
 
-// game plays a topic's ten at a pace, all right, and says which run it was.
+// game plays a chapter's ten at a pace, all right, and says which run it was.
 func (w *world) game(user int64, pace func(int) time.Duration, answers ...func(int64, int) json.RawMessage) int64 {
 	w.t.Helper()
-	s, err := w.g.startTopic(w.t.Context(), user, MixTopic)
+	s, err := w.g.startChapter(w.t.Context(), user, MixChapter)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestScriptedRunsAreMarked(t *testing.T) {
 	}
 	// Marked as it's played: a run left half-way, three quick answers in, is a script's already.
 	user := w.user()
-	s, err := w.g.startTopic(t.Context(), user, MixTopic)
+	s, err := w.g.startChapter(t.Context(), user, MixChapter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +205,7 @@ func TestScriptedOutOfStatistics(t *testing.T) {
 	// Calibration counts CalibrateFrom answers of people.
 	id := w.b.Live("", "choice")[0].Base().ID
 	for i := range CalibrateFrom {
-		res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at, shadow) VALUES (?, 'topic', '[]', 0, 1)`, bot)
+		res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at, shadow) VALUES (?, 'chapter', '[]', 0, 1)`, bot)
 		if err != nil {
 			t.Fatal(err)
 		}

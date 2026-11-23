@@ -21,11 +21,11 @@ func TestReadsNeverNest(t *testing.T) {
 		t.Fatal(err)
 	}
 	w.play(ana, day.ID, repeat(w.wrong, Length)...)
-	topic, err := w.g.StartTopic(ctx, bo, w.b.Categories[0].ID)
+	chapter, err := w.g.StartChapter(ctx, bo, w.b.Categories[0].ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.play(bo, topic.ID, repeat(w.right, Length)...)
+	w.play(bo, chapter.ID, repeat(w.right, Length)...)
 	duel, err := w.g.DuelFriend(ctx, ana, bo)
 	if err != nil {
 		t.Fatal(err)
@@ -33,7 +33,7 @@ func TestReadsNeverNest(t *testing.T) {
 	w.playSide(ana, duel, repeat(w.right, Length))
 	reads := map[string]func(context.Context) error{
 		"Count":        w.g.Count,
-		"NewsOf":       func(ctx context.Context) error { _, err := w.g.NewsOf(ctx, bo, topic.ID); return err },
+		"NewsOf":       func(ctx context.Context) error { _, err := w.g.NewsOf(ctx, bo, chapter.ID); return err },
 		"ProfileOf":    func(ctx context.Context) error { _, err := w.g.ProfileOf(ctx, "player2", ana); return err },
 		"StatsOf":      func(ctx context.Context) error { _, err := w.g.StatsOf(ctx, ana); return err },
 		"BoardOf":      func(ctx context.Context) error { _, err := w.g.BoardOf(ctx, w.g.Today(), ana); return err },

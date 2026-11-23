@@ -201,7 +201,7 @@ func (s *Server) unfriend(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]bool{"ok": true})
 }
 
-// told keeps a line Начало has told the player once (play.Told): a friend's yes, what came of a duel they left.
+// told keeps a line Днес has told the player once (play.Told): a friend's yes, what came of a duel they left.
 func (s *Server) told(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {

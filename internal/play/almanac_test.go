@@ -20,7 +20,7 @@ func (w *world) knows(user int64, ids ...string) {
 // knowsAt is knows from a time on.
 func (w *world) knowsAt(user, at int64, ids ...string) {
 	w.t.Helper()
-	res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at, finished_at) VALUES (?, 'topic', '[]', 0, 0)`, user)
+	res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at, finished_at) VALUES (?, 'chapter', '[]', 0, 0)`, user)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestFactsCollected(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
-	run, err := w.g.StartTopic(ctx, ana, "history")
+	run, err := w.g.StartChapter(ctx, ana, "history")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestFactsCollected(t *testing.T) {
 	alm, err := w.g.AlmanacOf(ctx, ana, AlmanacQuery{Limit: AlmanacPage})
 	if err != nil || len(alm.Facts) != want || alm.Found != want || len(alm.Ink) != 0 ||
 		slices.ContainsFunc(alm.Facts, func(l Learned) bool { return l.Ink }) {
-		t.Fatalf("%d facts in the almanac after a topic's game half right, want %d in grey (ink %v, %v)",
+		t.Fatalf("%d facts in the almanac after a chapter's game half right, want %d in grey (ink %v, %v)",
 			len(alm.Facts), want, alm.Ink, err)
 	}
 	w.knows(ana, ids...)

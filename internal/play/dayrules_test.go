@@ -54,9 +54,9 @@ func drawFingerprint(t *testing.T) string {
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 
-// dayRulesBank is a bank written out here, never to change: ten topics, each with every type at every difficulty,
+// dayRulesBank is a bank written out here, never to change: ten chapters, each with every type at every difficulty,
 // pictures, estimates and years, questions about Bulgaria, questions of a date, one due for review, one retired, and
-// two topics' questions naming one subject.
+// two chapters' questions naming one subject.
 func dayRulesBank(t *testing.T) *bank.Bank {
 	t.Helper()
 	var categories []bank.Category
@@ -80,14 +80,14 @@ func dayRulesBank(t *testing.T) *bank.Bank {
 			"license": "PD", "source": "https://commons.wikimedia.org/p"}
 	}
 	for c := range 10 {
-		category := string(rune('a'+c)) + "topic"
+		category := string(rune('a'+c)) + "topic" // the draw's fixture: its ids are in DayRules' hash
 		categories = append(categories, bank.Category{ID: category, Name: fmt.Sprintf("Тема %d", c+1)})
 		for _, level := range []string{"easy", "medium", "hard"} {
 			for k := range 2 {
 				text := func(what string) string { return fmt.Sprintf("%s %s %s %d?", what, category, level, k) }
 				answer := fmt.Sprintf("Отговор %s %s %d", category, level, k)
 				if c < 2 && level == "medium" && k == 0 {
-					answer = "„Титаник“" // two topics, one subject
+					answer = "„Титаник“" // two chapters, one subject
 				}
 				wrong := []string{"Едно", "Друго", "Трето"}
 				add(category, map[string]any{"type": "choice", "difficulty": level, "text": text("Кое"), "answer": answer, "wrong": wrong})

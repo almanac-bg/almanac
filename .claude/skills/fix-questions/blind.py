@@ -31,11 +31,11 @@ LETTERS = "ABCDEFGH"
 
 
 IMAGES = {}  # a question's id: the folder its pictures are in
-# A question's topic as a player sees it, by its id's prefix (his-: История): the answerer says where one belongs
-# instead, if not there (a day takes one question a topic, so a misfiled one takes another topic's place).
-TOPICS = {}
+# A question's category as a player sees it, by its id's prefix (his-: История): the answerer says where one belongs
+# instead, if not there (a day takes one question a category, so a misfiled one takes another category's place).
+CATEGORIES = {}
 for c in json.load(open(f"{a.bank}/categories.json")):
-    TOPICS[c["id"][:3]] = c["name"]
+    CATEGORIES[c["id"][:3]] = c["name"]
 
 
 def live():
@@ -65,7 +65,7 @@ def picture(im, qid):
 
 def sheet_item(q):
     """The question as asked, and its key in the sheet's own terms."""
-    s = {"id": q["id"], "topic": TOPICS.get(q["id"][:3], ""), "kind": q["type"], "text": q["text"]}
+    s = {"id": q["id"], "category": CATEGORIES.get(q["id"][:3], ""), "kind": q["type"], "text": q["text"]}
     if q.get("image"):
         s["picture"] = picture(q["image"], q["id"])
     t = q["type"]
@@ -115,7 +115,7 @@ if a.do == "sheets":
         s, k = sheet_item(q)
         items.append(s)
         key[q["id"]] = {"key": k, "kind": q["type"], "tolerance": q.get("tolerance"), "sheet": s}
-    # Mixed by id hash, so a sheet isn't one topic and one kind.
+    # Mixed by id hash, so a sheet isn't one category and one kind.
     items = shuffled("sheets", items)
     n = 0
     for n, k in enumerate(range(0, len(items), a.size), 1):
@@ -155,7 +155,7 @@ for i, k in key.items():
     got = answers.get(i)
     if got is None:
         continue
-    said, sure, elsewhere = got.get("a"), got.get("sure"), got.get("topic")
+    said, sure, elsewhere = got.get("a"), got.get("sure"), got.get("category")
     want = k["key"]
     if k["kind"] == "number":
         try:
@@ -175,8 +175,8 @@ for i, k in key.items():
         disagree[i] = f"a model answering without the key, sure: {readable(k['sheet'], said)}"
     elif off:
         unsure += 1
-    if elsewhere and elsewhere != k["sheet"].get("topic"):
-        moved = f"a model answering without the key: it belongs under „{elsewhere}“, not „{k['sheet'].get('topic')}“"
+    if elsewhere and elsewhere != k["sheet"].get("category"):
+        moved = f"a model answering without the key: it belongs under „{elsewhere}“, not „{k['sheet'].get('category')}“"
         disagree[i] = f"{disagree[i]}; {moved}" if i in disagree else moved
 json.dump(disagree, open(f"{out}/disagree.json", "w"), ensure_ascii=False, indent=1)
 print(f"answered {len(answers)} of {len(key)} (missing {len(missing)}); sure and otherwise: {len(disagree)}; "

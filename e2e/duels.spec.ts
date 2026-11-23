@@ -271,7 +271,7 @@ test("a duel left before its first question isn't „Твой ред“; one beg
   const other: string[] = [];
   a.on("request", (r) => {
     const path = new URL(r.url()).pathname;
-    if (r.method() === "POST" && (path === "/api/topic" || path === "/api/day")) other.push(path);
+    if (r.method() === "POST" && (path === "/api/chapter" || path === "/api/day")) other.push(path);
   });
 
   // A tap on „Дуел“, then „Отказ“ on the count: no question shown, so nothing waits in Приятели.

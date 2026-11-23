@@ -26,14 +26,14 @@ var day = []string{"movies", "technology", "history", "nature", "geography", "li
 func TestDraw(t *testing.T) {
 	pictures := map[string]func() ([]byte, error){"site": Site}
 	for name, c := range map[string]Card{
-		"seven": {Issue: 9, Date: "20 ноември", Topics: day, Shape: "1102111013"},
-		"ten":   {Issue: 365, Date: "11 ноември", Topics: day, Shape: "1111111111"},
-		"none":  {Issue: 42, Date: "23 декември", Topics: day, Shape: "0000000000"},
-		"near":  {Issue: 10, Date: "21 ноември", Topics: day, Shape: "2222222222"},
-		"wide":  {Issue: 10000, Date: "29 септември", Topics: day, Shape: "1201201201"},
-		"national": {Issue: 194, Date: "24 май", National: "Денят на българската азбука и култура", Topics: day,
+		"seven": {Issue: 9, Date: "20 ноември", Chapters: day, Shape: "1102111013"},
+		"ten":   {Issue: 365, Date: "11 ноември", Chapters: day, Shape: "1111111111"},
+		"none":  {Issue: 42, Date: "23 декември", Chapters: day, Shape: "0000000000"},
+		"near":  {Issue: 10, Date: "21 ноември", Chapters: day, Shape: "2222222222"},
+		"wide":  {Issue: 10000, Date: "29 септември", Chapters: day, Shape: "1201201201"},
+		"national": {Issue: 194, Date: "24 май", National: "Денят на българската азбука и култура", Chapters: day,
 			Shape: "1101110111"},
-		"unknown": {Issue: 3, Date: "14 ноември", Topics: day[:7], Shape: "101101"},
+		"unknown": {Issue: 3, Date: "14 ноември", Chapters: day[:7], Shape: "101101"},
 	} {
 		pictures[name] = func() ([]byte, error) { return Draw(c) }
 	}
@@ -65,12 +65,12 @@ func TestDraw(t *testing.T) {
 // is filled to its edges on both sides; близо on its left side only, inside a whole edge; wrong on neither, inside a
 // dashed edge, its glyph faded; and one that counts for nobody is dashed and empty.
 func TestTilesPartInGrey(t *testing.T) {
-	for topic := range vivid {
-		topics := make([]string, 10)
-		for i := range topics {
-			topics[i] = topic
+	for chapter := range vivid {
+		chapters := make([]string, 10)
+		for i := range chapters {
+			chapters[i] = chapter
 		}
-		b, err := Draw(Card{Issue: 1, Date: "12 ноември", Topics: topics, Shape: "1203000000"})
+		b, err := Draw(Card{Issue: 1, Date: "12 ноември", Chapters: chapters, Shape: "1203000000"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -95,12 +95,12 @@ func TestTilesPartInGrey(t *testing.T) {
 			{"void", false, false, false}} {
 			left, right := filled(i, 8, 14), filled(i, 106, 112)
 			if left != want.left || right != want.right || whole(i) != want.whole {
-				t.Errorf("%s, %s: filled at the left %v, at the right %v; its edge whole %v", topic, want.name, left,
+				t.Errorf("%s, %s: filled at the left %v, at the right %v; its edge whole %v", chapter, want.name, left,
 					right, whole(i))
 			}
 		}
 		if grey(3, 12, 108, 12, 108) < 250 {
-			t.Errorf("%s: one that counts for nobody has something in it", topic)
+			t.Errorf("%s: one that counts for nobody has something in it", chapter)
 		}
 		darkest := uint8(255)
 		for y := y0 + 30; y < y0+90; y++ {
@@ -109,7 +109,7 @@ func TestTilesPartInGrey(t *testing.T) {
 			}
 		}
 		if darkest > 240 {
-			t.Errorf("%s: a wrong one has no glyph", topic)
+			t.Errorf("%s: a wrong one has no glyph", chapter)
 		}
 	}
 }
@@ -143,9 +143,9 @@ func TestChaptersAreTheClients(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for topic := range vivid {
-		if len(all[topic]) == 0 {
-			t.Errorf("no glyph for %s", topic)
+	for chapter := range vivid {
+		if len(all[chapter]) == 0 {
+			t.Errorf("no glyph for %s", chapter)
 		}
 	}
 }
@@ -232,7 +232,7 @@ func TestFacesHaveTheLetters(t *testing.T) {
 
 func BenchmarkDraw(b *testing.B) {
 	for b.Loop() {
-		if _, err := Draw(Card{Issue: 9, Date: "20 ноември", Topics: day, Shape: "1102111013"}); err != nil {
+		if _, err := Draw(Card{Issue: 9, Date: "20 ноември", Chapters: day, Shape: "1102111013"}); err != nil {
 			b.Fatal(err)
 		}
 	}

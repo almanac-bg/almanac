@@ -89,7 +89,7 @@ func TestSharingTheDay(t *testing.T) {
 		t.Fatalf("the shared day's page: %d\n%s", status, body)
 	}
 	// What the page says of the link (its preview, the day shared) names nobody; the day's board under it is
-	// everyone's, as on Начало.
+	// everyone's, as on Днес.
 	head, _, _ := strings.Cut(body, `<script type="application/json" id="boot">`)
 	shared := regexp.MustCompile(`"shared":\{[^}]*\}`).FindString(body)
 	for _, secret := range []string{u["name"].(string), u["tag"].(string)} {

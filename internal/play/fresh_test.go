@@ -22,9 +22,9 @@ import (
 // of them), each with the game below that holds it to the rule (TestNothingPlayedAgain), or why it's a repeat by
 // design. A new way fails the test until it's here.
 var freshFor = map[string]string{
-	"startTopic": "a topic",
-	"Draw":       "a topic",
-	"DuelFriend": "a friend's duel",
+	"startChapter": "a chapter",
+	"Draw":         "a chapter",
+	"DuelFriend":   "a friend's duel",
 	// By design:
 	"StartDay": "by design: the day's ten are the same for everyone",
 	"drawDay":  "by design: the day's ten are the same for everyone",
@@ -34,7 +34,7 @@ var freshFor = map[string]string{
 // TestNothingPlayedAgain holds the rule across every way a game starts: a player who has just played a game, starting
 // any other kind (or the same again: a rematch), is dealt questions they haven't seen while the bank has them. A
 // friend's duel is drawn for both its players: none of them has seen a question dealt while some are left that none
-// has. The player has played most of the bank before (all but three topics), so that a draw that didn't prefer what
+// has. The player has played most of the bank before (all but three chapters), so that a draw that didn't prefer what
 // they haven't seen would deal it again almost surely. The repeats by design (freshFor) are the day (the same for
 // everyone), and a duel's second side (the same ten as the first).
 func TestNothingPlayedAgain(t *testing.T) {
@@ -62,8 +62,8 @@ func TestNothingPlayedAgain(t *testing.T) {
 			f.must(err)
 			f.w.play(f.ana, s.ID, repeat(f.w.right, Length)...)
 		}},
-		{"a topic", func(f *fresh) {
-			s, err := f.w.g.startTopic(f.ctx(), f.ana, MixTopic)
+		{"a chapter", func(f *fresh) {
+			s, err := f.w.g.startChapter(f.ctx(), f.ana, MixChapter)
 			f.must(err)
 			f.w.play(f.ana, s.ID, repeat(f.w.right, Length)...)
 		}},
@@ -82,15 +82,15 @@ func TestNothingPlayedAgain(t *testing.T) {
 		deal func(f *fresh) (picks []Pick, pool func(bank.Question) bool, players []int64)
 	}
 	nexts := []next{
-		{"a topic", func(f *fresh) ([]Pick, func(bank.Question) bool, []int64) {
-			s, err := f.w.g.startTopic(f.ctx(), f.ana, MixTopic)
+		{"a chapter", func(f *fresh) ([]Pick, func(bank.Question) bool, []int64) {
+			s, err := f.w.g.startChapter(f.ctx(), f.ana, MixChapter)
 			f.must(err)
 			return f.w.picks(s.ID), anyQuestion, []int64{f.ana}
 		}},
-		{"a topic of one", func(f *fresh) ([]Pick, func(bank.Question) bool, []int64) {
-			s, err := f.w.g.StartTopic(f.ctx(), f.ana, freshTopics[0])
+		{"a chapter of one", func(f *fresh) ([]Pick, func(bank.Question) bool, []int64) {
+			s, err := f.w.g.StartChapter(f.ctx(), f.ana, freshChapters[0])
 			f.must(err)
-			return f.w.picks(s.ID), func(q bank.Question) bool { return q.Base().Category == freshTopics[0] }, []int64{f.ana}
+			return f.w.picks(s.ID), func(q bank.Question) bool { return q.Base().Category == freshChapters[0] }, []int64{f.ana}
 		}},
 		{"a friend's duel", func(f *fresh) ([]Pick, func(bank.Question) bool, []int64) {
 			id, err := f.w.g.DuelFriend(f.ctx(), f.ana, f.bo)
@@ -143,13 +143,13 @@ func TestNothingPlayedAgain(t *testing.T) {
 	}
 }
 
-// freshTopics are the topics the player hasn't played before the test's games (newFresh): the rest they have, all.
-var freshTopics = []string{"geography", "history", "science"}
+// freshChapters are the chapters the player hasn't played before the test's games (newFresh): the rest they have, all.
+var freshChapters = []string{"geography", "history", "science"}
 
 func anyQuestion(bank.Question) bool { return true }
 
 // fresh is a world for TestNothingPlayedAgain, the day after the first issue (neither Ана nor Бо played it): Ана, who
-// has played every question but those of freshTopics (some wrong, days ago), and her friend Бо.
+// has played every question but those of freshChapters (some wrong, days ago), and her friend Бо.
 type fresh struct {
 	t       *testing.T
 	w       *world
@@ -165,16 +165,16 @@ func newFresh(t *testing.T) *fresh {
 		t.Fatal(err)
 	}
 	w.wait(25 * time.Hour)
-	// Ана's past: every question but those of freshTopics, a third of them wrong, four days ago, in one long game.
+	// Ана's past: every question but those of freshChapters, a third of them wrong, four days ago, in one long game.
 	var picks []Pick
 	for _, q := range w.b.Live("", "") {
-		if !slices.Contains(freshTopics, q.Base().Category) {
+		if !slices.Contains(freshChapters, q.Base().Category) {
 			picks = append(picks, Pick{ID: q.Base().ID, Seed: uint64(len(picks))})
 		}
 	}
 	var runID int64
 	f.must(w.g.DB.Tx(f.ctx(), func(tx *sql.Tx) error {
-		r, err := w.g.insertRun(f.ctx(), tx, f.ana, "topic", nil, MixTopic, picks)
+		r, err := w.g.insertRun(f.ctx(), tx, f.ana, "chapter", nil, MixChapter, picks)
 		if err != nil {
 			return err
 		}

@@ -1,26 +1,26 @@
-// Package play is the game: runs through a set of questions (the day's, a chapter's: topics.go, a duel's), one
+// Package play is the game: runs through a set of questions (the day's, a chapter's: chapters.go, a duel's), one
 // question at a time, against the server's clock; duels, kept as runs; friends.
 //
 // A question's time runs only while it's shown: Show starts it, Answer stops it. How long it is is the server's
-// (Limit): by how much the question gives to read, at a slow reader's pace, never under its kind's floor; an answer
-// the player's screen timed within it is taken if the line brings it late, up to LateGrace (late.go). A question with pictures waits for
-// them: Show starts its time PictureWait later, and Start sooner, once the player's screen has them in, so that a slow
-// line doesn't eat the time, and the server still says when it runs. Until its time runs, the screen gets the pictures
-// only (bank.PicturesView): its words and options come with its time, and an answer before it is refused, so that
-// nobody reads a question off the clock. Between questions a player reads the answer and its fact for as long as they
-// like; a question of the day's ten dealt on its own date („На този ден“) shows its day's line with them (dealtOn). A
-// question left showing past its time counts as unanswered, whenever the run is next looked at. A question is graded
-// against the version of it that showed, whatever the bank has become meanwhile (versions.go); the day's ten hold
-// still for their day, and one found wrong during it counts for nobody that day (day.go). Everything a run does
-// goes through the database, so a refresh, a second tab or a restart of the server changes nothing. A run left
-// half-way goes on where it stopped: the day's when the player comes back to it that day (a run of the day's
-// questions ends with its day, DayGrace after: dayOver), a topic's when they start the same topic again that day
-// (StartTopic). A game played quicker than a person plays counts for its player alone (fair.go).
+// (Limit): by how much the question gives to read, at a slow reader's pace, never under its kind's floor; an answer the
+// player's screen timed within it is taken if the line brings it late, up to LateGrace (late.go). A question with
+// pictures waits for them: Show starts its time PictureWait later, and Start sooner, once the player's screen has them
+// in, so that a slow line doesn't eat the time, and the server still says when it runs. Until its time runs, the screen
+// gets the pictures only (bank.PicturesView): its words and options come with its time, and an answer before it is
+// refused, so that nobody reads a question off the clock. Between questions a player reads the answer and its fact for
+// as long as they like; a question of the day's ten dealt on its own date („На този ден“) shows its day's line with
+// them (dealtOn). A question left showing past its time counts as unanswered, whenever the run is next looked at. A
+// question is graded against the version of it that showed, whatever the bank has become meanwhile (versions.go); the
+// day's ten hold still for their day, and one found wrong during it counts for nobody that day (day.go). Everything a
+// run does goes through the database, so a refresh, a second tab or a restart of the server changes nothing. A run left
+// half-way goes on where it stopped: the day's when the player comes back to it that day (a run of the day's questions
+// ends with its day, DayGrace after: dayOver), a chapter's when they start the same chapter again that day
+// (StartChapter). A game played quicker than a person plays counts for its player alone (fair.go).
 //
-// No game deals a player again what they've played, in any game, while the bank has questions they haven't: a topic's,
-// a duel's are drawn for all their players, those none of them has seen first, then those the fewest have (choose,
-// seenAmong). One repeats by design: the day (the same ten for everyone). TestNothingPlayedAgain holds it, for every
-// way a game starts.
+// No game deals a player again what they've played, in any game, while the bank has questions they haven't: a
+// chapter's, a duel's are drawn for all their players, those none of them has seen first, then those the fewest have
+// (choose, seenAmong). One repeats by design: the day (the same ten for everyone). TestNothingPlayedAgain holds it, for
+// every way a game starts.
 //
 // A guest who signs in to their account brings everything along (Merge), and a player who goes leaves others'
 // history whole (Forget): merge.go, checked against the schema so that no table of a player's is left out.
@@ -93,7 +93,7 @@ var Bulgaria, _ = time.LoadLocation("Europe/Sofia")
 // Errors a player may cause.
 var (
 	ErrNoRun      = errors.New("no such run")
-	ErrNoTopic    = errors.New("no such topic")
+	ErrNoChapter  = errors.New("no such chapter")
 	ErrOutOfStep  = errors.New("not the question now")
 	ErrBadAnswer  = errors.New("an answer the question can't take")
 	ErrNoQuestion = errors.New("no questions to play")
@@ -148,20 +148,20 @@ type Pick struct {
 
 // run is a run as the database has it.
 type run struct {
-	id, userID    int64
-	kind          string
-	day, category string
-	picks         []Pick
-	at            int
-	shownAt       sql.NullInt64
-	rights        int
-	tie           tiebreak // what decides between the same right answers (board.go)
-	finished      bool
-	shadow        int  // why it counts for its player alone (fair.go: ShadowScript…), 0 if it doesn't
-	pencil        bool // a day's issue played a second time in one browser: writes pencil only (ink.go)
+	id, userID   int64
+	kind         string
+	day, chapter string
+	picks        []Pick
+	at           int
+	shownAt      sql.NullInt64
+	rights       int
+	tie          tiebreak // what decides between the same right answers (board.go)
+	finished     bool
+	shadow       int  // why it counts for its player alone (fair.go: ShadowScript…), 0 if it doesn't
+	pencil       bool // a day's issue played a second time in one browser: writes pencil only (ink.go)
 }
 
-const runColumns = `id, user_id, kind, coalesce(day, ''), coalesce(category, ''), questions,
+const runColumns = `id, user_id, kind, coalesce(day, ''), coalesce(chapter, ''), questions,
 	at, shown_at, rights, closeness, finished_at IS NOT NULL, shadow, pencil <> 0`
 
 type scanner interface{ Scan(...any) error }
@@ -169,7 +169,7 @@ type scanner interface{ Scan(...any) error }
 func scanRun(row scanner) (*run, error) {
 	var r run
 	var picks string
-	err := row.Scan(&r.id, &r.userID, &r.kind, &r.day, &r.category, &picks,
+	err := row.Scan(&r.id, &r.userID, &r.kind, &r.day, &r.chapter, &picks,
 		&r.at, &r.shownAt, &r.rights, &r.tie.closeness, &r.finished, &r.shadow, &r.pencil)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNoRun
@@ -235,11 +235,11 @@ func load(q interface {
 
 // State is a run as a player sees it.
 type State struct {
-	ID       int64  `json:"id"`
-	Kind     string `json:"kind"`
-	Day      string `json:"day,omitempty"`
-	Category string `json:"category,omitempty"`
-	Total    int    `json:"total"`
+	ID      int64  `json:"id"`
+	Kind    string `json:"kind"`
+	Day     string `json:"day,omitempty"`
+	Chapter string `json:"chapter,omitempty"`
+	Total   int    `json:"total"`
 	// Void is how many of the Total count for nobody (day.go): the run is of Total − Void questions.
 	Void   int `json:"void,omitempty"`
 	At     int `json:"at"`
@@ -270,11 +270,11 @@ func closeAnswer(score float64, right bool) bool { return score > 0 && !right }
 
 // Shown is the question on screen, with the time it has left.
 type Shown struct {
-	N        int    `json:"n"`
-	Category string `json:"category"`
-	View     any    `json:"view"`
-	LimitMs  int64  `json:"limitMs"`
-	LeftMs   int64  `json:"leftMs"`
+	N       int    `json:"n"`
+	Chapter string `json:"chapter"`
+	View    any    `json:"view"`
+	LimitMs int64  `json:"limitMs"`
+	LeftMs  int64  `json:"leftMs"`
 	// MoreMs is how soon more of the question shows (the next clue): look again then. 0 for nothing more.
 	MoreMs int64 `json:"moreMs,omitempty"`
 	// StartsMs is how soon its time starts by itself, while it waits for its pictures: the screen starts it sooner
@@ -302,7 +302,7 @@ type Result struct {
 // state builds what a player sees of a run.
 func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 	s := State{
-		ID: r.id, Kind: r.kind, Day: r.day, Category: r.category, Total: len(r.picks), Void: len(r.picks) - r.counted(),
+		ID: r.id, Kind: r.kind, Day: r.day, Chapter: r.chapter, Total: len(r.picks), Void: len(r.picks) - r.counted(),
 		At: r.at, Rights: r.rights, Done: r.finished,
 	}
 	rows, err := tx.Query(`SELECT n, score, is_right FROM answers WHERE run_id = ? ORDER BY n`, r.id)
@@ -330,7 +330,7 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 			limit := Limit(d.Question())
 			since := g.Now().Sub(time.UnixMilli(r.shownAt.Int64))
 			s.Question = &Shown{
-				N: r.at, Category: d.Question().Base().Category, View: bank.ViewAt(d, max(0, since)),
+				N: r.at, Chapter: d.Question().Base().Category, View: bank.ViewAt(d, max(0, since)),
 				LimitMs: limit.Milliseconds(), LeftMs: max(0, min(limit, limit-since).Milliseconds()),
 				MoreMs: bank.NextStep(d, max(0, since)).Milliseconds(), StartsMs: max(0, -since.Milliseconds()),
 				OnThisDay: r.dealtOn() != "" && d.Question().Extra().OnDay(r.dealtOn()),
@@ -572,10 +572,10 @@ func (r *run) startAt(tx *sql.Tx, t time.Time) error {
 }
 
 // Answer grades an answer to question n, the one showing. A null answer gives up on it. An answer to the question just
-// answered (the one before, past any that count for nobody the run went on over: day.go) is one sent again, its reply lost on the way (a line that dropped, a server restarting): it gets the answer
-// taken the first time, as it was, and changes nothing (again). One before the question's time runs (still waiting for
-// its pictures) is out of step. It counts if it arrives within Grace of the question's time; AnswerTimed takes one
-// the screen timed within it later.
+// answered (the one before, past any that count for nobody the run went on over: day.go) is one sent again, its reply
+// lost on the way (a line that dropped, a server restarting): it gets the answer taken the first time, as it was, and
+// changes nothing (again). One before the question's time runs (still waiting for its pictures) is out of step. It
+// counts if it arrives within Grace of the question's time; AnswerTimed takes one the screen timed within it later.
 func (g *Game) Answer(ctx context.Context, userID, runID int64, n int, answer json.RawMessage) (Result, error) {
 	return g.answer(ctx, userID, runID, n, answer, false, g.Now())
 }
@@ -695,13 +695,13 @@ func newSeed() uint64 { return rand.Uint64() }
 
 // Reviewed is a question of a finished run, gone over: as it was shown, its answer, and what the player gave.
 type Reviewed struct {
-	N        int             `json:"n"`
-	Category string          `json:"category"`
-	View     any             `json:"view"`
-	Reveal   any             `json:"reveal"`
-	Given    json.RawMessage `json:"given"` // as shown; null: no answer
-	Right    bool            `json:"right"`
-	Close    bool            `json:"close,omitempty"`
+	N       int             `json:"n"`
+	Chapter string          `json:"chapter"`
+	View    any             `json:"view"`
+	Reveal  any             `json:"reveal"`
+	Given   json.RawMessage `json:"given"` // as shown; null: no answer
+	Right   bool            `json:"right"`
+	Close   bool            `json:"close,omitempty"`
 	// Void is an answer to a question that counts for nobody (day.go): in no score.
 	Void bool `json:"void,omitempty"`
 }
@@ -774,7 +774,7 @@ func (g *Game) Review(ctx context.Context, userID, runID int64) ([]Reviewed, err
 		if err != nil {
 			return nil, err
 		}
-		it.Category, it.View, it.Reveal = d.Question().Base().Category, d.View(), bank.RevealOn(d, crowd, r.dealtOn())
+		it.Chapter, it.View, it.Reveal = d.Question().Base().Category, d.View(), bank.RevealOn(d, crowd, r.dealtOn())
 		it.Void = r.picks[it.N].Void
 		out = append(out, it)
 	}

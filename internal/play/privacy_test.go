@@ -29,8 +29,8 @@ func TestProfileShowsRanks(t *testing.T) {
 	if p, err = w.g.ProfileOf(ctx, "player1", 0); err != nil || !ranked(p.Ranks) {
 		t.Fatalf("after a day: %+v %v", p, err)
 	}
-	// A topic's game, under way: nothing of it shows.
-	s, err := w.g.startTopic(ctx, ana, MixTopic)
+	// A chapter's game, under way: nothing of it shows.
+	s, err := w.g.startChapter(ctx, ana, MixChapter)
 	if err != nil {
 		t.Fatal(err)
 	}

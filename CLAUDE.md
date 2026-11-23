@@ -13,7 +13,7 @@ their reasons: read it before changing what a player sees or how the game plays,
 Every day ten questions; each one a player gets right in the issue writes its fact in ink in their Алманах, and their
 rank in a chapter says how much of it the book holds in ink; played alone, with friends, beside all of Bulgaria. Three
 places: Днес (the day's issue, the same ten for everyone, asked once, its result shared without the answers, and on it the
-day's board), Алманах (the player's book: a chapter per topic, ink from the issues, every other fact met in grey, a seal
+day's board), Алманах (the player's book: a chapter per subject, ink from the issues, every other fact met in grey, a seal
 per chapter named for the book), Приятели (friends, and duels with them on one's own time, on one
 page). The streak is the habit and forgives two missed days a week. The score is the number right; nothing
 else adds up but ink and the streak. DECISIONS.md, „The direction“, is final: it lists the player's nouns and the rule
@@ -23,7 +23,7 @@ every later change passes.
 
 The day's ten questions are the heart of the game: the habit a player comes back for. Everything
 else serves it or stays out of its way. The game already has many systems; a new one must replace something or prove
-it's needed, and quiet beats loud (a new player sees the day and the topics first, a game's news is three cards at
+it's needed, and quiet beats loud (a new player sees the day and the chapters first, a game's news is three cards at
 most). A change is judged by whether players come back: the retention numbers in `/admin`.
 
 ## Where things are

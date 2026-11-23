@@ -27,16 +27,16 @@ func (s *Server) today(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, out)
 }
 
-// todayOf is the day screen's state for u (nil: a visitor), as GET /api/day sends it and the page of Начало has it
+// todayOf is the day screen's state for u (nil: a visitor), as GET /api/day sends it and the page of Днес has it
 // in its boot (pages.go).
 func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, error) {
 	day := s.game.Today()
 	out := map[string]any{"day": day, "issue": play.Issue(day), "streak": 0, "run": nil}
-	topics, err := s.game.IssueTopics(ctx, day)
+	chapters, err := s.game.IssueChapters(ctx, day)
 	if err != nil {
 		return nil, err
 	}
-	out["topics"] = topics
+	out["chapters"] = chapters
 	if name := bank.NationalName(day); name != "" {
 		out["national"] = name
 	}
@@ -50,7 +50,7 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 			return nil, err
 		}
 		out["streak"], out["spare"] = streak.Days, streak.Spare
-		// What came of the days just missed, told on Начало once (play.TellStreak: the client says when it has): the
+		// What came of the days just missed, told on Днес once (play.TellStreak: the client says when it has): the
 		// week forgave one; or it had forgiven what it does already and the streak ended, and a new one begins.
 		recent := s.game.Now().In(play.Bulgaria).AddDate(0, 0, -3).Format(time.DateOnly)
 		told, err := s.game.StreakTold(ctx, u.ID)
@@ -79,7 +79,7 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 		if out["firstDay"], err = s.game.FirstDay(ctx, u.ID, day); err != nil {
 			return nil, err
 		}
-		// A game that ended without its result on screen: its news is told on Начало, once (play/told.go).
+		// A game that ended without its result on screen: its news is told on Днес, once (play/told.go).
 		if untold, err := s.game.Untold(ctx, u.ID); err != nil {
 			return nil, err
 		} else if untold != 0 {
@@ -90,12 +90,12 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 		if open, err := s.game.Unfinished(ctx, u.ID); err != nil {
 			return nil, err
 		} else if open != nil {
-			topics, err := s.game.IssueTopics(ctx, open.Day)
+			chapters, err := s.game.IssueChapters(ctx, open.Day)
 			if err != nil {
 				return nil, err
 			}
 			midnight, _ := time.ParseInLocation(time.DateOnly, day, play.Bulgaria)
-			y := map[string]any{"day": open.Day, "issue": play.Issue(open.Day), "topics": topics, "run": open,
+			y := map[string]any{"day": open.Day, "issue": play.Issue(open.Day), "chapters": chapters, "run": open,
 				"until": midnight.Add(play.DayGrace).UnixMilli()}
 			if name := bank.NationalName(open.Day); name != "" {
 				y["national"] = name
@@ -161,21 +161,21 @@ func (s *Server) startDay(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, st)
 }
 
-func (s *Server) startTopic(w http.ResponseWriter, r *http.Request) error {
+func (s *Server) startChapter(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
 		return err
 	}
 	var in struct {
-		Category string `json:"category"`
+		Chapter string `json:"chapter"`
 	}
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
-	if !s.limits.allow("topic:"+strconv.FormatInt(u.ID, 10), 120, time.Hour) {
+	if !s.limits.allow("chapter:"+strconv.FormatInt(u.ID, 10), 120, time.Hour) {
 		return errTooMany
 	}
-	st, err := s.game.StartTopic(r.Context(), u.ID, in.Category)
+	st, err := s.game.StartChapter(r.Context(), u.ID, in.Chapter)
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ func (s *Server) runOf(r *http.Request) (int64, int64, error) {
 	return u.ID, id, nil
 }
 
-// left are the player's games of their own left unfinished today (play.Left): a topic's tile says where each stopped,
+// left are the player's games of their own left unfinished today (play.Left): a chapter's tile says where each stopped,
 // and its screen goes on with it.
 func (s *Server) left(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)

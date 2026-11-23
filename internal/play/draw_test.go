@@ -71,7 +71,7 @@ func TestShapesDiffer(t *testing.T) {
 	where := func(slots []slot, typ string) int {
 		return slices.IndexFunc(slots, func(s slot) bool { return s.typ == typ })
 	}
-	for _, shape := range [][]slot{daySlots, topicSlots(0), topicSlots(2)} {
+	for _, shape := range [][]slot{daySlots, chapterSlots(0), chapterSlots(2)} {
 		seen := map[string]map[int]bool{}
 		for seed := range uint64(40) {
 			slots := inBands(slices.Clone(shape), rand.New(rand.NewPCG(seed, 5)))
@@ -160,7 +160,7 @@ func TestOnePuzzleTwoPicturesADay(t *testing.T) {
 }
 
 // A day takes the question that belongs to its date, at least BGFloor about Bulgaria where the bank has them, and an
-// estimate for its number; every place still fits just so, and the topics stay one each.
+// estimate for its number; every place still fits just so, and the chapters stay one each.
 func TestDayOfItsDate(t *testing.T) {
 	b := biggerSample(t, 20)
 	day := "2026-03-03"
@@ -182,18 +182,18 @@ func TestDayOfItsDate(t *testing.T) {
 		if len(short) > 0 || len(picks) != Length {
 			t.Fatalf("seed %d: %d picks, short %v", seed, len(picks), short)
 		}
-		found, bg, topics := false, 0, map[string]bool{}
+		found, bg, chapters := false, 0, map[string]bool{}
 		for _, p := range picks {
 			q, _ := b.Get(p.ID)
 			found = found || p.ID == dated.Base().ID
 			bg += b2i(q.Extra().BG)
-			topics[q.Base().Category] = true
+			chapters[q.Base().Category] = true
 		}
 		if n := dayNumber(t, b, picks); !b.Estimate(n) {
 			t.Fatalf("seed %d: the day's number is %s, not an estimate", seed, n.Base().ID)
 		}
-		if !found || bg < BGFloor || len(topics) != Length {
-			t.Fatalf("seed %d: dated %v, %d about Bulgaria, %d topics", seed, found, bg, len(topics))
+		if !found || bg < BGFloor || len(chapters) != Length {
+			t.Fatalf("seed %d: dated %v, %d about Bulgaria, %d chapters", seed, found, bg, len(chapters))
 		}
 	}
 	// Any other day keeps it for its own: never drawn before (or after) its date.
@@ -322,7 +322,7 @@ func TestNoSubjectTwiceInAWeek(t *testing.T) {
 	}
 }
 
-// recurringBank is a bank of ten topics with n questions for every place of a day in each, about 100 subjects
+// recurringBank is a bank of ten chapters with n questions for every place of a day in each, about 100 subjects
 // between them all (answers and quoted titles), each asked again every few dozen questions.
 func recurringBank(t *testing.T, n int) *bank.Bank {
 	t.Helper()
@@ -344,7 +344,7 @@ func recurringBank(t *testing.T, n int) *bank.Bank {
 	picture := map[string]any{"file": "p.webp", "w": 600, "h": 400, "alt": "Снимка", "credit": "Някой", "license": "PD",
 		"source": "https://commons.wikimedia.org/p"}
 	for c := range 10 {
-		category := string(rune('a'+c)) + "topic"
+		category := string(rune('a'+c)) + "chapter"
 		categories = append(categories, bank.Category{ID: category, Name: fmt.Sprintf("Тема %d", c+1)})
 		for i := range n {
 			text := func(what string) string { return fmt.Sprintf("%s %d „%s“?", what, i, subject()) }
@@ -403,7 +403,7 @@ func TestOtherGamesDealWhatWasMet(t *testing.T) {
 	dealt := func(met map[string]bool) int {
 		n := 0
 		for seed := range uint64(300) {
-			for _, p := range Draw(b, MixTopic, 0, nil, nil, met, rand.New(rand.NewPCG(seed, 9))) {
+			for _, p := range Draw(b, MixChapter, 0, nil, nil, met, rand.New(rand.NewPCG(seed, 9))) {
 				if p.ID == untouched {
 					n++
 				}

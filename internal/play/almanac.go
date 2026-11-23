@@ -11,10 +11,10 @@ import (
 	"github.com/almanac-bg/almanac/internal/bank"
 )
 
-// The Алманах is a player's book: a chapter per topic. A game across topics (a duel's, or one of every topic kept from
-// before) has its facts in their own topics' chapters, never one list of them all. A chapter holds the fact behind every question the player has
-// met, in ink where it was a right answer in the issue the first time they met it, else in grey (ink.go), and says one
-// number, its ink.
+// The Алманах is a player's book: a chapter for each of the bank's. A game across chapters (a duel's, or one of every
+// chapter kept from before) has its facts in their own chapters, never one list of them all. A chapter holds the fact
+// behind every question the player has met, in ink where it was a right answer in the issue the first time they met it,
+// else in grey (ink.go), and says one number, its ink.
 
 // Learned is one fact in a player's almanac: the question (its picture too), its answer, and the fact behind it; in
 // ink or in grey (ink.go); when it was written, and where: the day's ten (its issue), a chapter's game, a duel. A
@@ -22,7 +22,7 @@ import (
 // keeps no corrected one).
 type Learned struct {
 	ID       string `json:"id"`
-	Category string `json:"category"`
+	Chapter  string `json:"chapter"`
 	Question string `json:"question,omitempty"`
 	Answer   string `json:"answer"`
 	// Lines is an answer of parts (an order, a match, a split: bank.AnswerLines), a line each: the entry lists them
@@ -32,7 +32,7 @@ type Learned struct {
 	Fact   string   `json:"fact"`
 	Ink    bool     `json:"ink,omitempty"`
 	At     int64    `json:"at"`
-	// Kind is the game it was learned in ("day", "topic", "duel"), and Issue the day's, for one of the day's ten.
+	// Kind is the game it was learned in ("day", "chapter", "duel"), and Issue the day's, for one of the day's ten.
 	Kind  string `json:"kind,omitempty"`
 	Issue int    `json:"issue,omitempty"`
 	// Image is a picture question's picture (bank.Picture: a choice of pictures', its answer's), as the play screen
@@ -73,14 +73,14 @@ type Almanac struct {
 // question's id), whichever it is, in Page's place (the first, if the chapter hasn't it): the day's result links to
 // the facts the day wrote, which a few games since may have moved off the first page.
 type AlmanacQuery struct {
-	Topic, From, Search, Fact string
-	Page, Limit               int
+	Chapter, From, Search, Fact string
+	Page, Limit                 int
 }
 
-// inChapter says whether a question's fact belongs to a chapter (its topic; "", the book as a whole: what its head
+// inChapter says whether a question's fact belongs to a chapter ("", the book as a whole: what its head
 // counts).
-func inChapter(q bank.Question, topic string) bool {
-	return topic == "" || q.Base().Category == topic
+func inChapter(q bank.Question, chapter string) bool {
+	return chapter == "" || q.Base().Category == chapter
 }
 
 // learnedAt is where and when a fact was written: the right answer that wrote it (ink.go).
@@ -92,7 +92,7 @@ type learnedAt struct {
 
 // learnedAs is a written question as its almanac shows it.
 func learnedAs(q bank.Question, at learnedAt, ink bool) Learned {
-	l := Learned{ID: q.Base().ID, Category: q.Base().Category, Question: q.Base().Text, Answer: bank.AnswerText(q),
+	l := Learned{ID: q.Base().ID, Chapter: q.Base().Category, Question: q.Base().Text, Answer: bank.AnswerText(q),
 		Lines: bank.AnswerLines(q), Fact: q.Extra().Fact, At: at.at, Kind: at.kind, Ink: ink}
 	l.Image, l.Credit = bank.Picture(q)
 	if at.kind == "day" {
@@ -132,7 +132,7 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, aq AlmanacQuery) (Al
 			countIn(out.Ink, q)
 		}
 		at := w.at
-		if !inChapter(q, aq.Topic) || paged && (at.at > before || at.at == before && q.Base().ID >= fromID) {
+		if !inChapter(q, aq.Chapter) || paged && (at.at > before || at.at == before && q.Base().ID >= fromID) {
 			return
 		}
 		if l := learnedAs(q, at, w.ink); len(words) == 0 || hasWords(l, words) {

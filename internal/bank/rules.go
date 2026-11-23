@@ -82,7 +82,7 @@ var Rules = []Rule{
 	{Name: "own-number", Says: "a number question's text or a name in it shows no number within the tolerance of its answer („Стоте дни“)", From: AuditFrom, one: ruleOwnNumber},
 	{Name: "order-gap", Says: "an order's measured values are 10% apart from their neighbours; exact ones (years, counts) only differ", one: ruleOrderGap},
 	{Name: "options", Says: "no option stands out by its form: only the answer with a regnal numeral, in another script, or in quotes", one: ruleOptions},
-	{Name: "number-rank", Says: "across the bank and a topic, a choice of numbers has its answer about as often at each of the four ranks, not mostly in the middle", Hint: true, all: ruleNumberRank},
+	{Name: "number-rank", Says: "across the bank and a category, a choice of numbers has its answer about as often at each of the four ranks, not mostly in the middle", Hint: true, all: ruleNumberRank},
 	{Name: "long-answer", Says: "the answer isn't much longer than every wrong option", Hint: true, one: ruleLongAnswer},
 	{Name: "answer-word", Says: "no clue, and no question text, shares a word with the answer that the wrong options don't", one: ruleAnswerWord},
 	{Name: "dated", Says: "a question for a day (on) has its day's line (day), ending in a period and naming the date, unless its text names it", one: ruleDated},

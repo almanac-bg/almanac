@@ -20,7 +20,7 @@ import (
 // a day at most. Claimed in day_mails before it's queued in the outbox (which lets go of one to an address the mail
 // server refused: mail.Suppressed), so a restart never sends two.
 //
-// Asked for on Начало, under the day's result where notifications can't come (screens/today.ts), and in Настройки
+// Asked for on Днес, under the day's result where notifications can't come (screens/today.ts), and in Настройки
 // → Известия, where it's switched off too; or by the signed link in every mail (mailOff). Off without a row
 // (mail_prefs), unlike the streak's mail: it's sent only to whoever asked.
 

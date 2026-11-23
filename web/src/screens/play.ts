@@ -1,5 +1,5 @@
-// A chapter's game: questions by topic, as many as you like, shaped by how well you know the topic. Everyone plays
-// the same game. It's started from its chapter in the Алманах („Играй 10 въпроса“); a run of one is /play/<topic>, whose
+// A chapter's game: its questions, as many as you like, shaped by how well you know the chapter. Everyone plays
+// the same game. It's started from its chapter in the Алманах („Играй 10 въпроса“); a run of one is /play/<chapter>, whose
 // result has one action (the day's ten while they wait, else ten more at once) and the rest as quiet links: ten more,
 // its questions gone over, the way back to its chapter.
 
@@ -10,16 +10,16 @@ import type { State } from "../game/types.ts";
 import { api, errorText } from "../lib/api.ts";
 import { type Child, h, lifetime, signal, slot } from "../lib/dom.ts";
 import { backOut, byTap, entry, hold, mark, title } from "../lib/router.ts";
-import { categories, player, user } from "../state.ts";
+import { chapters, player, user } from "../state.ts";
 import { stakeLine } from "../ui.ts";
 import { missing } from "./missing.ts";
 
-export function topic([category = ""]: string[]) {
-  const name = categories.find((c) => c.id === category)?.name;
-  // A topic the game doesn't have (an old link, a topic renamed): said so, with the way to the day's ten.
+export function chapter([id = ""]: string[]) {
+  const name = chapters.find((c) => c.id === id)?.name;
+  // A chapter the game doesn't have (an old link, a chapter renamed): said so, with the way to the day's ten.
   if (name === undefined) return missing();
   title(name);
-  // While the day's ten wait, a topic's result points to them (the habit comes first), with the streak at stake.
+  // While the day's ten wait, a chapter's result points to them (the habit comes first), with the streak at stake.
   // Asked as the screen opens and as each game starts (a new player is a player only then), so it's in long before
   // the game ends.
   const day = signal<DayWaits | null>(null);
@@ -31,15 +31,15 @@ export function topic([category = ""]: string[]) {
   if (user.peek()) ask();
   return run({
     name,
-    chapter: category,
-    home: `/almanac/${category}`,
+    chapter: id,
+    home: `/almanac/${id}`,
     lead: "Десет въпроса от темата, от лесен към труден.",
     begin: async () => {
-      const s = await api<State>("POST", "/api/topic", { category });
+      const s = await api<State>("POST", "/api/chapter", { chapter: id });
       ask();
       return s;
     },
-    left: (l) => l.category === category,
+    left: (l) => l.chapter === id,
     finished: (s, again, just) =>
       h(
         "div",
@@ -52,13 +52,13 @@ export function topic([category = ""]: string[]) {
           s,
           null,
           {
-            main: () => nextOf(day(), again, category).main,
-            also: [() => nextOf(day(), again, category).also],
+            main: () => nextOf(day(), again, id).main,
+            also: [() => nextOf(day(), again, id).also],
             quiet: true,
           },
           [h("p", { class: "news-met" }, "Фактите от играта са в твоя Алманах, в сиво."), just ? news(s.id) : null],
           just,
-          category,
+          id,
         ),
       ),
   });
@@ -83,17 +83,17 @@ interface DayWaits {
   spare: boolean;
 }
 
-/** Whether the day's ten still wait for the player (null once played), from Начало's state. */
+/** Whether the day's ten still wait for the player (null once played), from Днес's state. */
 async function dayWaits(): Promise<DayWaits | null> {
   const t = await api<{ streak: number; spare?: boolean; run: State | null }>("GET", "/api/day");
   return t.run?.done ? null : { streak: t.streak, spare: t.spare ?? true };
 }
 
-/** A game of a topic the player left unfinished today (play.Left): how far it got, and whether its question is
+/** A game of a chapter the player left unfinished today (play.Left): how far it got, and whether its question is
  * showing, its time running. */
 export interface LeftRun {
   id: number;
-  category: string;
+  chapter: string;
   at: number;
   total: number;
   open?: boolean;
@@ -120,14 +120,14 @@ interface Run {
   finished: (s: State, again: () => void, just: boolean) => Child;
 }
 
-/** Plays a topic's run. Opened by a tap, it starts after a short count, which the player can cut
+/** Plays a chapter's run. Opened by a tap, it starts after a short count, which the player can cut
  * short or back out of (back where they came from, or to its start come from outside); come to otherwise (a reload, back or forward, a link from outside),
  * nothing starts by itself: the screen says what it is, or where it was left, with „Започни“ or „Продължи“. A game
  * finished here shows its result again; one whose question this tab was showing goes straight back to it, its time
  * running (as one opened by a tap does). */
 function run(r: Run): Child {
   const screen = slot(() => h("p", { class: "muted" }, "…"));
-  // What „Отказ“ on the count comes back to in a game opened from outside (its own entry held over Начало): the
+  // What „Отказ“ on the count comes back to in a game opened from outside (its own entry held over Днес): the
   // screen's start, in place (router.ts, backOut).
   let startHere = async () => {};
   const ready = () => {

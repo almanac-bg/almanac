@@ -1,4 +1,4 @@
-// app.js holds what a daily visit uses: Начало, a game, the screens a game leads to. A screen a daily visit doesn't
+// app.js holds what a daily visit uses: Днес, a game, the screens a game leads to. A screen a daily visit doesn't
 // open loads on its own, the first time it's opened: Профил's places, the Алманах and the
 // friends (me, settings, avatar, almanac, friends with its duels' cards, player). Each is handed the app's
 // pieces it uses from here, and imports nothing of the app but types: a module it imported would be one app.js
@@ -7,62 +7,28 @@
 // release that doesn't change such a screen leaves its file as it was, cached; and app.js stays small, within the
 // first screen's budget (cmd/build).
 
-import { picture as illustration } from "./art/picture.ts";
 import { recover } from "./fresh.ts";
-import { answering } from "./game/answering.ts";
 import { news } from "./game/news.ts";
-import { count } from "./game/numbers.ts";
-import { answered, crowdLine, picture } from "./game/questions.ts";
-import { board, boardRow, hands, reviewSheet, scoreCard, summary } from "./game/results.ts";
-import { guardLeaving, questionHead, readyClock, startScreen, timer, trail, upNext } from "./game/run.ts";
+import { hands, reviewSheet } from "./game/results.ts";
 import { ApiError, api, errorText } from "./lib/api.ts";
-import { dayInBulgaria } from "./lib/day.ts";
-import {
-  type Child,
-  computed,
-  effect,
-  h,
-  lifetime,
-  listen,
-  onCleanup,
-  signal,
-  slot,
-  untracked,
-  when,
-} from "./lib/dom.ts";
+import { type Child, computed, effect, h, onCleanup, signal, untracked, when } from "./lib/dom.ts";
 import { reportProblem } from "./lib/errors.ts";
-import { calm, setTick, tickOn } from "./lib/prefs.ts";
+import { setTick, tickOn } from "./lib/prefs.ts";
 import { needsHomeScreen, pushable, pushOn, pushPrefs, setPushPref, turnOff, turnOn } from "./lib/push.ts";
-import { byTap, go, goBack, rename, title } from "./lib/router.ts";
-import { feelKit, loadFeel, play, playAnswer, playCount, quietWhenSilent, setSound, soundOn } from "./lib/sound.ts";
-import { dateWords, issueWords, leftWords, listWords, searchWords, weekday, withWord } from "./lib/words.ts";
+import { go, rename, title } from "./lib/router.ts";
+import { feelKit, loadFeel, play, quietWhenSilent, setSound, soundOn } from "./lib/sound.ts";
+import { leftWords, searchWords, withWord } from "./lib/words.ts";
 import { acceptedLine, startDuel } from "./screens/duel.ts";
 import { keepGame, mailAsk } from "./screens/keep.ts";
 import { missing } from "./screens/missing.ts";
-import { nameFirst } from "./screens/name.ts";
-import { noEmail, noEmailLine, signIn } from "./screens/signin.ts";
+import { noEmail, signIn } from "./screens/signin.ts";
 import { loadStats } from "./screens/stats.ts";
-import { rankName, rankNames } from "./seal.ts";
-import {
-  categories,
-  checkNews,
-  look,
-  notice,
-  player,
-  playingWhile,
-  sawFriends,
-  setLook,
-  topics,
-  user,
-} from "./state.ts";
+import { chapters, checkNews, look, notice, player, sawFriends, setLook, user } from "./state.ts";
 import {
   avatar,
   back,
   chapterName,
-  chip,
   emailWords,
-  explain,
-  fact,
   failure,
   formatNumber,
   glyph,
@@ -75,20 +41,13 @@ import {
   playerRow,
   profileHead,
   profileHref,
-  questions,
   record,
   schemeSwitch,
-  scoreRow,
   seal,
   sealsSection,
-  segmented,
   shapeNames,
   standing,
   textWords,
-  tiles,
-  toneOf,
-  topicMark,
-  verdict,
   who,
 } from "./ui.ts";
 
@@ -96,28 +55,14 @@ export const kit = {
   acceptedLine,
   inSight,
   isOwnTag,
-  answered,
-  answering,
-  ApiError,
   api,
   avatar,
   back,
-  board,
-  boardRow,
-  byTap,
   chapterName,
-  chip,
-  calm,
-  categories,
+  chapters,
   computed,
-  count,
-  crowdLine,
-  dateWords,
-  dayInBulgaria,
   effect,
   errorText,
-  explain,
-  fact,
   failure,
   feelKit,
   formatNumber,
@@ -125,17 +70,10 @@ export const kit = {
   checkNews,
   glyph,
   go,
-  goBack,
-  guardLeaving,
   h,
   hands,
-  illustration,
-  issueWords,
   keepGame,
   leaf,
-  lifetime,
-  listen,
-  listWords,
   nameWords,
   emailWords,
   textWords,
@@ -148,39 +86,27 @@ export const kit = {
 
   mini,
   missing,
-  nameFirst,
   needsHomeScreen,
   news,
 
   notice,
   onCleanup,
-  picture,
   standing,
   play,
-  playAnswer,
-  playCount,
   player,
-  playingWhile,
   profileHead,
   profileHref,
   pushable,
   pushOn,
   pushPrefs,
-  questionHead,
-  questions,
   quietWhenSilent,
-  readyClock,
-  rankName,
-  rankNames,
   record,
   rename,
   reportProblem,
   reviewSheet,
   schemeSwitch,
-  scoreCard,
   seal,
   sealsSection,
-  segmented,
   setPushPref,
   setSound,
   setTick,
@@ -190,32 +116,18 @@ export const kit = {
   signal,
   signIn,
   noEmail,
-  noEmailLine,
-  slot,
   soundOn,
   startDuel,
-  startScreen,
-  summary,
   tickOn,
-  tiles,
-  timer,
   title,
-  toneOf,
-  topicMark,
-  topics,
-  trail,
   turnOff,
   turnOn,
   untracked,
-  upNext,
   user,
-  verdict,
-  weekday,
   when,
   withWord,
   who,
   playerRow,
-  scoreRow,
 };
 
 export type Kit = typeof kit;

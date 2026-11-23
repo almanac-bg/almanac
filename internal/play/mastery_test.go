@@ -9,9 +9,9 @@ import (
 	"github.com/almanac-bg/almanac/internal/bank"
 )
 
-// A topic run's shape: a true-or-not second, an order and a match in the middle, a split and a number last; easy to hard by
-// ability, about two in three right.
-func TestTopicShape(t *testing.T) {
+// A chapter run's shape: a true-or-not second, an order and a match in the middle, a split and a number last; easy to
+// hard by ability, about two in three right.
+func TestChapterShape(t *testing.T) {
 	for ability, want := range map[float64]string{
 		-2:  "c:e t:e c:e c:e c:e c:e s:m o:m m:m n:h",
 		0:   "c:e t:e c:e c:m c:m o:m c:m m:m s:h n:h",
@@ -19,7 +19,7 @@ func TestTopicShape(t *testing.T) {
 		1:   "c:e t:m o:m m:m c:h c:h c:h c:h s:h n:h",
 	} {
 		var got []string
-		for _, s := range topicSlots(ability) {
+		for _, s := range chapterSlots(ability) {
 			got = append(got, s.typ[:1]+":"+string(s.difficulty[:1]))
 		}
 		if strings.Join(got, " ") != want {
@@ -67,7 +67,7 @@ func TestAbility(t *testing.T) {
 	}
 }
 
-// The mastery a player's games shape themselves by: one who knows a topic draws harder games of it than one who
+// The mastery a player's games shape themselves by: one who knows a chapter draws harder games of it than one who
 // doesn't; nothing of it is shown (DECISIONS.md, „The direction“).
 func TestMasteryShapesGames(t *testing.T) {
 	w := setup(t)
@@ -78,7 +78,7 @@ func TestMasteryShapesGames(t *testing.T) {
 		answer func(int64, int) json.RawMessage
 	}{{ana, w.right}, {bo, w.wrong}} {
 		for range 3 {
-			s, err := w.g.StartTopic(ctx, p.user, "history")
+			s, err := w.g.StartChapter(ctx, p.user, "history")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -91,7 +91,7 @@ func TestMasteryShapesGames(t *testing.T) {
 		t.Fatalf("ana %.2f, bo %.2f", a, b)
 	}
 	hardOnes := func(user int64) int {
-		s, _ := w.g.StartTopic(ctx, user, "history")
+		s, _ := w.g.StartChapter(ctx, user, "history")
 		n := 0
 		for _, p := range w.picks(s.ID) {
 			if q, _ := w.b.Get(p.ID); q.Base().Difficulty == bank.Hard {

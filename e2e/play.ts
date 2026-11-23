@@ -135,7 +135,7 @@ export async function openGame(page: Page, path: string): Promise<void> {
   await page.getByRole("button", { name: "Започни сега" }).click();
 }
 
-/** Starts the day's ten from Начало (or the rest of them: „Продължи“), cutting its count short. */
+/** Starts the day's ten from Днес (or the rest of them: „Продължи“), cutting its count short. */
 export async function startDay(page: Page, button = "Започни"): Promise<void> {
   await page.getByRole("button", { name: button, exact: true }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
@@ -174,8 +174,8 @@ export async function moveOn(page: Page): Promise<void> {
  * nothing, and bring nothing. */
 export async function playedBefore(page: Page, days: number): Promise<void> {
   await inDB(page, (db, id) => {
-    const add = db.prepare(`INSERT INTO runs (user_id, kind, category, questions, started_at, finished_at)
-      VALUES (?, 'topic', '', '[{"id":""}]', ?, ?)`);
+    const add = db.prepare(`INSERT INTO runs (user_id, kind, chapter, questions, started_at, finished_at)
+      VALUES (?, 'chapter', '', '[{"id":""}]', ?, ?)`);
     for (let d = 1; d <= days; d++) {
       const at = Date.now() - d * 24 * 60 * 60 * 1000;
       add.run(id, at, at);
@@ -200,15 +200,15 @@ export async function daysPlayed(page: Page, ...back: number[]): Promise<void> {
   });
 }
 
-/** Deals the player (a guest, made now if there's none) a game of a topic with these questions, in this order,
- * straight in the test server's database: started now and not finished, it's the game the topic's next start goes on
- * with (play/runs.go, StartTopic). */
-export async function dealt(page: Page, category: string, ids: string[]): Promise<void> {
+/** Deals the player (a guest, made now if there's none) a game of a chapter with these questions, in this order,
+ * straight in the test server's database: started now and not finished, it's the game the chapter's next start goes on
+ * with (play/runs.go, StartChapter). */
+export async function dealt(page: Page, chapter: string, ids: string[]): Promise<void> {
   await inDB(page, (db, id) => {
     const picks = JSON.stringify(ids.map((q, i) => ({ id: q, seed: i + 1 })));
-    db.prepare("INSERT INTO runs (user_id, kind, category, questions, started_at) VALUES (?, 'topic', ?, ?, ?)").run(
+    db.prepare("INSERT INTO runs (user_id, kind, chapter, questions, started_at) VALUES (?, 'chapter', ?, ?, ?)").run(
       id,
-      category,
+      chapter,
       picks,
       Date.now(),
     );
@@ -256,8 +256,8 @@ const factsRule = `WITH met AS (
 export async function knows(page: Page, ids: string[], at = Date.now(), ink = false): Promise<void> {
   await inDB(page, (db, id) => {
     const run = db
-      .prepare(`INSERT INTO runs (user_id, kind, category, questions, started_at, finished_at)
-        VALUES (?, 'topic', '', '[]', 0, 0)`)
+      .prepare(`INSERT INTO runs (user_id, kind, chapter, questions, started_at, finished_at)
+        VALUES (?, 'chapter', '', '[]', 0, 0)`)
       .run(id).lastInsertRowid;
     const add = db.prepare(`INSERT INTO answers (run_id, n, question_id, given, score, is_right, ms, at)
       VALUES (?, ?, ?, '{}', 1, 1, 3000, ?)`);
@@ -271,7 +271,7 @@ export async function knows(page: Page, ids: string[], at = Date.now(), ink = fa
   });
 }
 
-/** The book's ten chapters (the bank's topics). */
+/** The book's ten chapters (the bank's categories). */
 export const chapters = [
   "general",
   "science",
@@ -443,7 +443,7 @@ export async function cutOrOverlapping(page: Page): Promise<string[]> {
       if ((el as HTMLElement).offsetParent !== null) out.push(`a tag shown ${say(el)}`);
     // Inside its card: a seal's name, a friend's day, a chapter's words.
     for (const card of document.querySelectorAll(
-      ".seal-row, .friend, .duel-card, .ch-stand, .entry, .way, .card-leaf",
+      ".seal-row, .friend, .duel-card, .chapter-stand, .entry, .way, .card-leaf",
     )) {
       const box = card.getBoundingClientRect();
       for (const el of card.querySelectorAll("*")) {

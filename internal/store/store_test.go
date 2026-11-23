@@ -869,7 +869,7 @@ func TestOneMeasure(t *testing.T) {
 
 // Duels on one's own time (0088): each says which kind it is (with a person, against a recording), a recording's
 // outcome is a's or b's as a person's is, a duel the server cut off under way ends without a result, the rating's moves
-// and who left under way go, and so do the players' ratings and Начало's lines of a live duel left.
+// and who left under way go, and so do the players' ratings and Днес's lines of a live duel left.
 func TestDuelsOwnTime(t *testing.T) {
 	db := openBefore(t, filepath.Join(t.TempDir(), "game.db"), "0088_duels_own_time.sql")
 	for _, q := range []string{
@@ -928,6 +928,38 @@ func TestAnimalAvatars(t *testing.T) {
 		if got.String != w || got.Valid != (w != "") {
 			t.Errorf("player %d: %v, want %q", id, got, w)
 		}
+	}
+	db.Close()
+}
+
+// One name for a chapter (0119): a game of a chapter is of the kind 'chapter', and the chapter it's of is runs.chapter;
+// every run keeps its rows, and the answers and shares that point to them stay.
+func TestChapters(t *testing.T) {
+	db := openBefore(t, filepath.Join(t.TempDir(), "game.db"), "0119_chapters.sql")
+	for _, q := range []string{
+		`INSERT INTO users (id, name, tag, created_at, seen_at) VALUES (1, 'А', 'a', 1, 1)`,
+		`INSERT INTO runs (id, user_id, kind, day, category, questions, at, rights, closeness, started_at, finished_at,
+			told, pencil) VALUES (10, 1, 'topic', NULL, 'history', '[]', 4, 3, 0, 1, NULL, 0, 1),
+			(11, 1, 'day', '2026-11-22', NULL, '[]', 10, 7, 5, 1, 2, 1, 0), (12, 1, 'duel', NULL, 'mix', '[]', 1, 0, 0, 1, 2, 1, 0)`,
+		`INSERT INTO shares (code, run_id, created_at) VALUES ('abcd2345', 11, 3)`,
+	} {
+		if _, err := db.Write.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	if err := db.migrateTo(migrationsThrough("0119_chapters.sql")); err != nil {
+		t.Fatal(err)
+	}
+	var runs string
+	var shares int
+	_ = db.Read.QueryRow(`SELECT group_concat(concat_ws(' ', id, kind, coalesce(day, '-'), coalesce(chapter, '-'), at,
+		rights, closeness, coalesce(finished_at, '-'), told, pencil), ', ') FROM (SELECT * FROM runs ORDER BY id)`).Scan(&runs)
+	_ = db.Read.QueryRow(`SELECT count(*) FROM shares`).Scan(&shares)
+	if runs != "10 chapter - history 4 3 0 - 0 1, 11 day 2026-11-22 - 10 7 5 2 1 0, 12 duel - mix 1 0 0 2 1 0" || shares != 1 {
+		t.Errorf("runs %q, shares %d", runs, shares)
+	}
+	if _, err := db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at) VALUES (1, 'topic', '[]', 3)`); err == nil {
+		t.Error("a run of the kind 'topic' is taken still")
 	}
 	db.Close()
 }

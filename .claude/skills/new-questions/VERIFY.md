@@ -32,8 +32,8 @@ Your prompt gives you: `<skill>` (this folder), `<repo>` (the game's code), `<ba
    accepted value (or the text pins the source) and the skill's tolerance formula, and **a well-read player can place
    them** (an anchor: a height, a distance, an age, a famous total, named in the text or the fact), never an archive's
    count (episodes, seats, a council's members, prize money, works, goals, awards, times): such a number is a DROP or
-   a FIX. An easy true-or-not that nobody could miss (a truism, not a misconception) is a FIX. **The topic:** it belongs under its category
-   (a player of the topic expects it there). Orders: exact values, measured ones
+   a FIX. An easy true-or-not that nobody could miss (a truism, not a misconception) is a FIX. **The category:** it belongs under its category
+   (a player of the category expects it there). Orders: exact values, measured ones
    10% apart. Matches: one right per left, a tempting decoy that fits no left. Splits: every item in its group only,
    under every source. Clues are off (2026-11-23): a new clues question is a DROP.
 5. **The difficulty** fits the rubric for players in Bulgaria. Relabel only within the plan's cells: a question that

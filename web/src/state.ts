@@ -1,4 +1,4 @@
-// What the whole app shares: who's playing, and the categories. The server puts both in the page (lib/boot.ts); who's
+// What the whole app shares: who's playing, and the chapters. The server puts both in the page (lib/boot.ts); who's
 // playing is kept true to the session's cookie by fresh.ts.
 
 import { api } from "./lib/api.ts";
@@ -18,17 +18,17 @@ export interface User {
   drawn?: boolean;
 }
 
-export interface Category {
+export interface Chapter {
   id: string;
   name: string;
 }
 
 export const user = signal<User | null>(boot.user ?? null);
-export const categories: Category[] = boot.categories ?? [];
-/** Every topic at once (play.MixTopic): what a duel draws from, and a game of all of them kept from before. */
-const mix: Category = { id: "mix", name: "Всички теми" };
-/** Every topic a game can be of, the bank's and every topic at once: for naming a game's topic. */
-export const topics: Category[] = [...categories, mix];
+export const chapters: Chapter[] = boot.chapters ?? [];
+/** Every chapter at once (play.MixChapter): what a duel draws from, and a game of all of them kept from before. */
+const mix: Chapter = { id: "mix", name: "Всички теми" };
+/** Every chapter a game can be of, the bank's and every chapter at once: for naming a game's chapter. */
+export const chaptersAndMix: Chapter[] = [...chapters, mix];
 /** The key browsers subscribe to notifications with ("": none here). */
 export const pushKey = boot.push ?? "";
 

@@ -4,8 +4,8 @@
 // the page it was opened from, and how far down the page was scrolled; back comes to a page where it was left. A game
 // under way guards its screen (beforeLeaving): a link out, the browser's back (or a phone's) and the game's own arrow
 // all ask first, and only „Излез“ goes on, to where they were going. A game gets an entry of its own when its screen
-// has none behind it in the app (hold): the day's ten on Начало, a game opened by a link from outside; so that back, mid-question, lands on the guard and not outside the game. Under
-// a game opened from outside is Начало, not the game's page again: „Излез“ leaves the game, and its page drawn anew
+// has none behind it in the app (hold): the day's ten on Днес, a game opened by a link from outside; so that back, mid-question, lands on the guard and not outside the game. Under
+// a game opened from outside is Днес, not the game's page again: „Излез“ leaves the game, and its page drawn anew
 // would take the player straight back into it.
 //
 // A page that has fallen behind (a new version of the game out, another account signed in: fresh.ts) opens its next
@@ -254,8 +254,8 @@ export function mark(patch: Partial<Entry>): void {
   }
 }
 
-/** Opens a path in the app; the one already open opens afresh (Начало, tapped in the middle of the day's ten, is
- * Начало again, not the question). A game's own entry (hold) is the game's, not a page: a path opened from it opens
+/** Opens a path in the app; the one already open opens afresh (Днес, tapped in the middle of the day's ten, is
+ * Днес again, not the question). A game's own entry (hold) is the game's, not a page: a path opened from it opens
  * from the page under it, gone back to first, so that back from there comes to that page once, not to it twice (and
  * the path it was opened over is that page itself). */
 export function go(to: string, replace = false): void {
@@ -287,7 +287,7 @@ function open(to: string, replace: boolean, tap: boolean, under = false): void {
 }
 
 /** Goes to `to` the way back: back in the history if it's the page before, else opening it in place of this one (a
- * page reached from outside, its way back to Начало): never a new entry, so that back after it doesn't come here
+ * page reached from outside, its way back to Днес): never a new entry, so that back after it doesn't come here
  * again. */
 export function leave(to: string): void {
   if (entry().from === to) travel(-1, arrive);
@@ -302,8 +302,8 @@ export function goBack(fallback: string): void {
 }
 
 /** Backs out of a game's count („Отказ“): back where the screen was come to from (goBack); a game holding an entry of
- * its own (hold: a page opened from outside the app, Начало under it) gives it back instead, and its screen's start
- * shows again in place (`stay`), not Начало. */
+ * its own (hold: a page opened from outside the app, Днес under it) gives it back instead, and its screen's start
+ * shows again in place (`stay`), not Днес. */
 export function backOut(fallback: string, stay: () => void): void {
   if (!entry().game) {
     goBack(fallback);
@@ -321,9 +321,9 @@ export const byTap = (): boolean => tapped;
 export const canGoBack = (): boolean => entry().from !== undefined;
 
 /** Gives a game under way an entry of its own over the page it's played on, unless back from the page stays in the
- * app already (`always`: even then; the day's ten, on Начало, whose back would leave Начало itself): back, mid-game,
+ * app already (`always`: even then; the day's ten, on Днес, whose back would leave Днес itself): back, mid-game,
  * comes to the game's guard, then to the page under it. A game opened from outside the app (nothing of the app's
- * before its page) has Начало under it: back and „Излез“ come there, out of the game, and back again leaves. */
+ * before its page) has Днес under it: back and „Излез“ come there, out of the game, and back again leaves. */
 export function hold(always = false): void {
   const s = entry();
   if (s.game || (!always && s.from !== undefined)) return;
@@ -335,7 +335,7 @@ export function hold(always = false): void {
   history.pushState({ i: at, from: under, game: true }, "", page);
 }
 
-/** A game over: its entry of its own (hold) goes, back to the page under it, which takes the game's address (Начало
+/** A game over: its entry of its own (hold) goes, back to the page under it, which takes the game's address (Днес
  * under a game opened from outside) and keeps what's given (its result); the screen stays as it is. */
 export function release(keep: Partial<Entry> = {}): void {
   if (!entry().game) {

@@ -18,7 +18,7 @@ import (
 // The transaction that finishes the run notes that it's due (runs_after, afterDue), so none of it is lost to a closed connection or a restart in between: the request that finished the run settles it at
 // once, on a context of its own that the player leaving doesn't cancel (finished: the result shows the duel's outcome), and
 // hands the rest to the background (afterLater), so that the last answer doesn't wait for the player's history to be
-// read again; the game's news waits for it instead (AfterWait: NewsOf, Начало), and gets it as soon as it's
+// read again; the game's news waits for it instead (AfterWait: NewsOf, Днес), and gets it as soon as it's
 // done. The sweep each minute does whatever that left (AfterDue), a few times more, waiting longer each time, before
 // it gives up. All of it may be done again safely: a duel is settled once, a note kept once.
 //
@@ -118,7 +118,7 @@ func (g *Game) afterLater(userID, runID int64, settled bool) {
 }
 
 // AfterWait waits until what follows the player's runs just finished is done (afterLater), or ctx is: what reads
-// what a game earned (its news, Начало) reads it whole. Nothing to wait for, it doesn't.
+// what a game earned (its news, Днес) reads it whole. Nothing to wait for, it doesn't.
 func (g *Game) AfterWait(ctx context.Context, userID int64) {
 	g.later.mu.Lock()
 	w := g.later.by[userID]

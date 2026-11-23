@@ -1,6 +1,6 @@
 // Алманах, one of the three places: the player's book (DESIGN.md, Places). Its head — whose book it is, what ink and
 // grey mean — then its chapters, each a card in its colour with its seal as the badge and its ink („22 с мастило“),
-// in their numbers' order. A chapter (/almanac/<topic>) is its head
+// in their numbers' order. A chapter (/almanac/<chapter>) is its head
 // on its sheet (the seal, its ink, the rank and the way to the next), „Игра по тема“, and its facts, ink and grey, the
 // latest first, a page at a time, found by their words. How well a player knows a chapter (mastery) is the game's own,
 // never shown.
@@ -31,7 +31,7 @@ let {
   searchWords,
   signal,
   title,
-  categories,
+  chapters,
   user,
 } = {} as Kit;
 
@@ -49,7 +49,7 @@ interface Rank {
 
 interface Learned {
   id: string;
-  category: string;
+  chapter: string;
   /** The question; none for a statement to judge, whose answer is the statement itself. */
   question?: string;
   answer: string;
@@ -62,7 +62,7 @@ interface Learned {
   ink?: boolean;
   at: number;
   /** Where it was met: the day's ten (its issue), a chapter's game, a duel. */
-  kind?: "day" | "topic" | "duel";
+  kind?: "day" | "chapter" | "duel";
   issue?: number;
   /** A picture question's picture (a choice of pictures', its answer's), as the play screen has it, and whose it is. */
   image?: Picture;
@@ -108,20 +108,20 @@ function setKit(kit: Kit) {
     searchWords,
     signal,
     title,
-    categories,
+    chapters,
     user,
   } = kit);
 }
 
 /** A chapter's game left unfinished today (play.Left): where it stopped. */
 interface Left {
-  category: string;
+  chapter: string;
   at: number;
   total: number;
 }
 
-/** The book's chapters, in its order: the bank's topics. */
-const chapters = () => categories.map((t) => t.id);
+/** The book's chapters, in the bank's order. */
+const chapterIds = () => chapters.map((t) => t.id);
 const nameOf = (id: string) => chapterName(id) || id;
 
 /** Алманах: the book's head, then its chapters. */
@@ -157,7 +157,7 @@ function book(p: Page, left: () => Left[] = () => []): Child {
   const rankOf = (id: string) => p.ranks?.find((r) => r.chapter === id);
   // The chapters in their numbers' order (Глава 1, 2, …), always the same: a book's contents, never resorted. A row's
   // cards are as tall as its tallest, so a card with no ink yet leaves no hole beside an inked one.
-  const order = categories.map((c) => c.id);
+  const order = chapters.map((c) => c.id);
   return h(
     "section",
     { class: "screen book" },
@@ -177,15 +177,15 @@ function book(p: Page, left: () => Left[] = () => []): Child {
         left().map((l) =>
           h(
             "p",
-            { class: `book-left t-${l.category}` },
-            glyph(l.category, 32),
+            { class: `book-left ch-${l.chapter}` },
+            glyph(l.chapter, 32),
             h(
               "span",
               { class: "book-left-words" },
-              h("b", null, nameOf(l.category)),
+              h("b", null, nameOf(l.chapter)),
               `Следва въпрос ${l.at + 1}\u00a0от\u00a0${l.total}.`,
             ),
-            h("a", { class: "btn inline", href: `/play/${l.category}` }, "Продължи"),
+            h("a", { class: "btn inline", href: `/play/${l.chapter}` }, "Продължи"),
           ),
         ),
     ),
@@ -235,7 +235,7 @@ function shortDate(day: string): string {
   return `${d} ${shortMonths[m - 1]}`;
 }
 
-/** A chapter of the book (/almanac/<topic>): its head on its sheet, „Игра по тема“, and its facts as entries, the
+/** A chapter of the book (/almanac/<chapter>): its head on its sheet, „Игра по тема“, and its facts as entries, the
  * latest first, a page at a time, found by their words. Its page and search are in the address (?page=2&q=…), so back
  * to it, or a reload, opens the same. Opened at facts (?fact=<id>, one for each: the day's result's, of the facts the
  * day wrote), it opens on the page that holds them, the first of them in sight, each tinted in the chapter's colour
@@ -243,7 +243,7 @@ function shortDate(day: string): string {
 export function chapter(kit: Kit, [id = ""]: string[]): Child {
   setKit(kit);
   // A chapter the book doesn't have: the page that isn't there, not an empty chapter by that name.
-  if (!chapters().includes(id)) return missing();
+  if (!chapterIds().includes(id)) return missing();
   const name = nameOf(id);
   // Come to by a turn of this chapter's pages: the facts stay in sight once they're in.
   let toFacts = turned;
@@ -264,7 +264,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
   let find: string[] = [];
   /** The chapter's first page, which has its rank: asked for apart when the chapter opens on another. */
   const loadFirst = () =>
-    api<Page>("GET", `/api/almanac?${new URLSearchParams({ topic: id })}`).then(
+    api<Page>("GET", `/api/almanac?${new URLSearchParams({ chapter: id })}`).then(
       (p) => {
         first.set(p);
         total.set(p.found);
@@ -279,7 +279,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
     rename(`/almanac/${id}${shown.size ? `?${shown}` : ""}`);
   };
   const load = () => {
-    const q = new URLSearchParams({ topic: id, page: String(page.peek()) });
+    const q = new URLSearchParams({ chapter: id, page: String(page.peek()) });
     if (query.peek().trim()) q.set("q", query.peek().trim());
     // Opened at facts: the page that holds the latest of them, whichever it is (play.AlmanacQuery.Fact).
     const mark = marked;
@@ -333,8 +333,8 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
   // The chapter's game left half-way today: it goes on from where it stopped (play.Left).
   const left = signal<{ at: number; total: number } | null>(null);
   if (user.peek())
-    api<{ runs: { category: string; at: number; total: number }[] }>("GET", "/api/runs/left").then(
-      (r) => left.set(r.runs.find((x) => x.category === id) ?? null),
+    api<{ runs: { chapter: string; at: number; total: number }[] }>("GET", "/api/runs/left").then(
+      (r) => left.set(r.runs.find((x) => x.chapter === id) ?? null),
       () => {},
     );
   let typing = 0;
@@ -354,7 +354,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
     if (query.peek().trim()) shown.set("q", query.peek().trim());
     return `/almanac/${id}${shown.size ? `?${shown}` : ""}`;
   };
-  const index = chapters().indexOf(id);
+  const index = chapterIds().indexOf(id);
   const finder = user.peek()
     ? h(
         "label",
@@ -374,7 +374,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
     : null;
   return h(
     "section",
-    { class: `screen chapter spread t-${id}` },
+    { class: `screen chapter spread ch-${id}` },
     h(
       "div",
       { class: "chapter-side page-1" },
@@ -474,13 +474,13 @@ function stand(id: string, r: Rank | undefined, ink: number): Child {
   const ranked = r && r.level > 0 ? r : null;
   return h(
     "div",
-    { class: "ch-stand" },
-    ranked ? h("span", { class: "ch-seal" }, seal(id, ranked.level, 64, "rimmed")) : null,
+    { class: "chapter-stand" },
+    ranked ? h("span", { class: "chapter-seal" }, seal(id, ranked.level, 64, "rimmed")) : null,
     h(
       "div",
-      { class: "ch-words" },
-      ink ? h("p", { class: "ch-ink" }, h("b", { class: "num" }, formatNumber(ink)), " с мастило") : null,
-      ranked ? null : h("p", { class: "ch-next" }, "Всеки верен отговор в броя на деня вписва факт с мастило."),
+      { class: "chapter-words" },
+      ink ? h("p", { class: "chapter-ink" }, h("b", { class: "num" }, formatNumber(ink)), " с мастило") : null,
+      ranked ? null : h("p", { class: "chapter-next" }, "Всеки верен отговор в броя на деня вписва факт с мастило."),
     ),
     ranked ? standing(ranked) : null,
   );
@@ -531,7 +531,7 @@ function entry(f: Learned, find: string[]): Child {
   ];
   return h(
     "li",
-    { class: `entry ${f.ink ? "ink" : "met"} t-${f.category}`, "data-fact": f.id },
+    { class: `entry ${f.ink ? "ink" : "met"} ch-${f.chapter}`, "data-fact": f.id },
     im
       ? h(
           "div",

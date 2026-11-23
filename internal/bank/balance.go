@@ -7,8 +7,8 @@ import (
 
 // The bank's balance. Since 16 Nov 2026 there is no aim for the difficulties (the owner's call: batches are written
 // by the day's runway, which spends hard places about three times faster than easy ones, so no fixed mix could
-// follow it). What stays: every category about the same size (within SizeSlack of the mean: no topic outweighs
-// another), and each category's kinds near TypeMix, so that the topic games have every kind.
+// follow it). What stays: every category about the same size (within SizeSlack of the mean: no category outweighs
+// another), and each category's kinds near TypeMix, so that the chapter games have every kind.
 
 // Difficulties in order, easy first.
 var Difficulties = []Difficulty{Easy, Medium, Hard}

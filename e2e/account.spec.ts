@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { expect, type Page, test } from "@playwright/test";
 import { mailedCode, openGame } from "./play.ts";
 
-/** Plays a topic's first question in, which makes the page a guest. */
+/** Plays a chapter's first question in, which makes the page a guest. */
 async function becomeGuest(page: Page) {
   await openGame(page, "/play/music");
   await expect(page.locator(".question-head")).toContainText("1 от 10"); // playing made a guest
@@ -128,7 +128,7 @@ test("past ten wrong codes for an address its code is longer, and still signs in
   await expect(page.getByText(`Влизаш с ${email}`)).toBeVisible();
 });
 
-test("a name changed in Настройки is kept on leaving, and a deleted profile ends on Начало", async ({ page }) => {
+test("a name changed in Настройки is kept on leaving, and a deleted profile ends on Днес", async ({ page }) => {
   await becomeGuest(page);
   await page.goto("/settings");
   await page.getByLabel("Име", { exact: true }).fill("Светулка");

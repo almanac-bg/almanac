@@ -70,7 +70,7 @@ test("the server's card has the chapters' glyphs as pictures.ts draws them", () 
   const ids = [...day.matchAll(/--t-(\w+): #/g)].map((m) => m[1] ?? "");
   assert.ok(ids.length >= 10, "app.css has the chapters' colours");
   const glyphs = Object.fromEntries(
-    ids.map((id) => [id, pictures[`topic-${id}`] ?? assert.fail(`no picture for ${id}`)]),
+    ids.map((id) => [id, pictures[`chapter-${id}`] ?? assert.fail(`no picture for ${id}`)]),
   );
   const want = `${JSON.stringify(glyphs, null, 2)}\n`;
   const file = join(root, "internal/card/glyphs.json");

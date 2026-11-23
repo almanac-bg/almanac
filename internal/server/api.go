@@ -39,7 +39,7 @@ var (
 // playerErrors are the errors a player may cause, as the API answers them.
 var playerErrors = map[error]*apiError{
 	play.ErrNoRun:       {http.StatusNotFound, "no_run", "Няма такава игра."},
-	play.ErrNoTopic:     {http.StatusNotFound, "no_topic", "Няма такава тема."},
+	play.ErrNoChapter:   {http.StatusNotFound, "no_chapter", "Няма такава тема."},
 	play.ErrOutOfStep:   {http.StatusConflict, "out_of_step", "Играта е продължила другаде. Зареждаме я наново."},
 	play.ErrBadAnswer:   {http.StatusBadRequest, "bad_answer", "Този отговор не е за този въпрос."},
 	play.ErrNoQuestion:  {http.StatusServiceUnavailable, "no_questions", "В момента няма въпроси за игра."},

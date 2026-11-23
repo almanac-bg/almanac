@@ -31,7 +31,7 @@ func (w *world) stored(user int64, kind, day string, finished, scripted bool) {
 // shadowed puts a game straight in the database, as stored does, a shadow for the reason given.
 func (w *world) shadowed(user int64, day string, shadow int) {
 	w.t.Helper()
-	w.stored(user, "topic", day, true, false)
+	w.stored(user, "chapter", day, true, false)
 	if _, err := w.db.Write.Exec(`UPDATE runs SET shadow = ? WHERE id = (SELECT max(id) FROM runs WHERE user_id = ?)`,
 		shadow, user); err != nil {
 		w.t.Fatal(err)
@@ -44,7 +44,7 @@ func TestPeopleDays(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana, script, admin, brought := w.user(), w.user(), w.user(), w.user()
-	w.stored(ana, "topic", "2026-11-11", true, false)
+	w.stored(ana, "chapter", "2026-11-11", true, false)
 	w.stored(ana, "day", "2026-11-12", true, false)
 	w.stored(script, "day", "2026-11-12", true, true)
 	w.stored(admin, "day", "2026-11-12", true, false)
@@ -76,8 +76,8 @@ func TestNewcomersMerged(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	guest, owner := w.user(), w.user()
-	w.stored(guest, "topic", "2026-11-12", true, false)
-	w.stored(owner, "topic", "2026-11-12", true, false)
+	w.stored(guest, "chapter", "2026-11-12", true, false)
+	w.stored(owner, "chapter", "2026-11-12", true, false)
 	if err := w.db.Tx(ctx, func(tx *sql.Tx) error { return w.g.Merge(tx, guest, owner) }); err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestDayCounts(t *testing.T) {
 	w.stored(old, "day", "2026-11-12", true, false)
 	w.stored(ana, "day", "2026-11-12", true, false)
 	w.stored(ana, "day", "2026-11-13", true, false)
-	w.stored(ana, "topic", "2026-12-12", true, false)
+	w.stored(ana, "chapter", "2026-12-12", true, false)
 	w.stored(bo, "day", "2026-11-12", true, false)
 	w.stored(bo, "day", "2026-11-19", true, false)
 	w.stored(bo, "day", "2026-12-19", true, false)

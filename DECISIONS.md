@@ -150,8 +150,8 @@ packages' doc comments; this file holds only what must not drift.
   2026-11-18, after the product review's classroom items).
 - **A game outside the day is a chapter's** (owner, 2026-11-22, undoing 2026-11-20's „Микс“ and „България“ at the
   Алманах's head): no „Играй от всички теми“, no „Играй за България“. The book's head says whose book it is and what
-  ink means, and its chapters are the ways to play; a duel still draws from every topic. Past games of „България“ are
-  kept as games of every topic.
+  ink means, and its chapters are the ways to play; a duel still draws from every chapter. Past games of „България“ are
+  kept as games of every chapter.
 - **Accessibility for special needs comes later, not now.** No new work for screen readers, extra time, pausing the
   pace or similar needs until the owner calls for it; what the game already has (contrast, labels, the axe checks)
   stays and isn't broken. Layout that breaks for ordinary players (large system text, small tap targets) is not this:
@@ -173,7 +173,7 @@ packages' doc comments; this file holds only what must not drift.
 
 - **The real bank is private** (`almanac-bg/almanac-questions`, in `private/`): answers that leak make cheating and
   copies. Only `bank/sample` is public.
-- **The bank grows by the day's runway** (how many days each place of the day has left), topics kept equal in size.
+- **The bank grows by the day's runway** (how many days each place of the day has left), chapters kept equal in size.
 - **Balance by adding, never by retiring.** A question is retired only for a real flaw (wrong, stale, weak, a twin that
   gives another away), never to make room.
 - **Rules are code** (`bank lint`), so a later change of a rule is a query, not a pass over 14 000 questions.

@@ -53,7 +53,7 @@ func TestAYearOfDays(t *testing.T) {
 		return n
 	}
 	for day := range 365 {
-		var plenty []bool // whether each place has a question left in most topics
+		var plenty []bool // whether each place has a question left in most chapters
 		for _, s := range daySlots {
 			plenty = append(plenty, left(s) >= Length)
 		}
@@ -67,7 +67,7 @@ func TestAYearOfDays(t *testing.T) {
 		if last, _ := b.Get(picks[len(picks)-1].ID); last.Base().Type != "number" && plenty[len(daySlots)-1] {
 			t.Fatalf("day %d ends on %s, a %s: the day ends on its hard number", day, last.Base().ID, last.Base().Type)
 		}
-		topics := map[string]bool{}
+		chapters := map[string]bool{}
 		named := map[string]string{}
 		for i, p := range picks {
 			if used[p.ID] {
@@ -103,10 +103,10 @@ func TestAYearOfDays(t *testing.T) {
 				t.Fatalf("day %d, place %d: %s is a %s %s (picture %v), not as planned", day, i, p.ID,
 					q.Base().Difficulty, q.Base().Type, q.Extra().Image != nil)
 			}
-			topics[q.Base().Category] = true
+			chapters[q.Base().Category] = true
 		}
-		if len(picks) != Length || len(topics) != Length {
-			t.Fatalf("day %d: %d questions from %d topics", day, len(picks), len(topics))
+		if len(picks) != Length || len(chapters) != Length {
+			t.Fatalf("day %d: %d questions from %d chapters", day, len(picks), len(chapters))
 		}
 	}
 	if repeats > 0 {

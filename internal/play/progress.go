@@ -8,11 +8,11 @@ import (
 	"slices"
 )
 
-// Progress is ink and the streak (DECISIONS.md, „The direction“): the player's Алманах, a chapter per topic with the
-// facts written in it in ink and grey (almanac.go, ink.go) and its rank from its ink (rank.go), and the streak, the
-// habit (runs.go). Nothing else adds up across games: no XP, no points (a game's score is its right answers:
-// board.go), no achievements, no lifetime totals; a duel's is its record between two people
-// (duels.go). How well a player knows each topic (mastery.go) is the game's own, to shape their games, never shown.
+// Progress is ink and the streak (DECISIONS.md, „The direction“): the player's Алманах, a chapter for each of the
+// bank's with the facts written in it in ink and grey (almanac.go, ink.go) and its rank from its ink (rank.go), and the
+// streak, the habit (runs.go). Nothing else adds up across games: no XP, no points (a game's score is its right
+// answers: board.go), no achievements, no lifetime totals; a duel's is its record between two people (duels.go). How
+// well a player knows each chapter (mastery.go) is the game's own, to shape their games, never shown.
 //
 // What a game brings is told once, at its end (NewsOf): what it wrote in the book, the ranks it raised, or the
 // chapter nearest its next. A bad game brings no praise: what it's told is what's true of it.
@@ -58,7 +58,8 @@ func (g *Game) LookOf(ctx context.Context, userID int64) (Look, error) {
 	return g.lookOf(userID, read), err
 }
 
-// SetAvatar changes a player's avatar: an animal of Shapes ("fox"). An avatar is a face, so an animal only (DECISIONS.md).
+// SetAvatar changes a player's avatar: an animal of Shapes ("fox"). An avatar is a face, so an animal only
+// (DECISIONS.md).
 func (g *Game) SetAvatar(ctx context.Context, userID int64, shape string) error {
 	if !slices.Contains(Shapes, shape) {
 		return ErrNoAvatar

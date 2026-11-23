@@ -61,7 +61,7 @@ test("everything a player may read is in Bulgarian letters and words, not loanwo
 const retired: [RegExp, string][] = [
   [/въпроси(те)? на деня|днешните въпроси/iu, "„днешният брой“ or „броят на деня“"],
   [/изиграни дни|дни поред/iu, "„дни без прекъсване“ (the streak forgives missed days: not „поред“, not a total)"],
-  [/игр[аи] на глават?а|игри на главите/iu, "„игра по тема“ (a game outside the day is a topic's)"],
+  [/игр[аи] на глават?а|игри на главите/iu, "„игра по тема“ (a game outside the day is a chapter's)"],
 ];
 
 test("a thing is called by its one name", () => {
@@ -83,7 +83,7 @@ test("a thing is called by its one name", () => {
 
 /**
  * What questions are about is a „тема“; „глава“ is the book's word for one, said only in the Алманах itself („Глава 1“
- * over a topic's name, „Главите“): DECISIONS.md. Out of the book „глава“ read oddly („силен в глава Технологии“).
+ * over a chapter's name, „Главите“): DECISIONS.md. Out of the book „глава“ read oddly („силен в глава Технологии“).
  */
 test("„глава“ is said only in the Алманах", () => {
   const book = "web/src/screens/almanac.ts";
@@ -124,11 +124,11 @@ test("no „си“ with a man's or a woman's participle", () => {
 });
 
 /**
- * A topic's name is in quotes only right after the word „тема“ or „глава“ („тема „История““); standing alone it's
+ * A chapter's name is in quotes only right after the word „тема“ or „глава“ („тема „История““); standing alone it's
  * bare („Печат: История“, „Печатът на История“): web/DESIGN.md, Copy.
  */
-test("a topic's name is quoted after „тема“ or „глава“ and only there", () => {
-  const name = String.raw`\$\{(?:chapterName|nameOf|topicName)\(`;
+test("a chapter's name is quoted after „тема“ or „глава“ and only there", () => {
+  const name = String.raw`\$\{(?:chapterName|nameOf)\(`;
   const alone = new RegExp(`(?<!(?:тема|глава) )„${name}`, "u");
   const bare = new RegExp(`(?:тема|глава) ${name}`, "u");
   const found: string[] = [];
@@ -137,8 +137,8 @@ test("a topic's name is quoted after „тема“ or „глава“ and only
     readFileSync(join(root, path), "utf8")
       .split("\n")
       .forEach((line, i) => {
-        if (alone.test(line)) found.push(`${path}:${i + 1}: a topic's name standing alone is bare`);
-        if (bare.test(line)) found.push(`${path}:${i + 1}: a topic's name after „тема“ or „глава“ is in quotes`);
+        if (alone.test(line)) found.push(`${path}:${i + 1}: a chapter's name standing alone is bare`);
+        if (bare.test(line)) found.push(`${path}:${i + 1}: a chapter's name after „тема“ or „глава“ is in quotes`);
       });
   }
   assert.deepEqual(found, []);

@@ -258,7 +258,7 @@ test.describe("on its side", () => {
 });
 
 /** A question on a phone on its side: the header and the bar of places step aside, as upright; the head is small,
- * the topic still in it; a choice's answers start on the screen; rows of a list are a phone's on its side (a list of
+ * the chapter still in it; a choice's answers start on the screen; rows of a list are a phone's on its side (a list of
  * eight goes on below it: the sample's planets). */
 async function sideways(page: Page): Promise<void> {
   await expect(page.locator(".places-foot")).toBeHidden();

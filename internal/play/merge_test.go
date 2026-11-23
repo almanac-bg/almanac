@@ -388,7 +388,7 @@ func TestForgetLeavesTheDaysAsNobodys(t *testing.T) {
 	w.playDay(gone)
 	// A day played only at a script's speed doesn't count (D1): once the games are gone, nothing could tell it, so it
 	// goes with them.
-	w.stored(gone, "topic", "2026-11-10", true, true)
+	w.stored(gone, "chapter", "2026-11-10", true, true)
 	if err := accounts.Delete(ctx, gone); err != nil {
 		t.Fatal(err)
 	}

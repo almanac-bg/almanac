@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// A game that ended without its news on screen waits for Начало, once; news told with a game tells every game
+// A game that ended without its news on screen waits for Днес, once; news told with a game tells every game
 // finished before it too, and one too old is let go.
 func TestUntold(t *testing.T) {
 	w := setup(t)
@@ -41,10 +41,10 @@ func TestUntold(t *testing.T) {
 		t.Fatalf("told, still untold: %d", id)
 	}
 	// Two games, the news of the second: both told.
-	a, _ := w.g.StartTopic(ctx, ana, "history")
+	a, _ := w.g.StartChapter(ctx, ana, "history")
 	w.play(ana, a.ID, repeat(w.wrong, Length)...)
 	w.wait(time.Minute)
-	b, _ := w.g.StartTopic(ctx, ana, "history")
+	b, _ := w.g.StartChapter(ctx, ana, "history")
 	w.play(ana, b.ID, repeat(w.wrong, Length)...)
 	if id := untold(); id != b.ID {
 		t.Fatalf("the latest untold: %d, not %d", id, b.ID)
@@ -56,7 +56,7 @@ func TestUntold(t *testing.T) {
 		t.Fatalf("the earlier game still untold: %d", id)
 	}
 	// A game too long ago is let go.
-	c, _ := w.g.StartTopic(ctx, ana, "history")
+	c, _ := w.g.StartChapter(ctx, ana, "history")
 	w.play(ana, c.ID, repeat(w.wrong, Length)...)
 	w.wait(UntoldWithin + time.Hour)
 	if id := untold(); id != 0 {
@@ -71,7 +71,7 @@ func TestNewsFacts(t *testing.T) {
 	ctx := t.Context()
 	ana := w.user()
 	right, wrong := w.right, w.wrong
-	s, _ := w.g.StartTopic(ctx, ana, "history")
+	s, _ := w.g.StartChapter(ctx, ana, "history")
 	w.play(ana, s.ID, right, right, right, wrong, wrong, wrong, wrong, wrong, wrong, wrong)
 	n, err := w.g.NewsOf(ctx, ana, s.ID)
 	if err != nil {
@@ -80,7 +80,7 @@ func TestNewsFacts(t *testing.T) {
 	if n.Ink != 0 || n.MetBefore != 0 {
 		t.Fatalf("a first game, three right: %+v", n)
 	}
-	s, _ = w.g.StartTopic(ctx, ana, "history")
+	s, _ = w.g.StartChapter(ctx, ana, "history")
 	w.play(ana, s.ID, repeat(wrong, Length)...)
 	n, _ = w.g.NewsOf(ctx, ana, s.ID)
 	if n.Ink != 0 || n.Rose != nil {

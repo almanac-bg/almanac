@@ -1,4 +1,4 @@
-// A page that isn't there: said plainly, with the way back to Начало — to the day's ten, while they wait.
+// A page that isn't there: said plainly, with the way back to Днес — to the day's ten, while they wait.
 
 import { api } from "../lib/api.ts";
 import { h, signal } from "../lib/dom.ts";
@@ -7,7 +7,7 @@ import { user } from "../state.ts";
 
 export function missing() {
   title("Няма такава страница");
-  // A player's day may be played already: then it's Начало, not the day's ten, that the way back leads to.
+  // A player's day may be played already: then it's Днес, not the day's ten, that the way back leads to.
   const played = signal(false);
   if (user.peek())
     api<{ run: { done: boolean } | null }>("GET", "/api/day").then(

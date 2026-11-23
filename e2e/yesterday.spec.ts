@@ -19,7 +19,7 @@ async function yesterdayWaits(page: Page, until: number): Promise<void> {
     const t = await res.json();
     const day = new Date(`${t.day}T12:00:00Z`);
     day.setUTCDate(day.getUTCDate() - 1);
-    t.yesterday = { day: day.toISOString().slice(0, 10), issue: t.issue - 1, topics: t.topics, run: t.run, until };
+    t.yesterday = { day: day.toISOString().slice(0, 10), issue: t.issue - 1, chapters: t.chapters, run: t.run, until };
     t.run = null;
     await route.fulfill({ response: res, json: t });
   });

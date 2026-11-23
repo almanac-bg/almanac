@@ -10,7 +10,7 @@ import (
 )
 
 // news tells the player, once, what's new since they last looked (play.NewsOf): the milestones noted in their book;
-// and, for the game they just played (run), the facts it put in their Алманах and how it moved a topic's mastery.
+// and, for the game they just played (run), the facts it put in their Алманах and how it moved a chapter's mastery.
 func (s *Server) news(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
@@ -29,7 +29,7 @@ func (s *Server) news(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, n)
 }
 
-// streakTold keeps a streak notice Начало has told as told (play.TellStreak), so that it isn't told again on another
+// streakTold keeps a streak notice Днес has told as told (play.TellStreak), so that it isn't told again on another
 // device.
 func (s *Server) streakTold(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)

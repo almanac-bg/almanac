@@ -51,7 +51,7 @@ func (w *world) book(user int64) map[string]bool {
 // book in grey, as the answer wrote it.
 func (w *world) met(user int64, id string) {
 	w.t.Helper()
-	res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at, finished_at) VALUES (?, 'topic', '[]', 0, 0)`, user)
+	res, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at, finished_at) VALUES (?, 'chapter', '[]', 0, 0)`, user)
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -139,22 +139,22 @@ func TestInkAndGrey(t *testing.T) {
 	}
 
 	// Another game: grey only, right or wrong; and the issue's wrong one, right now, stays grey.
-	topic, err := w.g.StartTopic(ctx, ana, "history")
+	chapter, err := w.g.StartChapter(ctx, ana, "history")
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.play(ana, topic.ID, append(repeat(w.right, Length/2), repeat(w.wrong, Length/2)...)...)
+	w.play(ana, chapter.ID, append(repeat(w.right, Length/2), repeat(w.wrong, Length/2)...)...)
 	book = w.book(ana)
-	for _, p := range w.picks(topic.ID) {
+	for _, p := range w.picks(chapter.ID) {
 		if ink, written := book[p.ID]; !written || ink {
-			t.Errorf("a topic's answer: written %v, ink %v", written, ink)
+			t.Errorf("a chapter's answer: written %v, ink %v", written, ink)
 		}
 	}
-	if n, _ := w.g.NewsOf(ctx, ana, topic.ID); n.Ink != 0 || n.MetBefore != 0 {
-		t.Fatalf("a topic's news: %+v", n)
+	if n, _ := w.g.NewsOf(ctx, ana, chapter.ID); n.Ink != 0 || n.MetBefore != 0 {
+		t.Fatalf("a chapter's news: %+v", n)
 	}
 	if again, _ := w.g.InkOf(ctx, ana); !maps.Equal(again, ink) {
-		t.Fatalf("a topic's game moved the ink: %v, was %v", again, ink)
+		t.Fatalf("a chapter's game moved the ink: %v, was %v", again, ink)
 	}
 	w.consistent(ana)
 }
@@ -193,14 +193,14 @@ func TestAnswerSaysItsInk(t *testing.T) {
 			}
 		}
 	}
-	topic, err := w.g.StartTopic(ctx, ana, "history")
+	chapter, err := w.g.StartChapter(ctx, ana, "history")
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.show(ana, topic.ID)
+	w.show(ana, chapter.ID)
 	w.wait(3 * time.Second)
-	if res, err := w.answer(ana, topic.ID, 0, w.right(topic.ID, 0)); err != nil || res.Ink {
-		t.Fatalf("a topic's right answer: ink %v, %v", res.Ink, err)
+	if res, err := w.answer(ana, chapter.ID, 0, w.right(chapter.ID, 0)); err != nil || res.Ink {
+		t.Fatalf("a chapter's right answer: ink %v, %v", res.Ink, err)
 	}
 }
 
@@ -243,7 +243,7 @@ func TestScriptWritesNothing(t *testing.T) {
 	w.consistent(gal)
 }
 
-// The book as the answers write it, one by one, is the book the whole rule writes from them, through days, topics and
+// The book as the answers write it, one by one, is the book the whole rule writes from them, through days, chapters and
 // a duel; and a guest's book brought to an account is written again with it: ink once at most.
 func TestFactsAsTheRule(t *testing.T) {
 	w := setup(t)
@@ -262,13 +262,13 @@ func TestFactsAsTheRule(t *testing.T) {
 		w.wait(24 * time.Hour)
 	}
 	w.consistent(ana)
-	// A guest who played today's issue too, and a topic's game, brought to Ana's account: her ink stays hers, the
-	// guest's topic comes as pencil, and nothing else is lost.
+	// A guest who played today's issue too, and a chapter's game, brought to Ana's account: her ink stays hers, the
+	// guest's chapter comes as pencil, and nothing else is lost.
 	w.dayGame(ana, nil)
 	before := w.book(ana)
 	w.since(ana, 30*24*time.Hour)
 	w.dayGame(bo, nil)
-	topic := w.game(bo, nil)
+	chapter := w.game(bo, nil)
 	w.fold(bo, ana)
 	after := w.book(ana)
 	for id, ink := range before {
@@ -276,9 +276,9 @@ func TestFactsAsTheRule(t *testing.T) {
 			t.Errorf("%s: %v before the guest came, %v after", id, ink, after[id])
 		}
 	}
-	for _, p := range w.picks(topic) {
+	for _, p := range w.picks(chapter) {
 		if ink, written := after[p.ID]; !written || ink && !before[p.ID] {
-			t.Errorf("the guest's topic, %s: written %v, ink %v", p.ID, written, ink)
+			t.Errorf("the guest's chapter, %s: written %v, ink %v", p.ID, written, ink)
 		}
 	}
 	w.consistent(ana)
@@ -311,7 +311,7 @@ func TestFactsAsTheRule(t *testing.T) {
 }
 
 // The issue played a second time in one browser (SecondPlay) writes pencil only, as the answers then and by the
-// whole rule; a topic's game is no second play of anything.
+// whole rule; a chapter's game is no second play of anything.
 func TestSecondPlayWritesGrey(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()

@@ -52,7 +52,7 @@ never edit it), `<batch>` (this batch's folder) and your category.
   Everyday Bulgaria after 2015 is welcome; never news that goes stale (pin what can change to a date and add
   `reviewBy`: from that day no game deals it until it is checked again).
 - Every question: `added` and `updated` = the plan's `date`, a fact of at most 140 characters about the answer, and a
-  subject that belongs under your category (a player of the topic expects it there).
+  subject that belongs under your category (a player of the category expects it there).
 - Spread the difficulty honestly by the rubric: a question is labelled for what Bulgarian players know, not for its
   cell. If a question you wrote is easier or harder than its cell, write another one for the cell.
 

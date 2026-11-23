@@ -218,9 +218,9 @@ func TestRanksToldOnce(t *testing.T) {
 	}
 	// Five facts of geography in ink, and seven of history: two chapters at Страница, told as one.
 	var all []answered
-	for _, topic := range []string{"geography", "history"} {
+	for _, chapter := range []string{"geography", "history"} {
 		k := 0
-		for _, q := range w.b.Live(topic, "") {
+		for _, q := range w.b.Live(chapter, "") {
 			if q.Extra().Fact != "" && k < 7 {
 				all, k = append(all, answered{q.Base().ID, true}), k+1
 			}
@@ -242,12 +242,12 @@ func TestRanksToldOnce(t *testing.T) {
 	}
 	// A chapter's game writes pencil: no rank moves.
 	before, _ := w.g.RanksOf(ctx, ana)
-	topic := w.game(ana, nil)
+	chapter := w.game(ana, nil)
 	w.g.AfterWait(ctx, ana)
 	after, _ := w.g.RanksOf(ctx, ana)
 	for i := range before {
 		if before[i] != after[i] {
-			t.Fatalf("a chapter's game (%d) moved a rank: %+v to %+v", topic, before[i], after[i])
+			t.Fatalf("a chapter's game (%d) moved a rank: %+v to %+v", chapter, before[i], after[i])
 		}
 	}
 }

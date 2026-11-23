@@ -126,8 +126,8 @@ const page = (name: string) => () => {
 router.start(
   root as unknown as Element,
   [
-    { path: /^\/$/, view: page("Начало") },
-    { path: /^\/play\/([a-z]+)$/, view: page("topic") },
+    { path: /^\/$/, view: page("Днес") },
+    { path: /^\/play\/([a-z]+)$/, view: page("chapter") },
     { path: /^\/friends$/, view: page("Приятели") },
     { path: /^\/settings$/, view: page("Настройки") },
     { path: /^\/duel\/([0-9]+)$/, view: page("duel") },
@@ -173,7 +173,7 @@ test("a tap opens a page over the one it's tapped on; back comes to that one aga
   history.back();
   await tick();
   assert.equal(location.pathname, "/");
-  assert.deepEqual(drawn, ["Приятели", "Начало"]);
+  assert.deepEqual(drawn, ["Приятели", "Днес"]);
   assert.equal(router.byTap(), false);
 });
 
@@ -199,7 +199,7 @@ test("a game holds an entry of its own: back mid-game asks, stays on „Оста
   unguard();
   await tick();
   assert.equal(index, at - 1);
-  assert.deepEqual(drawn, ["topic"]);
+  assert.deepEqual(drawn, ["chapter"]);
 });
 
 test("a game over gives back its entry, and the page under it keeps its result", async () => {
@@ -284,13 +284,13 @@ function fromOutside(url: string): void {
   history.replaceState({ i: router.entry().i }, "", url);
 }
 
-test("a game opened from outside has Начало under it: back asks, and „Излез“ leaves the game for Начало", async () => {
+test("a game opened from outside has Днес under it: back asks, and „Излез“ leaves the game for Днес", async () => {
   fromOutside("/duel/7");
   const at = index;
   router.hold();
   assert.equal(router.entry().game, true);
   assert.equal(location.pathname, "/duel/7", "the game keeps its address");
-  assert.equal(entries[at]?.url, "/", "Начало under it");
+  assert.equal(entries[at]?.url, "/", "Днес under it");
   let ask: (() => void) | null = null;
   const unguard = router.beforeLeaving((proceed) => {
     ask = proceed;
@@ -307,7 +307,7 @@ test("a game opened from outside has Начало under it: back asks, and „И
   await tick();
   assert.equal(index, at);
   assert.equal(location.pathname, "/");
-  assert.deepEqual(drawn, ["Начало"], "out of the game, not into it again");
+  assert.deepEqual(drawn, ["Днес"], "out of the game, not into it again");
 });
 
 test("a game opened from outside, over: the page under it takes its address, renamed or not, and its result", async () => {
@@ -394,7 +394,7 @@ test("„Отказ“ on a game's count: back where it was come from; opened fr
   await tick();
   assert.equal(stayed, 1, "its start shown again");
   assert.equal(index, at);
-  assert.equal(location.pathname, "/play/science", "not Начало");
+  assert.equal(location.pathname, "/play/science", "not Днес");
   assert.equal(router.entry().game, undefined);
   assert.deepEqual(drawn, [], "nothing drawn over it");
 });

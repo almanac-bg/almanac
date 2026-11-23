@@ -14,9 +14,9 @@ func TestCountsKeptOverARestart(t *testing.T) {
 	ctx := t.Context()
 	w.g.CrowdMin = 1
 	ana := w.user()
-	s, _ := w.g.startTopic(ctx, ana, MixTopic)
+	s, _ := w.g.startChapter(ctx, ana, MixChapter)
 	w.play(ana, s.ID, repeat(w.right, Length)...)
-	w.wait(keepEvery) // the counts the topic's start made were kept: these are, keepEvery after them
+	w.wait(keepEvery) // the counts the chapter's start made were kept: these are, keepEvery after them
 	if err := w.g.Count(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestCountsKeptOverARestart(t *testing.T) {
 	gone, cancel := context.WithCancel(ctx)
 	cancel() // a request that can't wait at all: what's kept is there at once
 	h2, err := restarted.hardness(gone)
-	if err != nil || !maps.Equal(h2.byID, h.byID) || len(h2.byTopic[""]) != len(h.byTopic[""]) {
+	if err != nil || !maps.Equal(h2.byID, h.byID) || len(h2.byChapter[""]) != len(h.byChapter[""]) {
 		t.Fatalf("the hardness kept: %v", err)
 	}
 	if c := restarted.Crowd(q); c == nil || c.Answers != crowd.Answers || c.Right != crowd.Right {

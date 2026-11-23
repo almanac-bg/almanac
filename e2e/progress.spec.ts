@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { openGame, playedBefore, playRun, startDay } from "./play.ts";
 
-test("a topic's game never tells how well the topic is known, and the avatar is anyone's to choose", async ({
+test("a chapter's game never tells how well the chapter is known, and the avatar is anyone's to choose", async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -9,7 +9,7 @@ test("a topic's game never tells how well the topic is known, and the avatar is 
   await playedBefore(page, 1);
   await openGame(page, "/play/history");
   await playRun(page);
-  // How well the topic is known is the game's own (play/mastery.go): never told. Nothing about XP, levels or
+  // How well the chapter is known is the game's own (play/mastery.go): never told. Nothing about XP, levels or
   // achievements: the game has none (DECISIONS.md, „The direction“).
   await expect(page.locator(".summary")).toBeVisible();
   await expect(page.locator(".summary")).not.toContainText(/XP|[Нн]иво \d|[Пп]остижени|оценка|Познавач|Новак/);

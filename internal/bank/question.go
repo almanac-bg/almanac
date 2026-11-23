@@ -1,5 +1,6 @@
 // Package bank holds the game's questions: the types a question can be, the bank on disk, and the checks a bank must
-// pass before a server plays it.
+// pass before a server plays it. Its questions are filed by category, one file each: a category is a chapter, and
+// „category“ is the bank's word for it alone (the game's, the API's and the client's is „chapter“).
 //
 // Every type lives in its own file (choice.go, number.go, order.go, truefalse.go, match.go, split.go, clues.go) and plugs in through the
 // same three steps: it checks itself, deals itself for one play (shuffled, without its answer), and grades what a
@@ -98,7 +99,7 @@ type Tail struct {
 // RetiredWhys are the reasons a question leaves play: wrong (its answer or fact was), stale (it stopped being true),
 // weak (dull, too easy, unfair or badly made), twin (another question asks the same), giveaway (it gave another's
 // answer away, or another gave its), rule (a rule of the bank changed). Wrong and stale ones also leave what players
-// have learned (Моят Алманах): what they learned there wasn't so.
+// have learned (their Алманах): what they learned there wasn't so.
 var RetiredWhys = []string{"wrong", "stale", "weak", "twin", "giveaway", "rule"}
 
 // Untrue is whether a retired question left play because it wasn't (or stopped being) true.
@@ -235,7 +236,7 @@ func mustJSON(v any) json.RawMessage {
 	return b
 }
 
-// AnswerText is a question's answer in words, as players read it (Моят Алманах): numbers written the Bulgarian way,
+// AnswerText is a question's answer in words, as players read it (the Алманах): numbers written the Bulgarian way,
 // with their unit; an answer of parts (AnswerLines) on one line.
 func AnswerText(q Question) string {
 	switch q := q.(type) {

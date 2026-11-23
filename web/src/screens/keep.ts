@@ -81,7 +81,7 @@ export interface MailPrefs {
 /** The day's reminder by mail (server/daymail.go), asked for where no notification can come here. A player with an
  * email turns it on with a tap; a guest gives one, and the code sent to it, which keeps their game too (`stake`,
  * said first, is what it risks till then). What came of it is said in its place. `no`: a „Не сега“ under it
- * (Начало's ask); `folded`: the guest's form a tap away (Настройки, where the profile's own is further down);
+ * (Днес's ask); `folded`: the guest's form a tap away (Настройки, where the profile's own is further down);
  * `turning`: told as it's being turned on (before a guest's email is set as theirs); `yes`: told once it's on, with
  * the mail as it is now; `primary`: it's the page's one action (the first results'). */
 export function mailAsk({

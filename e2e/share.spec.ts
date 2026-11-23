@@ -50,7 +50,7 @@ test("the day shared: its score and shape and a link, which brings another to th
   // The day's result says the same score.
   await expect(page.locator(".score-n")).toHaveText(rights);
 
-  // Whoever opens the link: Начало, the score shared and its shape over the same ten, and no name.
+  // Whoever opens the link: Днес, the score shared and its shape over the same ten, and no name.
   const other = await browser.newContext({ ...test.info().project.use, baseURL: test.info().project.use.baseURL });
   const visitor = await other.newPage();
   await visitor.goto(link);

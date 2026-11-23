@@ -1,4 +1,4 @@
-// АЛМАНАХ's web client: the edition's frame — the bar (the rosette and the name, the three places on a big screen, the
+// АЛМАНАХ's web client: its frame — the bar (the rosette and the name, the three places on a big screen, the
 // player's avatar in the corner: Профил and Настройки), the double rule under it, the three places as words at the
 // foot of a phone's screen — and the screen the router puts under it. A game has the whole screen: the frame steps
 // aside while one is under way. A new visitor's cover (the day alone: screens/today.ts) and the sign-in page
@@ -15,14 +15,14 @@ import { path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
 import { duelOne } from "./screens/duel.ts";
 import { missing } from "./screens/missing.ts";
-import { topic } from "./screens/play.ts";
+import { chapter } from "./screens/play.ts";
 import { signInPage } from "./screens/signin.ts";
 import { sharedDay, today } from "./screens/today.ts";
 import { cover, friendsNews, look, playing, user, watchNews } from "./state.ts";
 import { avatar, rosette } from "./ui.ts";
 
-/** The three places (DECISIONS.md, „The redesign“): where each goes, its name, and which paths are part of it. A game
- * of the day is played on Днес, and its board is on its result; a topic's from its chapter in the Алманах; a duel
+/** The three places (DECISIONS.md, „The direction“): where each goes, its name, and which paths are part of it. A game
+ * of the day is played on Днес, and its board is on its result; a chapter's from its chapter in the Алманах; a duel
  * is the friends'. */
 const places: [href: string, label: string, icon: string, here: (p: string) => boolean][] = [
   ["/", "Днес", "today", (p) => p === "/"],
@@ -83,7 +83,7 @@ if (root) {
     main,
     [
       { path: /^\/$/, view: today },
-      { path: /^\/play\/([a-z]+)$/, view: topic },
+      { path: /^\/play\/([a-z]+)$/, view: chapter },
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
       { path: /^\/almanac$/, view: later(() => import("./screens/almanac.ts").then((m) => m.almanac)) },
       { path: /^\/almanac\/([a-z]+)$/, view: later(() => import("./screens/almanac.ts").then((m) => m.chapter)) },

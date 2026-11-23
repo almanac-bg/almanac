@@ -1,6 +1,6 @@
 // What a screen asks the server: each thing once a visit. A part that loads its data as it's made, made again by a
-// render that runs again, asks again each time (the topics' tiles asking for the player's stats); a page that
-// loads itself anew asks for all of it again. Counted here over the ways a player goes round Начало and the topics, a
+// render that runs again, asks again each time (the chapters' tiles asking for the player's stats); a page that
+// loads itself anew asks for all of it again. Counted here over the ways a player goes round Днес and the chapters, a
 // deploy among them: a visit that asks for anything twice fails, and so does a deploy that loads the page more than once.
 import { expect, type Page, type Request, test } from "@playwright/test";
 import { playRun, startDay } from "./play.ts";
@@ -51,7 +51,7 @@ const tab = (page: Page, href: string) =>
 test("each screen asks the server for each thing once a visit, and a deploy loads the page once", async ({ page }) => {
   test.slow();
   await page.goto("/");
-  // A player with the day played: Начало asks for all it shows.
+  // A player with the day played: Днес asks for all it shows.
   await startDay(page);
   await playRun(page);
   await expect(page.locator(".summary")).toBeVisible();
@@ -59,16 +59,16 @@ test("each screen asks the server for each thing once a visit, and a deploy load
   const home = (asked: string[]) => {
     expect(asked.filter((p) => /^\/api\/runs\/\d+\/review$/.test(p)).length).toBeLessThanOrEqual(1);
   };
-  home(await once(page, "Начало, loaded", () => page.reload()));
+  home(await once(page, "Днес, loaded", () => page.reload()));
   await once(page, "Приятели", () => tab(page, "/friends"));
   await once(page, "Алманах", () => tab(page, "/almanac"));
   await once(page, "Профил", () => tab(page, "/me"));
-  home(await once(page, "Начало, from Профил", () => tab(page, "/")));
-  // Начало tapped on Начало opens it afresh: once more, not more than that.
-  home(await once(page, "Начало, tapped again", () => tab(page, "/")));
+  home(await once(page, "Днес, from Профил", () => tab(page, "/")));
+  // Днес tapped on Днес opens it afresh: once more, not more than that.
+  home(await once(page, "Днес, tapped again", () => tab(page, "/")));
   // A chapter, its game's count backed out of: back on the chapter.
   await once(page, "a chapter", () => page.goto("/almanac/history"));
-  await once(page, "a topic", async () => {
+  await once(page, "a chapter", async () => {
     await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
     await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   });
@@ -76,9 +76,9 @@ test("each screen asks the server for each thing once a visit, and a deploy load
     await page.getByRole("button", { name: "Отказ", exact: true }).click();
     await expect(page).toHaveURL(/\/almanac\/history$/);
   });
-  await once(page, "a topic, loaded", () => page.goto("/play/music"));
-  await once(page, "Моят Алманах", () => page.goto("/almanac"));
-  home(await once(page, "Начало, from Моят Алманах", () => tab(page, "/")));
+  await once(page, "a chapter, loaded", () => page.goto("/play/music"));
+  await once(page, "the Алманах", () => page.goto("/almanac"));
+  home(await once(page, "Днес, from the Алманах", () => tab(page, "/")));
 
   // A deploy: the next screen comes with the page loaded anew, once.
   await page.route("**/api/**", async (route) => {
@@ -88,7 +88,7 @@ test("each screen asks the server for each thing once a visit, and a deploy load
   await once(page, "Приятели, the server's version another", () => tab(page, "/friends"));
   let loads = 0;
   page.on("load", () => loads++);
-  home(await once(page, "Начало, after a deploy", () => tab(page, "/")));
+  home(await once(page, "Днес, after a deploy", () => tab(page, "/")));
   await page.waitForTimeout(1500); // a page that went on loading itself would have by now
   expect(loads).toBe(1);
 });
