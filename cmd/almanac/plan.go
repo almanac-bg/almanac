@@ -16,7 +16,8 @@ import (
 
 // A batch plan says what a batch of new questions writes, the same in every category (the bank's categories stay the
 // same size): where the day's runway is shortest first, the dates that have the fewest questions of their own, how many
-// about Bulgaria, and the ids to take. The /new-questions skill runs its writers, checkers and cross-check from it.
+// about Bulgaria, the themes of each chapter furthest short of their targets (those about Bulgaria first), and the ids
+// to take. The /new-questions skill runs its writers, checkers and cross-check from it.
 type batchPlan struct {
 	Date string `json:"date"`
 	// Through is the last day drawn of the days whose questions were taken off the runway (-used), "" for none.
@@ -60,6 +61,23 @@ type planCategory struct {
 	Dates []string `json:"dates"`
 	// Avoid are the subjects that come back too often in the category already (over bank check's 1%).
 	Avoid []string `json:"avoid"`
+	// Themes are the chapter's themes (bank.PlanThemes), those the batch writes for first: the ones about Bulgaria
+	// short of their target, then the rest short, each with how many of Each it writes (a writer's spares go the same
+	// way); the themes it writes none for after. None for a bank without themes.
+	Themes []planTheme `json:"themes,omitempty"`
+}
+
+// planTheme is a chapter's theme in the plan: its questions now against its target share of the chapter, how many it
+// lacks for it (Short; below 0, over), and how many of the batch's questions go to it (Write).
+type planTheme struct {
+	ID     string  `json:"id"`
+	Name   string  `json:"name"`
+	BG     bool    `json:"bg,omitempty"`
+	Have   int     `json:"have"`
+	Share  float64 `json:"share"`
+	Target float64 `json:"target"`
+	Short  int     `json:"short"`
+	Write  int     `json:"write"`
 }
 
 type planCell struct {
@@ -170,6 +188,10 @@ func planBatch(b *bank.Bank, each int, now time.Time, used play.Used) batchPlan 
 
 	dates := thinDates(b, now, used)
 	repeats := b.Repeats(SubjectMost)
+	chapters := map[string]bank.ChapterThemes{}
+	for _, ch := range b.ThemesOf() {
+		chapters[ch.Category] = ch
+	}
 	for i, c := range b.Categories {
 		prefix, next := b.NextID(c.ID)
 		pc := planCategory{ID: c.ID, Name: c.Name, Cells: cells, BG: bg,
@@ -185,6 +207,12 @@ func planBatch(b *bank.Bank, each int, now time.Time, used play.Used) batchPlan 
 				if s.Category == c.ID && float64(s.N) > SubjectShare*float64(size) {
 					pc.Avoid = append(pc.Avoid, r.Name)
 				}
+			}
+		}
+		if ch, ok := chapters[c.ID]; ok {
+			for _, t := range bank.PlanThemes(ch, each) {
+				pc.Themes = append(pc.Themes, planTheme{ID: t.ID, Name: t.Name, BG: t.BG, Have: t.N,
+					Share: math.Round(t.Share*10) / 10, Target: t.Target, Short: t.Short, Write: t.Write})
 			}
 		}
 		p.Categories = append(p.Categories, pc)
@@ -347,6 +375,19 @@ func (p batchPlan) String() string {
 	}
 	for _, c := range p.Categories {
 		fmt.Fprintf(&s, "  %-11s %s … %s   dates %s\n", c.ID, c.FirstID, c.LastID, strings.Join(c.Dates, " "))
+		var themes []string
+		for _, t := range c.Themes {
+			if t.Write > 0 {
+				bg := ""
+				if t.BG {
+					bg = " (bg)"
+				}
+				themes = append(themes, fmt.Sprintf("%s%s %d", t.Name, bg, t.Write))
+			}
+		}
+		if len(themes) > 0 {
+			fmt.Fprintf(&s, "  %-11s themes to write, those about Bulgaria first: %s\n", "", strings.Join(themes, ", "))
+		}
 		if len(c.Avoid) > 0 {
 			fmt.Fprintf(&s, "  %-11s avoid: %s\n", "", strings.Join(c.Avoid, ", "))
 		}

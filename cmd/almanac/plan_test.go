@@ -202,3 +202,44 @@ func TestNationalDaysReport(t *testing.T) {
 		t.Errorf("no live bank: missing %v", missing)
 	}
 }
+
+// A plan gives each category's questions to its themes furthest short of their targets, those about Bulgaria named
+// first, never to a catch-all; and bank check shows every chapter's themes against their targets.
+func TestPlanThemesAndReport(t *testing.T) {
+	b, problems := bank.Load("../../bank/sample")
+	if b == nil {
+		t.Fatal(problems)
+	}
+	p := planBatch(b, 30, time.Date(2026, 11, 16, 12, 0, 0, 0, time.UTC), play.Used{})
+	for _, c := range p.Categories {
+		if len(c.Themes) != len(b.Themes[c.ID]) {
+			t.Fatalf("%s: %d themes of %d", c.ID, len(c.Themes), len(b.Themes[c.ID]))
+		}
+		written, writing := 0, true
+		for i, th := range c.Themes {
+			written += th.Write
+			if th.Write > 0 && (th.ID == bank.OtherTheme || th.ID == bank.MixedTheme) {
+				t.Errorf("%s: %d for the catch-all %s", c.ID, th.Write, th.ID)
+			}
+			if th.Write > 0 && !writing {
+				t.Errorf("%s: %s takes %d after a theme that takes none", c.ID, th.ID, th.Write)
+			}
+			writing = th.Write > 0
+			if i > 0 && th.Write > 0 && th.BG && !c.Themes[i-1].BG {
+				t.Errorf("%s: %s, about Bulgaria, after %s", c.ID, th.ID, c.Themes[i-1].ID)
+			}
+		}
+		if written != p.Each {
+			t.Errorf("%s: the themes take %d of %d", c.ID, written, p.Each)
+		}
+	}
+	s := themes(b)
+	for _, want := range []string{"the chapters' themes", "Спорт (sports):", "points off the targets", "the biggest gaps:", "Смесени"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("no %q in\n%s", want, s)
+		}
+	}
+	if !strings.Contains(p.String(), "themes to write, those about Bulgaria first:") {
+		t.Errorf("the plan names no themes:\n%s", p.String())
+	}
+}

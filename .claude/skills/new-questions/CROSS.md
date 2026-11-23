@@ -37,7 +37,9 @@ and `<batch>` (this batch's folder).
    say so prominently: the bank holds the categories within 2% of their mean size (`bank add -check` says if the
    batch would break that), so never cut the others to match, and never pad.
 4. **Within each category, the plan's cells:** keep each cell's `count`, and the category's `bg` about Bulgaria, where
-   the questions allow; report the cells (and a `bg`) that came out short.
+   the questions allow; report the cells (and a `bg`) that came out short. When you cut, keep the questions in the
+   plan's `themes` (those with `write` > 0, the Bulgarian ones first) over those in themes already over their target;
+   report the themes the batch wrote into against the plan's `write`.
 
 ## Deliver
 

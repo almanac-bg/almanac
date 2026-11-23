@@ -18,7 +18,9 @@
 // tolerance formula (number.go) that count no list, judge an offset scale and show no number near the answer
 // (estimate.go), orders' gaps (order.go), and give-aways and twins from one question to another (giveaway.go, on the
 // word stems of text.go), near-duplicates that ask one fact in other words (near.go). Errors for questions added
-// since StrictFrom, warnings for older ones, waivers for the true exceptions.
+// since StrictFrom, warnings for older ones, waivers for the true exceptions. Each chapter's themes (themes.go), with
+// the share of it each aims for, are what a batch is planned by: every question names its own, and the draw never
+// reads them.
 package bank
 
 import (
@@ -90,6 +92,9 @@ type Tail struct {
 	Day string `json:"day,omitempty"`
 	// BG is a question about Bulgaria: its people, places, history, culture, language, sport. Every day has a few.
 	BG bool `json:"bg,omitempty"`
+	// Theme is the one of its chapter's themes (themes.go: the bank's ThemesFile) it is mainly about: what a batch is
+	// planned by, never what the draw reads. Every question added since ThemesFrom names one.
+	Theme string `json:"theme,omitempty"`
 	// Sources are the pages the answer and the fact were confirmed on (URLs): what a later check starts from, and
 	// where to look first when a source turns out wrong. Never sent to a player. Every question added since
 	// SourcesFrom has them.

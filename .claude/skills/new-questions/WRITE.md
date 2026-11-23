@@ -45,14 +45,23 @@ never edit it), `<batch>` (this batch's folder) and your category.
 - **`firstId` … `lastId`**: your ids. Number your questions from `firstId` up, one by one, no gaps.
 - **`avoid`**: subjects your category names too often already. Write away from them; never a question whose answer or
   main subject is one of them.
+- **`themes`**: your chapter's themes, those the batch writes into first (each `write` > 0: the themes furthest short
+  of their target share, those about Bulgaria, `bg`, first), with what each `covers` in `<bank>/themes.json`. Spread
+  your questions over them about as `write` says, across your cells (a hard number in Средновековна България, an easy
+  choice in Биология…); write none into a theme with `write` 0 unless a cell can't be filled honestly otherwise (say
+  so in your notes), and none into „друго“ (`other`) or „Смесени“ (`mixed`) by design. Your questions about Bulgaria
+  (`bg`) go first into the Bulgarian themes the plan names. **Every question carries `"theme"`**: the id of the one
+  theme it is mainly about (the more specific when two fit; `mixed` only for a match, split or order over several;
+  `other` only when none fits). `bank add` refuses a new question without one, or with a theme its chapter doesn't
+  have.
 - **About Bulgaria: your entry's `bg`** questions (about 30% of the batch), each cell's `bg` of its `count`
   (`"bg": true`: Bulgarian people, places, history, culture, language, food, customs, sport, institutions, nature; not
   merely written in Bulgarian). Every day needs three. If a cell's subject truly can't give its `bg` honestly, write
   the rest in another cell of yours and say so in your notes; never mark a question `bg` that isn't about Bulgaria.
   Everyday Bulgaria after 2015 is welcome; never news that goes stale (pin what can change to a date and add
   `reviewBy`: from that day no game deals it until it is checked again).
-- Every question: `added` and `updated` = the plan's `date`, a fact of at most 140 characters about the answer, and a
-  subject that belongs under your category (a player of the category expects it there).
+- Every question: `added` and `updated` = the plan's `date`, a fact of at most 140 characters about the answer, its
+  `theme`, and a subject that belongs under your category (a player of the category expects it there).
 - Spread the difficulty honestly by the rubric: a question is labelled for what Bulgarian players know, not for its
   cell. If a question you wrote is easier or harder than its cell, write another one for the cell.
 

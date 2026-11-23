@@ -17,6 +17,7 @@ import (
 // A bank on disk is a directory:
 //
 //	categories.json         the categories, in the order players see them
+//	themes.json             each category's themes, with the share of it each aims for (themes.go)
 //	questions/<id>.json     each category's questions, one JSON array per category
 //	images/                 the pictures the questions use
 //
@@ -45,6 +46,8 @@ type Bank struct {
 	// Questions are every question, retired ones too, by category in the order of Categories, then as in its file.
 	Questions []Question
 	byID      map[string]Question
+	// Themes are each category's themes (ThemesFile; nil for a bank without them).
+	Themes map[string][]Theme
 	// waived are the rules the bank's waivers lift, by question: [id, rule].
 	waived map[[2]string]bool
 }
@@ -154,6 +157,12 @@ func Load(dir string) (*Bank, []Problem) {
 		known[c.ID] = true
 	}
 
+	themes, errs := readThemes(dir, b.Categories)
+	for _, e := range errs {
+		fail(ThemesFile, 0, "", e)
+	}
+	b.Themes = themes
+
 	files, err := os.ReadDir(filepath.Join(dir, QuestionsDir))
 	if err != nil {
 		fail(QuestionsDir, 0, "", err.Error())
@@ -185,6 +194,7 @@ func Load(dir string) (*Bank, []Problem) {
 			q, line := item.q, item.line
 			h := q.Base()
 			errs, warnings := checkQuestion(q, today)
+			errs = append(errs, b.checkTheme(q)...)
 			for _, im := range picturesOf(q) {
 				errs = append(errs, im.checkFiles(filepath.Join(dir, ImagesDir))...)
 			}

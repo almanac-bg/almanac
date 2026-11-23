@@ -49,7 +49,8 @@ Your prompt gives you: `<skill>` (this folder), `<repo>` (the game's code), `<ba
    (an artwork: the artist died 70+ years ago); no legible text naming the answer; it reads at about 170×100 px on a
    phone. Look at each with the Read tool.
 8. **`bg`** is right: about Bulgaria, not merely in Bulgarian. **`avoid`:** no answer or main subject from the plan's
-   list.
+   list. **`theme`** is the one of the chapter's themes (`<bank>/themes.json`, what each `covers`) the question is
+   mainly about: fix a wrong one (it's a label, never a reason to drop).
 9. **Bulgarian:** standard literary Bulgarian; „…“ quotes, spaced dash —, „г.“ after a year; Bulgarian words, not
    Russian ones or loanwords (check the ones you're unsure of in rechnik.chitanka.info or the РБЕ); gender-neutral to
    the player.
