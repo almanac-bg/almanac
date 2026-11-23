@@ -1161,9 +1161,23 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
     const next = view.items[at + 1];
     said.textContent = `„${view.items[at]}“: ${view.groups[side]}.${next === undefined ? "" : ` Следва „${next}“.`}`;
     sides.update((s) => [...s, side]);
-    if (at + 1 === n) submit({ sides: [...sides.peek()] });
-    else window.setTimeout(lay, 180);
+    if (at + 1 === n) {
+      // The last one sent: the answer goes, and says so at once, its pips full, the groups done with (sent).
+      for (const p of pips.children) p.classList.add("done");
+      undo.hidden = true;
+      deck.parentElement?.classList.add("sent");
+      deck.append(sent);
+      submit({ sides: [...sides.peek()] });
+    } else window.setTimeout(lay, 180);
   };
+  const sent = h("p", { class: "split-sent", role: "status" }, "Отговорът е изпратен.");
+  // Refused (the options free again, the question still open): the last one can be taken back again.
+  effect(() => {
+    if (locked() || !sent.isConnected) return;
+    deck.parentElement?.classList.remove("sent");
+    sent.remove();
+    undo.hidden = false;
+  });
   const back = () => {
     if (locked.peek() || sides.peek().length === 0) return;
     sides.update((s) => s.slice(0, -1));

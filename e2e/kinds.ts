@@ -165,6 +165,10 @@ export async function answerAs(page: Page, q: Q, how: How): Promise<void> {
           .nth(ok ? group : 1 - group)
           .dispatchEvent("click");
       }
+      // The last card sent says so at once, the groups done with, nothing left to undo, while the answer goes.
+      await expect(ask.locator(".split-sent")).toHaveCount(1);
+      await expect(ask.locator(".split-side").first()).toBeDisabled();
+      await expect(ask.locator(".split-pips b.done")).toHaveCount(items.length);
       return;
     }
   }
