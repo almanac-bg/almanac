@@ -887,18 +887,21 @@ function ofFriends(t: Today): Child {
   const rows = t.friends ?? [];
   if (!rows.length) {
     const mine = t.board.mine ?? t.board.top.find((s) => s.me);
-    return [
-      mine ? h("ol", { class: "rows ranks" }, scoreRow({ ...mine, me: true }, 1)) : null,
+    // Why the row is alone, on the board's card under it: the board's own words, not a line beside it.
+    return h(
+      "ol",
+      { class: "rows ranks" },
+      mine ? scoreRow({ ...mine, me: true }, 1) : null,
       t.befriended === false
         ? h(
-            "p",
+            "li",
             { class: "board-empty" },
             "Още нямаш приятели. ",
             h("a", { href: "/friends" }, "Добави приятели"),
             " и сравнявайте резултатите си всеки ден.",
           )
-        : h("p", { class: "board-empty" }, "Още никой от приятелите ти не е играл днес."),
-    ];
+        : h("li", { class: "board-empty" }, "Още никой от приятелите ти не е играл днес."),
+    );
   }
   return h(
     "ol",

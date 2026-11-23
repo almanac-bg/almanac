@@ -6817,6 +6817,11 @@
     font: 600 1rem / 1.45 var(--font-sans);
   }
 
+  /* On the board's card, under the player's row alone: why it's alone. */
+  .rows > .board-empty {
+    padding: var(--space-3) 0 var(--space-2);
+  }
+
   /* A friend's way to a duel, a button (or „Премахни“), at the row's end: 44px to tap, the row no taller for it. */
   .friend-act {
     grid-area: act;
