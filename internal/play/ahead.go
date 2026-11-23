@@ -51,9 +51,14 @@ import (
 // no day as a rerun, and what the days hold out of every other game is a season's questions, not a year's 3,650; the
 // runway warns a season and two months before a place runs out, early enough to write for it.
 //
-// The days ahead are drawn in a transaction of their own (KeepDays: as the server starts, then each minute when the
+// The days ahead are kept apart from the players' games (KeepDays: as the server starts, then each minute when the
 // day or the bank has changed), never in a player's: a game that rolls back can't take them with it. A player's game
-// only reads them (days); today's, if it isn't drawn yet, is drawn there as it always was.
+// only reads them (days); today's, if it isn't drawn yet, is drawn there as it always was. Nor do they hold the game's
+// one writer while they're drawn: drawing ninety days takes seconds on the server, and every answer, and the health
+// probe's write, would wait for it (on 23 Nov 2026 a bank whose questions changed kind had every day after tomorrow
+// drawn again in one transaction; the probe timed out, and the deploy under way went back for it). So today and the
+// rules are kept in one short transaction, the days ahead are worked out from what it read, outside any (only
+// EnsureDays writes them, one keeping at a time), and each day that changed is written in a transaction of its own.
 
 // DayRules names the day's draw as it is, and the days after tomorrow are drawn again whenever it changes. It ends with
 // what drawDay makes of a fixed bank on fixed days and seeds (TestDayRulesNameTheDraw): a change to how a day is drawn
@@ -77,6 +82,8 @@ type dayBars struct {
 }
 
 type daysCache struct {
+	keeping sync.Mutex // held by EnsureDays: the days ahead are kept by one at a time
+
 	mu   sync.Mutex
 	day  string     // the day the bars are for
 	bank *bank.Bank // and the bank they were drawn from
@@ -120,9 +127,13 @@ func (g *Game) KeepDays(ctx context.Context) {
 	}
 }
 
-// EnsureDays draws today and the days ahead that are missing (or due again), in a transaction of its own, and keeps
-// what they hold for the games of the day (days). Nothing to do if this day and bank are done already.
+// EnsureDays draws today and the days ahead that are missing (or due again), and keeps what they hold for the games of
+// the day (days). Nothing to do if this day and bank are done already. Today and the rules are kept in a transaction
+// of their own (keepToday), the days ahead drawn outside any (drawAhead), and each day that changed written in its own
+// (writeDays): the game's one writer is never held for long.
 func (g *Game) EnsureDays(ctx context.Context) error {
+	g.daysAhead.keeping.Lock()
+	defer g.daysAhead.keeping.Unlock()
 	today, b := g.Today(), g.Bank()
 	g.daysAhead.mu.Lock()
 	done := g.daysAhead.day == today && g.daysAhead.bank == b
@@ -136,56 +147,83 @@ func (g *Game) EnsureDays(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	var bars dayBars
+	var stored map[string][]Pick
 	err = g.DB.Tx(context.WithoutCancel(ctx), func(tx *sql.Tx) error {
 		var err error
-		bars, err = g.drawAhead(tx, today, b, answered)
+		stored, err = g.keepToday(tx, today, b)
 		return err
 	})
 	if err != nil {
 		return err
 	}
-	g.daysAhead.mu.Lock()
+	all := g.drawAhead(today, b, stored, answered)
+	// While the days are written, one at a time, the other games keep out of the days ahead both as they were and as
+	// they will be.
+	bars := barsOf(all, today, b)
+	both := dayBars{all: maps.Clone(bars.all), met: answered}
+	for day, picks := range stored {
+		for _, p := range picks {
+			if day >= today {
+				both.all[p.ID] = true
+			}
+		}
+	}
+	g.keptDays(today, b, both)
+	if err := g.writeDays(ctx, today, stored, all); err != nil {
+		g.keptDays("", nil, dayBars{}) // the games read the days from the database, and the next minute tries again
+		if errors.Is(err, errDayTurned) {
+			return nil
+		}
+		return err
+	}
 	bars.met = answered
-	g.daysAhead.day, g.daysAhead.bank, g.daysAhead.bars = today, b, bars
-	g.daysAhead.mu.Unlock()
+	g.keptDays(today, b, bars)
 	return nil
 }
 
-// drawAhead draws today if it isn't yet, voids today's questions the bank no longer plays as the day began (day.go),
-// draws the days after tomorrow again if the rules or the bank's dated and Bulgarian questions changed since they were
-// drawn, draws a day after tomorrow again if its kinds aren't the day's (shaped: a question's kind changed since), mends
-// a day ahead if a question of it left the bank, is of a kind the game no longer deals, or is due for review by then
-// (mendDay: drawn again if it can't be), and draws the days missing up to
-// Ahead (while none is short, else it warns in the log); it says what today and the days ahead hold. Of the questions
-// that fit, those not answered (by anyone) come first.
-func (g *Game) drawAhead(tx *sql.Tx, today string, b *bank.Bank, answered map[string]bool) (dayBars, error) {
+// keptDays keeps what the days hold for the games of a day and bank (days).
+func (g *Game) keptDays(day string, b *bank.Bank, bars dayBars) {
+	g.daysAhead.mu.Lock()
+	defer g.daysAhead.mu.Unlock()
+	g.daysAhead.day, g.daysAhead.bank, g.daysAhead.bars = day, b, bars
+}
+
+// keepToday draws today if it isn't yet, voids today's questions the bank no longer plays as the day began (day.go),
+// and lets go of the days after tomorrow if the rules or the bank's dated and Bulgarian questions changed since they
+// were drawn (drawAhead draws them again); it says which days are stored.
+func (g *Game) keepToday(tx *sql.Tx, today string, b *bank.Bank) (map[string][]Pick, error) {
 	if _, err := g.day(tx, today, b); err != nil && !errors.Is(err, ErrNoQuestion) {
-		return dayBars{}, err
+		return nil, err
 	}
 	if err := g.voidDay(tx, today, b); err != nil {
-		return dayBars{}, err
+		return nil, err
 	}
-	d, _ := time.Parse(time.DateOnly, today)
-	tomorrow := d.AddDate(0, 0, 1).Format(time.DateOnly)
 	rules := drawnBy(b)
 	var was string
 	if err := tx.QueryRow(`SELECT value FROM kv WHERE key = 'days_drawn_by'`).Scan(&was); err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return dayBars{}, err
+		return nil, err
 	}
 	if was != rules {
-		if _, err := tx.Exec(`DELETE FROM days WHERE day > ?`, tomorrow); err != nil {
-			return dayBars{}, err
+		if _, err := tx.Exec(`DELETE FROM days WHERE day > ?`, DayShift(today, 1)); err != nil {
+			return nil, err
 		}
 		if _, err := tx.Exec(`INSERT INTO kv (key, value) VALUES ('days_drawn_by', ?)
 			ON CONFLICT (key) DO UPDATE SET value = excluded.value`, rules); err != nil {
-			return dayBars{}, err
+			return nil, err
 		}
 	}
-	all, err := storedDays(tx, "")
-	if err != nil {
-		return dayBars{}, err
-	}
+	return storedDays(tx, "")
+}
+
+// drawAhead is what the days should hold, from those stored (left as they are): a day after tomorrow whose kinds
+// aren't the day's (shaped: a question's kind changed since) drawn again; a day ahead mended if a question of it left
+// the bank, is of a kind the game no longer deals, or is due for review by then (mendDay: drawn again if it can't be);
+// and the days missing up to Ahead drawn (while none is short, else it warns in the log). Of the questions that fit,
+// those not answered (by anyone) come first. It reads and writes nothing: writeDays stores what it drew.
+func (g *Game) drawAhead(today string, b *bank.Bank, stored map[string][]Pick, answered map[string]bool) map[string][]Pick {
+	all := maps.Clone(stored)
+	d, _ := time.Parse(time.DateOnly, today)
+	tomorrow := d.AddDate(0, 0, 1).Format(time.DateOnly)
 	used := map[string]bool{}
 	for _, picks := range all {
 		for _, p := range picks {
@@ -198,9 +236,6 @@ func (g *Game) drawAhead(tx *sql.Tx, today string, b *bank.Bank, answered map[st
 		// place, else is drawn again; nobody has played it. So is one after tomorrow whose kinds aren't the day's any
 		// more (shaped), its question's kind changed since.
 		if picks := all[day]; day > tomorrow && !shaped(b, picks) {
-			if _, err := tx.Exec(`DELETE FROM days WHERE day = ?`, day); err != nil {
-				return dayBars{}, err
-			}
 			delete(all, day)
 			for _, p := range picks { // its questions are free for it, drawn again, or another day
 				delete(used, p.ID)
@@ -209,18 +244,11 @@ func (g *Game) drawAhead(tx *sql.Tx, today string, b *bank.Bank, answered map[st
 		}
 		if picks := all[day]; day > today && !dealsOn(b, picks, day) {
 			if mended, ok := mendDay(b, day, picks, used, answered, recentSubjects(b, all, day), r); ok {
-				data, _ := json.Marshal(mended)
-				if _, err := tx.Exec(`UPDATE days SET questions = ? WHERE day = ?`, string(data), day); err != nil {
-					return dayBars{}, err
-				}
 				all[day] = mended
 				for _, p := range mended {
 					used[p.ID] = true
 				}
 				continue
-			}
-			if _, err := tx.Exec(`DELETE FROM days WHERE day = ?`, day); err != nil {
-				return dayBars{}, err
 			}
 			delete(all, day)
 		}
@@ -232,22 +260,69 @@ func (g *Game) drawAhead(tx *sql.Tx, today string, b *bank.Bank, answered map[st
 			continue
 		}
 		picks, short := drawDay(b, day, used, answered, recentSubjects(b, all, day), r)
+		if g.drawn != nil {
+			g.drawn(day)
+		}
 		if len(short) > 0 {
 			// A place has run short: the days ahead stop here until the bank grows.
 			slog.Warn("days ahead stop short: the bank needs questions for the day", "day", day, "short", short)
 			break
-		}
-		data, _ := json.Marshal(picks)
-		if _, err := tx.Exec(`INSERT INTO days (day, questions) VALUES (?, ?)`, day, string(data)); err != nil {
-			return dayBars{}, err
 		}
 		all[day] = picks
 		for _, p := range picks {
 			used[p.ID] = true
 		}
 	}
-	return barsOf(all, today, b), nil
+	return all
 }
+
+// writeDays stores the days after today that drawAhead changed from those stored, each in a transaction of its own, so
+// that the game's other writes go between them. Only EnsureDays writes them, one keeping at a time, so none has
+// changed since it read them; but the day may turn meanwhile, and then it stops (errDayTurned), with nothing more
+// written: the new today is drawn as a player first asks for it, and the next keeping goes on from there. It stops
+// too if ctx ends.
+func (g *Game) writeDays(ctx context.Context, today string, stored, all map[string][]Pick) error {
+	days := slices.Collect(maps.Keys(stored))
+	for day := range all {
+		if _, ok := stored[day]; !ok {
+			days = append(days, day)
+		}
+	}
+	slices.Sort(days)
+	for _, day := range days {
+		was, had := stored[day]
+		picks, has := all[day]
+		if day <= today || had == has && slices.Equal(was, picks) {
+			continue
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		data, _ := json.Marshal(picks)
+		err := g.DB.Tx(context.WithoutCancel(ctx), func(tx *sql.Tx) error {
+			if g.Today() != today {
+				return errDayTurned
+			}
+			var err error
+			switch {
+			case !has:
+				_, err = tx.Exec(`DELETE FROM days WHERE day = ?`, day)
+			case !had:
+				_, err = tx.Exec(`INSERT INTO days (day, questions) VALUES (?, ?)`, day, string(data))
+			default:
+				_, err = tx.Exec(`UPDATE days SET questions = ? WHERE day = ?`, string(data), day)
+			}
+			return err
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// errDayTurned stops writeDays: the days ahead were drawn for a day that has ended.
+var errDayTurned = errors.New("the day turned while the days ahead were written")
 
 // storedDays are the days stored from `from` on (every day for "").
 func storedDays(tx *sql.Tx, from string) (map[string][]Pick, error) {

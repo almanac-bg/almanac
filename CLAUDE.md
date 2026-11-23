@@ -198,7 +198,8 @@ SQLite in `/var/lib/almanac`, and backs it up to R2 every 15 minutes. Deploys co
 to where it was, so put the copy from before that release back by hand, `/var/lib/almanac/before-vX.Y.Z.db`, with
 `systemctl stop almanac.socket almanac` first, and lose what was played since; a release is taken only signed, so
 one from before signatures only while it's kept in `/usr/local/lib/almanac`, the five used latest), `almanac-bank` (check the new
-questions apart, then pull and reload them), `journalctl -u almanac` (logs). The `almanac backup` commands need the service's settings:
+questions apart, then pull and reload them), `journalctl -u almanac` (logs). A bank reload and a deploy never run at
+once (they share a lock: `TestDeployAndBankShareALock`). The `almanac backup` commands need the service's settings:
 `systemd-run --pipe --wait -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac backup verify`
 brings the latest copy back and checks it (the server does this itself daily). Health: `https://almanac.bg/api/health`
 shows the live version and the bank played (its commit; one refused).

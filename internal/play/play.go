@@ -121,6 +121,7 @@ type Game struct {
 	dayCrowds dayCrowdCache         // how the day's players have answered its questions (crowd.go)
 	boards    boardCache            // the days' boards (board.go)
 	daysAhead daysCache             // today's questions and the days ahead's (ahead.go)
+	drawn     func(day string)      // if set, told of each day ahead drawn (tests make the drawing slow with it)
 	versions  versions              // the questions' versions kept (versions.go)
 
 	later  laters                  // what follows the runs just finished, under way (after.go)
