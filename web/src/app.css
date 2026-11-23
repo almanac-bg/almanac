@@ -6000,6 +6000,16 @@
   .score-leaf .tile.near {
     box-shadow: inset 0 0 0 2.5px rgb(22 19 43 / 0.55);
   }
+
+  /* A small phone (or large text): ten in a row would be specks of 20px; two rows of five, as the share's card draws
+     them, each a finger's size. */
+  @media (max-width: 22.5rem) {
+    .score-leaf .tiles {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
+      max-width: 16.5rem;
+    }
+  }
   /* A right tile of the sheet's own chapter would melt into it: every right one on the sheet has a rim of ink. */
   :is(.score-leaf, .issue-leaf) .tile.right {
     box-shadow: inset 0 0 0 2px #16132b;

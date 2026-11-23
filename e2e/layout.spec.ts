@@ -516,6 +516,9 @@ for (const size of sizes)
         await expect(page.locator(".summary")).toBeVisible({ timeout: 10_000 });
         await settled(page);
         expect(await byDayAndNight(page, () => sideways(page)), "the day's result").toEqual([]);
+        // The score's ten tiles a finger's size: on the smallest phone two rows of five, not ten specks in one.
+        const tile = await page.locator(".score-leaf .tile").first().boundingBox();
+        expect.soft(tile?.width ?? 0, "the result's tiles too small").toBeGreaterThanOrEqual(small ? 40 : 24);
 
         // A new player's places, the day played.
         for (const path of ["/almanac", "/me", "/friends", "/settings"]) {
