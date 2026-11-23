@@ -135,6 +135,9 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await a.getByLabel("Потребителско име", { exact: true }).fill(`@${tag}`);
   await a.goto("/me");
   await expect(a.locator(".me-tag")).toHaveText(`@${tag}`);
+  // And in Приятели, under the way to add one: the tag a friend adds her by, without a trip to Профил.
+  await a.goto("/friends");
+  await expect(a.locator(".own-tag")).toHaveText(`Твоето потребителско име е @${tag}.`);
 
   // Bo asks her by that tag; an unknown tag is said to be unknown. A guest who hasn't finished a game is told to play
   // one first: a request is a player's.

@@ -2,7 +2,7 @@
 // once): who asks to be friends; the duels open („Чакащи дуели“: a friend's waiting for you first, yours waiting for
 // them), first while there are any, for a duel to play stays first here until it's played; the friends, each with
 // their day, the duels between you and „Дуел“ (the one way to start one here), and the one way to make more (by
-// потребителско име or email); and the last ten duels played („Изиграни дуели“, compact rows). Each duel holds all
+// потребителско име or email, one's own said under it); and the last ten duels played („Изиграни дуели“, compact rows). Each duel holds all
 // there is of it (screens/duelcards.ts). A duel named in the address (`?duel=<id>`: one just played, or an old link
 // to it: screens/duel.ts) is first in its group. The day's board is on Днес's result (today.ts, dayBoard).
 
@@ -361,7 +361,8 @@ function page(kit: Kit): Child {
   }
 }
 
-/** Asking someone to be friends: by their tag (@tag) or their email, on a line, „Добави“ beside it. */
+/** Asking someone to be friends: by their tag (@tag) or their email, on a line, „Добави“ beside it; under it, the
+ * player's own tag, for a friend to add them by. */
 function addFriend(reload: () => Promise<void>): Child {
   const to = signal("");
   const busy = signal(false);
@@ -423,6 +424,14 @@ function addFriend(reload: () => Promise<void>): Child {
       }),
       h("button", { class: "btn inline", disabled: busy }, "Добави"),
     ),
+    // One's own, for a friend to add: the one way in is a name or an email, and asked „как те намирам?“, the answer
+    // was two pages away (Профил, Настройки).
+    () => {
+      const tag = user()?.tag;
+      return tag
+        ? h("p", { class: "muted own-tag" }, ["Твоето потребителско име е ", h("b", null, `@${tag}`), "."])
+        : null;
+    },
     () => {
       const n = note();
       return n && h("p", { class: n.bad ? "bad" : "muted", role: n.bad ? "alert" : "status", ref: inSight }, n.text);
