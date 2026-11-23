@@ -203,7 +203,9 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   (DECISIONS.md).
   Every duel is a card (`.duel-card`, one a row on a big screen too, as on a phone; owner, 2026-11-22: the cards
   read better than compact rows): the two face to face, no label over them (every duel is with a friend), the
-  player's avatar and „Ти“ on the left, the other's with their name on the right; no name on a
+  player's avatar and „Ти“ on the left, the other's with their name on the right, the middle between them of one width
+  on every card, so the faces stand in the same place card after card (on a big screen the two in the card's middle,
+  30rem at most, each avatar beside its name); no name on a
   duel's card, nor in its dialogs, is a link: a profile opens from the friends' list (owner, 2026-11-22); between them how
   it stands: „Твой ред“ or „Чакаш“ (quiet) over „още 6 дни“; a played one's score, a heavy numeral („8:6“), over its
   end as a chip, told apart at a glance by fill and line, never red or green („✓ Победа“ filled in ink, „Загуба“

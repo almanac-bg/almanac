@@ -351,6 +351,13 @@ test("every duel played, beyond the ten listed, in a dialog a page at a time", a
   await page.goto("/friends");
   const played = page.locator(".duels-played");
   await expect(played.locator(".duel-card")).toHaveCount(10);
+  // The faces in the same place card after card, whatever stands between them („✓ Победа“, „Загуба“).
+  for (const side of [1, 2]) {
+    const lefts = await played
+      .locator(`.duel-card-side:nth-child(${side === 1 ? 1 : 3}) .avatar`)
+      .evaluateAll((all) => all.map((a) => Math.round(a.getBoundingClientRect().left)));
+    expect(new Set(lefts).size, `side ${side}: ${lefts}`).toBe(1);
+  }
   // Under the last, the way to all of them.
   const all = played.getByRole("button", { name: "Всички завършени дуели (23)" });
   expect(
