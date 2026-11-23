@@ -77,7 +77,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   - A friend's duel waiting (`.duel-waiting`, owner, 2026-11-23), under the streak: the sender's avatar, „Иво ти
     изпрати дуел.“ („Още 2 те чакат.“, a link to Приятели, while more do) and „Играй“ at its end, an outlined button to
     the first sent (`/duel/<id>`): never the cover's action, which is the day's ten.
-  - On a big screen, under them, „В броя“: the ten chapters in their order.
+  - On a big screen, under them, „В броя“: the ten chapters in their order, as a book's table of contents on the
+    page (no card, no lines between: nothing in it opens).
   - A new visitor: the cover, „Започни“, and under it „Едни и същи за цяла България.“ In an app's own browser, one
     line under „Започни“: on Android „Имаш игра в браузъра? Отвори я там“, a tap that opens it; on an iPhone, where no
     link can, „Имаш игра в браузъра? Отвори я там: ··· → Отвори в Safari“, no button (`coverExit`).

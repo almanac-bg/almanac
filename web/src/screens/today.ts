@@ -462,7 +462,7 @@ function contents(t: Today): Child {
     h("div", { class: "sect-head" }, h("h2", null, "В броя"), h("span", { class: "sect-note" }, "от лесен към труден")),
     h(
       "ol",
-      { class: "rows" },
+      { class: "contents-list" },
       list.map((id, i) =>
         h(
           "li",

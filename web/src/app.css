@@ -5845,11 +5845,18 @@
     display: none;
   }
 
+  /* A book's table of contents, not rows to tap (nothing in it opens): on the page, no card, no lines between. */
+  .contents-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
   .contents-row {
     display: flex;
     align-items: center;
     gap: 12px;
-    min-height: 48px;
+    min-height: 40px;
     font: 700 1rem / 1.2 var(--font-sans);
   }
 
