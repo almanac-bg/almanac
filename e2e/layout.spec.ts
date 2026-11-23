@@ -24,6 +24,7 @@ import {
   cutOrOverlapping,
   daysPlayed,
   dealt,
+  givenUp,
   keptPlayer,
   knows,
   linkedNames,
@@ -1065,6 +1066,43 @@ test.describe("a short wide window with a mouse, 640 × 400", () => {
     await expect(page.locator(".question-top")).toHaveClass(/stuck/);
   });
 });
+
+// A phone on its side: the count's „Отказ“ and a duel's „Започни“ in sight, the screen's height not grown past by the
+// ring centred for an upright phone, nor by the faces over a duel's start (the review of #712 found both below it).
+for (const viewport of [
+  { width: 568, height: 320 },
+  { width: 844, height: 390 },
+]) {
+  test.describe(`a phone on its side, ${viewport.width} × ${viewport.height}`, () => {
+    test.use({ viewport, isMobile: true, hasTouch: true });
+
+    const inSight = (page: Page, selector: string) =>
+      page.evaluate((selector) => {
+        const r = document.querySelector(selector)?.getBoundingClientRect();
+        return r ? r.bottom <= innerHeight + 1 : false;
+      }, selector);
+
+    test("the count's „Отказ“ and a duel's „Започни“ within the screen", async ({ page, browser }) => {
+      await page.goto("/");
+      await page.getByRole("button", { name: "Започни", exact: true }).click();
+      await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
+      expect(await inSight(page, ".get-ready .actions .btn:last-child"), "„Отказ“").toBe(true);
+
+      const other = await (await browser.newContext()).newPage();
+      await befriend(page, other);
+      const me = await page.evaluate(async () => (await (await fetch("/api/me")).json()).user.id as number);
+      const made = await (await other.request.post("/api/duels", { data: { friend: me } })).json();
+      const run =
+        made.duel.runId ??
+        (await (await other.request.post(`/api/duels/${made.duel.id}/play`, { data: {} })).json()).duel.runId;
+      await givenUp(other, run); // sent once its first player has played it
+      await other.context().close();
+      await page.goto(`/duel/${made.duel.id}`);
+      await expect(page.getByRole("button", { name: "Започни", exact: true })).toBeVisible();
+      expect(await inSight(page, ".get-ready .btn.primary"), "„Започни“").toBe(true);
+    });
+  });
+}
 
 test.describe("on a laptop, Настройки and Вход", () => {
   test.use({ viewport: { width: 1366, height: 900 }, isMobile: false, hasTouch: false });

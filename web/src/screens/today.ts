@@ -247,15 +247,27 @@ export function today() {
     screen.show(() => home(t, t.run, false));
     scrollTo(0, 0);
   };
-  const start = (t: Today) => () => {
+  const start = (t: Today) => async () => {
     failed = "";
     hold(true);
-    // A question showing (left so on another device): its time runs, so straight back to it, without a count.
+    // A question showing (left so on another device): its time runs, so straight back to it, without a count, on
+    // its clock as the server has it now, not as it was when Днес was drawn (that clock gave the player time the
+    // server had already taken). Its time over meanwhile, the count and the next question, as for any day.
     const left = t.run;
     if (left && !left.done && left.question) {
-      screen.show(() => playRun(left, (s) => home(t, s, true)));
-      scrollTo(0, 0);
-      return;
+      screen.show(starting);
+      try {
+        const now = await api<State>("GET", `/api/runs/${left.id}`);
+        if (!now.done && now.question) {
+          screen.show(() => playRun(now, (s) => home(t, s, true)));
+          scrollTo(0, 0);
+          return;
+        }
+      } catch (err) {
+        failed = errorText(err);
+        back(t);
+        return;
+      }
     }
     counting = true;
     screen.show(() =>
@@ -641,7 +653,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[], reload: (
       h(
         "p",
         { class: "kicker score-kicker" },
-        `Брой\u00a0${t.issue ?? issueOf(t.day)} ·\u00a0${dateWords(t.day).replace(" ", "\u00a0")}`,
+        `Брой\u00a0${t.issue ?? issueOf(t.day)}\u00a0· ${dateWords(t.day).replace(" ", "\u00a0")}`,
       ),
       h(
         "h1",

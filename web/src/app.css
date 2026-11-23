@@ -956,6 +956,10 @@
       text-decoration-thickness: 3px;
     }
 
+    .link.danger:hover:not(:disabled) {
+      color: var(--danger);
+    }
+
     :is(.ink-row, .ink-chapter):hover {
       text-decoration: underline;
       text-decoration-thickness: 2px;
@@ -3641,6 +3645,29 @@
     width: min(100%, 320px);
   }
 
+  /* A phone on its side (or a short window): the count smaller and its two ways side by side, so that „Отказ“ is in
+     sight under the ring, not below the screen. */
+  @media (orientation: landscape) and (max-height: 30rem) {
+    .get-ready:not(.start-screen) {
+      gap: var(--space-3);
+      padding-top: 0;
+    }
+
+    .ready-clock {
+      width: 104px;
+      height: 104px;
+    }
+
+    .ready-n {
+      font-size: calc(20px + 1.5rem);
+    }
+
+    .get-ready:not(.start-screen) .actions {
+      grid-template-columns: 1fr 1fr;
+      width: min(100%, 26rem);
+    }
+  }
+
   /* A chapter's game before it starts: its sheet, the glyph over its name and what it is. */
   .start-leaf {
     justify-items: center;
@@ -3662,6 +3689,24 @@
   .start-faces {
     display: flex;
     gap: var(--space-3);
+  }
+
+  /* A phone on its side: no room for the faces over „Започни“, which would fall below the screen. */
+  @media (orientation: landscape) and (max-height: 30rem) {
+    .start-faces {
+      display: none;
+    }
+
+    .start-card {
+      padding: 0;
+      background: none;
+      box-shadow: none;
+    }
+
+    .start-screen {
+      gap: var(--space-3);
+      padding-top: 0;
+    }
   }
 
   /* Tabs that switch what a screen shows: a well, the chosen one a raised surface, both pills; a setting's few choices
@@ -7353,17 +7398,21 @@
       align-content: center;
     }
 
-    .playing .get-ready:not(.start-screen) {
-      grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
-      align-content: stretch;
-    }
+    /* The ring at the screen's very middle only where the screen is tall enough for it: on a short one (a phone on its
+       side) the rows around it would grow past the screen and push „Отказ“ out of sight. */
+    @media (max-width: 47.99rem) and (min-height: 36rem) {
+      .playing .get-ready:not(.start-screen) {
+        grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+        align-content: stretch;
+      }
 
-    .playing .get-ready:not(.start-screen) > .intro {
-      align-self: end;
-    }
+      .playing .get-ready:not(.start-screen) > .intro {
+        align-self: end;
+      }
 
-    .playing .get-ready:not(.start-screen) > .actions {
-      align-self: start;
+      .playing .get-ready:not(.start-screen) > .actions {
+        align-self: start;
+      }
     }
 
     /* A run's question is a column the screen's height (run.ts): the head, the pips and the clock at the top, the

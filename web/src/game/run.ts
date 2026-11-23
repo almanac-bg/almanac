@@ -429,7 +429,7 @@ export function guardLeaving(
     ),
   );
   listen(document, "keydown", (e: KeyboardEvent) => {
-    if (e.key !== "Escape" || e.defaultPrevented) return;
+    if (e.key !== "Escape" || e.repeat || e.defaultPrevented) return; // held down: once, not open-shut-open
     if (asking()) keep();
     else if (now() && !document.querySelector("dialog[open]"))
       layer.parentElement?.querySelector<HTMLElement>(".game-leave")?.click();

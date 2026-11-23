@@ -34,6 +34,8 @@ export const hearing: ((res: Response, code: string) => void)[] = [];
  * while the new one comes). Anything sent that may change what the player sees (a step of a game, a friend added)
  * forgets them all, as a change of player does (state.ts); a mark of something seen changes nothing shown. */
 const kept = new Map<string, unknown>();
+/** Counts the forgettings: a GET sent before one and answered after it is of the time before the change, not kept. */
+let era = 0;
 
 /** What the server last answered a GET of `path` with, while this page has been open; undefined if it hasn't. */
 export function lastOf<T>(path: string): T | undefined {
@@ -43,6 +45,7 @@ export function lastOf<T>(path: string): T | undefined {
 /** Forgets every answer kept (lastOf). */
 export function forget(): void {
   kept.clear();
+  era++;
 }
 
 /** Sets `s` to an answer of the server's (`v`) unless it holds the same already: a page drawn from what it showed last
@@ -56,6 +59,7 @@ const marksOnly = /\/(seen|told|streak-told|news)$/;
 
 export async function api<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<T> {
   if (method !== "GET" && !marksOnly.test(path)) forget();
+  const sentIn = era;
   if (body === undefined && method !== "GET") body = {};
   let res: Response;
   try {
@@ -90,7 +94,7 @@ export async function api<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: 
     reportProblem(`${method} ${path}: ${res.status} without JSON (${type}, ${text.length} characters)`);
     throw new ApiError("server", ours);
   }
-  if (method === "GET") {
+  if (method === "GET" && sentIn === era) {
     // The latest kept last; a few dozen at most (a book's pages and searches are many).
     kept.delete(path);
     kept.set(path, data);
