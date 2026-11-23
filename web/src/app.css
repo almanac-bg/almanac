@@ -6331,6 +6331,18 @@
     gap: var(--space-3);
   }
 
+  /* A friend's duel, the result's action: whose it is over the button, as the cover's duel row says it. */
+  .result-duel-from {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+  }
+
+  .result-duel-from > span {
+    min-width: 0;
+  }
+
   /* Yesterday's issue finished after midnight: today's date set big, its words beside it, the way on to it. */
   .tomorrow {
     display: grid;

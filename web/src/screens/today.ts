@@ -710,9 +710,27 @@ function duelWaiting(t: Today): Child {
   );
 }
 
-/** The result's action while a friend's duel waits: that duel, „Играй дуела с Иво“. */
+/** The result's action while a friend's duel waits: that duel. Whose it is on a line over it, as the cover's duel
+ * row says it („Иво ти изпрати дуел.“), and the button „Играй дуела“ (a long name in it broke it over two lines);
+ * „Играй дуела с Иво“ aloud. */
 function duelGo(d: NonNullable<Today["duel"]>): Child {
-  return h("a", { class: "btn primary result-duel-go", href: `/duel/${d.id}` }, `Играй дуела ${withWord(d.from.name)}`);
+  return [
+    h(
+      "p",
+      { class: "result-duel-from" },
+      avatar(d.from.look?.avatar, { name: d.from.name }),
+      h("span", null, h("b", null, nameWords(d.from.name)), " ти изпрати дуел."),
+    ),
+    h(
+      "a",
+      {
+        class: "btn primary result-duel-go",
+        href: `/duel/${d.id}`,
+        "aria-label": `Играй дуела ${withWord(d.from.name)}`,
+      },
+      "Играй дуела",
+    ),
+  ];
 }
 
 /** „Прегледай въпросите“: the day's questions and their facts, a tap away in their dialog. */

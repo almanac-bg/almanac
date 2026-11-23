@@ -107,8 +107,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      links („Нови печати: „Страница“ в География и в Технологии и игри.“; one chapter's: its ladder under it). No
      single question picked out of the ten (the day's ten are all a tap away, in their dialog), and no one chapter's
      bar beside the day's whole ink: next to it, either reads as the day's ink.
-  4. The action, past the first results: „Сподели“; while a friend's duel waits, that duel („Играй дуела с Иво“, the
-     first sent), sharing then the quiet link beside the tiles (owner, 2026-11-23). Over it, the streak as the cover has
+  4. The action, past the first results: „Сподели“; while a friend's duel waits, that duel (whose it is on a line over it, „Иво ти изпрати дуел.“
+     as the cover says it, then „Играй дуела“: a long name in the button broke it in two; the first sent), sharing then the quiet link beside the tiles (owner, 2026-11-23). Over it, the streak as the cover has
      it, lit, with today's in it („30 дни без прекъсване“; owner, 2026-11-23: it grew out of sight).
   5. Nothing of tomorrow (no „Утре“ card: the result is the day's). Past the first results, a guest's ask to keep the
      game and the reminder's ask while reminders are off, a player with a profile's too (a plain button, never a second
