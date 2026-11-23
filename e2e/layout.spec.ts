@@ -941,6 +941,69 @@ test.describe("a tablet, 768 × 1024", () => {
   });
 });
 
+// The pages of a list (a chapter's facts, every duel played) at twice the text on a phone: „Страница 2 от 4“ on a line
+// of its own, „По-нови“ and „По-стари“ under it, whole, nothing sideways.
+test.describe("a list's pages, twice the text, 375 × 667", () => {
+  test.use({ viewport: { width: 375, height: 667 }, bypassCSP: true });
+
+  test("a chapter's pages and the duels played turn whole on the screen", async ({ page }) => {
+    await textAt(page, 200);
+    const found = 95;
+    await page.route(/\/api\/almanac\?/, async (route) => {
+      const facts = Array.from({ length: 30 }, (_, i) => ({
+        id: `geo-${i}`,
+        chapter: "geography",
+        question: `Въпрос ${i + 1}`,
+        answer: `Отговор ${i + 1}`,
+        fact: "Факт.",
+        at: Date.now() - i * 60_000,
+        kind: "day",
+        issue: 3,
+      }));
+      await route.fulfill({ json: { facts, found, ink: { geography: 0 } } });
+    });
+    const duel = (id: number) => ({
+      id,
+      state: "won",
+      you: { name: "Заек 817", rights: 7, done: true, look: { avatar: "hare" } },
+      opponent: { name: `Мария ${id}`, tag: `maria${id}`, rights: 5, done: true, look: { avatar: "fox" } },
+      runId: id,
+      first: true,
+      createdAt: Date.now(),
+      endedAt: Date.now(),
+    });
+    const ids = (from: number, n: number) => Array.from({ length: n }, (_, i) => duel(from - i));
+    await page.route("**/api/duels", (r) =>
+      r.fulfill({ json: { yours: [], theirs: [], played: ids(23, 10), playedAll: 23 } }),
+    );
+    await page.route("**/api/duels/played?page=*", (r) =>
+      r.fulfill({ json: { duels: ids(23, 10), page: 1, pages: 3 } }),
+    );
+    await page.goto("/");
+    await knows(page, ["geo-961"]);
+    await page.goto("/almanac/geography");
+    await textIs(page, 200);
+    const pages = page.locator(".chapter-facts .pages");
+    await expect(pages).toBeVisible();
+    await settled(page);
+    expect(await sideways(page), "a chapter").toEqual([]);
+    const whole = (s: string) =>
+      page
+        .locator(s)
+        .evaluateAll((all) =>
+          all
+            .filter((e) => e.getBoundingClientRect().left < 0 || e.getBoundingClientRect().right > innerWidth)
+            .map((e) => e.textContent),
+        );
+    expect(await whole(".chapter-facts .pages > *"), "a chapter's pages").toEqual([]);
+    await page.goto("/friends");
+    await page.getByRole("button", { name: /^Всички завършени дуели/ }).click();
+    const box = page.getByRole("dialog", { name: "Завършени дуели" });
+    await expect(box.locator(".pages")).toBeAttached();
+    expect(await whole(".duels-all .pages > *"), "the duels played").toEqual([]);
+  });
+});
+
 // A laptop at 200 % zoom (1280 × 800 is 640 × 400), a mouse: laid out as a phone on its side, the places in the bar at
 // the top (one at the foot took „Започни“ under it), the game's question within the height.
 test.describe("a short wide window with a mouse, 640 × 400", () => {

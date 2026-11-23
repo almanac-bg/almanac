@@ -3737,6 +3737,21 @@
     text-align: center;
   }
 
+  /* Large text, few words to a line: where the page is on a line of its own, the two buttons under it, at its ends
+     (in a row, „По-стари“ ran off the screen and the page scrolled sideways). */
+  .tight .pages {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .tight .pages-at {
+    grid-area: 1 / 1 / 2 / -1;
+  }
+
+  .tight .pages > .btn:last-child {
+    grid-column: 3;
+  }
+
   /* The duels to play, one stack: the first challenged on top, the edges of one or two more under it, each a little
      narrower, as sheets lie in a stack. */
   .duel-pile {
