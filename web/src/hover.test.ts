@@ -31,3 +31,12 @@ test("every :hover is only where a pointer hovers", () => {
   assert.ok(seen >= 10, `only ${seen} :hover rules found: the check no longer reads the style?`);
   assert.deepEqual(loose, [], "wrap these in @media (hover: hover) and (pointer: fine)");
 });
+
+// A desktop review (2026-11-23) found many clickable things that gave the mouse nothing back: each kind of them
+// answers it, as a button does.
+test("every kind of clickable thing answers the mouse", () => {
+  const hovered = [...css.matchAll(/([^{};]*:hover[^{]*)\{/g)].map((m) => m[1] ?? "").join("\n");
+  const things = [".btn", ".more", ".segmented button", ".link", ".switch", ".tile-tap", "streak-chip", ".ink-row"];
+  for (const thing of [...things, ".ink-chapter", ".chapter-card", ".duel-card-open", ".places"])
+    assert.ok(hovered.includes(thing), `${thing} has no :hover`);
+});

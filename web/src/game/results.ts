@@ -6,7 +6,6 @@ import { api, errorText } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { calm } from "../lib/prefs.ts";
 import { feelKit, play } from "../lib/sound.ts";
-import { chapters } from "../state.ts";
 import { avatar, chapterName, chip, fact, type Look, leaf, tiles, who } from "../ui.ts";
 import { type FriendDay, fewFriends, friendsLine, groupWords, markAt, shortName } from "./knew.ts";
 import { closeLine, closeWords } from "./numbers.ts";
@@ -76,8 +75,8 @@ export function scoreCard(s: State, line: Child) {
   return h(
     "div",
     { class: "card hero" },
-    // Ten of ten: the logo's rosette as a seal, and the words.
-    perfect ? h("div", { class: "perfect-head" }, seal(), h("p", { class: "kicker" }, "Всички верни")) : null,
+    // Ten of ten: the mark drawn large beside the score, and the words.
+    perfect ? perfectHead() : null,
     h(
       "div",
       { class: "score-row" },
@@ -106,7 +105,7 @@ export function chapterCard(s: State, chapter: string, open?: (at: number) => vo
   return leaf(
     chapter,
     [
-      perfect ? h("div", { class: "perfect-head" }, seal(), h("p", { class: "kicker" }, "Всички верни")) : null,
+      perfect ? perfectHead() : null,
       h("div", { class: "score-kicker" }, chip(chapter)),
       h(
         "h1",
@@ -161,8 +160,14 @@ export function land(hero: HTMLElement, run: number, perfect: boolean, day: bool
   );
 }
 
-/** The logo's rosette as a seal: four petals, the gold one last. */
-function seal(): SVGElement {
+/** Ten of ten, the result's one big moment besides a rank risen: the game's mark drawn large beside the score (feel.ts
+ * draws it in petal by petal as the result lands), „Всички верни“ under it. */
+export function perfectHead(): HTMLElement {
+  return h("div", { class: "perfect" }, perfectMark(), h("p", { class: "kicker perfect-words" }, "Всички верни"));
+}
+
+/** The logo's rosette: four petals, the gold one last, on the sheet in its ink in both themes. */
+function perfectMark(): SVGElement {
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", "0 0 64 64");
@@ -174,7 +179,7 @@ function seal(): SVGElement {
     group.setAttribute("transform", `rotate(${turn} 32 32)`);
     const petal = document.createElementNS(ns, "path");
     petal.setAttribute("d", "M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z");
-    petal.style.fill = turn < 0 ? "var(--gold)" : "var(--ink)";
+    petal.setAttribute("class", turn < 0 ? "petal gold" : "petal");
     petal.style.transformOrigin = "32px 32px";
     group.append(petal);
     svg.append(group);
@@ -320,11 +325,20 @@ function reviewed(all: Reviewed[], versus?: Versus, friends: FriendDay[] = []): 
       return h(
         "article",
         { class: `reviewed ${kind === "missed" ? "wrong" : kind} ch-${it.chapter}`, "data-n": it.n },
+        // Its number and its chapter's chip (the glyph and the name: wherever a chapter is, its glyph is), and how
+        // it went with its sign, as a duel's sides say it.
         h(
           "p",
           { class: "reviewed-head" },
-          h("span", { class: "kicker" }, `${it.n + 1} · ${chapters.find((c) => c.id === it.chapter)?.name ?? ""}`),
-          versus ? null : h("span", { class: "reviewed-says" }, verdicts[kind][1]),
+          h("span", { class: "reviewed-at" }, h("span", { class: "reviewed-n" }, String(it.n + 1)), chip(it.chapter)),
+          versus
+            ? null
+            : h(
+                "span",
+                { class: kind === "right" ? "reviewed-says right" : "reviewed-says" },
+                h("span", { class: "duel-q-sign", "aria-hidden": "true" }, verdicts[kind][0]),
+                verdicts[kind][1],
+              ),
         ),
         h("h3", { class: "ask" }, it.view.text),
         versus

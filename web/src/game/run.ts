@@ -30,7 +30,7 @@ import {
   verdict,
   verdictSays,
 } from "../ui.ts";
-import { answering, liveRegion, type Say, spokenVerdict } from "./answering.ts";
+import { answering, countdown, liveRegion, type Say, spokenVerdict } from "./answering.ts";
 import {
   answered,
   answerWords,
@@ -65,11 +65,18 @@ function showing(run: number): void {
   }
 }
 
-/** Plays a run from where it stands; `done` draws what comes after its last answer. A duel is named over each
- * question as its page names it (`versus`: „Дуел с Мария“); played second (the run's
+/** Plays a run from where it stands; `done` draws what comes after its last answer, and `ending` hears that answer is
+ * in (while it shows: what comes after can be asked for meanwhile). A duel is named over each question as its page
+ * names it (`versus`: „Дуел с Мария“); played second (the run's
  * `against`), how the other's answer went (`them`, their name) shows once the player's own is in, never when they gave
  * it: a duel isn't a race. */
-export function playRun(initial: State, done: (s: State) => Child, versus = "", them = ""): Child {
+export function playRun(
+  initial: State,
+  done: (s: State) => Child,
+  versus = "",
+  them = "",
+  ending: () => void = () => {},
+): Child {
   const screen = slot();
   hold();
 
@@ -149,6 +156,7 @@ export function playRun(initial: State, done: (s: State) => Child, versus = "", 
       screen.show(() =>
         question(s, q, next, reload, versus, say, them, (now) => {
           last = now;
+          if (now.done) ending();
         }),
       );
       scrollTo(0, 0);
@@ -209,7 +217,7 @@ function givenUp(g: GivenUp, total: number, on: () => void): Child {
     { class: "question given-up" },
     h("p", { class: "kicker" }, `Въпрос ${g.n + 1} от ${total} · ${chapterName(g.chapter)}`),
     h("p", { class: "muted" }, "Излезе, без да отговориш. Ето верния отговор."),
-    h("h1", { class: "ask" }, wholeWords(g.view.text)),
+    h("h1", { class: "ask" }, wholeWords(g.view.text, true)),
     picture(g.view),
     answered(g.view, g.reveal, null),
     fact(g.reveal.fact, g.reveal.day),
@@ -258,7 +266,7 @@ export function getReady(what: string, start: () => void, cancel: () => void): C
     h(
       "div",
       { class: "actions" },
-      h("button", { class: "btn primary big", onclick: begin }, "Започни сега"),
+      h("button", { class: "btn primary big", onclick: begin }, "Веднага"),
       h("button", { class: "btn", onclick: () => leave(cancel) }, "Отказ"),
     ),
   );
@@ -273,19 +281,21 @@ export function starting(): Child {
 
 /** A game come to without a tap (a reload, back or forward, a link from outside): nothing starts by itself. What it is
  * (`what`, `lead`), where it stopped if it was left half-way (`left`: its pips, and the next question), and the gold
- * button that starts it (its count) or goes on with it (`button`, if it says another word). */
+ * button that starts it (its count) or goes on with it (`button`, if it says another word). A chapter's game on the
+ * chapter's sheet; a duel on a card, the two players' faces (`faces`) over its words, as the chapter's glyph is. */
 export function startScreen(
   what: string,
   lead: string,
-  left: { at: number; total: number; marks?: Mark[] } | null,
+  left: { at: number; total: number; marks?: Mark[]; leftMs?: number } | null,
   start: () => void,
   button = left ? "Продължи" : "Започни",
   chapter = "",
+  faces: Child = null,
 ): Child {
   const go = h("button", { class: "btn primary big", type: "button", onclick: start }, button);
   const words = [
     h("h1", null, what),
-    h("p", { class: "lead" }, left ? `Следва въпрос ${left.at + 1}\u00a0от\u00a0${left.total}.` : lead),
+    h("p", { class: "lead" }, left ? leftLine(left.at, left.total, left.leftMs) : lead),
   ];
   return h(
     "div",
@@ -293,10 +303,25 @@ export function startScreen(
     // A chapter's game on its sheet, with its glyph, as the chapter's page has it.
     chapter
       ? leaf(chapter, [glyph(chapter, 72), h("div", { class: "intro" }, words)], "start-leaf")
-      : h("div", { class: "intro" }, words),
+      : faces
+        ? h("div", { class: "card start-card" }, faces, h("div", { class: "intro" }, words))
+        : h("div", { class: "intro" }, words),
     left?.marks ? trail(left.marks, left.total, left.at, chapter) : null,
     h("div", { class: "actions" }, go),
   );
+}
+
+/** Where a game left half-way stands, in a line: the question that comes next, or, while its time runs (shown on
+ * another device or tab, or left: the clock is the server's), that it does and how long it has, counting down, so
+ * that „Продължи“ comes as no surprise: „Времето на въпрос 8 тече: остават 5 с.“ */
+export function leftLine(at: number, total: number, leftMs = 0): Child {
+  if (leftMs <= 0) return `Следва въпрос ${at + 1} от ${total}.`;
+  const left = countdown(leftMs);
+  return () => {
+    const s = left();
+    if (s <= 0) return `Времето на въпрос ${at + 1} изтече.`;
+    return `Времето на въпрос ${at + 1} тече: ${s === 1 ? "остава" : "остават"} ${s} с.`;
+  };
 }
 
 /** The seconds before a start, big, in a ring that runs out with them (in CSS, over the same time, like a question's
@@ -386,10 +411,9 @@ export function guardLeaving(
     going.set(true);
     await leave(on);
   };
-  listen(document, "keydown", (e: KeyboardEvent) => {
-    if (e.key === "Escape" && asking()) keep();
-  });
-  return h(
+  // Esc asks too, as the game's arrow out does (a way out a keyboard has), and closes the asking again; not while a
+  // sheet of its own is open over the game (a picture shown large), which Esc closes.
+  const layer = h(
     "div",
     { class: "leave-layer", hidden: () => !asking() || !(now() || going()) },
     h(
@@ -404,6 +428,13 @@ export function guardLeaving(
       ),
     ),
   );
+  listen(document, "keydown", (e: KeyboardEvent) => {
+    if (e.key !== "Escape" || e.defaultPrevented) return;
+    if (asking()) keep();
+    else if (now() && !document.querySelector("dialog[open]"))
+      layer.parentElement?.querySelector<HTMLElement>(".game-leave")?.click();
+  });
+  return layer;
 }
 
 /** The top of a question: the way out, what's played (the day's issue, or the chapter: `aside`; in a duel, with whom:
@@ -526,6 +557,20 @@ export function upNext(ms: number, label: string): Child {
   );
 }
 
+/** The game held from moving on by itself (a touch of the answer's panel): its line stops where it is, and says the
+ * way on instead. */
+function stayOn(panel: HTMLElement): void {
+  const line = panel.querySelector<HTMLElement>(".up-next");
+  const fill = line?.querySelector<HTMLElement>(".up-next-fill");
+  if (!line || !fill) return;
+  const now = getComputedStyle(fill).transform;
+  fill.style.transition = "none";
+  fill.style.transform = now === "none" ? "" : now;
+  line.classList.add("held");
+  const label = line.querySelector(".up-next-label");
+  if (label) label.textContent = "Продължаваш с „Напред“.";
+}
+
 /** A question of a run, asked and answered; `taken` hears where the run stands once its answer is in. */
 function question(
   s: State,
@@ -557,13 +602,23 @@ function question(
     if (!due || document.hidden) return;
     const go = due;
     due = null;
+    // On its way at once, however slow the line: the answer's panel clears, „Напред“ pressed, while the next question
+    // comes (it isn't asked for sooner: its time would start).
+    after.classList.add("going");
+    after.querySelector(".up-next-go")?.setAttribute("aria-disabled", "true");
     go();
   };
-  document.addEventListener("visibilitychange", moveOn);
+  // On by itself, unless the player has taken hold of the answer (a touch, a scroll of its panel): then it waits for
+  // „Напред“.
+  let waits = false;
+  const onItsOwn = () => {
+    if (!waits) moveOn();
+  };
+  document.addEventListener("visibilitychange", onItsOwn);
   onCleanup(() => {
     clearTimeout(advance);
     for (const t of shown) clearTimeout(t);
-    document.removeEventListener("visibilitychange", moveOn);
+    document.removeEventListener("visibilitychange", onItsOwn);
   });
 
   // A step of the answer's showing, `ms` after its first; with less motion, at once.
@@ -653,10 +708,18 @@ function question(
         theirLine(them, res.state.against?.[q.n]),
         // Ink, said where it was written, as the server says it was (in the issue, met there first): grey isn't said.
         res.ink && res.reveal.fact ? filed(q.chapter) : null,
-        fact(res.reveal.fact, res.reveal.day),
+        inkable(fact(res.reveal.fact, res.reveal.day), s.kind === "day" && !!res.reveal.fact, !!res.ink),
         res.reveal.credit ? pictureCredit(res.reveal.credit) : null,
         res.reveal.credits?.length ? h("p", { class: "credit" }, creditsWords(res.reveal.credits)) : null,
-        upNext(lasts, res.state.done ? "Резултатът идва след малко…" : `Въпрос ${q.n + 2} идва след малко…`),
+        upNext(
+          lasts,
+          // A duel has no result page: its end is on its card in Приятели (DECISIONS.md).
+          res.state.done
+            ? versus
+              ? "Към дуела след малко…"
+              : "Резултатът идва след малко…"
+            : `Въпрос ${q.n + 2} идва след малко…`,
+        ),
         // „Напред“ on a foot of its own, opaque to the panel's edge: what scrolls in the panel never shows under it.
         h(
           "div",
@@ -671,7 +734,7 @@ function question(
                 moveOn();
               },
             },
-            res.state.done ? "Към резултата" : "Напред",
+            res.state.done ? (versus ? "Към дуела" : "Към резултата") : "Напред",
           ),
         ),
       ].map(waiting);
@@ -687,11 +750,23 @@ function question(
         ans.heading.dispatchEvent(new Event("refit"));
       });
       say(spokenVerdict(kind, q.view, res.reveal));
-      advance = window.setTimeout(moveOn, lasts);
+      advance = window.setTimeout(onItsOwn, lasts);
+      // The first touch or scroll of the panel (but „Напред“'s own) holds it: the line stops, and says the way on.
+      const holdIt = (e: Event) => {
+        if ((e.target as Element | null)?.closest?.(".up-next-go")) return;
+        for (const type of ["pointerdown", "wheel"]) after.removeEventListener(type, holdIt);
+        waits = true;
+        clearTimeout(advance);
+        stayOn(after);
+      };
+      for (const type of ["pointerdown", "wheel"]) after.addEventListener(type, holdIt, { passive: true });
     });
     at(beats.crowd, () => shows(crowd));
     at(beats.fact, () => {
       for (const part of rest) shows(part);
+      // Written in ink: the fact, come in the book's grey, darkens to ink once, as it shows (app.css, .inking).
+      for (const part of rest)
+        if (part instanceof HTMLElement && part.classList.contains("ink")) part.classList.add("inking");
       // Where answering took the focus away with it (a pad, a list, a deck gone for their answer), it goes to the way
       // on; on an answer chosen, it stays there.
       const focus = document.activeElement;
@@ -826,6 +901,13 @@ function names(text: string, answer: string): boolean {
   return new RegExp(`(?<!\\p{L})${word}(?!\\p{L})`, "iu").test(text.replaceAll("\u00ad", ""));
 }
 
+/** A fact of the day's issue as the book has it: in grey where the answer wrote nothing (a miss, a fact met before),
+ * and where it wrote it in ink, marked to darken to ink as it shows (`inking`). Other games' facts are as they are. */
+function inkable(part: Child, day: boolean, ink: boolean): Child {
+  if (day && part instanceof HTMLElement) part.classList.add(ink ? "ink" : "grey");
+  return part;
+}
+
 /** How long what the player chose stays chosen before the answer shows, however quick the line. */
 const holdMs = 280;
 
@@ -868,6 +950,9 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
   const mine = answers instanceof Element ? answers.querySelector("button.option.wrong") : null;
   const key = right ?? (answers instanceof Element ? answers : after);
   const keyWas = key.getBoundingClientRect().top;
+  // The question's sheet, which on a phone shrinks to the question alone: its height as it was.
+  const leafEl = page.querySelector<HTMLElement>(":scope > .q-leaf");
+  const leafWas = leafEl?.getBoundingClientRect().height ?? 0;
   // What has to stay in sight: the right answer, and the player's own beside it.
   const keyBox = () => {
     const a = key.getBoundingClientRect();
@@ -965,6 +1050,22 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
     rise = Math.max(rise, dy);
     if (Math.abs(dy) >= 1) el.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], settling);
   });
+  // The sheet made smaller (a phone's: the question alone) shrinks in the same movement, never in one frame: its
+  // colour, drawn behind it from its height then to its height now (app.css, .leaf-ghost), as the answers come up
+  // under it. Nothing is laid out anew meanwhile: the page stays where it was put.
+  const leafNow = leafEl?.getBoundingClientRect().height ?? 0;
+  if (leafEl && leafWas - leafNow >= 1) {
+    const ghost = h("span", { class: "leaf-ghost", "aria-hidden": "true" });
+    leafEl.classList.add("shrinking");
+    leafEl.prepend(ghost);
+    const shrink = ghost.animate([{ height: `${leafWas}px` }, { height: `${leafNow}px` }], settling);
+    const done = () => {
+      ghost.remove();
+      leafEl.classList.remove("shrinking");
+    };
+    shrink.onfinish = done;
+    shrink.oncancel = done;
+  }
   // A head made smaller (stuck) has its count, pips and arrow go from where they were, at their size then.
   headParts.forEach((el, i) => {
     const [a, b] = [headWas[i], el.getBoundingClientRect()];

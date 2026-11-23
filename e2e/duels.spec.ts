@@ -7,7 +7,7 @@ import { answer, befriend, endedBefore, meetAs, moveOn, playRun, startDay } from
 /** A game opened by a tap: its count, cut short. */
 async function countIn(page: Page): Promise<void> {
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await page.getByRole("button", { name: "Веднага" }).click();
 }
 
 /** Does what loads a page, and waits until it has asked whether something has come to Приятели (the dot). */
@@ -21,6 +21,8 @@ async function playSecond(page: Page, other: string): Promise<void> {
     await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
     await answer(page);
     await expect(page.locator(".their-line")).toContainText(`${other}:`);
+    // A duel has no result page: its last answer's way on goes to it, in Приятели.
+    if (n === 9) await expect(page.locator(".after .up-next-go")).toHaveText("Към дуела");
     await moveOn(page);
   }
 }
@@ -99,6 +101,14 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await expect(b).toHaveURL(/\/friends\?duel=\d+$/, { timeout: 10_000 });
   const result = b.locator(".duel-card.landed");
   await expect(result).toHaveClass(/s-(won|lost|draw)/);
+  // In one draw, the finished duels from their head at the screen's top (as far as the page goes), the new one marked.
+  await expect(result).toHaveClass(/\blit\b/);
+  expect(
+    await b.locator(".duels-played").evaluate((el) => {
+      const top = el.getBoundingClientRect().top;
+      return top >= 0 && (top <= 40 || scrollY >= document.documentElement.scrollHeight - innerHeight - 1);
+    }),
+  ).toBe(true);
   await b.keyboard.press("Shift"); // the moment, to its end
   await expect(result.locator(".duel-card-score")).toHaveText(/^\d+:\d+$/);
   await expect(result.locator(".duel-card-row")).toHaveCount(2);
@@ -196,6 +206,8 @@ test("a duel opened from its link (a notification, a chat) ends on its card in �
   // game's end goes back from its own entry once, not twice (bug hunt 2026-11-23: „…“ for good, or the page before).
   const link = await b.context().newPage();
   await link.goto(`/duel/${id}`);
+  // Its start on a card, the two face to face over its words, as a chapter's game has its glyph.
+  await expect(link.locator(".start-card .start-faces .avatar")).toHaveCount(2);
   await link.getByRole("button", { name: "Започни", exact: true }).click();
   await countIn(link);
   await playSecond(link, "Ана");
@@ -351,6 +363,13 @@ test("every duel played, beyond the ten listed, in a dialog a page at a time", a
   await page.goto("/friends");
   const played = page.locator(".duels-played");
   await expect(played.locator(".duel-card")).toHaveCount(10);
+  // The faces in the same place card after card, whatever stands between them („✓ Победа“, „Загуба“).
+  for (const side of [1, 2]) {
+    const lefts = await played
+      .locator(`.duel-card-side:nth-child(${side === 1 ? 1 : 3}) .avatar`)
+      .evaluateAll((all) => all.map((a) => Math.round(a.getBoundingClientRect().left)));
+    expect(new Set(lefts).size, `side ${side}: ${lefts}`).toBe(1);
+  }
   // Under the last, the way to all of them.
   const all = played.getByRole("button", { name: "Всички завършени дуели (23)" });
   expect(

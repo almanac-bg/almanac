@@ -18,11 +18,11 @@ import type { FriendDay } from "../game/knew.ts";
 import { news } from "../game/news.ts";
 import { closeLine, count, percent, withOwn } from "../game/numbers.ts";
 import { answerWords } from "../game/questions.ts";
-import { land, opensReview, reviewSheet } from "../game/results.ts";
-import { getReady, playRun, shownHere, starting } from "../game/run.ts";
+import { land, opensReview, perfectHead, reviewSheet } from "../game/results.ts";
+import { getReady, leftLine, playRun, shownHere, starting } from "../game/run.ts";
 import { cardFile, cardPath, type SharedDay, shareCard, shareDay, shareText } from "../game/share.ts";
 import type { Board, Mark, Reviewed, Score, State } from "../game/types.ts";
-import { api, errorText, serverNow } from "../lib/api.ts";
+import { api, errorText, lastOf, serverNow, setIfNew } from "../lib/api.ts";
 import { boot } from "../lib/boot.ts";
 import { dayInBulgaria, hourInBulgaria } from "../lib/day.ts";
 import { type Child, h, onCleanup, type Signal, signal, slot } from "../lib/dom.ts";
@@ -156,11 +156,34 @@ export function today() {
     gone = true;
     clearTimeout(lateEnds);
   });
+  // Днес drawn from what it showed last (come back to it: api.ts, lastOf), until the day comes: then drawn anew only
+  // where it has changed, and only while the player hasn't moved on from it (a count, a game).
+  let before: Today | null = null;
+  // Днес drawn from the day the server gave (not only from what it showed last).
+  let drawn = false;
+  let stats: Promise<Stats> | null = null;
+  const statsAsked = () => stats;
   const load = async () => {
+    // The player's numbers (the streak's week) asked for with the day, not after it.
+    stats = user.peek() ? loadStats() : null;
+    stats?.catch(() => {});
+    // Not with something to say over it once (a notice: drawn twice, it would go with the first), nor a day gone by,
+    // yesterday's offered, or a question with its time running (its seconds as they were).
+    const was = inPage || drawn || bye || notice.peek() ? undefined : lastOf<Today>("/api/day");
+    const now = dayInBulgaria(new Date(serverNow()));
+    if (was && was.day === now && !was.yesterday && !(was.run && !was.run.done && was.run.question)) {
+      before = was;
+      day = was.day;
+      screen.show(() => home(was, was.run, false));
+    }
     try {
       const t = inPage ?? (await api<Today>("GET", "/api/day"));
       inPage = undefined;
       if (gone) return;
+      const was = before;
+      before = null;
+      drawn = true;
+      if (was && (JSON.stringify(t) === JSON.stringify(was) || counting || playing.peek())) return;
       day = t.day;
       // Yesterday's issue left half-way just before midnight, while the game lets it be finished: offered first.
       const view = lateView(t) ?? t;
@@ -171,7 +194,9 @@ export function today() {
         screen.show(() => playRun(run, (s) => home(view, s, true)));
       else screen.show(() => home(view, view.run, false));
     } catch (err) {
-      if (!gone) screen.show(() => failure(err, load, null));
+      // Drawn from what it showed last, it stays so: the line's trouble is said only over nothing.
+      if (gone || before) return;
+      screen.show(() => failure(err, load, null));
     }
   };
   /** Днес for yesterday's issue (`t.yesterday`): its day, issue, chapters and run; nothing of today's (its board, its
@@ -211,7 +236,7 @@ export function today() {
     };
   };
   // The day's ten (or the rest of them) start after the count every game has, which „Отказ“ backs out of: nothing
-  // is sent before it runs out or „Започни сега“, so a tap by mistake costs nothing. What went wrong starting shows
+  // is sent before it runs out or „Веднага“, so a tap by mistake costs nothing. What went wrong starting shows
   // on the issue, back on Днес. They're played over Днес in an entry of their own (router.ts, hold): back,
   // mid-game, asks first, then comes to Днес, not out of the game.
   let counting = false;
@@ -309,8 +334,12 @@ export function today() {
     const streakSaid = !run?.done && t.streak >= streakFrom && endsTonight(t) ? null : streakNotice(t);
     if (run?.done) return result(t, run, just, notices, load);
     // The player's numbers (Профил's): the streak's week, the facts in the book.
-    const stats = signal<Stats | null>(null);
-    if (user.peek()) loadStats().then(stats.set, () => {});
+    const stats = signal<Stats | null>(lastOf<Stats>("/api/me/stats") ?? null);
+    if (user.peek())
+      (statsAsked() ?? loadStats()).then(
+        (now) => setIfNew(stats, now),
+        () => {},
+      );
     const first = !user.peek();
     const marks = run?.trail ?? [];
     // Днес's budget (DESIGN.md): the issue, its action, the streak; on a big screen the issue's contents under them.
@@ -329,8 +358,8 @@ export function today() {
           : h("p", { class: "streak-notice", role: "status" }, streakSaid.long),
         first ? null : duelWaiting(t),
         first ? null : untold(t),
-        // A new visitor's cover says once what the ten are (issueGo): no list of them again beside it.
-        first ? null : contents(t),
+        // On a big screen the issue's contents, a new visitor's too (their right page had „Започни“ and two lines).
+        contents(t),
       ),
     );
   }
@@ -344,6 +373,8 @@ export function today() {
 function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): Child {
   const players = t.board.players;
   const at = marks.length;
+  // A question of it with its time running (shown on another device, or left): the line says so (leftLine).
+  const running = t.run && !t.run.done && t.run.question?.n === at ? t.run.question.leftMs : 0;
   const lead = shared && !at ? shared : null;
   const order = t.chapters?.length ? t.chapters : [];
   const [, , date = 1] = t.day.split("-").map(Number);
@@ -394,7 +425,7 @@ function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): 
                 : "Десет въпроса за днес",
           ),
           at
-            ? [h("p", { class: "issue-deck" }, `Следва въпрос ${at + 1}\u00a0от\u00a010.`), tiles(marks, order)]
+            ? [h("p", { class: "issue-deck" }, leftLine(at, 10, running)), tiles(marks, order)]
             : lead
               ? h("div", { class: "shared-score" }, tiles(sharedMarks, order, sharedMarks.length))
               : order.length
@@ -445,7 +476,13 @@ function issueGo(start: () => void, at: number, error: string, first: boolean): 
           "div",
           { class: "issue-words" },
           h("h2", null, "Едни и същи за цяла България."),
-          h("p", { class: "deck" }, "По един въпрос от всяка от десетте теми, от лесен към труден. Без регистрация."),
+          h(
+            "p",
+            { class: "deck" },
+            // Said by „В броя“ under it on a big screen: there, only „Без регистрация.“
+            h("span", { class: "issue-words-ten" }, "По един въпрос от всяка от десетте теми, от лесен към труден. "),
+            "Без регистрация.",
+          ),
         )
       : null,
   ];
@@ -462,7 +499,7 @@ function contents(t: Today): Child {
     h("div", { class: "sect-head" }, h("h2", null, "В броя"), h("span", { class: "sect-note" }, "от лесен към труден")),
     h(
       "ol",
-      { class: "rows" },
+      { class: "contents-list" },
       list.map((id, i) =>
         h(
           "li",
@@ -534,7 +571,7 @@ const outOf = (s: State) => s.total - (s.void ?? 0);
  *   1. the score on its sheet, the tiles, how many knew the tenth, and how all of България did on average;
  *   2. what the day wrote in the book („Днес в Алманаха“: its ink, by chapter; a rank risen);
  *   3. the action: sharing it (on the first results, keeping the game and being reminded, or the way out of an app's
- *      browser, which come right under the score instead);
+ *      browser, which come right under what the day wrote instead);
  *   4. tomorrow;
  *   5. the day's board, Приятели · България (dayBoard).
  *
@@ -600,7 +637,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[], reload: (
   const hero = leaf(
     order[0] ?? "general",
     [
-      perfect ? h("div", { class: "perfect-head" }, perfectMark(), h("p", { class: "kicker" }, "Всички верни")) : null,
+      perfect ? perfectHead() : null,
       h(
         "p",
         { class: "kicker score-kicker" },
@@ -656,11 +693,12 @@ function result(t: Today, run: State, just: boolean, notices: Child[], reload: (
       hero,
       best,
       zero ? missed(missedList, () => openReview()) : null,
-      // The first results' action, right under the score.
-      first ? action : null,
       // 2. What the day wrote in the book. Asked on every visit: the ink is counted again; a rank risen is told once
       // (play.NewsOf).
       news(run.id, 0, undefined, best.set, "Днес в Алманаха"),
+      // The first results' action (keeping the game, or the way out of an app's browser) right under it: what the
+      // game wrote is what keeping it keeps, and on a phone it was under the ask, out of the first screen.
+      first ? action : null,
       // The streak with today's in it, lit: the day just played is what made it (owner, 2026-11-23: it grew out of
       // sight). Once the day as it stands has come.
       () => (known() && !t.late ? streakSection(fresh(), () => null, true) : null),
@@ -709,9 +747,27 @@ function duelWaiting(t: Today): Child {
   );
 }
 
-/** The result's action while a friend's duel waits: that duel, „Играй дуела с Иво“. */
+/** The result's action while a friend's duel waits: that duel. Whose it is on a line over it, as the cover's duel
+ * row says it („Иво ти изпрати дуел.“), and the button „Играй дуела“ (a long name in it broke it over two lines);
+ * „Играй дуела с Иво“ aloud. */
 function duelGo(d: NonNullable<Today["duel"]>): Child {
-  return h("a", { class: "btn primary result-duel-go", href: `/duel/${d.id}` }, `Играй дуела ${withWord(d.from.name)}`);
+  return [
+    h(
+      "p",
+      { class: "result-duel-from" },
+      avatar(d.from.look?.avatar, { name: d.from.name }),
+      h("span", null, h("b", null, nameWords(d.from.name)), " ти изпрати дуел."),
+    ),
+    h(
+      "a",
+      {
+        class: "btn primary result-duel-go",
+        href: `/duel/${d.id}`,
+        "aria-label": `Играй дуела ${withWord(d.from.name)}`,
+      },
+      "Играй дуела",
+    ),
+  ];
 }
 
 /** „Прегледай въпросите“: the day's questions and their facts, a tap away in their dialog. */
@@ -868,18 +924,21 @@ function ofFriends(t: Today): Child {
   const rows = t.friends ?? [];
   if (!rows.length) {
     const mine = t.board.mine ?? t.board.top.find((s) => s.me);
-    return [
-      mine ? h("ol", { class: "rows ranks" }, scoreRow({ ...mine, me: true }, 1)) : null,
+    // Why the row is alone, on the board's card under it: the board's own words, not a line beside it.
+    return h(
+      "ol",
+      { class: "rows ranks" },
+      mine ? scoreRow({ ...mine, me: true }, 1) : null,
       t.befriended === false
         ? h(
-            "p",
+            "li",
             { class: "board-empty" },
             "Още нямаш приятели. ",
             h("a", { href: "/friends" }, "Добави приятели"),
             " и сравнявайте резултатите си всеки ден.",
           )
-        : h("p", { class: "board-empty" }, "Още никой от приятелите ти не е играл днес."),
-    ];
+        : h("li", { class: "board-empty" }, "Още никой от приятелите ти не е играл днес."),
+    );
   }
   return h(
     "ol",
@@ -890,15 +949,17 @@ function ofFriends(t: Today): Child {
 
 /** The day among everyone who played it: how they spread (spreadChart), where the player stands, then the best twenty
  * and the player's own place under them if further down. Alone on the board, a place says nothing; with none right,
- * it would only rub the day in: how many played instead. */
+ * on a first day, or in the lower half, it would only rub the day in („34-то място от 35“ to a new player): how many
+ * played instead (the chart and the rows still show where the player is). */
 function everyone(t: Today, run: State): Child {
   const b = t.board;
   const mine = b.mine && b.place && !b.top.some((s) => s.me) ? b.mine : null;
+  const placeSaid = !!b.place && !!b.mine?.rights && !t.firstDay && b.place <= Math.ceil(b.players / 2);
   return [
     spreadChart(b, run),
     b.players < 2
       ? null
-      : b.place && b.mine?.rights
+      : b.place && placeSaid
         ? h(
             "p",
             { class: "board-note" },
@@ -910,10 +971,17 @@ function everyone(t: Today, run: State): Child {
           "ol",
           { class: "rows ranks" },
           b.top.map((s, i) => scoreRow(s, s.place ?? i + 1)),
-          mine && b.place ? scoreRow(mine, b.place, b.place > b.top.length + 1) : null,
+          mine && b.place ? ownRow(mine, b.place, b.top.length) : null,
         )
       : null,
   ];
+}
+
+/** The player's own row under the best (`shown` of them), at its place; further down than the next, a quiet „…“
+ * over it, in the places' column: the places between are left out, not missing. */
+function ownRow(mine: Score, place: number, shown: number): Child {
+  const apart = place > shown + 1;
+  return [apart ? h("li", { class: "rank-skip", "aria-hidden": "true" }, "…") : null, scoreRow(mine, place, apart)];
 }
 
 /** How all of България did with the day: how many got each count of right answers, the player's own bar in ink with
@@ -1154,7 +1222,8 @@ function streakNotice(t: Today): StreakSaid | null {
       long: `${missed} До два пропуснати дни на седмица ти се прощават. Серия: ${count(t.streak, "ден", "дни")}.`,
     };
   }
-  const text = t.ended ? `Серията ти прекъсна. ${begins}.` : `Радваме се, че се върна. ${begins}.`;
+  // An ended streak leads with what begins, never with the loss (its being new says the old one ended).
+  const text = t.ended ? `${begins}.` : `Радваме се, че се върна. ${begins}.`;
   return { short: text, long: text };
 }
 
@@ -1162,26 +1231,6 @@ function streakNotice(t: Today): StreakSaid | null {
 interface StreakSaid {
   short: string;
   long: string;
-}
-
-/** The logo's rosette over ten of ten: four petals, the gold one last (feel.ts draws them in). */
-function perfectMark(): SVGElement {
-  const ns = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(ns, "svg");
-  svg.setAttribute("viewBox", "0 0 64 64");
-  svg.setAttribute("class", "perfect-mark");
-  svg.setAttribute("aria-hidden", "true");
-  for (const turn of [45, 135, 225, -45]) {
-    const group = document.createElementNS(ns, "g");
-    group.setAttribute("transform", `rotate(${turn} 32 32)`);
-    const petal = document.createElementNS(ns, "path");
-    petal.setAttribute("d", "M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z");
-    petal.setAttribute("class", turn < 0 ? "petal gold" : "petal");
-    petal.style.transformOrigin = "32px 32px";
-    group.append(petal);
-    svg.append(group);
-  }
-  return svg;
 }
 
 /** A moment's time of day in Bulgaria: „00:15“. */

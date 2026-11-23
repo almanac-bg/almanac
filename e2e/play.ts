@@ -132,14 +132,14 @@ export async function openGame(page: Page, path: string): Promise<void> {
   await page.goto(path);
   await page.getByRole("button", { name: "Започни", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await page.getByRole("button", { name: "Веднага" }).click();
 }
 
 /** Starts the day's ten from Днес (or the rest of them: „Продължи“), cutting its count short. */
 export async function startDay(page: Page, button = "Започни"): Promise<void> {
   await page.getByRole("button", { name: button, exact: true }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await page.getByRole("button", { name: "Веднага" }).click();
 }
 
 /** Plays a run's ten questions, solo: answer, see the answer (and its fact), and move on. Each question opens at the
@@ -163,7 +163,7 @@ export async function moveOn(page: Page): Promise<void> {
   // This answer's own button, and only it: the game moves on by itself a few seconds after it shows, and a tap that
   // comes later (a busy machine) must not wait for the next question's button and press that one, which would skip
   // the next question unanswered.
-  const go = page.locator(".after").getByRole("button", { name: /^(Напред|Към резултата)$/ });
+  const go = page.locator(".after").getByRole("button", { name: /^(Напред|Към резултата|Към дуела)$/ });
   const button = (await go.count()) ? await go.elementHandle({ timeout: 1000 }).catch(() => null) : null;
   await button?.click({ timeout: 5000 }).catch(() => {}); // gone already: the game moved on
   await button?.dispose();

@@ -93,7 +93,7 @@ export function settings(kit: Kit) {
   signedIn = signal("");
   return h(
     "section",
-    { class: "screen" },
+    { class: "screen narrow" },
     h("div", { class: "intro" }, () => (user() ? back("/me", "Профил") : null), h("h1", null, "Настройки")),
     // What's this device's (sounds, less motion) is there with a profile or without one.
     when(
@@ -286,7 +286,7 @@ function account(): Child {
           h("strong", null, () => emailWords(user()?.email ?? "")),
           ".",
         ),
-        h("button", { class: "link", onclick: signOut }, "Излез"),
+        h("button", { class: "link tap", onclick: signOut }, "Излез"),
         signOutOthers(),
       ],
       () => [
@@ -568,7 +568,7 @@ function deleteAccount(): Child {
           h("button", { class: "link tap", onclick: () => asking.set(false) }, "Отказ"),
           error() && h("p", { class: "bad", role: "alert" }, error()),
         )
-      : h("button", { class: "link tap", onclick: () => asking.set(true) }, "Изтрий профила");
+      : h("button", { class: "link tap danger", onclick: () => asking.set(true) }, "Изтрий профила");
 }
 
 async function signOut() {
@@ -602,7 +602,7 @@ function signOutOthers(): Child {
     }
   };
   return [
-    h("button", { class: "link", onclick: run, disabled: busy }, "Излез от другите устройства"),
+    h("button", { class: "link tap", onclick: run, disabled: busy }, "Излез от другите устройства"),
     () => said() && h("p", { class: bad() ? "bad" : "muted", role: "status" }, said()),
   ];
 }

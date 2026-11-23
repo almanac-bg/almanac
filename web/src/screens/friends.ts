@@ -18,6 +18,8 @@ import { duelGroup } from "./duelcards.ts";
 let {
   acceptedLine,
   api,
+  lastOf,
+  setIfNew,
   errorText,
   formatNumber,
   h,
@@ -76,6 +78,8 @@ export function friends(kit: Kit): Child {
   ({
     acceptedLine,
     api,
+    lastOf,
+    setIfNew,
     errorText,
     formatNumber,
     h,
@@ -116,12 +120,19 @@ function page(kit: Kit): Child {
   // lands once (duelcards.ts), with what its game brought under it, asked for once (game/news.ts: it marks the game
   // as told). One that isn't among those listed (older than the last ten) is asked for by itself.
   const named = Number(asked.get("duel")) || 0;
-  const top = signal<DuelView | null>(null);
-  let brought: Child = null;
+  // Come back to (or come to from a duel's game, which asked for them as it ended: screens/duel.ts), the page as it
+  // was last shown, at once, the duel named first in its group, and anew in place where it has changed (api.ts,
+  // lastOf).
+  const data = signal<Friends | null>(lastOf<Friends>("/api/friends") ?? null);
+  const duels = signal<Duels | null>(lastOf<Duels>("/api/duels") ?? null);
+  const had = duels.peek();
+  const top = signal<DuelView | null>(
+    (named && had && [...had.yours, ...had.theirs, ...had.played].find((o) => o.id === named)) || null,
+  );
+  const landing = top.peek();
+  let brought: Child = landing?.runId && landing.state !== "yours" ? news(landing.runId) : null;
   // Brought into sight once this visit, as the page opens (duelcards.ts).
   const sight = { done: false };
-  const data = signal<Friends | null>(null);
-  const duels = signal<Duels | null>(null);
   const error = signal("");
   // The list that couldn't load (with nothing of it shown yet): the failure, and the way to try again.
   const failed = signal<unknown>(null);
@@ -136,7 +147,7 @@ function page(kit: Kit): Child {
         api<Friends>("GET", "/api/friends"),
         api<Duels>("GET", "/api/duels"),
         // The landing's moment needs the game's feel; without it the card is whole, only still.
-        named && !duels.peek() ? loadFeel().catch(() => null) : null,
+        named && !top.peek() ? loadFeel().catch(() => null) : null,
       ]);
       if (named) {
         const first =
@@ -152,8 +163,8 @@ function page(kit: Kit): Child {
       failed.set(null);
       // Drawn anew only when something changed: a look every quarter minute that found the same would otherwise
       // rebuild the lists under the pointer (a tooltip showing, a row hovered, gone).
-      if (JSON.stringify(f) !== JSON.stringify(data.peek())) data.set(f);
-      if (JSON.stringify(d) !== JSON.stringify(duels.peek())) duels.set(d);
+      setIfNew(data, f);
+      setIfNew(duels, d);
       if (f.accepted && !yes.peek()) yes.set(acceptedLine(f.accepted));
     } catch (err) {
       // A look again that failed, with the list on the screen, waits for the next one quietly.
@@ -231,7 +242,7 @@ function page(kit: Kit): Child {
     return d ? duelGroup(kit, which, d, top(), brought, sight) : null;
   };
 
-  return [invitations(), group("open"), friendsList(), group("played")];
+  return [invitations(), group("open"), friendsList(), adding(), group("played")];
 
   /** Who asks to be friends, at the page's top: each as every row of players has them (their avatar and name, a way
    * to their profile), what they ask on a line of its own under the name, and the two answers. */
@@ -251,7 +262,7 @@ function page(kit: Kit): Child {
             "div",
             { class: "invitation-actions" },
             h("button", { class: "btn inline", type: "button", onclick: () => accept(r) }, "Приеми"),
-            h("button", { class: "link", type: "button", onclick: () => drop(r) }, "Откажи"),
+            h("button", { class: "link tap", type: "button", onclick: () => drop(r) }, "Откажи"),
           ),
         ),
       );
@@ -274,8 +285,10 @@ function page(kit: Kit): Child {
             ? h(
                 "span",
                 { class: "sect-note" },
-                h("button", { class: "link muted", type: "button", onclick: () => editing.update((e) => !e) }, () =>
-                  editing() ? "Готово" : "Премахни приятел",
+                h(
+                  "button",
+                  { class: "link muted tap", type: "button", onclick: () => editing.update((e) => !e) },
+                  () => (editing() ? "Готово" : "Премахни приятел"),
                 ),
               )
             : null;
@@ -332,14 +345,27 @@ function page(kit: Kit): Child {
             );
       },
       // Outside the parts drawn again on each look (every 15 s): drawn again, its field would lose the focus mid-word.
-      when(data, () => adder),
+      () => error() && h("p", { class: "bad", role: "alert" }, error()),
+    );
+  }
+
+  /** Adding a friend, a section of its own headed as every other („Добави приятел“), and under it the requests sent
+   * that wait for an answer („Изпратени покани (2)“), each with „Отмени“. */
+  function adding(): Child {
+    return when(data, () => [
+      h(
+        "section",
+        { class: "sect friends-add" },
+        h("div", { class: "sect-head" }, h("h2", null, "Добави приятел")),
+        adder,
+      ),
       () => {
         const out = data()?.requests.out ?? [];
         return out.length
           ? h(
-              "div",
-              { class: "waiting-for" },
-              h("p", { class: "kicker" }, "Изпратени покани"),
+              "section",
+              { class: "sect waiting-for" },
+              h("div", { class: "sect-head" }, h("h2", null, `Изпратени покани (${formatNumber(out.length)})`)),
               h(
                 "ul",
                 { class: "rows waiting" },
@@ -350,15 +376,14 @@ function page(kit: Kit): Child {
                     r.email
                       ? h("span", null, emailWords(r.email))
                       : h("a", { href: profileHref(r.tag ?? "") }, nameWords(r.name ?? "")),
-                    h("button", { class: "link muted", type: "button", onclick: () => drop(r) }, "Отмени"),
+                    h("button", { class: "link muted tap", type: "button", onclick: () => drop(r) }, "Отмени"),
                   ),
                 ),
               ),
             )
           : null;
       },
-      () => error() && h("p", { class: "bad", role: "alert" }, error()),
-    );
+    ]);
   }
 }
 
@@ -463,7 +488,7 @@ function row(f: Friend, remove: () => void, challenge: () => void, editing: () =
     null,
     () =>
       editing()
-        ? h("button", { class: "link muted friend-act", type: "button", onclick: remove }, "Премахни")
+        ? h("button", { class: "link muted tap friend-act", type: "button", onclick: remove }, "Премахни")
         : h(
             "button",
             {

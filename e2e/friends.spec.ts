@@ -179,6 +179,8 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await b.getByRole("button", { name: "Добави", exact: true }).click();
   await expect(b.getByText("Поканата до Ана Петрова е изпратена.")).toBeVisible();
   await expect(b.locator(".waiting")).toContainText("Ана Петрова");
+  // Adding and the requests sent each a section, headed as every section of the page is.
+  await expect(b.locator(".sect-head h2")).toContainText(["Добави приятел", "Изпратени покани (1)"]);
   // Its name a link as every player's name is: one rule for all of them, never underlined only in part.
   expect(await linkedNames(b)).toEqual([]);
 
@@ -201,6 +203,12 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   // One friend of that name: the name alone, the @username left to her profile.
   await expect.poll(() => readText(b.locator(".friend .friend-name"))).toMatch(/^Ана Петрова/);
   await expect(b.locator(".friend .friend-tag")).toBeHidden();
+  // The avatar level with the name, however tall the row: never centred on the row, below the name.
+  const [face, name] = await Promise.all([
+    b.locator(".friend > .avatar").boundingBox(),
+    b.locator(".friend .friend-text").boundingBox(),
+  ]);
+  expect(Math.abs((face?.y ?? 0) - (name?.y ?? 99))).toBeLessThanOrEqual(6);
 
   // Bo hears of her yes in Приятели, once, over his friends; nothing over the day (Днес is the issue and the streak).
   const yes = b.locator(".friends .accepted-notice");
@@ -336,25 +344,32 @@ test("the day's board at 320 px, the day played: the rows hold their squares, an
   }
 });
 
-test("a day of none right isn't rubbed in: no place on the board of all България, only how many played", async ({
+test("a day isn't rubbed in: a place on the board of all България only in its upper half, past a first day", async ({
   page,
 }) => {
   test.setTimeout(120_000);
   await page.goto("/");
   await startDay(page);
   await playRun(page);
-  // The day as the server says it, its board as 53 played it, the player's own row with 3 right or none; Днес opened
-  // again from another place, so that it asks for the day.
+  // The day as the server says it, its board as 53 played it, the player's own row with 3 right or none, high or
+  // low, on a first day or past it; Днес opened again from another place, so that it asks for the day. Only a place in
+  // the upper half, with some right, past a first day, is said: else how many played.
   const row = (name: string, rights: number, me = false) => ({ name, rights, of: 10, me });
-  for (const rights of [3, 0]) {
+  for (const [rights, place, firstDay] of [
+    [3, 20, false],
+    [0, 53, false],
+    [3, 20, true],
+    [3, 40, false],
+  ] as const) {
     await page.route("**/api/day", async (route) => {
       const day = await (await route.fetch()).json();
       day.friends = [];
       day.befriended = false;
+      day.firstDay = firstDay;
       day.board = {
         ...day.board,
         players: 53,
-        place: rights ? 20 : 53,
+        place,
         top: [row("Ана", 9), row("Бо", 8)],
         mine: row("Аз", rights, true),
       };
@@ -366,7 +381,7 @@ test("a day of none right isn't rubbed in: no place on the board of all Бълг
     const board = page.locator(".day-board");
     await expect(board.getByRole("tab", { name: "Всички" })).toHaveAttribute("aria-selected", "true");
     await expect(board.locator(".board-note")).toHaveText(
-      rights ? /^В България си на 20\S* място от 53\.$/ : "Днес играха 53 души.",
+      rights && place === 20 && !firstDay ? /^В България си на 20\S* място от 53\.$/ : "Днес играха 53 души.",
     );
     await page.unroute("**/api/day");
   }

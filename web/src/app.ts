@@ -33,7 +33,9 @@ const places: [href: string, label: string, icon: string, here: (p: string) => b
 reportErrors();
 applyPrefs();
 keepFresh();
-loadPictures().catch(() => {}); // the illustrations, in a file of their own: on their way at once
+// The illustrations, in a file of their own: asked for with the page (server/pages.go, a modulepreload) and on their way
+// at once.
+const pictures = loadPictures().catch(() => {});
 
 /** The places as links (the bar's on a big screen, the foot's on a phone): the one here marked; a dot on Приятели
  * while something has come there since the player last looked (friendsNews). */
@@ -53,8 +55,14 @@ const placeLinks = () =>
     ),
   );
 
+// The first screen drawn with its pictures (the cover's ten glyphs, the avatar): their file is a sixth of the app's and
+// asked for beside it, so it's nearly always in first, but its module comes a moment after the app's, and a cold
+// load painted the cover's glyphs as empty tiles that popped in. Never held for them more than a moment.
 const root = document.getElementById("app");
-if (root) {
+if (root) Promise.race([pictures, new Promise((r) => setTimeout(r, 500))]).then(() => draw(root));
+
+/** The frame and the screen under it, started. */
+function draw(root: HTMLElement): void {
   const main = h("main", { id: "main" });
   mount(root, () => [
     h(
@@ -99,6 +107,18 @@ if (root) {
     ],
     missing,
   );
+  // The places' own code, once the first screen is in and the browser has a moment: a place opened later is drawn at
+  // once, its file already here (later's load comes from memory), never a blank page while it comes.
+  const places = () => {
+    for (const load of [
+      () => import("./screens/almanac.ts"),
+      () => import("./screens/friends.ts"),
+      () => import("./screens/me.ts"),
+    ])
+      load().catch(() => {});
+  };
+  if (typeof requestIdleCallback === "function") requestIdleCallback(places, { timeout: 5000 });
+  else setTimeout(places, 2000);
   // In a game the frame steps aside (app.css): the question gets the screen.
   effect(() => document.documentElement.classList.toggle("playing", playing()));
   // The frame bare, no places: a new visitor's cover (Днес at its own address), and the sign-in page.

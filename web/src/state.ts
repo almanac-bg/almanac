@@ -1,7 +1,7 @@
 // What the whole app shares: who's playing, and the chapters. The server puts both in the page (lib/boot.ts); who's
 // playing is kept true to the session's cookie by fresh.ts.
 
-import { api } from "./lib/api.ts";
+import { api, forget } from "./lib/api.ts";
 import { boot } from "./lib/boot.ts";
 import { effect, onCleanup, signal, untracked } from "./lib/dom.ts";
 import { path } from "./lib/router.ts";
@@ -24,6 +24,14 @@ export interface Chapter {
 }
 
 export const user = signal<User | null>(boot.user ?? null);
+// What the server answered for one player isn't another's to draw: a sign-in, a sign-out, a game brought here forget it
+// (api.ts, lastOf).
+let whose = user.peek()?.id ?? 0;
+effect(() => {
+  const id = user()?.id ?? 0;
+  if (id !== whose) forget();
+  whose = id;
+});
 export const chapters: Chapter[] = boot.chapters ?? [];
 /** Every chapter at once (play.MixChapter): what a duel draws from, and a game of all of them kept from before. */
 const mix: Chapter = { id: "mix", name: "Всички теми" };

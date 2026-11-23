@@ -20,13 +20,16 @@
 import { expect, type Page, test } from "@playwright/test";
 import { answerAs, beside, closeable, flaws, kinds, panelFlaws, type Q, unseenAnswers } from "./kinds.ts";
 import {
+  befriend,
   cutOrOverlapping,
   daysPlayed,
   dealt,
   keptPlayer,
   knows,
   linkedNames,
+  mailedCode,
   moveOn,
+  playedBefore,
   playRun,
   startDay,
 } from "./play.ts";
@@ -513,6 +516,9 @@ for (const size of sizes)
         await expect(page.locator(".summary")).toBeVisible({ timeout: 10_000 });
         await settled(page);
         expect(await byDayAndNight(page, () => sideways(page)), "the day's result").toEqual([]);
+        // The score's ten tiles a finger's size: on the smallest phone two rows of five, not ten specks in one.
+        const tile = await page.locator(".score-leaf .tile").first().boundingBox();
+        expect.soft(tile?.width ?? 0, "the result's tiles too small").toBeGreaterThanOrEqual(small ? 40 : 24);
 
         // A new player's places, the day played.
         for (const path of ["/almanac", "/me", "/friends", "/settings"]) {
@@ -542,7 +548,7 @@ for (const size of sizes)
           );
           await page.goto("/play/history");
           await page.getByRole("button", { name: "Продължи", exact: true }).click();
-          await page.getByRole("button", { name: "Започни сега" }).click();
+          await page.getByRole("button", { name: "Веднага" }).click();
           const shot = async (name: string) => {
             const dir = process.env.FIT_SHOTS;
             if (dir)
@@ -828,7 +834,7 @@ test.describe("every kind of question at a phone's own large text, 24 and 32px, 
       await dealt(page, "history", ids);
       await page.goto("/play/history");
       await page.getByRole("button", { name: "Продължи", exact: true }).click();
-      await page.getByRole("button", { name: "Започни сега" }).click();
+      await page.getByRole("button", { name: "Веднага" }).click();
       for (let n = 0; n < ids.length; n++) {
         await expect(page.locator(".question-head")).toContainText(`${n + 1} от ${ids.length}`, { timeout: 10_000 });
         await each(`question ${n + 1}`);
@@ -856,7 +862,7 @@ test.describe("on a laptop, 1366 × 650", () => {
       );
       await page.goto("/play/history");
       await page.getByRole("button", { name: "Продължи", exact: true }).click();
-      await page.getByRole("button", { name: "Започни сега" }).click();
+      await page.getByRole("button", { name: "Веднага" }).click();
       for (const [n, { name, q }] of all.entries()) {
         const where = `${name} (${q.id})`;
         await expect(page.locator(".question-head")).toContainText(`${n + 1} от ${all.length}`, { timeout: 10_000 });
@@ -866,6 +872,16 @@ test.describe("on a laptop, 1366 × 650", () => {
           const box = await page.locator(".answering .btn.primary").first().boundingBox();
           expect.soft(box && box.y + box.height, `${where}: its action below the screen`).toBeLessThanOrEqual(650);
         }
+        // A picture over the question: right under its sheet, and whole on the screen with it.
+        if (q.image) {
+          const at = await page.evaluate(() => {
+            const sheet = document.querySelector(".run-question > .q-leaf")?.getBoundingClientRect();
+            const pic = document.querySelector(".run-question > .picture")?.getBoundingClientRect();
+            return sheet && pic ? { gap: pic.top - sheet.bottom, bottom: pic.bottom } : null;
+          });
+          expect.soft(at?.bottom, `${where}: its picture below the screen`).toBeLessThanOrEqual(650);
+          expect.soft(at?.gap, `${where}: its picture away from its sheet`).toBeLessThanOrEqual(24);
+        }
         await answerAs(page, q, how);
         await expect(page.locator(".after .up-next-go")).toBeVisible({ timeout: 40_000 });
         await settled(page);
@@ -874,6 +890,34 @@ test.describe("on a laptop, 1366 × 650", () => {
         await next(page);
       }
     });
+});
+
+// A number's pad has the most to fit under its question: on a phone of a usual height, the longest number question
+// the bank has (the real bank's too, where it's here) leaves the pad and „Отговори“ whole in sight under it.
+test.describe("a number's pad on a 375 × 812 phone", () => {
+  test.use({ viewport: { width: 375, height: 812 }, hasTouch: true });
+
+  test("the longest number questions: every key and „Отговори“ in sight", async ({ page }) => {
+    const all = kinds().filter((k) => k.q.type === "number");
+    await page.goto("/");
+    await dealt(
+      page,
+      "history",
+      all.map((k) => k.q.id),
+    );
+    await page.goto("/play/history");
+    await page.getByRole("button", { name: "Продължи", exact: true }).click();
+    await page.locator(".get-ready .btn.primary").click();
+    for (const [n, { name, q }] of all.entries()) {
+      await expect(page.locator(".question-head")).toContainText(`${n + 1} от ${all.length}`, { timeout: 10_000 });
+      await expect(page.locator("article.question .keypad")).toBeVisible();
+      await settled(page);
+      expect.soft(await unseenAnswers(page), `${name} (${q.id})`).toEqual([]);
+      await answerAs(page, q, "right");
+      await expect(page.locator(".after .up-next-go")).toBeVisible({ timeout: 40_000 });
+      await next(page);
+    }
+  });
 });
 
 test.describe("turned", () => {
@@ -900,6 +944,139 @@ test("a switch in Настройки is its whole row to tap, words and all", as
   const was = await sounds.getAttribute("aria-checked");
   await sounds.locator("xpath=ancestor::label").locator(".switch-text").click();
   await expect(sounds).not.toHaveAttribute("aria-checked", was ?? "");
+});
+
+test("Настройки' three-way switch: every choice on one line, on a 320px phone too", async ({ page }) => {
+  for (const width of [320, 375]) {
+    await page.setViewportSize({ width, height: 740 });
+    await page.goto("/settings");
+    const choices = page.getByRole("radio");
+    await expect(choices.first()).toBeVisible();
+    const lines = await choices.evaluateAll((all) =>
+      all.map((b) => {
+        const r = document.createRange();
+        r.selectNodeContents(b);
+        return `${b.textContent}: ${r.getClientRects().length}`;
+      }),
+    );
+    expect(lines, `${width}px`).toEqual(lines.map((l) => l.replace(/\d+$/, "1")));
+  }
+});
+
+// Between a phone and a laptop (a tablet upright), the page a phone's column in the middle, the places' bar under it
+// as wide: never a phone's page stretched from edge to edge. (A laptop with the browser's text at twice its size is the
+// same case, its media queries counted in that text; a style on the page, as textAt sets it, doesn't move them.)
+test.describe("a tablet, 768 × 1024", () => {
+  test.use({ viewport: { width: 768, height: 1024 } });
+
+  test("a phone's column, in the middle", async ({ page }) => {
+    for (const path of ["/", "/almanac", "/friends"]) {
+      await page.goto(path);
+      await expect(page.locator("main :is(h1, h2)").first()).toBeAttached();
+      const [main = 0, bar = 0] = await page.evaluate(() =>
+        ["#main", ".places-foot"].map((s) => document.querySelector(s)?.getBoundingClientRect().width ?? 0),
+      );
+      expect.soft(main, `${path}: the column`).toBeLessThanOrEqual(40 * 16 + 1);
+      expect.soft(bar, `${path}: the places' bar`).toBeLessThanOrEqual(40 * 16 + 1);
+    }
+  });
+});
+
+// The pages of a list (a chapter's facts, every duel played) at twice the text on a phone: „Страница 2 от 4“ on a line
+// of its own, „По-нови“ and „По-стари“ under it, whole, nothing sideways.
+test.describe("a list's pages, twice the text, 375 × 667", () => {
+  test.use({ viewport: { width: 375, height: 667 }, bypassCSP: true });
+
+  test("a chapter's pages and the duels played turn whole on the screen", async ({ page }) => {
+    await textAt(page, 200);
+    const found = 95;
+    await page.route(/\/api\/almanac\?/, async (route) => {
+      const facts = Array.from({ length: 30 }, (_, i) => ({
+        id: `geo-${i}`,
+        chapter: "geography",
+        question: `Въпрос ${i + 1}`,
+        answer: `Отговор ${i + 1}`,
+        fact: "Факт.",
+        at: Date.now() - i * 60_000,
+        kind: "day",
+        issue: 3,
+      }));
+      await route.fulfill({ json: { facts, found, ink: { geography: 0 } } });
+    });
+    const duel = (id: number) => ({
+      id,
+      state: "won",
+      you: { name: "Заек 817", rights: 7, done: true, look: { avatar: "hare" } },
+      opponent: { name: `Мария ${id}`, tag: `maria${id}`, rights: 5, done: true, look: { avatar: "fox" } },
+      runId: id,
+      first: true,
+      createdAt: Date.now(),
+      endedAt: Date.now(),
+    });
+    const ids = (from: number, n: number) => Array.from({ length: n }, (_, i) => duel(from - i));
+    await page.route("**/api/duels", (r) =>
+      r.fulfill({ json: { yours: [], theirs: [], played: ids(23, 10), playedAll: 23 } }),
+    );
+    await page.route("**/api/duels/played?page=*", (r) =>
+      r.fulfill({ json: { duels: ids(23, 10), page: 1, pages: 3 } }),
+    );
+    await page.goto("/");
+    await knows(page, ["geo-961"]);
+    await page.goto("/almanac/geography");
+    await textIs(page, 200);
+    const pages = page.locator(".chapter-facts .pages");
+    await expect(pages).toBeVisible();
+    await settled(page);
+    expect(await sideways(page), "a chapter").toEqual([]);
+    const whole = (s: string) =>
+      page
+        .locator(s)
+        .evaluateAll((all) =>
+          all
+            .filter((e) => e.getBoundingClientRect().left < 0 || e.getBoundingClientRect().right > innerWidth)
+            .map((e) => e.textContent),
+        );
+    expect(await whole(".chapter-facts .pages > *"), "a chapter's pages").toEqual([]);
+    await page.goto("/friends");
+    await page.getByRole("button", { name: /^Всички завършени дуели/ }).click();
+    const box = page.getByRole("dialog", { name: "Завършени дуели" });
+    await expect(box.locator(".pages")).toBeAttached();
+    expect(await whole(".duels-all .pages > *"), "the duels played").toEqual([]);
+  });
+});
+
+// A laptop at 200 % zoom (1280 × 800 is 640 × 400), a mouse: laid out as a phone on its side, the places in the bar at
+// the top (one at the foot took „Започни“ under it), the game's question within the height.
+test.describe("a short wide window with a mouse, 640 × 400", () => {
+  test.use({ viewport: { width: 640, height: 400 }, isMobile: false, hasTouch: false });
+
+  test("„Започни“ in sight, nothing over it; a question within the height", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.locator(".issue-go")).toBeVisible();
+    const go = await page.evaluate(() => {
+      const bar = document.querySelector(".places-foot")?.getBoundingClientRect();
+      const go = document.querySelector(".issue-go")?.getBoundingClientRect();
+      return go ? go.bottom - (bar?.height ? bar.top : innerHeight) : 0;
+    });
+    expect(go, "„Започни“ under the places or the screen's foot").toBeLessThanOrEqual(1);
+    expect(await sideways(page)).toEqual([]);
+    await startDay(page);
+    await expect(page.locator(".question-head")).toContainText("1 от 10");
+    await expect(page.locator(".question-top")).toHaveClass(/stuck/);
+  });
+});
+
+test.describe("on a laptop, Настройки and Вход", () => {
+  test.use({ viewport: { width: 1366, height: 900 }, isMobile: false, hasTouch: false });
+
+  test("are Профил's width: a field, a switch no further from its words", async ({ page }) => {
+    for (const path of ["/signin", "/settings"]) {
+      await page.goto(path);
+      await expect(page.locator("main :is(h1, h2)").first()).toBeVisible();
+      const wide = await page.locator("main .screen").evaluate((s) => s.getBoundingClientRect().width);
+      expect(wide, path).toBeLessThanOrEqual(40 * 16 + 1);
+    }
+  });
 });
 
 /** Controls on their own (not a link inside a sentence) whose tap reaches them less than 44px high: tried by
@@ -946,6 +1123,47 @@ test.describe("a finger's room", () => {
       expect(await smallTargets(page), path).toEqual([]);
     }
   });
+
+  test("a kept player's too: a friend, a request each way, Настройки with an email", async ({
+    page,
+    browser,
+  }, info) => {
+    test.setTimeout(120_000);
+    // A friend (their name a link, „Премахни приятел“ over them), someone asking (their „Откажи“), a request sent
+    // („Отмени“), and an email to sign in with („Излез“, „Излез от другите устройства“).
+    const friend = await (await browser.newContext()).newPage();
+    const asks = await (await browser.newContext()).newPage();
+    await page.goto("/");
+    await befriend(page, friend);
+    await asks.goto("/friends");
+    await asks.locator(".friends").getByRole("button", { name: "Добави приятел" }).click();
+    await playedBefore(asks, 1);
+    const tag = await page.evaluate(async () => (await (await fetch("/api/me")).json()).user.tag as string);
+    await asks.getByLabel("Потребителско име или имейл на приятел").fill(`@${tag}`);
+    await asks.getByRole("button", { name: "Добави", exact: true }).click();
+    await expect(asks.getByText(/^Поканата до .+ е изпратена\.$/)).toBeVisible();
+    await playedBefore(page, 1);
+    await page.goto("/friends");
+    await page.getByLabel("Потребителско име или имейл на приятел").fill("someone@example.com");
+    await page.getByRole("button", { name: "Добави", exact: true }).click();
+    await expect(page.locator(".waiting")).toContainText("someone@example.com");
+    await expect(page.locator(".invitation")).toHaveCount(1);
+    await expect(page.locator(".friend")).toHaveCount(1);
+    expect(await smallTargets(page), "/friends").toEqual([]);
+    await page.getByRole("button", { name: "Премахни приятел" }).click();
+    expect(await smallTargets(page), "/friends, changing the list").toEqual([]);
+    const email = `finger-${info.project.name}-${Date.now()}@example.com`;
+    await page.goto("/settings");
+    await page.getByLabel("Имейл").fill(email);
+    await page.getByRole("button", { name: "Прати ми код" }).click();
+    await expect.poll(() => mailedCode(email)).not.toBe("");
+    await page.getByLabel("Код").fill(mailedCode(email));
+    await page.getByRole("button", { name: "Потвърди" }).click();
+    await expect(page.getByRole("button", { name: "Излез от другите устройства" })).toBeVisible();
+    expect(await smallTargets(page), "/settings").toEqual([]);
+    await friend.context().close();
+    await asks.context().close();
+  });
 });
 
 // The questions gone over (the review under a game's result), with twice the text on a 320px phone: a number's scale
@@ -966,7 +1184,7 @@ test.describe("the questions gone over, twice the text, 320 × 568", () => {
     );
     await page.goto("/play/history");
     await page.getByRole("button", { name: "Продължи", exact: true }).click();
-    await page.getByRole("button", { name: "Започни сега" }).click();
+    await page.getByRole("button", { name: "Веднага" }).click();
     for (const [n, { q }] of all.entries()) {
       await expect(page.locator(".question-head")).toContainText(`${n + 1} от ${all.length}`, { timeout: 10_000 });
       await expect(page.locator("article.question .answering")).toBeVisible();

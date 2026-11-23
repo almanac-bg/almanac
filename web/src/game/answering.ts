@@ -208,7 +208,7 @@ export function answering<R>(spec: AnswerSpec<R>): Answering<R> {
     was = now;
   });
 
-  const heading = h("h1", { class: "ask", tabindex: -1 }, wholeWords(spec.view.text));
+  const heading = h("h1", { class: "ask", tabindex: -1 }, wholeWords(spec.view.text, true));
   clamp(heading, spec.view.text);
   if (spec.focus)
     requestAnimationFrame(() => {
@@ -235,7 +235,7 @@ export function answering<R>(spec: AnswerSpec<R>): Answering<R> {
 function clamp(heading: HTMLElement, text: string): void {
   const show = (s: string) => {
     heading.replaceChildren();
-    append(heading, [wholeWords(s)]);
+    append(heading, [wholeWords(s, true)]);
   };
   const fit = () => {
     if (!heading.isConnected) return;

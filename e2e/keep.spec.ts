@@ -118,7 +118,7 @@ test("a first day asks for the reminder only, not yet to keep the game; „Не 
   await page.goto("/");
   await startDay(page);
   await playRun(page);
-  // The first result's action, right under the score.
+  // The first result's action, under what the day wrote in the book.
   const ask = page.locator(".result-share.result-first");
   await expect(ask).toContainText("Да ти пишем, ако броят още те чака?");
   await expect(ask).not.toContainText("само на това устройство");

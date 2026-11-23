@@ -14,15 +14,25 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await expect(page.getByRole("heading", { level: 1 })).toContainText("от 10");
   // A first result is quiet: the right answers, no points, XP, level or goals (the game has none).
   await expect(page.locator(".screen")).not.toContainText(/XP|[Нн]иво \d|Цели за деня|точк/);
-  // The first result's action sits right under the score: keeping the game and being reminded (or, until that's there
-  // to ask, sharing it). Chapters are played from the Алманах, duels from Приятели.
-  await expect(page.locator(".result-main > .result-score + .result-share.result-first")).toBeVisible();
+  // The first result's action sits under the score and what the day wrote in the book: keeping the game and being
+  // reminded (or, until that's there to ask, sharing it). Chapters are played from the Алманах, duels from Приятели.
+  await expect(page.locator(".result-main > :is(.result-score, .day-news) + .result-share.result-first")).toBeVisible();
+  await expect(page.locator(".result-main > .result-share.result-first ~ .day-news")).toHaveCount(0);
   // The questions gone over, in their dialog: by the button, each question with its answers.
   const review = page.getByRole("dialog", { name: "Въпросите" });
   await page.getByRole("button", { name: "Прегледай въпросите" }).click();
   await expect(review.locator(".reviewed")).toHaveCount(10);
   await expect(review.locator(".review-of")).toHaveText(/^Брой\s\d+ · \d+ \S+ · \d+ от 10$/);
   await expect(review.locator(".lit")).toHaveCount(0);
+  // Shown, not answered: no answer, row or key in it is a stop for the keyboard (they do nothing).
+  const stops = await review.evaluate(
+    (d) =>
+      [...d.querySelectorAll<HTMLElement>("button, a[href], input, [tabindex]")].filter(
+        (e) =>
+          e.tabIndex >= 0 && e.closest(".options, .tf-options, .sortable-list, .match, .split, .split-board, .keypad"),
+      ).length,
+  );
+  expect(stops, "the answers gone over as stops for the keyboard").toBe(0);
   await review.getByRole("button", { name: "Затвори" }).click();
   await expect(review).toHaveCount(0);
   await expect(page.locator(".result .reviewed")).toHaveCount(0);
@@ -36,7 +46,8 @@ test("the day: ten questions, the result, the review, and one try only", async (
   await page.getByRole("button", { name: /^7\. / }).click();
   const seventh = review.locator(".reviewed").nth(6);
   await expect(seventh).toHaveClass(/\blit\b/);
-  await expect(seventh.locator(".kicker")).toHaveText(/^7 · /);
+  await expect(seventh.locator(".reviewed-n")).toHaveText("7");
+  await expect(seventh.locator(".reviewed-head .chip")).toBeVisible();
   const [head, at] = [await review.locator(".sheet-head").boundingBox(), await seventh.boundingBox()];
   expect(Math.abs((at?.y ?? 0) - ((head?.y ?? 0) + (head?.height ?? 0)))).toBeLessThan(32);
   await page.keyboard.press("Escape");
@@ -175,7 +186,7 @@ test("a chapter's count can be backed out of, or cut short", async ({ page }) =>
   await expect(page).toHaveURL(/\/almanac\/history$/);
 
   await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await page.getByRole("button", { name: "Веднага" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10", { timeout: 1500 });
 });
 
@@ -267,7 +278,7 @@ test("a question left while its time runs: asked first, given up, and the chapte
   await expect(left).toContainText("История");
   await expect(left).toContainText(/Следва въпрос \d+\u00a0от\u00a010\./);
   await left.getByRole("link", { name: "Продължи" }).click();
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await page.getByRole("button", { name: "Веднага" }).click();
   // First, once, what the question given up was: its answer, without points; then on.
   const missed = page.locator(".given-up");
   await expect(missed).toContainText("Въпрос 2 от 10");
@@ -310,23 +321,30 @@ test.describe("on a computer", () => {
     // The keys still play, unsaid (no key is drawn on a button): Enter starts at once.
     await expect(page.locator(".key-hint")).toHaveCount(0);
     await page.keyboard.press("Enter");
-    // 1–4 answer by the letters' order, and Enter goes on at once.
-    let keyed = false;
+    // 1–4 answer by the letters' order, and so do the letters' own keys (a Bulgarian keyboard); Enter goes on at once.
+    const keys = [
+      { key: "2", at: 1 },
+      { key: "в", at: 2 },
+    ];
+    let keyed = 0;
     for (let n = 0; n < 10; n++) {
       await expect(page.locator(".question-head")).toContainText(`${n + 1} от 10`, { timeout: 10_000 });
       const options = page.locator("article.question .options:not(.pic-options, .sortable-list) > button.option");
-      if (!keyed && (await options.count()) === 4) {
+      const k = keys[keyed];
+      if (k && (await options.count()) === 4) {
         await expect(options.locator(".letter")).toHaveText(["А", "Б", "В", "Г"]);
-        await page.keyboard.press("2");
-        await expect(options.nth(1)).toHaveClass(/right|wrong/);
+        // (A letter of a Bulgarian keyboard as its keydown has it: Playwright's keyboard has only the US one.)
+        if (/\d/.test(k.key)) await page.keyboard.press(k.key);
+        else await page.evaluate((key) => document.dispatchEvent(new KeyboardEvent("keydown", { key })), k.key);
+        await expect(options.nth(k.at)).toHaveClass(/right|wrong/);
         await page.keyboard.press("Enter");
-        keyed = true;
+        keyed++;
         continue;
       }
       await answer(page);
       await moveOn(page);
     }
-    expect(keyed).toBe(true);
+    expect(keyed).toBe(keys.length);
     await expect(page.locator(".summary")).toBeVisible({ timeout: 10_000 });
     // A player's Днес is a spread: the issue, and beside it its action, the streak and its contents.
     await page.goto("/");

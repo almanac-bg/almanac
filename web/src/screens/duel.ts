@@ -14,7 +14,7 @@ import { backOut, byTap, go, hold, title } from "../lib/router.ts";
 import { loadFeel } from "../lib/sound.ts";
 import { withWord } from "../lib/words.ts";
 import { player, user } from "../state.ts";
-import { failure, type Look } from "../ui.ts";
+import { avatar, failure, type Look } from "../ui.ts";
 import { missing } from "./missing.ts";
 import { nameFirst } from "./name.ts";
 import { signIn } from "./signin.ts";
@@ -186,9 +186,22 @@ export function duelOne(params: string[]) {
     const lead = d.first
       ? `Десет въпроса. После ${d.opponent?.name ?? "приятелят ти"} ще изиграе същите.`
       : `Същите десет въпроса, които изигра ${d.opponent?.name ?? "приятелят ти"}. След всеки отговор виждаш отговора на ${d.opponent?.name ?? "приятеля ти"}.`;
+    // On a card, the two face to face over its words, as a chapter's game has its glyph.
+    const faces = h(
+      "span",
+      { class: "start-faces", "aria-hidden": "true" },
+      avatar(d.you?.look?.avatar, { size: "l", name: d.you?.name ?? "" }),
+      avatar(d.opponent?.look?.avatar, { size: "l", name: d.opponent?.name ?? "" }),
+    );
     screen.show(() =>
-      startScreen(name, lead, s?.at ? { at: s.at, total: s.total, marks: s.trail } : null, () =>
-        s?.at ? void start(d) : begin(),
+      startScreen(
+        name,
+        lead,
+        s?.at ? { at: s.at, total: s.total, marks: s.trail, leftMs: s.question?.leftMs } : null,
+        () => (s?.at ? void start(d) : begin()),
+        undefined,
+        "",
+        faces,
       ),
     );
   };
@@ -219,17 +232,29 @@ export function duelOne(params: string[]) {
   // far as the player has come). Its end lands on its card in Приятели, first in its group, in place of this
   // page: the duel is settled by then (play: finished), sent to the friend or with its result, whose moment needs
   // the game's feel, asked for as the game starts.
+  // Приятели (its file, the friends, the duels) is asked for as the last answer shows, so that the game's end lands
+  // there in one draw, from them (api.ts, lastOf), never a blank page between.
   const play = (d: DuelView, s: State) => {
     loadFeel().catch(() => {});
+    let ahead: Promise<unknown> | null = null;
+    const askAhead = () => {
+      ahead ??= Promise.all([import("./friends.ts"), api("GET", "/api/friends"), api("GET", "/api/duels")]).catch(
+        () => null,
+      );
+      return ahead;
+    };
     screen.show(() =>
       playRun(
         s,
         () => {
-          go(cardHref(d.id), true);
+          askAhead().then(() => {
+            if (!life.aborted) go(cardHref(d.id), true);
+          });
           return h("p", { class: "muted" }, "…");
         },
         duelName(d),
         d.opponent?.name ?? "",
+        () => void askAhead(),
       ),
     );
   };

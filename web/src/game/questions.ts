@@ -4,7 +4,7 @@
 import { append, type Child, effect, h, listen, onCleanup, type Signal, signal } from "../lib/dom.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { play } from "../lib/sound.ts";
-import { hyphenate, listWords, withWord } from "../lib/words.ts";
+import { hyphenate, keepShort, listWords, withWord } from "../lib/words.ts";
 import { formatNumber, formatValue, type VerdictKind } from "../ui.ts";
 import { percent, rare, withOwn } from "./numbers.ts";
 import { optionSizes, overSizes } from "./sizes.ts";
@@ -49,10 +49,12 @@ export interface Asked {
 
 /** A cell's words (a pair, a thing to sort, a group): each that may break (hyphenate) held whole in a `.word`, so that
  * it goes to the next line whole where it fits there („Ангел / Каралийчев“, not „Ангел Каралий-/чев“), and breaks, at
- * its syllables, only where it's wider than the cell itself. */
-export function wholeWords(text: string): Child {
-  return hyphenate(text)
-    .split(/(\S*­\S*)/)
+ * its syllables, only where it's wider than the cell itself. A one-letter word goes with the word after it
+ * (keepShort), in its `.word` too, so that the two never part: in a question (`asked`, a line wide enough) always, in
+ * a narrow cell only where that word is too short to break (else „В / България“ beats „В Бълга-/рия“). */
+export function wholeWords(text: string, asked = false): Child {
+  return hyphenate(keepShort(text, !asked))
+    .split(/([^ \t\n\r]*­[^ \t\n\r]*)/)
     .map((part, i) => (i % 2 ? h("span", { class: "word" }, part) : part));
 }
 
@@ -156,8 +158,13 @@ export function ask(
 export function answered(view: View, reveal: Reveal, given: Answer | null, how?: VerdictKind): Child {
   const a = ask(view, () => {}, signal(true), undefined, true);
   a.reveal(reveal, given, undefined, how);
-  if (a.node instanceof Element)
+  if (a.node instanceof Element) {
     a.node.querySelector(".option.tf.right")?.append(h("small", { class: "tf-right" }, "верният отговор"));
+    // Shown, not answered: its options, rows and keys do nothing, so the keyboard passes them by (ten questions' worth
+    // were some forty stops on the way through the questions' dialog); a screen reader still reads them. A link (a
+    // picture's credit) stays one.
+    for (const el of a.node.querySelectorAll<HTMLElement>("button, [tabindex]")) el.tabIndex = -1;
+  }
   return a.node;
 }
 
@@ -223,6 +230,11 @@ export function picture(view: View, fit = false): Child {
       if (!img.isConnected || !below || img.closest(".answered")) return;
       const box = img.getBoundingClientRect();
       const under = below.getBoundingClientRect();
+      // Beside the answers (a laptop's spread): the screen's height under the picture's top is its own.
+      if (under.left >= box.right - 1) {
+        img.style.setProperty("--fit", `${Math.max(pictureFloor, Math.floor(innerHeight - box.top - scrollY - 16))}px`);
+        return;
+      }
       const gap = Number.parseFloat(getComputedStyle(img.parentElement ?? img).rowGap) || 0;
       const spare = Math.max(0, under.top - box.bottom - gap);
       const end = under.bottom + scrollY - box.height - spare;
@@ -264,13 +276,18 @@ export function picturesIn(view: View, ms: number): Promise<void> {
 /** What marks each answer, on every screen: a letter, so that everyone at a table (saying „Б“) names the same answer. */
 const letters = ["А", "Б", "В", "Г"];
 
-/** Keys 1–4 press the answer they mark, while the question waits for one (never in a field, never with a modifier). */
+/** Keys 1–4 press the answer they mark, and so do its letter's keys, А–Г (a Bulgarian keyboard), while the question
+ * waits for one (never in a field, never with a modifier). */
 function answerKeys(buttons: HTMLElement[], locked: Signal<boolean>): void {
   listen(document, "keydown", (e: KeyboardEvent) => {
     if (locked.peek() || e.metaKey || e.ctrlKey || e.altKey || e.repeat || e.target instanceof HTMLInputElement) return;
-    buttons[Number(e.key) - 1]?.click();
+    const i = /^[1-4]$/.test(e.key) ? Number(e.key) - 1 : letters.indexOf(e.key.toUpperCase());
+    if (i >= 0) buttons[i]?.click();
   });
 }
+
+/** Whether the player points with a mouse (a computer): its hints say „Щракни“, not „Докосни“, and name the keys. */
+const mouse = () => typeof matchMedia === "function" && matchMedia("(hover: hover) and (pointer: fine)").matches;
 
 /** The ✓ or ✕ on a revealed answer (its colour and words say the same). */
 const sign = () => h("span", { class: "sign", "aria-hidden": "true" });
@@ -573,7 +590,9 @@ function scale(answer: number, mine: number, how: VerdictKind | undefined, view:
 }
 
 /** Where everyone's guesses at a number fell: a bar for each part of the range a guess scores in, one at each end for
- * the guesses beyond it, the answer's part in the colour of a right answer and the player's own in theirs. */
+ * the guesses beyond it, the answer's part filled as a right answer is and the player's own outlined, as their mark
+ * on the scale over it is. The player's own beyond the range isn't one of those ends' bars (it would read as the most
+ * said): it's named at that end under them, „1900 лв. →“. */
 function spread(s: Spread, answer: number, mine: number | null, view: NumberView): HTMLElement {
   const n = s.bins.length;
   const at = (v: number) =>
@@ -586,7 +605,9 @@ function spread(s: Spread, answer: number, mine: number | null, view: NumberView
   const shares = [s.below, ...s.bins, s.above];
   const top = Math.max(...shares, 0.01);
   const theAnswer = column(answer);
-  const theirs = mine === null ? -1 : column(mine);
+  const at0 = mine === null ? -1 : column(mine);
+  const beyond = at0 === 0 ? "lo" : at0 === n + 1 ? "hi" : "";
+  const theirs = beyond ? -1 : at0;
   const unit = view.unit ? ` ${view.unit}` : "";
   const inRange = s.bins.reduce((a, b) => a + b, 0);
   const bars = h(
@@ -617,6 +638,14 @@ function spread(s: Spread, answer: number, mine: number | null, view: NumberView
       h("span", null, formatNumber(s.lo, view.step)),
       h("span", null, `${formatNumber(s.hi, view.step)}${unit}`),
     ),
+    beyond && mine !== null
+      ? h(
+          "p",
+          { class: `guess-out ${beyond}`, "aria-hidden": "true" },
+          h("i", { class: "guess-swatch mine" }),
+          beyond === "lo" ? `← ${formatNumber(mine, view.step)}${unit}` : `${formatNumber(mine, view.step)}${unit} →`,
+        )
+      : null,
     h(
       "div",
       { class: "guess-key", "aria-hidden": "true" },
@@ -704,7 +733,7 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
     } else {
       picked.set(item);
       play("tap");
-      said.textContent = `Взе „${view.items[item]}“. Докосни мястото, където да отиде.`;
+      said.textContent = `Взе „${view.items[item]}“. ${mouse() ? "Щракни" : "Докосни"} мястото, където да отиде.`;
     }
   };
   rows.forEach((row, item) => {
@@ -831,8 +860,12 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
     : h(
         "p",
         { class: "hint", id: how },
-        "Докосни ред, после новото му място, или го плъзни.",
-        h("span", { class: "sr" }, " Стрелките нагоре и надолу също го местят."),
+        mouse()
+          ? "Щракни ред, после новото му място, или го плъзни. Стрелките ↑ ↓ също го местят."
+          : [
+              "Докосни ред, после новото му място, или го плъзни.",
+              h("span", { class: "sr" }, " Стрелките нагоре и надолу също го местят."),
+            ],
       );
   return {
     node: h("div", { class: "stack" }, hint, list, said, display ? null : done),
@@ -1055,7 +1088,7 @@ function match(view: MatchView, submit: (a: Answer) => void, locked: Signal<bool
   const hint = h(
     "p",
     { class: "hint", hidden: display },
-    "Докосни нещо вляво, после двойката му вдясно.",
+    mouse() ? "Щракни нещо вляво, после двойката му вдясно." : "Докосни нещо вляво, после двойката му вдясно.",
     spare ? " Едно вдясно остава без двойка." : null,
   );
   const result = h("ol", { class: "options match-result", hidden: true });
@@ -1133,9 +1166,23 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
     const next = view.items[at + 1];
     said.textContent = `„${view.items[at]}“: ${view.groups[side]}.${next === undefined ? "" : ` Следва „${next}“.`}`;
     sides.update((s) => [...s, side]);
-    if (at + 1 === n) submit({ sides: [...sides.peek()] });
-    else window.setTimeout(lay, 180);
+    if (at + 1 === n) {
+      // The last one sent: the answer goes, and says so at once, its pips full, the groups done with (sent).
+      for (const p of pips.children) p.classList.add("done");
+      undo.hidden = true;
+      deck.parentElement?.classList.add("sent");
+      deck.append(sent);
+      submit({ sides: [...sides.peek()] });
+    } else window.setTimeout(lay, 180);
   };
+  const sent = h("p", { class: "split-sent", role: "status" }, "Отговорът е изпратен.");
+  // Refused (the options free again, the question still open): the last one can be taken back again.
+  effect(() => {
+    if (locked() || !sent.isConnected) return;
+    deck.parentElement?.classList.remove("sent");
+    sent.remove();
+    undo.hidden = false;
+  });
   const back = () => {
     if (locked.peek() || sides.peek().length === 0) return;
     sides.update((s) => s.slice(0, -1));
@@ -1221,9 +1268,9 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
   const hint = h(
     "p",
     { class: "hint" },
-    "Плъзни всяка карта наляво или надясно",
-    h("span", { class: "sr" }, " или натисни групата ѝ отдолу"),
-    ".",
+    mouse()
+      ? "Прати всяка карта наляво или надясно: плъзни я или натисни стрелките ← →."
+      : ["Плъзни всяка карта наляво или надясно", h("span", { class: "sr" }, " или натисни групата ѝ отдолу"), "."],
   );
   // Looked at, not answered: the two groups and every thing to put in them, all at once.
   const board = display

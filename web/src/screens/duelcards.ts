@@ -297,8 +297,14 @@ function shownNamed(card: HTMLElement, d: DuelView): void {
     if (!card.isConnected) return;
     if (!sight.done) {
       sight.done = true;
+      // One just finished: the finished ones from their head at the screen's top, it first among them, marked for a
+      // moment (as a fact the day wrote is in its chapter: app.css, .lit); one waiting, in sight.
+      const finished = card.closest<HTMLElement>(".duels-played");
       const r = card.getBoundingClientRect();
-      if (r.top < 0 || r.bottom > innerHeight * 0.8) card.scrollIntoView({ block: "center" });
+      if (finished)
+        scrollTo({ top: Math.max(0, finished.getBoundingClientRect().top + scrollY - 16), behavior: "instant" });
+      else if (r.top < 0 || r.bottom > innerHeight * 0.8) card.scrollIntoView({ block: "center" });
+      card.classList.add("lit");
     }
     land(card, d);
   });

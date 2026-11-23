@@ -29,7 +29,33 @@ const ours = "Нещо се обърка при нас. Опитай пак.";
  * error's code if it's one. */
 export const hearing: ((res: Response, code: string) => void)[] = [];
 
+/** The last answer to each GET while the page is open, by its path: a place come back to is drawn at once from what it
+ * showed last, and asked again, its page drawn anew in place where the answer differs (never the old screen held
+ * while the new one comes). Anything sent that may change what the player sees (a step of a game, a friend added)
+ * forgets them all, as a change of player does (state.ts); a mark of something seen changes nothing shown. */
+const kept = new Map<string, unknown>();
+
+/** What the server last answered a GET of `path` with, while this page has been open; undefined if it hasn't. */
+export function lastOf<T>(path: string): T | undefined {
+  return kept.get(path) as T | undefined;
+}
+
+/** Forgets every answer kept (lastOf). */
+export function forget(): void {
+  kept.clear();
+}
+
+/** Sets `s` to an answer of the server's (`v`) unless it holds the same already: a page drawn from what it showed last
+ * (lastOf) isn't drawn anew for nothing. */
+export function setIfNew<T>(s: { peek(): T; set(v: T): void }, v: T): void {
+  if (JSON.stringify(v) !== JSON.stringify(s.peek())) s.set(v);
+}
+
+/** Calls that only mark something as seen or told (a game's news, read once): they change nothing a page shows. */
+const marksOnly = /\/(seen|told|streak-told|news)$/;
+
 export async function api<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: string, body?: unknown): Promise<T> {
+  if (method !== "GET" && !marksOnly.test(path)) forget();
   if (body === undefined && method !== "GET") body = {};
   let res: Response;
   try {
@@ -63,6 +89,12 @@ export async function api<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: 
     const type = res.headers.get("Content-Type") || "no type";
     reportProblem(`${method} ${path}: ${res.status} without JSON (${type}, ${text.length} characters)`);
     throw new ApiError("server", ours);
+  }
+  if (method === "GET") {
+    // The latest kept last; a few dozen at most (a book's pages and searches are many).
+    kept.delete(path);
+    kept.set(path, data);
+    if (kept.size > 40) kept.delete(kept.keys().next().value ?? "");
   }
   return data as T;
 }

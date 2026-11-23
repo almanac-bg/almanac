@@ -10,7 +10,7 @@
 import { recover } from "./fresh.ts";
 import { news } from "./game/news.ts";
 import { hands, reviewSheet } from "./game/results.ts";
-import { ApiError, api, errorText } from "./lib/api.ts";
+import { ApiError, api, errorText, lastOf, setIfNew } from "./lib/api.ts";
 import { type Child, computed, effect, h, onCleanup, signal, untracked, when } from "./lib/dom.ts";
 import { reportProblem } from "./lib/errors.ts";
 import { setTick, tickOn } from "./lib/prefs.ts";
@@ -55,6 +55,8 @@ export const kit = {
   acceptedLine,
   inSight,
   isOwnTag,
+  lastOf,
+  setIfNew,
   api,
   avatar,
   back,

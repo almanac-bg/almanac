@@ -179,13 +179,13 @@ function run(r: Run): Child {
       if (s && !s.done) return play(s);
     }
     startHere = async () => {
-      const marks = left ? (await api<State>("GET", `/api/runs/${left.id}`).catch(() => null))?.trail : undefined;
+      const s = left ? await api<State>("GET", `/api/runs/${left.id}`).catch(() => null) : null;
       if (life.aborted) return;
       screen.show(() =>
         startScreen(
           r.name,
           r.lead,
-          left ? { at: left.at, total: left.total, marks } : null,
+          left ? { at: left.at, total: left.total, marks: s?.trail, leftMs: s?.question?.leftMs } : null,
           () => (left?.open ? start() : ready()),
           undefined,
           r.chapter,

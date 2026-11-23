@@ -30,6 +30,8 @@ test("the book's contents: a chapter a row with its ink, and no count of it all"
   await expect(movies).toContainText(/7\s*с\sмастило/);
   // A counter at zero is hidden: the book's head says how ink is written.
   await expect(cards.filter({ hasText: "География" })).not.toContainText("с мастило");
+  // A chapter before its first rank has the foot the others have: no seal yet, and how far the first is.
+  await expect(cards.filter({ hasText: "География" })).toContainText(/Още\sбез\sпечат\s*още\s1\sдо\s„Бележка“/);
   await expect(page.locator(".book-head a")).toHaveCount(0);
   // The chapters in their numbers' order, whatever their ink: a book's contents.
   await expect(cards.first()).toContainText("Обща култура");
@@ -40,6 +42,26 @@ test("the book's contents: a chapter a row with its ink, and no count of it all"
   await expect(page.locator(".entry")).toHaveCount(7);
   // Its game, a tap away.
   await expect(page.getByRole("link", { name: "Играй 10 въпроса" })).toHaveAttribute("href", "/play/movies");
+});
+
+test("a chapter says nothing of its ink until its numbers have come", async ({ page }) => {
+  // A fact in ink in „Кино и телевизия“; the chapter's numbers held back a moment, as on a slow line.
+  await page.goto("/");
+  await knows(page, ["mov-300"], Date.now(), true);
+  let release = () => {};
+  const held = new Promise<void>((done) => {
+    release = done;
+  });
+  await page.route(/\/api\/almanac\?/, async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.goto("/almanac/movies");
+  await expect(page.getByRole("heading", { level: 1, name: "Кино и телевизия" })).toBeVisible();
+  // Not „no ink yet“ while they're on their way: nothing.
+  await expect(page.locator(".chapter-stand")).toHaveCount(0);
+  release();
+  await expect(page.locator(".chapter-ink")).toContainText(/1\s*с\sмастило/);
 });
 
 test("a chapter comes a page at a time, by its numbers", async ({ page }) => {
@@ -216,6 +238,9 @@ test("a picture question's entry shows its picture, credited; a choice of pictur
     await expect(e.locator(".credit")).toContainText("Снимка:");
     const [p, word] = [await pic.boundingBox(), await e.locator(".entry-word").boundingBox()];
     expect(p && word && p.x > word.x).toBe(true);
+    // The fact right under the headword, beside a picture taller than both: no hole between them.
+    const fact = await e.locator(".entry-fact").boundingBox();
+    expect(fact && word && fact.y - (word.y + word.height)).toBeLessThanOrEqual(16);
   }
   await page.goto("/");
   await knows(page, ["his-002"]);
@@ -263,6 +288,10 @@ test("on a big screen a chapter's entries are one column, the latest first, top 
   expect(new Set(boxes.map((b) => Math.round(b.left))).size).toBe(1);
   for (const [i, b] of boxes.slice(1).entries()) expect(b.top).toBeGreaterThan(boxes[i]?.bottom ?? 0);
   expect(boxes[0]?.width).toBeLessThanOrEqual(44 * 16 + 1);
+  // Scrolled to its last fact, the chapter's head and its „Играй“ are still beside them: no half a screen left empty.
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const play = await page.getByRole("link", { name: "Играй 10 въпроса" }).boundingBox();
+  expect(play && play.y >= 0 && play.y + play.height <= 900).toBe(true);
 });
 
 test("a chapter the book doesn't have is the page that isn't there; the book with a slash after it is the book", async ({
@@ -292,4 +321,16 @@ test("on a big screen the book's chapters are five across, none over another", a
   for (const [i, a] of boxes.entries())
     for (const b of boxes.slice(i + 1))
       expect(a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1).toBe(false);
+  // Narrower, where names take two lines: each card's foot (its rank and bar) at the card's foot, level along a row.
+  await page.setViewportSize({ width: 1024, height: 768 });
+  const feet = await page
+    .locator(".chapter-card")
+    .evaluateAll((all) =>
+      all.map((c) => [
+        Math.round(c.getBoundingClientRect().top),
+        Math.round(c.querySelector(".card-rank")?.getBoundingClientRect().bottom ?? 0),
+      ]),
+    );
+  for (const [top, foot] of feet)
+    expect(feet.filter(([t]) => t === top).map(([, f]) => f)).toEqual(feet.filter(([t]) => t === top).map(() => foot));
 });

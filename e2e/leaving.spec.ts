@@ -29,12 +29,31 @@ test("the browser's back asks in the day's ten, opened from outside, and never l
   await expect(page).toHaveURL(/\/$/);
 });
 
+test("Esc mid-question asks as the arrow out does, „Остани“ first; Esc again plays on, „Излез“ leaves", async ({
+  page,
+}) => {
+  await page.goto("/almanac/history");
+  await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
+  await page.getByRole("button", { name: "Веднага" }).click();
+  await expect(page.locator(".question-head")).toContainText("1 от 10");
+  await expect(page.locator("article.question .answering")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByText(asked)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Остани" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByText(asked)).toBeHidden();
+  await expect(page.locator(".question-head")).toContainText("1 от 10");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Излез" }).click();
+  await expect(page).toHaveURL(/\/almanac$/);
+});
+
 test("the browser's back in a chapter asks, its address kept while it does; „Излез“ comes to its chapter", async ({
   page,
 }) => {
   await page.goto("/almanac/history");
   await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await page.getByRole("button", { name: "Веднага" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10");
   // Back once, then again while it asks: the game's address stays, the question with it.
   for (let i = 0; i < 2; i++) {
@@ -62,7 +81,7 @@ test("a chapter counts in only after a tap; a reload goes back to its question, 
   await page.waitForTimeout(3500);
   await expect(page.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
   await page.getByRole("button", { name: "Започни", exact: true }).click();
-  await page.getByRole("button", { name: "Започни сега" }).click();
+  await page.getByRole("button", { name: "Веднага" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10");
   // A reload mid-question: straight back to it, its time still running (no count first): never more of it than before.
   const secsLeft = async () =>
@@ -105,6 +124,12 @@ test("„Отказ“ on the count of a chapter opened from outside comes back 
   for (const out of ["click", "Escape"]) {
     await begin.click();
     await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
+    // On a phone the count's ring is in the middle of the screen it has to itself.
+    if (out === "click") {
+      const ring = await page.locator(".ready-clock").boundingBox();
+      const height = page.viewportSize()?.height ?? 0;
+      expect(Math.abs((ring?.y ?? 0) + (ring?.height ?? 0) / 2 - height / 2)).toBeLessThan(24);
+    }
     if (out === "click") await page.getByRole("button", { name: "Отказ", exact: true }).click();
     else await page.keyboard.press("Escape");
     await expect(begin).toBeVisible();
@@ -126,7 +151,8 @@ test("a chapter left half-way says so on its tile; another tab waits for „Пр
   const other = await context.newPage();
   await other.goto("/play/history");
   await expect(other.getByRole("button", { name: "Продължи" })).toBeVisible();
-  await expect(other.locator(".start-screen")).toContainText("Следва въпрос 2 от 10.");
+  // Its time running there, the line says so, counting down: „Продължи“ comes into a question with what time it has.
+  await expect(other.locator(".start-screen")).toContainText(/Времето на въпрос 2 тече: остав(а|ат) \d+\u00a0с\./);
   await other.goto("/almanac/history");
   await expect(other.locator(".chapter-play")).toContainText("Следва въпрос 2 от 10.");
   await other.close();

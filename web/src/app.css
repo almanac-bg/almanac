@@ -166,7 +166,7 @@
     --i-flame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 28'%3E%3Cpath d='M12 1c1.2 4.6 7 7.4 7 14.2a7 7 0 0 1-14 .4c0-3.6 1.9-6 3.8-7.6.2 2.4 1.2 3.8 2.7 4.3C11 9.2 11 5 12 1z'/%3E%3C/svg%3E");
     --i-share: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 15V4M7.5 8.5L12 4l4.5 4.5'/%3E%3Cpath d='M5 13v6h14v-6'/%3E%3C/svg%3E");
     --i-nib: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.5c2.6 3 5 6.2 5 9.3 0 2-1.1 3.4-2.6 4.1V18H9.6v-2.1C8.1 15.2 7 13.8 7 11.8c0-3.1 2.4-6.3 5-9.3zm0 6.3a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM8.6 19.4h6.8v2.1H8.6z'/%3E%3C/svg%3E");
-    --i-gear: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='3.2'/%3E%3Cpath d='M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M5.5 18.5l1.9-1.9M16.6 7.4l1.9-1.9'/%3E%3C/svg%3E");
+    --i-gear: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M9.75 4.74L9.97 2h4.06l.22 2.74 1.3.54 2.09-1.78 2.86 2.86-1.78 2.09.54 1.3 2.74.22v4.06l-2.74.22-.54 1.3 1.78 2.09-2.86 2.86-2.09-1.78-1.3.54-.22 2.74H9.97l-.22-2.74-1.3-.54-2.09 1.78-2.86-2.86 1.78-2.09-.54-1.3L2 14.03V9.97l2.74-.22.54-1.3-1.78-2.09 2.86-2.86 2.09 1.78z'/%3E%3Ccircle cx='12' cy='12' r='3.2'/%3E%3C/svg%3E");
     --i-pencil: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17z'/%3E%3Cpath d='M13.5 8.5l2 2'/%3E%3C/svg%3E");
     --i-today: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='5' width='17' height='15.5' rx='3'/%3E%3Cpath d='M8 3v4M16 3v4M3.5 10h17'/%3E%3Ccircle cx='12' cy='15.25' r='1.75' fill='%23000' stroke='none'/%3E%3C/svg%3E");
     --i-book: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 18.5V5.5A2.5 2.5 0 0 1 7.5 3H19v14H7.5A2.5 2.5 0 0 0 5 19.5 1.5 1.5 0 0 0 6.5 21H19'/%3E%3Cpath d='M9 7.5h6'/%3E%3C/svg%3E");
@@ -591,11 +591,14 @@
 
   /* The three places on a phone: words at the foot where a thumb is, the current one on a well. */
   /* The places on a phone: a pill that floats over the page, clear of every edge, the home bar under it. */
+  /* Never wider than the page's column (a tablet, large text on a laptop): in the middle, under it. */
   .places-foot {
     position: fixed;
     right: max(12px, env(safe-area-inset-right));
     bottom: max(12px, calc(env(safe-area-inset-bottom) - 8px));
     left: max(12px, env(safe-area-inset-left));
+    max-width: calc(40rem - 24px);
+    margin-inline: auto;
     z-index: 10;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -691,12 +694,23 @@
       max(var(--gutter), env(safe-area-inset-left));
   }
 
-  /* A big screen: the places in the bar, the avatar in the corner. */
+  /* A big screen: the places in the bar, the avatar in the corner. Up to here (a tablet, a laptop with its text at
+     twice its size) the page is a phone's column, 40rem in the middle, never stretched from edge to edge; from here a
+     page that isn't a spread has a little more. */
   @media (min-width: 56.25rem) {
     :root {
       --gutter: 40px;
     }
 
+    #main {
+      max-width: 48rem;
+    }
+  }
+
+  /* The places in the bar at the top: on a big screen, and on any short wide one (a phone on its side, a laptop at
+     200 % zoom), where a bar at the foot took a fifth of the height and covered „Започни“. Not narrower than the smallest
+     phone on its side (568 px): the name, the three places and the face don't fit side by side below that. */
+  @media (min-width: 56.25rem), (orientation: landscape) and (max-height: 30rem) and (min-width: 35rem) {
     .bar {
       gap: var(--space-3);
       min-height: 72px;
@@ -756,7 +770,21 @@
     #app {
       padding-bottom: var(--space-7);
     }
+  }
 
+  /* A phone on its side, narrower than a big screen: the places closer together, so that they fit beside the name. */
+  @media (orientation: landscape) and (max-height: 30rem) and (min-width: 35rem) and (max-width: 56.24rem) {
+    .bar .places {
+      gap: 2px;
+      margin-left: auto;
+    }
+
+    .places a {
+      padding: 0 10px;
+    }
+  }
+
+  @media (min-width: 56.25rem) {
     /* A place on a big screen is a spread: the page's whole width, on a 12-column grid, its pages side by side. */
     #main:has(.spread) {
       max-width: calc(var(--page) + 2 * var(--gutter));
@@ -911,6 +939,45 @@
       background: var(--action);
       opacity: 0.9;
     }
+
+    /* Everything else that's clicked answers the mouse too, each in its own quiet way: what's outlined takes a
+       surface or a line, a word its full ink, a tile or a card a ring. */
+    .more:hover {
+      background: var(--surface);
+    }
+
+    .segmented button:not([aria-selected="true"], [aria-checked="true"]):hover,
+    .link:hover:not(:disabled),
+    :is(.news-facts, .ink-row, .ink-chapter):hover {
+      color: var(--ink);
+    }
+
+    .link:hover:not(:disabled) {
+      text-decoration-thickness: 3px;
+    }
+
+    :is(.ink-row, .ink-chapter):hover {
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 4px;
+    }
+
+    .switch-row:hover .switch:not([aria-checked="true"]) {
+      box-shadow: inset 0 0 0 2px var(--ink-3);
+    }
+
+    .switch-row:hover .switch[aria-checked="true"] {
+      opacity: 0.9;
+    }
+
+    .tile-tap:hover {
+      outline: 2px solid var(--ink);
+      outline-offset: 2px;
+    }
+
+    a.streak-chip:hover {
+      box-shadow: inset 0 0 0 2px var(--line-2);
+    }
   }
 
   .btn:active:not(:disabled) {
@@ -974,6 +1041,11 @@
   .link.muted {
     color: var(--ink-3);
     font-weight: 700;
+  }
+
+  /* A way to a step that can't be undone („Изтрий профила“): in the danger's colour, as its button is. */
+  .link.danger {
+    color: var(--danger);
   }
 
   /* A link on its own line that's tapped, not read in a sentence: a finger's height. */
@@ -1791,6 +1863,23 @@
     color: var(--on-sheet);
   }
 
+  /* A question's sheet made smaller as its answer comes (run.ts, settle): its colour drawn behind it from its height
+     then, shrinking to its own; nothing laid out anew. */
+  .leaf.shrinking {
+    isolation: isolate;
+  }
+
+  .leaf-ghost {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: inherit;
+    pointer-events: none;
+  }
+
   /* The issue's cover and the chapters' cards: the corner turned. */
   .leaf.folded {
     clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--fold)), calc(100% - var(--fold)) 100%, 0 100%);
@@ -2302,7 +2391,8 @@
     display: grid;
     place-items: center;
     min-height: 3.375rem;
-    border: 2px solid var(--line);
+    /* The answers' frame: a key that answers looks as live as an answer does. */
+    border: 2px solid var(--line-2);
     border-radius: 14px;
     background: var(--surface);
     color: var(--ink);
@@ -2678,15 +2768,31 @@
     background: var(--line-2);
   }
 
+  /* Beyond the range, a lighter grey than the range's bars, dark enough for its 10px swatch to show. */
   .guess-bar.edge,
   .guess-swatch.edge {
-    background: var(--line);
+    background: color-mix(in srgb, var(--line-2) 50%, var(--line));
   }
 
+  /* The player's own: outlined in ink, hollow, as their mark on the scale is. */
   .guess-bar.mine,
   .guess-swatch.mine {
-    background: repeating-linear-gradient(135deg, var(--ink) 0 3px, transparent 3px 6px);
-    box-shadow: inset 0 0 0 1.5px var(--ink);
+    background: transparent;
+    box-shadow: inset 0 0 0 2px var(--ink);
+  }
+
+  /* The player's own beyond the range: named at its end, under the bars. */
+  .guess-out {
+    display: flex;
+    align-items: center;
+    margin: 0;
+    color: var(--ink);
+    font: 800 0.875rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .guess-out.hi {
+    justify-content: flex-end;
   }
 
   .guess-bar.answer,
@@ -2957,6 +3063,16 @@
   .split-text {
     justify-self: center;
     text-align: center;
+  }
+
+  /* The last card sent: the deck says the answer went, and the groups are done with until it shows. */
+  .split-sent {
+    color: var(--ink-2);
+    font: var(--t-label);
+  }
+
+  .split.sent .option.split-side {
+    opacity: 0.45;
   }
 
   .split-sides {
@@ -3287,6 +3403,26 @@
     text-wrap: pretty;
   }
 
+  /* The day's issue: a fact as the book has it, in grey where the answer wrote nothing, and in ink where it wrote it,
+     come in grey and darkened to ink once as it shows (run.ts, inkable); with less motion, in ink at once. */
+  .fact.grey > p {
+    color: var(--grey);
+  }
+
+  .fact.inking > p {
+    animation: inking 350ms ease-in-out 100ms both;
+  }
+
+  @keyframes inking {
+    from {
+      color: var(--grey);
+    }
+
+    to {
+      color: var(--ink);
+    }
+  }
+
   .fact-day {
     display: grid;
     gap: 6px;
@@ -3356,6 +3492,18 @@
     bottom: 0;
     z-index: 1;
     display: grid;
+  }
+
+  /* On to the next question (run.ts, moveOn): at once, the panel's words go and „Напред“ stays pressed while it comes. */
+  .after.going > :not(.after-foot) {
+    opacity: 0;
+    transition: opacity 120ms ease-out;
+  }
+
+  .run-question .after.going .btn.up-next-go {
+    cursor: progress;
+    opacity: 0.7;
+    transform: scale(0.985);
   }
 
   /* „Напред“ is the one action of an answer: the primary's look, whatever its class says (run.ts makes it a .btn). */
@@ -3504,10 +3652,22 @@
     color: var(--on-sheet);
   }
 
+  /* A duel before it starts: a card of the chapter's sheet's shape, the two face to face over what it is. */
+  .start-card {
+    justify-items: center;
+    width: min(100%, 26rem);
+    padding: 24px 20px 28px;
+  }
+
+  .start-faces {
+    display: flex;
+    gap: var(--space-3);
+  }
+
   /* Tabs that switch what a screen shows: a well, the chosen one a raised surface, both pills; a setting's few choices
      the same, as radios. */
   /* Its choices of one width, unless one's longest word needs more („Като устройството“): that one wider, its words
-     whole, never broken inside one. */
+     whole, never broken inside one (on a phone each as wide as its words, below). */
   .segmented {
     display: inline-grid;
     grid-auto-columns: minmax(min-content, 1fr);
@@ -3521,9 +3681,12 @@
 
   /* On a phone a switch is the screen's width, its choices sharing it: a target the thumb finds, not a pill on the
      left. */
+  /* Each choice as wide as its words, the room left shared among them: one of equal thirds broke „Като устройството“
+     onto two lines. */
   @media (max-width: 47.99rem) {
     .segmented {
       display: grid;
+      grid-auto-columns: auto;
       justify-self: stretch;
     }
   }
@@ -3539,6 +3702,20 @@
     color: var(--ink-3);
     font: 800 0.9375rem / 1.1 var(--font-sans);
     cursor: pointer;
+  }
+
+  /* A phone: a little less room either side of a choice's words, so that the three fit a 320px phone whole. */
+  @media (max-width: 47.99rem) {
+    .segmented button {
+      padding-inline: 12px;
+    }
+  }
+
+  /* The narrowest phones, the switch on a card (Настройки): less again. */
+  @media (max-width: 22.5rem) {
+    .segmented button {
+      padding-inline: 8px;
+    }
   }
 
   .segmented button:is([aria-selected="true"], [aria-checked="true"]) {
@@ -3637,6 +3814,21 @@
     text-align: center;
   }
 
+  /* Large text, few words to a line: where the page is on a line of its own, the two buttons under it, at its ends
+     (in a row, „По-стари“ ran off the screen and the page scrolled sideways). */
+  .tight .pages {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .tight .pages-at {
+    grid-area: 1 / 1 / 2 / -1;
+  }
+
+  .tight .pages > .btn:last-child {
+    grid-column: 3;
+  }
+
   /* The duels to play, one stack: the first challenged on top, the edges of one or two more under it, each a little
      narrower, as sheets lie in a stack. */
   .duel-pile {
@@ -3677,13 +3869,42 @@
     box-shadow: inset 0 0 0 3px var(--ink);
   }
 
-  /* The two sides of one width, whatever their names: what stands between them is in the card's middle. */
+  /* The two sides of one width, whatever their names, and the middle of one width on every card („Твой ред“, „8:6“
+     over „Равенство“, „Изтече“): the faces in the same place card after card. */
   .duel-card-sides {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 6rem minmax(0, 1fr);
     align-items: start;
     align-self: center;
     gap: var(--space-2);
+  }
+
+  /* A big screen: the two closer, in the card's middle (a column's width apart they were strangers), each avatar
+     beside its name, facing the other's; the card a line shorter for it. */
+  @media (min-width: 56.25rem) {
+    .duel-card-sides {
+      justify-self: center;
+      align-items: center;
+      width: min(100%, 30rem);
+    }
+
+    .duel-card-sides > .duel-card-side {
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      justify-items: start;
+      gap: var(--space-2);
+      text-align: left;
+    }
+
+    .duel-card-sides > .duel-card-side:last-child {
+      grid-template-columns: minmax(0, 1fr) auto;
+      justify-items: end;
+      text-align: right;
+    }
+
+    .duel-card-sides > .duel-card-side:last-child > .avatar {
+      grid-area: 1 / 2;
+    }
   }
 
   .duel-card-side {
@@ -4154,7 +4375,6 @@
   /* A question gone over: a card of its own, a band in its verdict's colour on top; its number, chapter and how it went
      over the question (the strongest line), the answers, and the fact a quiet note under them. */
   .reviewed {
-    --v-ink: var(--ink-3);
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-3);
@@ -4164,27 +4384,41 @@
     box-shadow: none;
   }
 
-  .reviewed.right {
-    --v-ink: var(--ink);
-  }
-
-  .reviewed.close {
-    --v-ink: var(--ink);
-  }
-
   .reviewed-head {
     display: flex;
     flex-wrap: wrap;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: var(--space-1) var(--space-3);
     margin: 0;
   }
 
+  /* The question's number, then its chapter's chip. */
+  .reviewed-at {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .reviewed-n {
+    min-width: 1.25rem;
+    color: var(--ink-3);
+    font: 900 1.25rem / 1 var(--font-numeral);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* How it went, as a duel's side says it: the sign and the word, right in ink, the rest quieter. */
   .reviewed-says {
-    color: var(--v-ink);
-    font-size: 0.8125rem;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--ink-3);
+    font-size: 0.9375rem;
     font-weight: 800;
+  }
+
+  .reviewed-says.right {
+    color: var(--ink);
   }
 
   .reviewed .ask {
@@ -4842,9 +5076,9 @@
   }
 
   /* On a big screen, one column read top to bottom, as on a phone: a page of its own (no spread: a second page would
-     hold only Настройки). */
+     hold only Настройки). Настройки and Вход the same width (.narrow): a field or a switch no further from its words. */
   @media (min-width: 56.25rem) {
-    .screen.me {
+    .screen:is(.me, .narrow) {
       width: 100%;
       max-width: 40rem;
       margin-inline: auto;
@@ -5023,8 +5257,13 @@
     height: 100%;
   }
 
+  /* A column whose foot (its ink, its rank and bar) sits at the card's foot: a name on two lines never puts one card's
+     numbers lower than its neighbours'. */
   .card-leaf {
     --fold: 34px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
     height: 100%;
     gap: 8px;
     padding: 14px;
@@ -5075,6 +5314,15 @@
     gap: 5px;
     padding-right: 22px;
     font: 900 0.8125rem / 1.25 var(--font-sans);
+  }
+
+  /* Before a first rank, with no ink to stand over it, the foot at the card's foot as on the others. */
+  .card-top + .card-rank {
+    margin-top: auto;
+  }
+
+  .card-rank .none {
+    font-weight: 700;
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -5241,7 +5489,22 @@
     hyphens: auto;
     border-radius: var(--r-2);
     background: var(--surface);
-    box-shadow: inset 6px 0 0 var(--ink);
+  }
+
+  /* Ink's mark: a straight bar of ink down the entry's left edge, round at its ends, clear of the card's corners
+     (an inset edge on a round card bent into a crescent). */
+  .entry.ink {
+    position: relative;
+  }
+
+  .entry.ink::before {
+    content: "";
+    position: absolute;
+    inset-block: 14px;
+    left: 6px;
+    width: 4px;
+    border-radius: 2px;
+    background: var(--ink);
   }
 
   .entry-when {
@@ -5299,9 +5562,10 @@
     font-size: 0.8125rem;
   }
 
+  /* Grey, as met: a hairline, quieter than ink, never a control's frame (nothing in it to tap but its picture). */
   .entry.met {
     background: transparent;
-    box-shadow: inset 0 0 0 1.5px var(--line-2);
+    box-shadow: inset 0 0 0 1.5px var(--line);
     color: var(--grey);
   }
 
@@ -5314,18 +5578,27 @@
   }
 
   /* A picture question's picture, beside its dateline, question and headword: a thumbnail at the entry's right, its
-     whole shape (a flag is never cut). */
-  .entry-top {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: 14px;
+     whole shape (a flag is never cut), the words running beside it and on under it, the fact too: no hole between the
+     headword and the fact under a tall picture. The entry's words in a flow, spaced as its grid spaces them. */
+  .entry.pictured {
+    display: flow-root;
   }
 
-  .entry-head {
-    display: grid;
-    align-content: start;
-    gap: 6px;
+  .entry.pictured > :is(.entry-word, .entry-lines, .credit) {
+    margin-top: 6px;
+  }
+
+  .entry.pictured > .entry-q {
+    margin-top: 8px;
+  }
+
+  .entry.pictured > .entry-fact {
+    margin-top: 10px;
+  }
+
+  .entry.pictured > .entry-zoom {
+    float: right;
+    margin: 0 0 8px 14px;
   }
 
   .entry-pic {
@@ -5436,8 +5709,17 @@
       min-height: 12.5rem;
     }
 
+    /* The chapter's head stays beside its facts as they scroll (a long chapter is thousands of pixels): never a half
+       screen left empty. Only where the screen is tall enough to hold it whole, its „Играй“ with it. */
     .chapter.spread > .page-1 {
       grid-column: 1 / span 5;
+    }
+
+    @media (min-height: 37.5rem) {
+      .chapter.spread > .page-1 {
+        position: sticky;
+        top: var(--space-4);
+      }
     }
 
     /* The facts in one column, a reading width (its head and search with it): a book reads top to bottom, the latest
@@ -5653,11 +5935,18 @@
     display: none;
   }
 
+  /* A book's table of contents, not rows to tap (nothing in it opens): on the page, no card, no lines between. */
+  .contents-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
   .contents-row {
     display: flex;
     align-items: center;
     gap: 12px;
-    min-height: 48px;
+    min-height: 40px;
     font: 700 1rem / 1.2 var(--font-sans);
   }
 
@@ -5695,14 +5984,27 @@
     height: 44px;
   }
 
-  .streak-chip.unlit .streak-flame {
-    filter: grayscale(0.4);
-    opacity: 0.85;
+  /* Unlit, while the day's ten wait: the flame's outline alone, hollow, in a quiet ink (its art greyed read as faded,
+     broken); the day played lights it. Its silhouette is the art's second path (art/pictures.ts, flame). */
+  .streak-chip.unlit .streak-flame path {
+    display: none;
   }
 
+  .streak-chip.unlit .streak-flame path:nth-child(2) {
+    display: inline;
+    fill: none;
+    stroke: var(--ink-3);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+  }
+
+  /* As wide as two digits whatever the number, so its words start in one place from day to day. */
   .status-n {
+    flex: none;
+    min-width: 0.95em;
     font: 900 3.25rem / 0.82 var(--font-numeral);
     font-variant-numeric: tabular-nums;
+    text-align: center;
   }
 
   .status-text {
@@ -5794,9 +6096,29 @@
     font: 800 0.9375rem / 1.2 var(--font-sans);
   }
 
-  /* On the sheet, a hollow or a half tile is drawn on white, so the sheet's colour doesn't hide it. */
+  /* On the sheet, a hollow or a half tile is see-through: a faint wash of white, its line in the sheet's ink, faded,
+     so that it stays quieter than a right one (on white with the chapter's deep line it outshone them, worst on a
+     chapter's game, all one colour). */
   .score-leaf .tile:is(.wrong, .near, .void) {
-    background-color: #fff;
+    background-color: rgb(255 255 255 / 0.25);
+  }
+
+  .score-leaf .tile:is(.wrong, .void) {
+    outline-color: rgb(22 19 43 / 0.55);
+  }
+
+  .score-leaf .tile.near {
+    box-shadow: inset 0 0 0 2.5px rgb(22 19 43 / 0.55);
+  }
+
+  /* A small phone (or large text): ten in a row would be specks of 20px; two rows of five, as the share's card draws
+     them, each a finger's size. */
+  @media (max-width: 22.5rem) {
+    .score-leaf .tiles {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
+      max-width: 16.5rem;
+    }
   }
   /* A right tile of the sheet's own chapter would melt into it: every right one on the sheet has a rim of ink. */
   :is(.score-leaf, .issue-leaf) .tile.right {
@@ -5821,22 +6143,40 @@
     color: var(--on-sheet);
   }
 
-  /* Ten of ten: the mark drawn over the score, petal by petal (feel.ts), and „Всички верни“. */
-  .perfect-head {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  /* Ten of ten: the game's mark drawn large beside the score, petal by petal (feel.ts), „Всички верни“ under it at the
+     date's size. The sheet takes a second column for it, beside the date and the score; the rest runs the whole
+     width under them. */
+  .score-leaf:has(> .perfect) {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
-  .perfect-head .kicker {
+  .score-leaf:has(> .perfect) > * {
+    grid-column: 1 / -1;
+  }
+
+  .score-leaf:has(> .perfect) > :is(.score-kicker, .score) {
+    grid-column: 1;
+  }
+
+  .score-leaf > .perfect {
+    display: grid;
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    justify-items: center;
+    gap: 6px;
+  }
+
+  .perfect-words {
     color: var(--on-sheet);
-    font-size: 0.875rem;
+    white-space: nowrap;
   }
 
-  /* Ten of ten: the rosette over the score, on the sheet (the same in both themes), its last petal gold. */
+  /* The rosette on the sheet (the same in both themes), its last petal gold: as large as the score leaves room for. */
   .perfect-mark {
-    width: 40px;
-    height: 40px;
+    width: clamp(64px, 24vw, 128px);
+    height: auto;
+    aspect-ratio: 1;
   }
 
   .perfect-mark .petal {
@@ -6099,6 +6439,18 @@
   .result-share {
     display: grid;
     gap: var(--space-3);
+  }
+
+  /* A friend's duel, the result's action: whose it is over the button, as the cover's duel row says it. */
+  .result-duel-from {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+  }
+
+  .result-duel-from > span {
+    min-width: 0;
   }
 
   /* Yesterday's issue finished after midnight: today's date set big, its words beside it, the way on to it. */
@@ -6398,8 +6750,8 @@
       grid-column: 8 / span 5;
     }
 
+    /* The cover as tall as what's on it: a height of its own left its lower quarter empty colour. */
     .issue-leaf {
-      min-height: 32.5rem;
       padding: 32px;
     }
 
@@ -6426,6 +6778,11 @@
 
     .contents-issue {
       display: grid;
+    }
+
+    /* A new visitor's line under „Започни“: what the ten are is „В броя“'s, under it. */
+    .issue-words-ten {
+      display: none;
     }
 
     /* The result: the player's own day on the left page (the score, what the day wrote, the action, tomorrow), the
@@ -6476,11 +6833,19 @@
     padding: var(--space-2) 0;
   }
 
+  /* The avatar level with the name, at the row's top however tall the row grows (a name on two lines, a line more
+     under it), never centred on the whole row below the name; „Дуел“ in the row's middle. */
   .friend {
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
       "pic name act"
       "pic day act";
+    align-content: center;
+    align-items: start;
+  }
+
+  .friend > .friend-act {
+    align-self: center;
   }
 
   /* A board's: its place before the avatar; under the name the score, the day's small squares after it (under it only
@@ -6550,9 +6915,20 @@
     border-top-color: transparent;
   }
 
-  /* Further down than the best: a little apart from them. */
+  /* Further down than the best: a little apart from them, a quiet „…“ in the places' column between (today.ts,
+     ownRow). */
   .rank-row.gap {
-    margin-top: var(--space-3);
+    margin-top: var(--space-1);
+  }
+
+  .rank-skip {
+    display: grid;
+    grid-template-columns: 1.5rem;
+    justify-items: center;
+    padding-top: var(--space-2);
+    color: var(--ink-3);
+    font: 900 1.25rem / 1 var(--font-numeral);
+    text-align: center;
   }
 
   .board-note {
@@ -6565,6 +6941,11 @@
     padding: var(--space-2) 0;
     color: var(--ink-2);
     font: 600 1rem / 1.45 var(--font-sans);
+  }
+
+  /* On the board's card, under the player's row alone: why it's alone. */
+  .rows > .board-empty {
+    padding: var(--space-3) 0 var(--space-2);
   }
 
   /* A friend's way to a duel, a button (or „Премахни“), at the row's end: 44px to tap, the row no taller for it. */
@@ -6608,6 +6989,17 @@
     font-weight: 800;
     text-decoration: none;
     overflow-wrap: break-word;
+  }
+
+  /* A friend's name, a way to their profile: a finger's 44px to tap, drawn no taller (the row has the room). */
+  a.friend-name {
+    position: relative;
+  }
+
+  a.friend-name::after {
+    content: "";
+    position: absolute;
+    inset: -12px 0;
   }
 
   /* The @username only where two friends share a name (`.same`): elsewhere it's on their profile. */
@@ -6676,12 +7068,6 @@
     flex: 1 0 auto;
   }
 
-  .waiting-for {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-2);
-  }
-
   .waiting li {
     display: flex;
     align-items: center;
@@ -6696,26 +7082,34 @@
     overflow-wrap: anywhere;
   }
 
-  /* Someone asks to be friends: their line, „Приеми“ and „Откажи“, on a card over the list. */
+  /* Someone asks to be friends: their line, and under it „Приеми“ and „Откажи“, on a card over the list as every card
+     is (no frame of its own). */
   .invitation {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2) var(--space-3);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
     padding: var(--space-4);
-    border-radius: var(--r-2);
+    border-radius: var(--r-3);
     background: var(--surface);
-    box-shadow: inset 0 0 0 2px var(--line);
   }
 
   /* Who asks, a row of players' look, and what they ask under the name, on the name's edge (the avatar's 28px and
-     the row's 10px gap in). */
+     the row's 10px gap in); the answers on that edge too. */
   .invitation-who {
     display: grid;
-    flex: 1 1 12rem;
     gap: 2px;
     min-width: 0;
+  }
+
+  /* Who asks, a way to their profile: a finger's 44px to tap, drawn no taller. */
+  .invitation a.who {
+    position: relative;
+  }
+
+  .invitation a.who::after {
+    content: "";
+    position: absolute;
+    inset: -8px 0;
   }
 
   .invitation-line {
@@ -6730,6 +7124,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-2) var(--space-4);
+    padding-left: 38px;
   }
 
   /* Read by screen readers, not shown. */
@@ -6744,15 +7139,19 @@
 
   /* ---- Profile ---- */
 
+  /* Настройки: a card a group (its name a kicker at its head), evenly apart. */
   .settings {
     display: grid;
-    gap: var(--space-5);
+    gap: var(--space-4);
   }
 
   .settings > section,
   .settings > form {
     display: grid;
-    gap: var(--space-4);
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border-radius: var(--r-3);
+    background: var(--surface);
   }
 
   /* ---- The server's own pages (privacy) ---- */
@@ -6927,7 +7326,7 @@
 
   /* A phone in a game, upright or on its side: the question has the whole screen, the header and the bar of places
      with it, and a stray tap can't leave it. The way out is the arrow before the question's count. */
-  @media (max-width: 47.99rem), (pointer: coarse) and (orientation: landscape) and (max-height: 30rem) {
+  @media (max-width: 47.99rem), (orientation: landscape) and (max-height: 30rem) {
     .playing .frame {
       display: none;
     }
@@ -6947,10 +7346,24 @@
       display: grid;
     }
 
-    /* The count before a run: in the middle of the screen it has to itself. */
+    /* The count before a run: its ring in the middle of the screen it has to itself, what it is over it, the ways on
+       under it. */
     .playing .get-ready {
       min-height: calc(100dvh - var(--app-top) - var(--app-foot));
       align-content: center;
+    }
+
+    .playing .get-ready:not(.start-screen) {
+      grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-content: stretch;
+    }
+
+    .playing .get-ready:not(.start-screen) > .intro {
+      align-self: end;
+    }
+
+    .playing .get-ready:not(.start-screen) > .actions {
+      align-self: start;
     }
 
     /* A run's question is a column the screen's height (run.ts): the head, the pips and the clock at the top, the
@@ -6965,6 +7378,16 @@
       display: grid;
       gap: var(--space-4);
       margin-top: auto;
+    }
+
+    /* A question with a picture: the sheet as tall as its words, the picture right under it, as large as the room
+       over the answers lets it be (questions.ts, picture: --fit). */
+    .run-question:has(> .picture) > .q-leaf {
+      min-height: 0;
+    }
+
+    .run-question > .picture {
+      max-height: max(120px, var(--fit, 30vh));
     }
 
     /* A narrow phone: a long question in four lines at most. */
@@ -7024,7 +7447,12 @@
       display: inline;
     }
 
-    /* The line that fills while the answer shows runs along the panel's top edge; „Напред“ says the rest. */
+    /* The line that fills while the answer shows runs along the panel's top edge, what it does said in small words
+       under its end (held, the way on instead: run.ts, stayOn), over the verdict's row. */
+    .run-question .after:has(> .up-next) {
+      padding-top: calc(var(--space-4) + 1.0625rem);
+    }
+
     .run-question .after .up-next {
       position: absolute;
       top: 0;
@@ -7034,10 +7462,12 @@
 
     .run-question .after .up-next-label {
       position: absolute;
-      width: 1px;
-      height: 1px;
+      top: 6px;
+      right: 0;
+      max-width: 100%;
       overflow: hidden;
-      clip-path: inset(50%);
+      font: var(--t-fine);
+      text-overflow: ellipsis;
       white-space: nowrap;
     }
 
@@ -7085,11 +7515,6 @@
   @media (min-width: 48rem) {
     html {
       scroll-padding-bottom: 0;
-    }
-
-    /* A tablet: the column a little wider than a phone's. */
-    #main {
-      max-width: 48rem;
     }
 
     /* A page's buttons are a hand's width (22rem), not the column's, at its left, the gold one first: the day's, a
@@ -7153,7 +7578,7 @@
 
   /* A phone on its side: the question and what answers it within the screen's height, as upright (above), with the
      head small from the start (run.ts, stays), the question smaller and a choice's answers two by two. */
-  @media (pointer: coarse) and (orientation: landscape) and (max-height: 30rem) {
+  @media (orientation: landscape) and (max-height: 30rem) {
     .question-top {
       --small: 1;
     }
@@ -7399,7 +7824,7 @@
   /* On a phone, once answered, the sheet shrinks to the question alone, the answers come up right under it, and of a
      choice of pictures only the player's and the right one stay. The answer's panel (docked, below) leaves them in
      sight. */
-  @media (max-width: 47.99rem), (pointer: coarse) and (orientation: landscape) and (max-height: 30rem) {
+  @media (max-width: 47.99rem), (orientation: landscape) and (max-height: 30rem) {
     .run-question.answered .q-leaf {
       grid-template-columns: auto minmax(0, 1fr);
       align-items: center;
@@ -7430,6 +7855,36 @@
 
     .run-question.answered .pic-options > .option.dim {
       display: none;
+    }
+  }
+
+  /* A phone of a usual height (a short one has all this already, below), a number's pad asked (the most there is to
+     fit under a question): the sheet as tall as its words, its chip folded to its glyph, the question a size smaller,
+     as an order's or pairs' are, so that every key and „Отговори“ show under the longest question. */
+  @media (max-width: 47.99rem) and (min-height: 43.76rem) {
+    .run-question:not(.answered):has(.keypad) .q-leaf {
+      gap: 10px;
+      min-height: 0;
+      padding: 14px 16px 18px;
+    }
+
+    .run-question:not(.answered):has(.keypad) .chip {
+      padding-right: 3px;
+    }
+
+    .run-question:not(.answered):has(.keypad) .chip-name {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .run-question:not(.answered):has(.keypad) .ask {
+      padding-right: 0;
+      font-size: calc(10px + 0.625rem);
+      line-height: 1.22;
     }
   }
 
@@ -7662,7 +8117,7 @@
 
   /* A phone on its side: the sheet low, the rows a little lower, so the question and its answers fit the screen's
      height. */
-  @media (pointer: coarse) and (orientation: landscape) and (max-height: 30rem) {
+  @media (orientation: landscape) and (max-height: 30rem) {
     .run-question .q-leaf {
       grid-template-columns: auto minmax(0, 1fr);
       align-items: center;
@@ -7739,6 +8194,32 @@
       grid-row: 4;
     }
 
+    /* A question with a picture: the sheet as tall as its words, the picture right under it at the sheet's width, as
+       tall as the screen leaves it (questions.ts, picture: --fit), both in sight with the answers beside them. The
+       answers span the sheet's row and the picture's, the answer comes under them. */
+    .run-question:has(> .picture) {
+      grid-template-rows: auto auto auto minmax(0, 1fr);
+    }
+
+    .run-question:has(> .picture) > .q-leaf {
+      grid-row: 2;
+      min-height: 0;
+    }
+
+    .run-question:has(> .picture) > .picture {
+      grid-row: 3 / span 2;
+      align-self: start;
+      max-height: max(160px, var(--fit, 40vh));
+    }
+
+    .run-question:has(> .picture) > .answering {
+      grid-row: 2 / span 2;
+    }
+
+    .run-question:has(> .picture) > .after {
+      grid-row: 4 / span 2;
+    }
+
     .run-question > .answering {
       grid-row: 2;
       grid-column: 2;
@@ -7763,6 +8244,11 @@
 
     .run-question .chip {
       justify-self: start;
+    }
+
+    /* A number's pad the column's width, as the answer that takes its place: the column doesn't jump. */
+    .run-question .number {
+      max-width: none;
     }
 
     .playing main > :is(.run-question, :has(.run-question)) {
@@ -7890,6 +8376,14 @@
   /* Nor the row of its ten chapters' glyphs (the issue's contents are under it, „В броя“). */
   .tight :is(.issue-time, .issue-toc) {
     display: none;
+  }
+
+  /* A short wide screen (a phone on its side, a laptop at 200 % zoom): the cover without its glyphs and its time too,
+     so that „Започни“ is in sight under it. */
+  @media (orientation: landscape) and (max-height: 30rem) {
+    :is(.issue-time, .issue-toc) {
+      display: none;
+    }
   }
 
   /* The places at a phone's foot: a name no bigger than its third of the screen holds whole (a phone that enlarges

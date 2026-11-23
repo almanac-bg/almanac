@@ -28,7 +28,9 @@ this file passes the rule for later (DECISIONS.md).
   (`startScreen()`). While leaving costs something (a question's time running), every way out asks first
   (`guardLeaving()`).
 - **Phone first, a spread on a big screen.** Every screen fits a 320px phone with no sideways scroll, at the usual
-  text size and at twice it. From 56.25rem a place is two pages side by side (`.spread`, `.page-1`, `.page-2`).
+  text size and at twice it. From 56.25rem a place is two pages side by side (`.spread`, `.page-1`, `.page-2`); short of
+  that (a tablet, a laptop with its text at twice its size) the phone's column, 40rem in the middle, the places' bar as
+  wide, never a phone's page stretched from edge to edge.
 
 ## Places and their budgets
 
@@ -39,7 +41,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
 - **The frame** (`app.ts`): the bar holds the rosette and „АЛМАНАХ“ in spaced capitals (a way to Днес); on a big
   screen the three places as an icon and a word on pills (`.places`; Днес a calendar, Алманах a book, Приятели two
   people; every name bold); the player's avatar
-  (`.bar-me`), or „Вход“ (the sign-in page, `/signin`). On a phone the places float at the foot (`.places-foot`): a
+  (`.bar-me`), or „Вход“ (the sign-in page, `/signin`); in the bar too on any short wide screen (a phone on its side, a
+  laptop at 200 % zoom: one at the foot covered „Започни“). On a phone upright the places float at the foot (`.places-foot`): a
   pill clear of every edge, its icon over its name, the current one on a well, a dot on Приятели while something has come there since the player last looked (a request, a
   duel sent, a duel's result), gone as it opens. One frame, the same everywhere: the mark is always at the left. It
   steps aside in a game (`html.playing`); on a new visitor's cover and on the sign-in page it is bare (`html.bare`):
@@ -65,7 +68,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   - On a phone the cover is under half the screen (its date sized by the height), so that „Започни“ is whole by 500px
     on 320 × 568 and 540px on 375 × 600 (`layout.spec.ts`). With large text its display type stays near its usual size
     (the date by the height) and „Около три минути“ gives way (`.issue-time`), so the cover never fills the screen.
-  - The streak (`.streak-chip`): the flame, the number and „дни без прекъсване“ (one: „ден“), from its first day (owner,
+  - The streak (`.streak-chip`): the flame (unlit while the day waits: its outline alone, hollow, in `--ink-3`), the
+    number (two digits wide, so the words stay put) and „дни без прекъсване“ (one: „ден“), from its first day (owner,
     2026-11-23: a player's second day showed nothing of the first; now „1 ден без прекъсване · С днешния брой серията
     ти става 2.“); under it one line: what came of the days just missed (told once), a day the week forgave, or while
     the day waits what it makes of the streak (`stakeLine`). With no streak running, what came of the days just missed
@@ -73,8 +77,10 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   - A friend's duel waiting (`.duel-waiting`, owner, 2026-11-23), under the streak: the sender's avatar, „Иво ти
     изпрати дуел.“ („Още 2 те чакат.“, a link to Приятели, while more do) and „Играй“ at its end, an outlined button to
     the first sent (`/duel/<id>`): never the cover's action, which is the day's ten.
-  - On a big screen, under them, „В броя“: the ten chapters in their order.
-  - A new visitor: the cover, „Започни“, and under it „Едни и същи за цяла България.“ In an app's own browser, one
+  - On a big screen, under them, „В броя“: the ten chapters in their order, as a book's table of contents on the
+    page (no card, no lines between: nothing in it opens).
+  - A new visitor: the cover, „Започни“, and under it „Едни и същи за цяла България.“ (on a big screen „В броя“ under
+    it, as a player's, and the line under the words only „Без регистрация.“). In an app's own browser, one
     line under „Започни“: on Android „Имаш игра в браузъра? Отвори я там“, a tap that opens it; on an iPhone, where no
     link can, „Имаш игра в браузъра? Отвори я там: ··· → Отвори в Safari“, no button (`coverExit`).
   - Nothing over the issue but what came of the player's own step (a profile signed in to, a game brought here).
@@ -85,7 +91,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   1. The score on a sheet of the issue's first chapter: „Брой 9 · 20 ноември“, the score as the hero numeral „7 от
      10“, the tiles, „На десетия въпрос вярно отговарят 14 %“ (nothing before a crowd: the tenth is
      always the hardest), and with a crowd „България днес: средно 6,2“ (the average always to one decimal: „6,0“). Ten of ten:
-     „Всички верни“ and the mark drawn over it. The card opens the day's questions (below): a tap anywhere on it,
+     the game's mark drawn large beside the score (64–128px, as much as the score leaves room for), „Всички
+     верни“ under it at the date's size. The card opens the day's questions (below): a tap anywhere on it,
      and each tile at its own question. None right: right under the score, „Въпросите“ open
      (`.missed-day`): the first four, each its dashed tile, the question, the right answer (an order, a match, a split
      in lines) and its fact, and „Прегледай въпросите“ under them; no word of praise. A best rank risen, the big moment, right
@@ -93,7 +100,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      факта от Кино и телевизия са с мастило в твоя Алманах.“), the ladder from Бележка to Летопис (`ladder()`), the
      art it brings, and other ranks risen with it in a line.
   2. On the first results (a guest's first day, a game just brought here, an app's own browser): the action, right
-     under the score — keeping the game and being reminded, or the way out to the phone's browser (a button: on Android
+     under what the day wrote in the book (3: what keeping the game keeps, in the first screen) — keeping the game and being reminded, or the way out to the phone's browser (a button: on Android
      it opens the phone's browser, elsewhere it copies the link for it; the app's menu named under it, „Или от менюто
      на приложението: ··· → Отвори в Safari“); sharing then stays a quiet link beside the tiles („Сподели резултата“).
   3. What the day wrote in the book, „Днес в Алманаха“ (`game/news.ts`), on a card: the whole of its ink at a glance,
@@ -103,8 +110,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      links („Нови печати: „Страница“ в География и в Технологии и игри.“; one chapter's: its ladder under it). No
      single question picked out of the ten (the day's ten are all a tap away, in their dialog), and no one chapter's
      bar beside the day's whole ink: next to it, either reads as the day's ink.
-  4. The action, past the first results: „Сподели“; while a friend's duel waits, that duel („Играй дуела с Иво“, the
-     first sent), sharing then the quiet link beside the tiles (owner, 2026-11-23). Over it, the streak as the cover has
+  4. The action, past the first results: „Сподели“; while a friend's duel waits, that duel (whose it is on a line over it, „Иво ти изпрати дуел.“
+     as the cover says it, then „Играй дуела“: a long name in the button broke it in two; the first sent), sharing then the quiet link beside the tiles (owner, 2026-11-23). Over it, the streak as the cover has
      it, lit, with today's in it („30 дни без прекъсване“; owner, 2026-11-23: it grew out of sight).
   5. Nothing of tomorrow (no „Утре“ card: the result is the day's). Past the first results, a guest's ask to keep the
      game and the reminder's ask while reminders are off, a player with a profile's too (a plain button, never a second
@@ -119,8 +126,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      „Още никой от приятелите ти не е играл днес.“). All България: how it spread (eleven bars, 0 to 10, the player's in
      ink with „ти“ over it, the average a thin line with its label in a row over the bars, clear of „ти“; from ten
      players; the ticks no bigger than their columns hold, so „10“ never runs into „9“ with large text), the player's
-     place („В България си на 20-о място от 53.“; with none right only „Днес играха 53 души.“, alone on the board
-     nothing), then the best twenty and the player's own row under them if further down. A row: the place (shared by
+     place („В България си на 20-о място от 53.“; with none right, on a first day or in the lower half only „Днес
+     играха 53 души.“, alone on the board nothing), then the best twenty and the player's own row under them if further down. A row: the place (shared by
      those as many right and as close on the number, never told apart by time: 1, 2, 2, 4; the player first among
      their equals), then the row built as a friend's (`scoreRow()`): the avatar, the name with the row's
      width and „ти“ after it, and on one line under the name the score (a heavy numeral as a friend's, never
@@ -133,8 +140,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
 - **The questions gone over** (`reviewSheet()`, `.review-sheet`): one dialog for every game (the day's issue, a
   chapter's game, a duel), on the game's sheet: „Въпросите“ and „Затвори“ at its head, which stays as the questions
   scroll under it; under it whose they are („Брой 11 · 22 ноември · 7 от 10“, „История · 6 от 10“, „Дуел с Иво ·
-  8:6“); then a card a question: its number and chapter, how it went (never a true-or-not's answer: „Точно“,
-  „Грешно“, „Близо“, „Без отговор“), the question, the answers as given with the right one, how others answered, the
+  8:6“); then a card a question: its number and its chapter's chip (`chip()`), how it went with its sign, as a duel's
+  sides say it (never a true-or-not's answer: „✓ Точно“ in ink, „✕ Грешно“, „◩ Близо“, „– Без отговор“ quieter), the question, the answers as given with the right one, how others answered, the
   fact, and „Нещо не е наред с въпроса?“. In a duel, in place of the one word, how it went for the two side by side
   under the question, each half the row (the small avatar, „✓ Точно“ in ink, „✕ Грешно“, „◩ Близо“, „– Без отговор“
   quieter: a question that parted them shows at a glance). On a phone it never takes the whole height: the page shows
@@ -147,23 +154,27 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
 - **Алманах:** its head (whose book it is and what ink and grey mean, nothing to play there: a game is a chapter's, from its page; no lifetime totals), then the chapters, each a folded
   card in its colour with its seal as the badge (40px), its ink („180 с мастило“), its rank over its bar and what's left to
   the next under it („Тетрадка“, the bar, „още 15 до „Книга““: a card has no room for both under the bar); a counter at zero is hidden, and the head says once how ink is written; a
-  chapter's card with no ink yet is its glyph over its name, as tall as the row it stands in.
+  chapter's card before its first rank has its glyph for the badge and the same foot as the others, „Още без печат“
+  over its bar, empty, and „още 1 до „Бележка““ under it (never a blank block of colour), as tall as the row it stands
+  in, the foot at the card's foot.
   Two across on a phone, five on a big screen (the page's whole width, the head a reading width).
   The chapters in their numbers' order (Глава 1, 2, …), always: a book's contents, never resorted. A chapter's game left
   half-way today shows under the head, where it stopped, with „Продължи“ (its cross comes back here).
 - **A chapter:** its head on its sheet (glyph, name, the seal, its ink, and under them as wide as the head its bar,
   the rank and „още 16 до „Книга““ under it: `standing()`), „Играй 10 въпроса“, then its facts, the latest first, each as tall as it holds:
-  ink black, facts met in grey (a thin solid 1.5px grey outline, lighter text). An entry reads in the order it was lived:
+  ink black on a white card, a straight bar of ink down its left edge; facts met in grey (a hairline, `--line`, lighter
+  text: quieter than ink, never a control's frame). An entry reads in the order it was lived:
   the dateline, the question small and muted (a kicker), the answer as the headword (big, bold) between it and the
   fact, then the fact in body text; a statement has no question, its headword right under the dateline; an answer of
   parts a line each. A picture question shows its picture (a choice of pictures, its answer's) beside the question and
-  headword, its whole shape (88px wide on a phone, 112px on a big screen), credited in the entry's small text; a tap
+  headword, its whole shape (88px wide on a phone, 112px on a big screen), the fact running on beside it (no hole
+  under the headword), credited in the entry's small text; a tap
   („Виж снимката голяма“, a magnifier for a pointer) shows it on a sheet as large as the screen holds it, whole, its
   biggest file, the headword its title and its credit under it (no zoom, no gallery). One
   column on a big screen too, 44rem at most, the head at the left: a book reads top to bottom, the latest first
   exactly, and one column leaves no hole beside a tall entry (two across did; columns or masonry would read down then
   across, and reshuffle as a page comes in). Thirty a page, turned as the duels played are: „По-нови“ and „По-стари“
-  either side of „Страница 2 от 4“, each off at its end, each page a link of its own (back is the page before;
+  either side of „Страница 2 от 4“ (at large text that on a line of its own, the two under it), each off at its end, each page a link of its own (back is the page before;
   owner, 2026-11-23). From ten facts, a search over them („Търси факт“); fewer are read at a
   glance. What a search found is marked in each entry (its question, headword and fact) in a soft tone of the
   chapter's colour under the full ink, never split by a soft hyphen. What ink and grey are is said at the book's head only, never again over a chapter's facts (each entry's chip says which it is).
@@ -173,7 +184,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   links in a line: „Още десет въпроса“, „Прегледай въпросите“, „Към темата“. On a big screen the result is a spread, as the day's: the sheet on the left page, the
   action, the ways on and that line on the right. „Прегледай въпросите“, the sheet and each tile open the questions'
   dialog, as the day's do. Its start
-  (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name.
+  (`/play/<chapter>`) is on the chapter's sheet, its glyph over its name; a duel's (`/duel/<id>`) on a card of that shape,
+  the two players' avatars over its name.
 - **Приятели:** the people and the duels (the day's board is Днес's), on one page with no tabs (owner, 2026-11-22),
   one column on a big screen too; the page's „Приятели“ is a screen reader's only, each section headed in sight
   (`.sect-head`), a list's count in brackets after its name. Top to bottom: who asks to be friends (a row each,
@@ -199,7 +211,9 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   (DECISIONS.md).
   Every duel is a card (`.duel-card`, one a row on a big screen too, as on a phone; owner, 2026-11-22: the cards
   read better than compact rows): the two face to face, no label over them (every duel is with a friend), the
-  player's avatar and „Ти“ on the left, the other's with their name on the right; no name on a
+  player's avatar and „Ти“ on the left, the other's with their name on the right, the middle between them of one width
+  on every card, so the faces stand in the same place card after card (on a big screen the two in the card's middle,
+  30rem at most, each avatar beside its name); no name on a
   duel's card, nor in its dialogs, is a link: a profile opens from the friends' list (owner, 2026-11-22); between them how
   it stands: „Твой ред“ or „Чакаш“ (quiet) over „още 6 дни“; a played one's score, a heavy numeral („8:6“), over its
   end as a chip, told apart at a glance by fill and line, never red or green („✓ Победа“ filled in ink, „Загуба“
@@ -224,8 +238,9 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   title, as every sheet that's gone through has it.
   A duel named in the address (`?duel=<id>`: its game just ended, or an old link to its page) is first in its group,
   brought into sight, and its result lands there once (`feel.duel`: the marks fill pair by pair, the score counts
-  up, the chip lands with the end's sound), never again. The record between two is the friend's row's, never a duel's. Friends are added in one field, „име или
-  имейл“; requests sent wait under „Изпратени покани“. Only two friends of one name show their @username. The
+  up, the chip lands with the end's sound), never again. The record between two is the friend's row's, never a duel's. Friends are added in one field under „Добави приятел“, „име или
+  имейл“; requests sent wait under „Изпратени покани (2)“, each section headed alike (`.sect-head`). A request to the
+  player is a card as every card is, no frame of its own, „Приеми“ and „Откажи“ under the name, on its edge. Only two friends of one name show their @username. The
   questions' dialog (above) says under its head whose duel it is and its score, each question with how it went for
   the two.
 - **Профил:** one column, on a big screen too: the avatar with a pencil on its top corner (a phone: always; a big screen: as the pointer
@@ -371,8 +386,10 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
 - **The tiles** (`tiles()`): the day's ten in their chapters' colours, a glyph on each. Right: filled, the glyph on a
   white rounded tile. Близо: the upper left half in the chapter's colour, cut on the diagonal (◩, never the left half,
   which reads too near a full one), the lower right hollow, the glyph straight over both, a 2.5px outline in the deep
-  colour. Wrong: hollow, a dashed outline, the glyph faded. A void one dashed and empty; one to come a quiet well. They
-  read at 28px. **The small squares** (`mini()`, 10px): a friend's or a board's row, in ink: full, the diagonal half,
+  colour. Wrong: hollow, a dashed outline, the glyph faded. A void one dashed and empty; one to come a quiet well. On
+  the score's sheet a hollow or half one is see-through (a faint wash of white, its line the sheet's ink, faded), never
+  brighter than a right one; under 22.5rem its ten are two rows of five, as the share's card has them. They read at
+  28px. **The small squares** (`mini()`, 10px): a friend's or a board's row, in ink: full, the diagonal half,
   empty; told apart by fill, never by colour, and nothing drawn inside them (unreadable at 10px). A day has one close
   answer at most (the hard number), so one ◩ at most.
 - **The pips** (`.trail`): a run's ten, a bar each: done right filled in ink, близо half, wrong hollow, the one asked in
@@ -468,7 +485,7 @@ to show it whole; nothing over the question.
   to adding more.
 - **A cell's words** (`wholeWords()`): a long word breaks only at its syllables (soft hyphens, `lib/words.ts`) and only
   where it's wider than its cell; a punctuation mark stays with its word. Never `break-all`.
-- **Answers** (`.option`): white, a 2px `--line-2` frame, the letter in a box (А–Г; keys 1–4 answer on a computer, never drawn on a button); a
+- **Answers** (`.option`): white, a 2px `--line-2` frame, the letter in a box (А–Г; keys 1–4, or the letters, answer on a computer, never drawn on a button); a
   choice's words have the row's width while it's asked.
 - **Answered:** the player's own right answer is ink — a dark fill with white text by day, a light fill with dark
   text by night — and a solid ✓; the right one they didn't give has a 3px ink outline and a ✓ in a ring; their wrong
@@ -492,7 +509,7 @@ to show it whole; nothing over the question.
   10 с и 20 с“); number, typed on the game's own pad (keys
   44px at the least; with large text what's typed stays in sight under the head), answered as what was said, the
   answer (not again where it was spot on), and both on a scale with its key (the answer a filled square; „ти,
-  вярно“ a filled disc, „ти, близо“ half filled, „ти“ hollow), nothing else (how everyone guessed is said under the verdict; its chart is the review's). Pairs or groups
+  вярно“ a filled disc, „ти, близо“ half filled, „ти“ hollow), nothing else (how everyone guessed is said under the verdict; its chart is the review's: the player's own bar outlined as their disc is, one beyond the chart's range named at its end, „1900 лв. →“). Pairs or groups
   whose time ran out with nothing given show the right ones with a ✓ in a ring: none of it the player's.
 - **The answer** (`.after`): under the answers, never over them; on a phone at the screen's foot, edge to edge, a
   surface. The page moves once (run.ts, `settle`), as little as it can: to show the verdict over „Напред“ (under an
@@ -527,7 +544,8 @@ to show it whole; nothing over the question.
   order's or pairs' line on how to answer is read, not shown (the first rows show over „Готово“). With `tight`, Днес's
   cover leaves out its row of glyphs, and the places' bar at a phone's foot grows at most a quarter, so „Започни“
   stays over it. A media query's rem
-  is the browser's own size, so a short screen is a phone on its side only with `(orientation: landscape)` too.
+  is the browser's own size, so a short screen is a phone on its side only with `(orientation: landscape)` too, and any
+  short wide window is laid out as one, with a mouse as with a finger (a laptop at 200 % zoom is 640 × 400).
   `e2e/layout.spec.ts` holds it at every size above.
 
 ## Motion

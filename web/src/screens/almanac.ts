@@ -13,6 +13,8 @@ import type { Child } from "../lib/dom.ts";
 // only types.
 let {
   api,
+  lastOf,
+  setIfNew,
   back,
   chapterName,
   failure,
@@ -90,6 +92,8 @@ const searchFrom = 10;
 function setKit(kit: Kit) {
   ({
     api,
+    lastOf,
+    setIfNew,
     back,
     chapterName,
     failure,
@@ -130,17 +134,23 @@ export function almanac(kit: Kit): Child {
   title("Алманах");
   // Not a player yet: the book as it starts, its chapters each a way to play one.
   if (!user.peek()) return book({ facts: [], found: 0, ink: {} });
-  const page = signal<Page | null>(null);
+  // Come back to, the book as it was last shown, at once, and anew in place if it has changed (api.ts, lastOf).
+  const page = signal<Page | null>(lastOf<Page>("/api/almanac") ?? null);
   const failed = signal<unknown>(null);
   // The games of a chapter left half-way today: each with the way to go on (a game's cross comes back here).
-  const left = signal<Left[]>([]);
+  const left = signal<Left[]>(lastOf<{ runs: Left[] }>("/api/runs/left")?.runs ?? []);
   api<{ runs: Left[] }>("GET", "/api/runs/left").then(
-    (r) => left.set(r.runs),
+    (r) => setIfNew(left, r.runs),
     () => {},
   );
   const load = () => {
     failed.set(null);
-    api<Page>("GET", "/api/almanac").then(page.set, failed.set);
+    api<Page>("GET", "/api/almanac").then(
+      (p) => setIfNew(page, p),
+      (err) => {
+        if (!page.peek()) failed.set(err);
+      },
+    );
   };
   load();
   return () => {
@@ -199,11 +209,14 @@ function book(p: Page, left: () => Left[] = () => []): Child {
 
 /** A chapter's card: its colour, its seal as the badge (or its glyph, before a rank) over its name, its ink, and its
  * rank over its bar, and under the bar what's left to the next („Тетрадка“, the bar, „още 15 до „Книга““: ui.ts,
- * standing). The corner turned, as a page of the book. */
+ * standing; before a rank, „Още без печат“, the bar empty, „още 1 до „Бележка““). The corner turned, as a page of the
+ * book. */
 function card(id: string, ink: number, r: Rank | undefined): Child {
   // The rank as counted when the last issue was over, what's left to the next from the ink shown (written answer by
   // answer, an issue under way too), as Профил has it.
   const ranked = r && r.level > 0 ? { ...r, ink } : null;
+  // Before its first rank, the same foot: „Още без печат“ over an empty bar, and what's left to „Бележка“ under it.
+  const way = ranked ?? { chapter: id, level: 0, ink, from: 0, nextAt: r?.nextAt || 1 };
   return h(
     "a",
     { class: "chapter-card", href: `/almanac/${id}` },
@@ -221,7 +234,12 @@ function card(id: string, ink: number, r: Rank | undefined): Child {
           ? h("span", { class: "card-ink" }, h("b", { class: "num" }, formatNumber(ink)), h("span", null, "с мастило"))
           : null,
         // A card is too narrow for both ends' words under the bar: the rank goes over it, what's left under it.
-        ranked ? h("span", { class: "card-rank" }, h("b", null, ranked.name), standing(ranked, false)) : null,
+        h(
+          "span",
+          { class: "card-rank" },
+          ranked ? h("b", null, ranked.name) : h("b", { class: "none" }, "Още без печат"),
+          standing(way, false),
+        ),
       ],
       "card-leaf",
       { next: "" },
@@ -256,11 +274,18 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
   let marked = at.getAll("fact");
   const page = signal(Math.max(0, (Number(at.get("page")) || 1) - 1));
   const query = signal(at.get("q") ?? "");
-  const data = signal<Page | null>(null);
-  const first = signal<Page | null>(null);
+  // Come back to (not to facts to mark), the chapter as it was last shown, at once, and anew in place if it has changed
+  // (api.ts, lastOf).
+  const opening = new URLSearchParams({ chapter: id, page: String(page.peek()) });
+  if (query.peek().trim()) opening.set("q", query.peek().trim());
+  const before = marked.length ? undefined : lastOf<Page>(`/api/almanac?${opening}`);
+  const data = signal<Page | null>(before ?? null);
+  const first = signal<Page | null>(
+    before?.ranks ? before : (lastOf<Page>(`/api/almanac?${new URLSearchParams({ chapter: id })}`) ?? null),
+  );
   const failed = signal<unknown>(null);
   // The chapter's facts in all, unsearched: the search shows from `searchFrom` of them.
-  const total = signal(0);
+  const total = signal(first.peek()?.found ?? 0);
   let asked = "";
   // The words the page shown was found by, marked in its entries (none unsearched).
   let find: string[] = [];
@@ -268,7 +293,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
   const loadFirst = () =>
     api<Page>("GET", `/api/almanac?${new URLSearchParams({ chapter: id })}`).then(
       (p) => {
-        first.set(p);
+        setIfNew(first, p);
         total.set(p.found);
       },
       () => {},
@@ -306,8 +331,8 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
           named();
           void loadFirst();
         }
-        data.set(p);
-        if (p.ranks) first.set(p);
+        setIfNew(data, p);
+        if (p.ranks) setIfNew(first, p);
         if (!ask.includes("q=")) total.set(p.found);
         if (toFacts) requestAnimationFrame(() => document.querySelector(".chapter-facts")?.scrollIntoView());
         toFacts = false;
@@ -333,10 +358,12 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
     load();
   }
   // The chapter's game left half-way today: it goes on from where it stopped (play.Left).
-  const left = signal<{ at: number; total: number } | null>(null);
+  const left = signal<{ at: number; total: number } | null>(
+    lastOf<{ runs: Left[] }>("/api/runs/left")?.runs.find((x) => x.chapter === id) ?? null,
+  );
   if (user.peek())
-    api<{ runs: { chapter: string; at: number; total: number }[] }>("GET", "/api/runs/left").then(
-      (r) => left.set(r.runs.find((x) => x.chapter === id) ?? null),
+    api<{ runs: Left[] }>("GET", "/api/runs/left").then(
+      (r) => setIfNew(left, r.runs.find((x) => x.chapter === id) ?? null),
       () => {},
     );
   let typing = 0;
@@ -395,12 +422,18 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
               h("h1", null, name),
             ),
           ),
-          () =>
-            stand(
-              id,
-              first()?.ranks?.find((r) => r.chapter === id),
-              first()?.ink[id] ?? 0,
-            ),
+          // Nothing of where it stands until its numbers have come: drawn before them, it said „no ink yet“ for a moment,
+          // right after a day's „+1 с мастило“ led here.
+          () => {
+            const f = first();
+            return f || !user.peek()
+              ? stand(
+                  id,
+                  f?.ranks?.find((r) => r.chapter === id),
+                  f?.ink[id] ?? 0,
+                )
+              : null;
+          },
         ],
         "chapter-leaf",
       ),
@@ -524,36 +557,34 @@ function entry(f: Learned, find: string[]): Child {
           textWords(f.answer, find),
         ),
   ];
+  // The picture first, at the entry's right: its words run beside it and on under it, the fact too, with no hole
+  // between the headword and the fact however tall the picture is.
   return h(
     "li",
-    { class: `entry ${f.ink ? "ink" : "met"} ch-${f.chapter}`, "data-fact": f.id },
+    { class: `entry ${f.ink ? "ink" : "met"}${im ? " pictured" : ""} ch-${f.chapter}`, "data-fact": f.id },
     im
       ? h(
-          "div",
-          { class: "entry-top" },
-          h("div", { class: "entry-head" }, head),
-          h(
-            "button",
-            {
-              class: "entry-zoom",
-              type: "button",
-              "aria-label": "Виж снимката голяма",
-              onclick: () => showPicture(f, im),
-            },
-            h("img", {
-              class: "entry-pic",
-              src: im.src,
-              srcset: im.srcset,
-              sizes: entryPicSizes,
-              width: im.w,
-              height: im.h,
-              alt: im.alt,
-              loading: "lazy",
-              decoding: "async",
-            }),
-          ),
+          "button",
+          {
+            class: "entry-zoom",
+            type: "button",
+            "aria-label": "Виж снимката голяма",
+            onclick: () => showPicture(f, im),
+          },
+          h("img", {
+            class: "entry-pic",
+            src: im.src,
+            srcset: im.srcset,
+            sizes: entryPicSizes,
+            width: im.w,
+            height: im.h,
+            alt: im.alt,
+            loading: "lazy",
+            decoding: "async",
+          }),
         )
-      : head,
+      : null,
+    head,
     h("p", { class: "entry-fact" }, textWords(f.fact, find)),
     f.credit ? pictureCredit(f.credit) : null,
   );

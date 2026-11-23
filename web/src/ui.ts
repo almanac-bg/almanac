@@ -7,7 +7,7 @@ import { errorText, passing } from "./lib/api.ts";
 import { hourInBulgaria } from "./lib/day.ts";
 import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
 import { calm, type Scheme, scheme, setScheme } from "./lib/prefs.ts";
-import { formatNumber, formatValue, found, hyphenate, keepNumbers, stakeWords } from "./lib/words.ts";
+import { formatNumber, formatValue, found, hyphenate, keepNumbers, keepShort, stakeWords } from "./lib/words.ts";
 import { glyphBox, rankName, rankNames, sealParts } from "./seal.ts";
 import { chapters, chaptersAndMix, user } from "./state.ts";
 
@@ -653,8 +653,9 @@ function marked(word: string, find: string[]): Child {
  * hyphen, never at any letter (large text at 320 px). With a search's words (`find`: words.ts, searchWords), what it
  * found marked: a search's word has no space in it, so a word of the text holds each match whole. */
 export function textWords(text: string, find: string[] = []): Child {
-  return keepNumbers(text)
-    .split(/(\s+)/)
+  // Words kept together (a number and its unit, a one-letter word and the next) are one, held whole together.
+  return keepShort(keepNumbers(text))
+    .split(/([ \t\n\r]+)/)
     .map((part, i) => (i % 2 ? part : wholeWord(part, find)));
 }
 

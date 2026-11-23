@@ -17,6 +17,8 @@ import type { Stats } from "./stats.ts";
 // only types.
 let {
   api,
+  lastOf,
+  setIfNew,
   h,
   nameWords,
   signal,
@@ -37,6 +39,8 @@ let {
 export function me(kit: Kit) {
   ({
     api,
+    lastOf,
+    setIfNew,
     h,
     nameWords,
     signal,
@@ -68,18 +72,29 @@ export function me(kit: Kit) {
     when(
       () => user(),
       () => {
-        const data = signal<Stats | null>(null);
-        const ranks = signal<ChapterRank[] | null>(null);
+        // Come back to, Профил as it was last shown, at once, and anew in place where it has changed (api.ts, lastOf).
+        const tag = user.peek()?.tag;
+        const theirs = tag ? `/api/players/${encodeURIComponent(tag)}` : "";
+        const data = signal<Stats | null>(lastOf<Stats>("/api/me/stats") ?? null);
+        const ranks = signal<ChapterRank[] | null>(
+          theirs ? (lastOf<{ ranks?: ChapterRank[] }>(theirs)?.ranks ?? null) : null,
+        );
         // Профил that couldn't load (no line): said, with the way to try again (the whole page, afresh).
         const failed = signal<unknown>(null);
-        loadStats().then(data.set, failed.set);
+        loadStats().then(
+          (s) => setIfNew(data, s),
+          (err) => {
+            if (!data.peek()) failed.set(err);
+          },
+        );
         // The ranks, as others see them on the player's page (not the book's: opening it is counted as opening the
         // book).
-        const tag = user.peek()?.tag;
-        if (tag)
-          api<{ ranks?: ChapterRank[] }>("GET", `/api/players/${encodeURIComponent(tag)}`).then(
-            (p) => ranks.set(p.ranks ?? []),
-            () => ranks.set([]),
+        if (theirs)
+          api<{ ranks?: ChapterRank[] }>("GET", theirs).then(
+            (p) => setIfNew(ranks, p.ranks ?? []),
+            () => {
+              if (!ranks.peek()) ranks.set([]);
+            },
           );
         else ranks.set([]);
         // The avatars: a sheet of their own (screens/avatar.ts), loaded with the page so that a tap opens it at once.
