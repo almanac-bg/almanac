@@ -23,7 +23,7 @@ import (
 //
 // The days ahead: the day's questions are drawn up to Ahead days before their day, and no other game deals them
 // (dayQuestions), so that the day stays one attempt for everyone. Were only today's ten kept out, a question would
-// reach a topic game or a duel before its own day, and the players who play most would meet more and
+// reach a chapter game or a duel before its own day, and the players who play most would meet more and
 // more of the day as a rerun, with its answer known. The questions that belong to a date („На този ден“) are kept out
 // the same way however far off their date is, until a day has dealt them (waiting): a date has only a few, one a year.
 //
@@ -312,7 +312,7 @@ func unproven(q bank.Question, today string) bool {
 
 // waiting is whether a question belongs to a date still to come (bank.Tail.On: every year's, or that year's from today
 // on): it waits for it, out of every other game, until a day has dealt it. „На този ден“ has a few questions a date,
-// each for one year; a topic game or a duel that dealt one first would leave its date empty a year sooner,
+// each for one year; a chapter game or a duel that dealt one first would leave its date empty a year sooner,
 // and show its answer before its day.
 func waiting(q bank.Question, today string) bool {
 	for _, d := range q.Extra().On {
@@ -367,11 +367,11 @@ func dealsOn(b *bank.Bank, picks []Pick, day string) bool {
 }
 
 // mendDay replaces each question of a day drawn ahead that can't be dealt on it (dealsOn: retired, of a kind the game
-// no longer deals, or due for review by then) with another in its own place: of the same topic, difficulty, kind (a
+// no longer deals, or due for review by then) with another in its own place: of the same chapter, difficulty, kind (a
 // split for clues, which share its place: newKinds) and picture (fitsPlace: an estimate for the number), about
 // Bulgaria if it was, dealable on the day, never a question another day has, naming no subject the
 // day's other questions do; those nobody has answered first, then those apart from the days before (recent). The rest
-// of the day stays as drawn, its shape and its topics too. Not mended (false) if a question has gone from the bank
+// of the day stays as drawn, its shape and its chapters too. Not mended (false) if a question has gone from the bank
 // altogether (its place is unknown) or a place has none that fits: the day is drawn again.
 func mendDay(b *bank.Bank, day string, picks []Pick, used, answered, recent map[string]bool,
 	r *mrand.Rand) ([]Pick, bool) {

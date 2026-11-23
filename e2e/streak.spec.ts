@@ -32,7 +32,7 @@ test("Профил shows the streak as it is now in its head, never an ended one
   await expect(page.locator(".me-intro")).not.toContainText("пропуснат");
 });
 
-test("a streak at stake: unlit till the day lights it, pointed to from a topic, tomorrow under the result", async ({
+test("a streak at stake: unlit till the day lights it, pointed to from a chapter, tomorrow under the result", async ({
   page,
 }) => {
   test.setTimeout(120_000);
@@ -42,7 +42,7 @@ test("a streak at stake: unlit till the day lights it, pointed to from a topic, 
   await page.reload();
   await expect(page.locator(".streak-chip.unlit")).toContainText("3");
   await expect(page.locator(".today-streak .day-stake")).toHaveText("С днешния брой серията ти става 4.");
-  // A topic's result points to the day while it waits: the gold button, the streak under it, „Още десет“ plain.
+  // A chapter's result points to the day while it waits: the gold button, the streak under it, „Още десет“ plain.
   await openGame(page, "/play/history");
   await playRun(page);
   // A new level may come with the game, in its sheet once the result has landed: put away.
@@ -58,7 +58,7 @@ test("a streak at stake: unlit till the day lights it, pointed to from a topic, 
   // Played: nothing of tomorrow under the result.
   await expect(page.locator(".summary .score-n")).toBeVisible();
   await expect(page.locator(".summary")).not.toContainText("Утре");
-  // The day played: a topic's result has „Още десет“ for its action, and says where its facts went, with no number.
+  // The day played: a chapter's result has „Още десет“ for its action, and says where its facts went, with no number.
   await openGame(page, "/play/history");
   await playRun(page);
   await expect(page.getByRole("button", { name: "Още десет въпроса" })).toHaveClass(/primary/);

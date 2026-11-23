@@ -57,7 +57,7 @@
 @layer app {
   /* ---- Tokens: Day first, then Night: for a dark system, or chosen (data-scheme: prefs.ts). Night is a deep
      violet-blue page with the same vivid chapters; a chapter's large sheet is darkened by night as far as its ink
-     still holds 4.5:1 (--s-<topic>). Text holds 4.5:1 on --bg, --surface and --surface-2 in both; control lines
+     still holds 4.5:1 (--s-<chapter>). Text holds 4.5:1 on --bg, --surface and --surface-2 in both; control lines
      (--line-2) 3:1. ---- */
 
   :root {
@@ -270,59 +270,59 @@
     --s-mix: #a19db2;
   }
 
-  /* A chapter's colours, on whatever is of its topic (.t-<topic>): --tv vivid, --td deep, --ts its sheet. Its art
+  /* A chapter's colours, on whatever is of it (.ch-<chapter>): --tv vivid, --td deep, --ts its sheet. Its art
      takes the vivid as its tone. */
-  .t-general {
+  .ch-general {
     --tv: var(--t-general);
     --td: var(--d-general);
     --ts: var(--s-general);
   }
-  .t-science {
+  .ch-science {
     --tv: var(--t-science);
     --td: var(--d-science);
     --ts: var(--s-science);
   }
-  .t-history {
+  .ch-history {
     --tv: var(--t-history);
     --td: var(--d-history);
     --ts: var(--s-history);
   }
-  .t-geography {
+  .ch-geography {
     --tv: var(--t-geography);
     --td: var(--d-geography);
     --ts: var(--s-geography);
   }
-  .t-movies {
+  .ch-movies {
     --tv: var(--t-movies);
     --td: var(--d-movies);
     --ts: var(--s-movies);
   }
-  .t-music {
+  .ch-music {
     --tv: var(--t-music);
     --td: var(--d-music);
     --ts: var(--s-music);
   }
-  .t-sports {
+  .ch-sports {
     --tv: var(--t-sports);
     --td: var(--d-sports);
     --ts: var(--s-sports);
   }
-  .t-technology {
+  .ch-technology {
     --tv: var(--t-technology);
     --td: var(--d-technology);
     --ts: var(--s-technology);
   }
-  .t-literature {
+  .ch-literature {
     --tv: var(--t-literature);
     --td: var(--d-literature);
     --ts: var(--s-literature);
   }
-  .t-nature {
+  .ch-nature {
     --tv: var(--t-nature);
     --td: var(--d-nature);
     --ts: var(--s-nature);
   }
-  .t-mix {
+  .ch-mix {
     --tv: var(--t-mix);
     --td: var(--d-mix);
     --ts: var(--s-mix);
@@ -413,11 +413,10 @@
     font-weight: 700;
   }
 
-  /* A kicker: small capitals over what it heads (the issue, a topic, a group of rows). */
+  /* A kicker: small capitals over what it heads (the issue, a chapter, a group of rows). */
   .kicker,
   .board h2,
-  .settings h2,
-  .section-title {
+  .settings h2 {
     color: var(--ink-3);
     font: 800 0.75rem / 1.2 var(--font-sans);
     letter-spacing: 0.12em;
@@ -1120,13 +1119,8 @@
   }
 
   /* A picture takes its chapter's vivid as its tone wherever it's put. */
-  :where([class^="t-"], [class*=" t-"]) {
+  :where([class^="ch-"], [class*=" ch-"]) {
     --tone: var(--tv);
-  }
-
-  /* A tone that isn't a chapter's: rose. */
-  .tone-rose {
-    --tone: var(--t-literature);
   }
 
   .dot {
@@ -1631,7 +1625,7 @@
     margin-right: auto;
   }
 
-  /* What's played: „Брой 31“, the topic, „Дуел с Мария“. */
+  /* What's played: „Брой 31“, the chapter, „Дуел с Мария“. */
   .question-head .kicker {
     color: var(--ink);
     font: 900 1rem / 1.2 var(--font-sans);
@@ -1820,7 +1814,7 @@
     pointer-events: none;
   }
 
-  /* Under the corner, the next sheet in its colour (its own .t-<topic>), or the page. */
+  /* Under the corner, the next sheet in its colour (its own .ch-<chapter>), or the page. */
   .leaf-next {
     position: absolute;
     right: 0;
@@ -4005,7 +3999,7 @@
 
   /* Ten of ten: the rosette as a seal, and the words in gold, over the score. */
 
-  /* Начало on a later visit: the day played as one short card, its score a size down from the result's. */
+  /* Днес on a later visit: the day played as one short card, its score a size down from the result's. */
 
   .board {
     display: grid;
@@ -4104,7 +4098,7 @@
     margin-left: 6px;
   }
 
-  .pts {
+  .rights {
     font: 800 1.375rem / 1 var(--font-numeral);
     white-space: nowrap;
   }
@@ -4119,7 +4113,7 @@
     background: color-mix(in srgb, var(--ink) 14%, transparent);
   }
 
-  /* Under a name: a friend's ten (the friends' day on Начало). */
+  /* Under a name: a friend's ten (the friends' day on Днес). */
   .row > .trail {
     grid-column: 2 / -1;
     max-width: 12rem;
@@ -4152,23 +4146,7 @@
     margin-block: -8px;
   }
 
-  .delta {
-    display: inline-flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 2px;
-    color: var(--ink-3);
-    font-size: 0.8125rem;
-    line-height: 1;
-    font-weight: 700;
-  }
-
-  .delta.up {
-    --i: var(--i-up);
-    color: var(--ink);
-  }
-
-  /* A question gone over: a card of its own, a band in its verdict's colour on top; its number, topic and how it went
+  /* A question gone over: a card of its own, a band in its verdict's colour on top; its number, chapter and how it went
      over the question (the strongest line), the answers, and the fact a quiet note under them. */
   .reviewed {
     --v-ink: var(--ink-3);
@@ -4226,62 +4204,6 @@
     color: var(--ink-3);
     font-size: 1rem;
     line-height: 1.5rem;
-  }
-
-  /* ---- Topics ---- */
-
-  /* Every row as tall as its tallest tile, so one with more to say doesn't make its row stand out. */
-
-  .mastery {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--ink-3);
-    font-size: 0.75rem;
-    line-height: 1rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-
-  .bars {
-    display: inline-flex;
-    align-items: flex-end;
-    gap: 2px;
-    height: 12px;
-  }
-
-  .bars i {
-    display: block;
-    width: 3px;
-    height: calc(1.6px * var(--n, 1) + 2.4px);
-    border-radius: 2px;
-    background: var(--line-2);
-  }
-
-  .bars i:nth-child(1) {
-    --n: 1;
-  }
-  .bars i:nth-child(2) {
-    --n: 2;
-  }
-  .bars i:nth-child(3) {
-    --n: 3;
-  }
-  .bars i:nth-child(4) {
-    --n: 4;
-  }
-  .bars i:nth-child(5) {
-    --n: 5;
-  }
-
-  .bars i:last-child {
-    height: 12px;
-  }
-
-  .bars i.on {
-    background: var(--tone, var(--ink));
   }
 
   /* ---- Pictures (art/pictures.ts): painted from one ramp of the tone they sit in, with the night ink and white ---- */
@@ -4931,8 +4853,7 @@
   /* A game's news in lines (news.ts), each in one quiet style: the facts it put in the Алманах, a tap from them; a
      seal it raised. */
 
-  .news-facts,
-  .news-note {
+  .news-facts {
     margin: 0;
     color: var(--ink-3);
     font-size: 0.9375rem;
@@ -4946,58 +4867,10 @@
     text-decoration: none;
   }
 
-  .news-note a {
-    color: inherit;
-  }
-
-  /* News told late, on Начало (play/told.go): whose it is, over it. */
+  /* News told late, on Днес (play/told.go): whose it is, over it. */
   .news-late {
     margin: 0;
     text-align: center;
-  }
-
-  /* A number's name, a tap from what it means: dotted under, the words in a small card over the page. */
-  .explain {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: inherit;
-    font: inherit;
-    cursor: help; /* no underline: the word is a tap away from its meaning, without standing out (owner, 15 Nov) */
-  }
-
-  /* By the word it explains (ui.ts places it), not in the middle of the screen. */
-  .explain-pop {
-    position: absolute;
-    inset: auto;
-    max-width: min(20rem, calc(100vw - 2 * var(--space-4)));
-    margin: 0;
-    padding: var(--space-4);
-    border: 0;
-    border-radius: var(--r-1);
-    background: var(--bg);
-    box-shadow: none;
-    color: var(--ink);
-    font: 500 1rem / 1.5rem var(--font-sans);
-    text-align: left;
-  }
-
-  /* It comes out of the word: from just by it, growing to its size, in 160ms; gone at once. */
-  .explain-pop:popover-open {
-    animation: explain-in 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
-    transform-origin: top center;
-  }
-
-  .explain-pop.above:popover-open {
-    --from: 6px;
-    transform-origin: bottom center;
-  }
-
-  @keyframes explain-in {
-    from {
-      opacity: 0;
-      transform: translateY(var(--from, -6px)) scale(0.96);
-    }
   }
 
   /* Under a result, after its gold button: „Прегледай въпросите“ and the other ways on, plain and the same size, side
@@ -5261,7 +5134,7 @@
 
   /* The seal beside the ink (the ink under it, with too little room beside it), and under them where it stands
      (.standing), as wide as the box. */
-  .ch-stand {
+  .chapter-stand {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -5272,30 +5145,30 @@
     color: #16132b;
   }
 
-  .ch-seal {
+  .chapter-seal {
     flex: none;
   }
 
-  .ch-words {
+  .chapter-words {
     display: grid;
     flex: 1 1 8rem;
     gap: 4px;
     min-width: 0;
   }
 
-  .ch-stand > .standing {
+  .chapter-stand > .standing {
     flex: 1 1 100%;
   }
 
-  .ch-stand .standing-words {
+  .chapter-stand .standing-words {
     font-size: 0.9375rem;
   }
 
-  .ch-stand .standing-now {
+  .chapter-stand .standing-now {
     font-size: 1.125rem;
   }
 
-  .ch-ink {
+  .chapter-ink {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
@@ -5303,12 +5176,12 @@
     font: 800 0.9375rem / 1 var(--font-sans);
   }
 
-  .ch-ink .num {
+  .chapter-ink .num {
     font-size: calc(28px + 1.75rem);
     line-height: 0.85;
   }
 
-  .ch-next {
+  .chapter-next {
     font: var(--t-note);
   }
 
@@ -6598,23 +6471,7 @@
     }
   }
 
-  /* A topic's small picture on a chip or a row. */
-  .topic-mark {
-    width: 26px;
-    height: 26px;
-    margin: -4px 0 -4px -4px;
-  }
-
-  /* A result's kicker line: what was played, and what's beside it. */
-  .day-line {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: var(--space-1) var(--space-3);
-  }
-
-  /* A topic's or a duel's result (results.ts, scoreCard): the score as the day's is. */
+  /* A chapter's or a duel's result (results.ts, scoreCard): the score as the day's is. */
   .score-row {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -6783,7 +6640,6 @@
     display: inline;
   }
 
-  .who-tag,
   .me-tag {
     overflow: hidden;
     color: var(--ink-3);
@@ -7013,14 +6869,12 @@
     .option,
     .option.crowd,
     .split-card,
-    .topic,
     .chip {
       transition: none;
     }
 
     .option.right,
     .option.wrong,
-    .explain-pop:popover-open,
     .number-out.live .typed::after {
       animation: none;
     }
@@ -7228,13 +7082,13 @@
     }
   }
 
-  /* A narrow phone: a topic's longest word still fits its tile whole. */
+  /* A narrow phone: a chapter's longest word still fits its tile whole. */
   @media (max-width: 22.5rem) {
     .segmented button {
       font-size: 0.8125rem;
     }
 
-    /* The longest topic's name („Литература“) fits beside its picture. */
+    /* The longest chapter's name („Литература“) fits beside its picture. */
 
     /* A board's row gives its gaps to the name. */
     .row {
@@ -7363,7 +7217,7 @@
       line-height: 1rem;
     }
 
-    /* The topic (or „На този ден“) stays in the small head: there's the width for it. */
+    /* The chapter (or „На този ден“) stays in the small head: there's the width for it. */
     .stuck .kicker {
       display: block;
     }
@@ -7442,7 +7296,7 @@
     }
   }
 
-  /* A laptop and up: the page takes the width. Начало in two columns (the day and the topics; beside them the streak
+  /* A laptop and up: the page takes the width. Днес in two columns (the day and the chapters; beside them the streak
      and the ways to play with others); Профил and a player's page one column of 40rem (.screen.me); every other page a
      centred column of 48rem, so no line of text runs too long. */
   @media (min-width: 64rem) {
@@ -7475,12 +7329,12 @@
       font-size: 1.375rem;
     }
 
-    /* Начало: floats, so each column stacks on its own, whatever the other's height. */
+    /* Днес: floats, so each column stacks on its own, whatever the other's height. */
 
     /* The streak, the habit's reward, leads the column beside the day, level with its result: a row of its own, its
        number big. */
 
-    /* A new player: the day and the topics, one centred column. */
+    /* A new player: the day and the chapters, one centred column. */
 
     /* The avatar's choice: bigger looks to choose from, more to a row. */
     .picker {
@@ -8097,7 +7951,7 @@
     hyphens: auto;
   }
 
-  /* A run's head: the count on its line, the topic under it once it doesn't fit beside it. */
+  /* A run's head: the count on its line, the chapter under it once it doesn't fit beside it. */
   .tight .question-head {
     flex-wrap: wrap;
     row-gap: var(--space-1);

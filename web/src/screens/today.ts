@@ -6,7 +6,7 @@
 // (game/share.ts, in a sheet with its card and its text), what its right answers wrote in the book (its ink, by
 // chapter, and a rank risen: game/news.ts), tomorrow (when the next issue comes, the streak it makes, the reminder's ask),
 // and the day's board, among friends and of all България (dayBoard). A wrong game is
-// never celebrated. Topics are played from their chapter in the Алманах, duels from Приятели (a friend's duel waiting
+// never celebrated. A chapter is played from its page in the Алманах, duels from Приятели (a friend's duel waiting
 // is its dot, a friend's yes its line). Once, under the streak: what came of the days just missed. Once, over the day:
 // what came of a step just taken (a profile signed in to, a game brought here). In an app's own browser the result's action
 // is the way out to the phone's browser with the game (keep.ts, exitWay), and the cover has a line for a game kept
@@ -53,8 +53,8 @@ export interface Today {
   day: string;
   /** The day's issue: its number from the first day of the day's ten (play/issue.go), the same for everyone. */
   issue?: number;
-  /** The issue's topics, in the order its ten are asked (play.IssueTopics): „В броя“. */
-  topics?: string[] | null;
+  /** The issue's chapters, in the order its ten are asked (play.IssueChapters): „В броя“. */
+  chapters?: string[] | null;
   /** On a national day, its name (bank.NationalName: „Освобождението“): the cover says it under the date, and the
    * share after the issue. */
   national?: string;
@@ -81,7 +81,7 @@ export interface Today {
   back?: { last: string };
   /** Yesterday's issue left half-way before midnight, while it can still be finished (play.Unfinished, DayGrace): its
    * day, issue, chapters and run, and until when (ms). Днес offers it first. */
-  yesterday?: { day: string; issue: number; national?: string; topics: string[] | null; run: State; until: number };
+  yesterday?: { day: string; issue: number; national?: string; chapters: string[] | null; run: State; until: number };
   /** Днес drawn for yesterday's issue (lateView): until when it can be finished, and the way on to today's. */
   late?: { until: number; today: () => void };
 }
@@ -197,7 +197,7 @@ export function today() {
       day: y.day,
       issue: y.issue,
       national: y.national,
-      topics: y.topics,
+      chapters: y.chapters,
       run: y.run,
       board: { day: y.day, players: 0, of: y.run.total - (y.run.void ?? 0), top: [] },
       friends: null,
@@ -339,7 +339,7 @@ function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): 
   const players = t.board.players;
   const at = marks.length;
   const lead = shared && !at ? shared : null;
-  const order = t.topics?.length ? t.topics : [];
+  const order = t.chapters?.length ? t.chapters : [];
   const [, , date = 1] = t.day.split("-").map(Number);
   const top = order[0] ?? "general";
   const sharedMarks: Mark[] = lead
@@ -354,7 +354,7 @@ function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): 
       { class: "issue-stack", "aria-hidden": "true" },
       order
         .slice(1)
-        .map((id, i) => h("span", { class: `stack-leaf t-${id}`, style: { "--i": String(order.length - 1 - i) } })),
+        .map((id, i) => h("span", { class: `stack-leaf ch-${id}`, style: { "--i": String(order.length - 1 - i) } })),
     ),
     leaf(
       top,
@@ -448,7 +448,7 @@ function issueGo(start: () => void, at: number, error: string, first: boolean): 
 /** The issue's contents on a big screen („В броя“): its ten chapters in their order, each with its glyph, the tenth
  * named the hard number. */
 function contents(t: Today): Child {
-  const list = t.topics ?? [];
+  const list = t.chapters ?? [];
   if (list.length < 2) return null;
   return h(
     "section",
@@ -564,7 +564,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[]): Child {
           ? undefined
           : () => api<{ friends: FriendDay[] }>("GET", `/api/runs/${run.id}/friends`).then((r) => r.friends),
     });
-  const order = t.topics ?? [];
+  const order = t.chapters ?? [];
   // The streak with today's, the game's stake, and the reminder's ask. A guest in an app's own browser has the way out
   // for the action; a guest on the first day, or one whose game was just brought here, the ask to keep it and be
   // reminded (while it's there to ask), right under the score; everyone else, sharing the day, and the reminder's ask
@@ -701,11 +701,11 @@ function missed(all: () => Reviewed[] | null, open: () => void): Child {
             h(
               "span",
               {
-                class: `tile ${q.void ? "void" : "wrong"} t-${q.category}`,
+                class: `tile ${q.void ? "void" : "wrong"} ch-${q.chapter}`,
                 role: "img",
-                "aria-label": chapterName(q.category),
+                "aria-label": chapterName(q.chapter),
               },
-              h("span", { class: "tile-pic" }, picture(`topic-${q.category}`)),
+              h("span", { class: "tile-pic" }, picture(`chapter-${q.chapter}`)),
             ),
             h("p", { class: "miss-q" }, q.view.text),
             rightAnswer(q),
@@ -999,7 +999,7 @@ function shareSheet(run: State, t: Today, streak: number): void {
               width: 1200,
               height: 630,
             })
-          : tiles(run.trail, t.topics ?? []),
+          : tiles(run.trail, t.chapters ?? []),
       ),
       h("pre", { class: "share-text" }, () => text() || "…"),
       h(

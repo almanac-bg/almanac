@@ -48,7 +48,7 @@ for (const scheme of ["light", "dark"] as const) {
         await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
         await check();
         expect(await greyOnSheets(page)).toEqual([]);
-        // A topic opened by its address: „Започни“ first, its count, then a question.
+        // A chapter opened by its address: „Започни“ first, its count, then a question.
         if (path === "/play/geography") {
           await page.getByRole("button", { name: "Започни", exact: true }).click();
           await page.getByRole("button", { name: "Започни сега" }).click();
@@ -141,7 +141,7 @@ for (const scheme of ["light", "dark"] as const) {
     // One right for both, one that parted them.
     const asked = (n: number, right: boolean) => ({
       n,
-      category: "history",
+      chapter: "history",
       view: { type: "truefalse", text: "София е столица на България от 1879 г." },
       reveal: { id: `q${n}`, truth: true, fact: "София става столица на 3 април 1879 г." },
       given: { truth: right },

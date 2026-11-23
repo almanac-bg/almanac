@@ -1,5 +1,5 @@
 // The pieces several screens draw with: the verdict and the fact, the streak, numbers with what they count, and each
-// topic's colour. The stylesheet draws them; these only say what to draw.
+// chapter's colour. The stylesheet draws them; these only say what to draw.
 
 import { picture } from "./art/picture.ts";
 import type { Credit, Score } from "./game/types.ts";
@@ -9,7 +9,7 @@ import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
 import { calm, type Scheme, scheme, setScheme } from "./lib/prefs.ts";
 import { formatNumber, formatValue, found, hyphenate, keepNumbers, stakeWords } from "./lib/words.ts";
 import { glyphBox, rankName, rankNames, sealParts } from "./seal.ts";
-import { categories, topics, user } from "./state.ts";
+import { chapters, chaptersAndMix, user } from "./state.ts";
 
 export { formatNumber, formatValue };
 
@@ -97,48 +97,43 @@ export function fact(text?: string, day?: string): Child {
 
 /** Where a right answer in the issue wrote its fact in ink (play.Result.Ink): its chapter. Only ink is said: every
  * other fact met is in the book in grey, and nothing says so as it's met. */
-export function filed(topic: string): Child {
+export function filed(chapter: string): Child {
   return h(
     "p",
     { class: "filed" },
     h("span", { class: "i i-nib", "aria-hidden": "true" }),
-    `Записано с мастило · тема „${chapterName(topic)}“`,
+    `Записано с мастило · тема „${chapterName(chapter)}“`,
   );
 }
 
-/** A topic's colour, the same on every screen: its chapter's (app.css, .t-<topic>). */
-export function toneOf(category: string): string {
-  return `t-${category}`;
-}
-
 /** A chapter's name, as players read it ("history" → „История“; "mix" → „Всички теми“). */
-export const chapterName = (topic: string): string => topics.find((c) => c.id === topic)?.name ?? "";
+export const chapterName = (chapter: string): string => chaptersAndMix.find((c) => c.id === chapter)?.name ?? "";
 
 /** A chapter's glyph: its art on a white disc, `size` across (for the eye: its name is said beside it). */
-export function glyph(topic: string, size = 28, cls = ""): HTMLElement {
+export function glyph(chapter: string, size = 28, cls = ""): HTMLElement {
   return h(
     "span",
     {
-      class: ["glyph", `t-${topic}`, cls].filter(Boolean).join(" "),
+      class: ["glyph", `ch-${chapter}`, cls].filter(Boolean).join(" "),
       style: { "--g": `${size}px` },
       "aria-hidden": "true",
     },
-    picture(`topic-${topic}`),
+    picture(`chapter-${chapter}`),
   );
 }
 
 /** A chapter's name with its glyph, on a white pill: a question's chapter. */
-export function chip(topic: string, words: Child = chapterName(topic)): HTMLElement {
-  return h("span", { class: `chip t-${topic}` }, glyph(topic), words);
+export function chip(chapter: string, words: Child = chapterName(chapter)): HTMLElement {
+  return h("span", { class: `chip ch-${chapter}` }, glyph(chapter), words);
 }
 
 /** A large sheet in a chapter's colour: a question, the day's score, a chapter's head. `fold`: its corner turned, the
- * next sheet's colour under it (`next`: its topic; none, the page), as the issue's cover and the chapters' cards have
+ * next sheet's colour under it (`next`: its chapter; none, the page), as the issue's cover and the chapters' cards have
  * it, and nothing else does. */
-export function leaf(topic: string, parts: Child, cls = "", fold: { next?: string } | null = null): HTMLElement {
+export function leaf(chapter: string, parts: Child, cls = "", fold: { next?: string } | null = null): HTMLElement {
   const sheet = h(
     "div",
-    { class: ["leaf", fold ? "folded" : "", `t-${topic}`, cls].filter(Boolean).join(" ") },
+    { class: ["leaf", fold ? "folded" : "", `ch-${chapter}`, cls].filter(Boolean).join(" ") },
     parts,
     fold ? h("span", { class: "fold", "aria-hidden": "true" }) : null,
   );
@@ -146,7 +141,7 @@ export function leaf(topic: string, parts: Child, cls = "", fold: { next?: strin
   return h(
     "div",
     { class: "leaf-wrap" },
-    fold.next ? h("span", { class: `leaf-next t-${fold.next}`, "aria-hidden": "true" }) : null,
+    fold.next ? h("span", { class: `leaf-next ch-${fold.next}`, "aria-hidden": "true" }) : null,
     sheet,
   );
 }
@@ -167,10 +162,10 @@ export const tileOf = (m?: { right: boolean; close?: boolean; void?: boolean }):
   !m ? "later" : m.void ? "void" : m.right ? "right" : m.close ? "near" : "wrong";
 
 /** The day's ten as tiles in their chapters' colours: right filled, близо half, wrong hollow, each with its glyph
- * (`topics`: the issue's, in its order). Read aloud as „3. История: вярно“. */
+ * (`chaptersOf`: the issue's, in its order). Read aloud as „3. История: вярно“. */
 export function tiles(
   marks: { right: boolean; close?: boolean; void?: boolean }[],
-  topicsOf: string[],
+  chaptersOf: string[],
   total = 10,
   label = "Как мина денят",
   open?: (n: number) => void,
@@ -179,15 +174,15 @@ export function tiles(
     "ol",
     { class: "tiles", "aria-label": label },
     Array.from({ length: total }, (_, i) => {
-      const topic = topicsOf[i] ?? "mix";
+      const chapter = chaptersOf[i] ?? "mix";
       const state = tileOf(marks[i]);
-      const says = `${i + 1}. ${chapterName(topic)}: ${tileWords[state]}`;
+      const says = `${i + 1}. ${chapterName(chapter)}: ${tileWords[state]}`;
       // A way to its question gone over (a result's): the whole tile a button, which says what the tile does.
       const tap = open && marks[i];
       return h(
         "li",
-        { class: `tile ${state} t-${topic}`, "aria-label": tap ? undefined : says },
-        h("span", { class: "tile-pic" }, picture(`topic-${topic}`)),
+        { class: `tile ${state} ch-${chapter}`, "aria-label": tap ? undefined : says },
+        h("span", { class: "tile-pic" }, picture(`chapter-${chapter}`)),
         tap ? h("button", { class: "tile-tap", type: "button", "aria-label": says, onclick: () => open(i) }) : null,
       );
     }),
@@ -209,14 +204,14 @@ const svgNS = "http://www.w3.org/2000/svg";
 
 /** A chapter's seal (seal.ts): its rank as its silhouette, the chapter's glyph in its middle, `size` across (24 at the
  * least; from 32, Летопис's number past the first). Named for a screen reader: „История: Тетрадка“. */
-export function seal(topic: string, rank: number, size = 32, cls = ""): SVGSVGElement {
+export function seal(chapter: string, rank: number, size = 32, cls = ""): SVGSVGElement {
   const svg = document.createElementNS(svgNS, "svg");
   svg.setAttribute("viewBox", "0 0 48 48");
   svg.setAttribute("width", String(size));
   svg.setAttribute("height", String(size));
-  svg.setAttribute("class", ["seal", `t-${topic}`, cls].filter(Boolean).join(" "));
+  svg.setAttribute("class", ["seal", `ch-${chapter}`, cls].filter(Boolean).join(" "));
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", `${chapterName(topic)}: ${rankName(rank)}`);
+  svg.setAttribute("aria-label", `${chapterName(chapter)}: ${rankName(rank)}`);
   for (const p of sealParts(rank)) {
     const path = document.createElementNS(svgNS, "path");
     path.setAttribute("d", p.d);
@@ -224,7 +219,7 @@ export function seal(topic: string, rank: number, size = 32, cls = ""): SVGSVGEl
     if (p.width) path.setAttribute("stroke-width", String(p.width));
     svg.append(path);
   }
-  const art = picture(`topic-${topic}`, `t-${topic}`);
+  const art = picture(`chapter-${chapter}`, `ch-${chapter}`);
   art.setAttribute("x", String(glyphBox.x));
   art.setAttribute("y", String(glyphBox.y));
   art.setAttribute("width", String(glyphBox.size));
@@ -307,7 +302,7 @@ export function standing(s: Standing, named = true): HTMLElement {
   const [now, next] = standingWords(s);
   return h(
     "span",
-    { class: `standing t-${s.chapter}` },
+    { class: `standing ch-${s.chapter}` },
     h(
       "span",
       { class: "standing-bar", "aria-hidden": "true" },
@@ -394,7 +389,7 @@ export function sealsSection(ranks: ChapterRank[], none: Child): HTMLElement {
 
 /** The chapters with a rank, the most ink first (then in the bank's order: a stable sort keeps it). */
 function sealsHad(ranks: ChapterRank[]): ChapterRank[] {
-  return categories
+  return chapters
     .map((c) => ranks.find((r) => r.chapter === c.id))
     .filter((r): r is ChapterRank => !!r && r.level > 0)
     .sort((a, b) => b.ink - a.ink);
@@ -417,7 +412,7 @@ function sealList(had: ChapterRank[]): Child {
       s.setAttribute("aria-hidden", "true");
       return h(
         "li",
-        { class: `seal-row t-${r.chapter}` },
+        { class: `seal-row ch-${r.chapter}` },
         s,
         h(
           "span",
@@ -449,7 +444,7 @@ export function ladder(chapter: string, rank: number, size = 24): HTMLElement {
   const at = Math.min(rank, rankNames.length);
   return h(
     "ol",
-    { class: `ladder t-${chapter}`, "aria-label": `${chapterName(chapter)}: ${rankName(rank)}` },
+    { class: `ladder ch-${chapter}`, "aria-label": `${chapterName(chapter)}: ${rankName(rank)}` },
     rankNames.map((name, i) => {
       const step = i + 1;
       return h(
@@ -460,98 +455,6 @@ export function ladder(chapter: string, rank: number, size = 24): HTMLElement {
       );
     }),
   );
-}
-
-/** A topic's small picture, as on a chip (decoration), in the topic's own tone wherever it's put; a plain dot for all
- * of them. */
-export function topicMark(category: string): Child {
-  return category
-    ? picture(`topic-${category}`, `topic-mark ${toneOf(category)}`)
-    : h("span", { class: "dot", "aria-hidden": "true" });
-}
-
-let explained = 0;
-
-/** A number's name (`label`) and what it means (`words`), in a small card by the word that comes out of it: shown
- * while a mouse is over the word (gone the moment it leaves) or the keyboard is on it; a tap keeps it until the next
- * one anywhere. */
-export function explain(label: Child, words: string): Child {
-  const id = `explain-${++explained}`;
-  // A manual popover: the game says when it goes (WebKit's light dismiss closed it under the very tap that opened it).
-  const pop = h("span", { class: "explain-pop", id, popover: "manual", role: "note" }, words) as HTMLElement;
-  let kept = false;
-  let mouse = false; // the last press was a mouse's: hovering already shows the card, a click only keeps it shown
-  const shown = () => pop.matches(":popover-open");
-  const show = () => {
-    if (!shown()) pop.showPopover();
-    // Under the word (over it if there's no room below), inside the screen's gutters, moving with the page.
-    const at = word.getBoundingClientRect();
-    const gutter = 16;
-    const left = Math.min(
-      Math.max(gutter, at.left + at.width / 2 - pop.offsetWidth / 2),
-      innerWidth - pop.offsetWidth - gutter,
-    );
-    const below = at.bottom + 8;
-    const above = below + pop.offsetHeight > innerHeight - gutter;
-    const top = above ? at.top - 8 - pop.offsetHeight : below;
-    pop.classList.toggle("above", above); // it comes out of the word: down from under it, up from over it
-    pop.style.left = `${Math.max(gutter, left) + scrollX}px`;
-    pop.style.top = `${Math.max(gutter, top) + scrollY}px`;
-  };
-  const hide = () => {
-    if (shown() && !kept) pop.hidePopover();
-  };
-  // Kept by a tap, it goes with the next tap anywhere else, or Esc.
-  const away = (e: Event) => {
-    if (!pop.isConnected) {
-      // Gone with its screen while open (no toggle then): nothing to put away, and no more listening.
-      for (const type of ["pointerdown", "keydown"]) document.removeEventListener(type, away, true);
-      return;
-    }
-    if (e instanceof KeyboardEvent ? e.key !== "Escape" : word.contains(e.target as Node)) return;
-    kept = false;
-    hide();
-  };
-  pop.addEventListener("toggle", () => {
-    const open = shown();
-    if (!open) kept = false;
-    for (const type of ["pointerdown", "keydown"]) {
-      if (open) document.addEventListener(type, away, true);
-      else document.removeEventListener(type, away, true);
-    }
-  });
-  const word = h(
-    "button",
-    {
-      class: "explain",
-      type: "button",
-      "aria-describedby": id,
-      onpointerenter: (e: PointerEvent) => e.pointerType === "mouse" && show(),
-      onpointerleave: (e: PointerEvent) => {
-        if (e.pointerType !== "mouse") return;
-        kept = false;
-        hide();
-      },
-      onpointerdown: (e: PointerEvent) => {
-        mouse = e.pointerType === "mouse";
-      },
-      onfocus: () => word.matches(":focus-visible") && show(),
-      onblur: hide,
-      onclick: () => {
-        if (mouse) return show();
-        // A tap or a key: the first keeps it, the next puts it away.
-        if (shown() && kept) {
-          kept = false;
-          hide();
-        } else {
-          kept = true;
-          show();
-        }
-      },
-    },
-    label,
-  ) as HTMLElement;
-  return [word, pop];
 }
 
 const dayNames = ["понеделник", "вторник", "сряда", "четвъртък", "петък", "събота", "неделя"];
@@ -591,7 +494,7 @@ export function weekStrip(week?: boolean[], forgiven?: boolean[]): Child {
 
 /** A streak at stake while the day's ten wait (play/runs.go: it runs to yesterday until they're played), in a line
  * (stakeWords), read again each minute, so a screen left open turns to the evening's line: on the day's card and under
- * a topic's result. */
+ * a chapter's result. */
 export function stakeLine(days: number, spare: boolean): Child {
   if (days < 1) return null;
   const hour = signal(hourInBulgaria());
@@ -848,8 +751,8 @@ export const scoreRow = (s: Score, place: number | null, gap = false) =>
   );
 
 /** A screen that couldn't load, never a dead end: what went wrong (lib/api.ts, errorText); „Опитай пак“ where trying
- * again can help, and the same by itself as the line comes back; and a way on (`way`: Начало, unless the screen is
- * Начало itself: null). */
+ * again can help, and the same by itself as the line comes back; and a way on (`way`: Днес, unless the screen is
+ * Днес itself: null). */
 export function failure(
   err: unknown,
   retry?: () => void,
@@ -875,7 +778,7 @@ export function inSight(el: Element): void {
   requestAnimationFrame(() => el.scrollIntoView({ block: "nearest", behavior: calm.peek() ? "auto" : "smooth" }));
 }
 
-/** The way back to where a screen is reached from (a way to play, from Начало; Настройки, from Профил): back in the
+/** The way back to where a screen is reached from (a way to play, from Днес; Настройки, from Профил): back in the
  * history when that's the page before, else that page in place of this one (router.ts, leave), never a new entry. */
 export function back(href: string, label: string): Child {
   return h(

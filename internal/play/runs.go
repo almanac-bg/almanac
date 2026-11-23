@@ -85,11 +85,11 @@ func SecondPlay(ctx context.Context, userID int64) context.Context {
 }
 
 // insertRun starts a game for a player, and, of a day's issue, whether it's a second play in this browser (SecondPlay).
-func (g *Game) insertRun(ctx context.Context, tx *sql.Tx, userID int64, kind string, day, category any, picks []Pick) (*run, error) {
+func (g *Game) insertRun(ctx context.Context, tx *sql.Tx, userID int64, kind string, day, chapter any, picks []Pick) (*run, error) {
 	data, _ := json.Marshal(picks)
 	second, _ := ctx.Value(secondKey{}).(map[int64]bool)
-	res, err := tx.Exec(`INSERT INTO runs (user_id, kind, day, category, questions, started_at, pencil)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`, userID, kind, day, category, string(data), store.Ms(g.Now()),
+	res, err := tx.Exec(`INSERT INTO runs (user_id, kind, day, chapter, questions, started_at, pencil)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`, userID, kind, day, chapter, string(data), store.Ms(g.Now()),
 		kind == "day" && second[userID])
 	if err != nil {
 		return nil, err
@@ -160,27 +160,27 @@ func (g *Game) Unfinished(ctx context.Context, userID int64) (*State, error) {
 	return &s, nil
 }
 
-// MixTopic is every topic at once: what a duel draws from, and the topic of a game of all of them kept from before
-// (runs.category), which a duel may take as a recording. Its games are shaped by how well the player knows all the
-// topics, and count toward each question's own topic.
-const MixTopic = "mix"
+// MixChapter is every chapter at once: what a duel draws from, and the chapter of a game of all of them kept from
+// before (runs.chapter), which a duel may take as a recording. Its games are shaped by how well the player knows all
+// the chapters, and count toward each question's own chapter.
+const MixChapter = "mix"
 
-// StartTopic starts a run of one of the bank's topics (a chapter's game), shaped by how well the player knows it; or,
-// if the player left a run of the topic unfinished today, goes on with it where it stopped, as the day's ten do. One left on an earlier day isn't taken up again: it was drawn before today's
-// questions were kept from other games.
-func (g *Game) StartTopic(ctx context.Context, userID int64, category string) (State, error) {
-	if !g.IsTopic(category) {
-		return State{}, ErrNoTopic
+// StartChapter starts a run of one of the bank's chapters (a chapter's game), shaped by how well the player knows it;
+// or, if the player left a run of the chapter unfinished today, goes on with it where it stopped, as the day's ten do.
+// One left on an earlier day isn't taken up again: it was drawn before today's questions were kept from other games.
+func (g *Game) StartChapter(ctx context.Context, userID int64, chapter string) (State, error) {
+	if !g.IsChapter(chapter) {
+		return State{}, ErrNoChapter
 	}
-	return g.startTopic(ctx, userID, category)
+	return g.startChapter(ctx, userID, chapter)
 }
 
-// startTopic is StartTopic for any topic, MixTopic too: a game of every topic, as players had before (the tests make
-// them; a duel takes one as a recording).
-func (g *Game) startTopic(ctx context.Context, userID int64, category string) (State, error) {
+// startChapter is StartChapter for any chapter, MixChapter too: a game of every chapter, as players had before (the
+// tests make them; a duel takes one as a recording).
+func (g *Game) startChapter(ctx context.Context, userID int64, chapter string) (State, error) {
 	b := g.Bank()
-	known := category // how well the player knows a game of every topic's questions: all the topics
-	if category == MixTopic {
+	known := chapter // how well the player knows a game of every chapter's questions: all the chapters
+	if chapter == MixChapter {
 		known = ""
 	}
 	p, err := g.pastOf(ctx, known, userID)
@@ -191,9 +191,9 @@ func (g *Game) startTopic(ctx context.Context, userID int64, category string) (S
 	var ended int64 // the run left unfinished, if its clock has just ended it
 	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		today, _ := time.ParseInLocation(time.DateOnly, g.Today(), Bulgaria)
-		left, err := scanRun(tx.QueryRow(`SELECT `+runColumns+` FROM runs WHERE user_id = ? AND kind = 'topic'
-			AND category = ? AND finished_at IS NULL AND started_at >= ? ORDER BY id DESC LIMIT 1`,
-			userID, category, store.Ms(today)))
+		left, err := scanRun(tx.QueryRow(`SELECT `+runColumns+` FROM runs WHERE user_id = ? AND kind = 'chapter'
+			AND chapter = ? AND finished_at IS NULL AND started_at >= ? ORDER BY id DESC LIMIT 1`,
+			userID, chapter, store.Ms(today)))
 		switch {
 		case err == nil:
 			done, err := g.settle(tx, left)
@@ -212,11 +212,11 @@ func (g *Game) startTopic(ctx context.Context, userID int64, category string) (S
 		if err != nil {
 			return err
 		}
-		picks := Draw(b, category, p.ability, p.seen, bars.all, bars.met, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+		picks := Draw(b, chapter, p.ability, p.seen, bars.all, bars.met, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 		if len(picks) == 0 {
 			return ErrNoQuestion
 		}
-		r, err := g.insertRun(ctx, tx, userID, "topic", nil, category, picks)
+		r, err := g.insertRun(ctx, tx, userID, "chapter", nil, chapter, picks)
 		if err != nil {
 			return err
 		}
@@ -229,24 +229,24 @@ func (g *Game) startTopic(ctx context.Context, userID int64, category string) (S
 	return s, err
 }
 
-// LeftRun is a game of the player's own left unfinished, to come back to: a topic's today (its category); how far it
+// LeftRun is a game of the player's own left unfinished, to come back to: a chapter's, today; how far it
 // got (At answered, of Total), and whether a question is showing now, its time running (Open).
 type LeftRun struct {
-	ID       int64  `json:"id"`
-	Category string `json:"category"`
-	At       int    `json:"at"`
-	Total    int    `json:"total"`
-	Open     bool   `json:"open,omitempty"`
+	ID      int64  `json:"id"`
+	Chapter string `json:"chapter"`
+	At      int    `json:"at"`
+	Total   int    `json:"total"`
+	Open    bool   `json:"open,omitempty"`
 }
 
-// Left are the games of the player's own left unfinished that StartTopic would go on with: the latest of each topic,
-// today's; the latest first. One whose clock has just run out on its last question ends now, as it would at its next
-// look, and isn't among them.
+// Left are the games of the player's own left unfinished that StartChapter would go on with: the latest of each
+// chapter, today's; the latest first. One whose clock has just run out on its last question ends now, as it would at
+// its next look, and isn't among them.
 func (g *Game) Left(ctx context.Context, userID int64) ([]LeftRun, error) {
 	today, _ := time.ParseInLocation(time.DateOnly, g.Today(), Bulgaria)
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT max(id) FROM runs WHERE user_id = ? AND finished_at IS NULL
-		AND kind = 'topic' AND category <> ? AND started_at >= ? GROUP BY category ORDER BY 1 DESC`,
-		userID, MixTopic, store.Ms(today))
+		AND kind = 'chapter' AND chapter <> ? AND started_at >= ? GROUP BY chapter ORDER BY 1 DESC`,
+		userID, MixChapter, store.Ms(today))
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +270,7 @@ func (g *Game) Left(ctx context.Context, userID int64) ([]LeftRun, error) {
 			return nil, err
 		}
 		if !s.Done {
-			left = append(left, LeftRun{ID: s.ID, Category: s.Category, At: s.At, Total: s.Total, Open: s.Question != nil})
+			left = append(left, LeftRun{ID: s.ID, Chapter: s.Chapter, At: s.At, Total: s.Total, Open: s.Question != nil})
 		}
 	}
 	return left, nil
@@ -321,7 +321,8 @@ func (g *Game) StreakOf(ctx context.Context, userID int64) (StreakNow, error) {
 }
 
 // streakHistory is what a streak is made of: the days a player finished the day's questions on (first: the first of
-// them, "" for none), and yesterday, if its run is still being played (open: within DayGrace of its midnight, it may count yet).
+// them, "" for none), and yesterday, if its run is still being played (open: within DayGrace of its midnight, it may
+// count yet).
 type streakHistory struct {
 	played map[string]bool
 	first  string
@@ -419,7 +420,8 @@ func dayBounds(day string) (int64, int64) {
 // monday is the Monday of a day's week.
 func monday(d time.Time) time.Time { return d.AddDate(0, 0, -((int(d.Weekday()) + 6) % 7)) }
 
-// Streak is how many days a player has played the day's issue one after another, up to Forgives a week forgiven (StreakOf).
+// Streak is how many days a player has played the day's issue one after another, up to Forgives a week forgiven
+// (StreakOf).
 func (g *Game) Streak(ctx context.Context, userID int64) (int, error) {
 	s, err := g.StreakOf(ctx, userID)
 	return s.Days, err

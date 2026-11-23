@@ -29,12 +29,12 @@ const (
 	whileAny
 )
 
-// daySlots is the day's shape: one question from each topic, easy to hard; a picture and a true-or-not among the easy
+// daySlots is the day's shape: one question from each chapter, easy to hard; a picture and a true-or-not among the easy
 // ones, a picture (while the bank has medium ones: whileAny) and the day's one puzzle (an order, a match or a split:
 // dayPuzzle) among the medium ones, and a number among the hard ones; the rest plain choices. One puzzle a day, not
 // three: a puzzle is all or nothing, the easiest question to slip on, and three of them could sink a day on slips
 // alone. Where each sits in its band is drawn with the day (inBands), the same for everyone who plays it, so that the
-// days don't all have one shape. A slot whose type a topic lacks takes the nearest it has instead (choose).
+// days don't all have one shape. A slot whose type a chapter lacks takes the nearest it has instead (choose).
 var daySlots = []slot{
 	{bank.Easy, "choice", noPicture, ""},
 	{bank.Easy, "choice", withPicture, ""},
@@ -72,13 +72,13 @@ func dayPuzzle(day string, has func(kind string) bool) string {
 // BGFloor is how many of a day's questions are about Bulgaria, at least, where the bank has them.
 const BGFloor = 3
 
-// drawDay draws a day (YYYY-MM-DD): each slot from another topic, never a question an earlier day had (while any are
+// drawDay draws a day (YYYY-MM-DD): each slot from another chapter, never a question an earlier day had (while any are
 // left), never one due for review by the day (overdue), and of those one nobody has answered (`answered`, if set) while
-// any are left. The slots that need something special (a picture, an order, a number) get their topics first, from
+// any are left. The slots that need something special (a picture, an order, a number) get their chapters first, from
 // those that have one; the number's from those that have an estimate (a unit, more than 20) while any do, for the
 // day's hardest stretch has one: a year or a small count is a choice in disguise. Then the day is made the day's: a question that
 // belongs to its date („На този ден“, bank.Tail.On) takes the place it fits, and at least BGFloor are about Bulgaria
-// (bank.Tail.BG), each in a place it fits, from that place's topic (an estimate's place only by another estimate).
+// (bank.Tail.BG), each in a place it fits, from that place's chapter (an estimate's place only by another estimate).
 // Throughout, a day names each subject once: no two of its questions share an answer or a quoted title
 // (bank.Subjects), so that nobody meets „Титаник“ twice in one day's ten; and, where it can, none the days just before
 // named (recent: recentSubjects), so that nobody meets one twice in a week either — a wish, never a reason to fall
@@ -108,23 +108,23 @@ func drawDay(b *bank.Bank, day string, used, answered, recent map[string]bool, r
 			slots[i].picture = s.picture
 		}
 	}
-	var topics []string
+	var chapters []string
 	next := func(wants ...func(string) bool) string {
-		if len(topics) == 0 { // more slots than topics: round again
+		if len(chapters) == 0 { // more slots than chapters: round again
 			for _, c := range b.Categories {
-				topics = append(topics, c.ID)
+				chapters = append(chapters, c.ID)
 			}
-			r.Shuffle(len(topics), func(i, j int) { topics[i], topics[j] = topics[j], topics[i] })
+			r.Shuffle(len(chapters), func(i, j int) { chapters[i], chapters[j] = chapters[j], chapters[i] })
 		}
 		i := -1
 		for _, want := range wants {
-			if i = slices.IndexFunc(topics, want); i >= 0 {
+			if i = slices.IndexFunc(chapters, want); i >= 0 {
 				break
 			}
 		}
 		i = max(i, 0)
-		t := topics[i]
-		topics = slices.Delete(topics, i, i+1)
+		t := chapters[i]
+		chapters = slices.Delete(chapters, i, i+1)
 		return t
 	}
 	special := func(s slot) bool { return s.typ != "choice" || s.picture == withPicture }
@@ -137,15 +137,15 @@ func drawDay(b *bank.Bank, day string, used, answered, recent map[string]bool, r
 	apart := func(q bank.Question) bool {
 		return !slices.ContainsFunc(bank.Subjects(q), func(k string) bool { return recent[k] })
 	}
-	// What each slot wants of a topic, best first: a question that fits it just so (fitsPlace: the number an estimate)
+	// What each slot wants of a chapter, best first: a question that fits it just so (fitsPlace: the number an estimate)
 	// and is apart from the days before, then one that fits just so (fits), then (the number) any of its difficulty,
 	// then any of its type.
 	wants := make([][]func(string) bool, len(slots))
 	fits := make([]func(string) bool, len(slots))
 	for i, s := range slots {
 		has := func(fit func(bank.Question) bool) func(string) bool {
-			return func(topic string) bool {
-				return slices.ContainsFunc(b.Live(topic, s.typ), func(q bank.Question) bool {
+			return func(chapter string) bool {
+				return slices.ContainsFunc(b.Live(chapter, s.typ), func(q bank.Question) bool {
 					return !used[q.Base().ID] && dealable(q) && fit(q)
 				})
 			}
@@ -159,8 +159,8 @@ func drawDay(b *bank.Bank, day string, used, answered, recent map[string]bool, r
 			return matches(q, slot{q.Base().Difficulty, s.typ, s.picture, ""}, true, true)
 		}))
 	}
-	// The special slots choose first, the one with the fewest topics to choose from first (the day's order on a tie),
-	// so that a topic one of them can't do without isn't spent on another.
+	// The special slots choose first, the one with the fewest chapters to choose from first (the day's order on a tie),
+	// so that a chapter one of them can't do without isn't spent on another.
 	var order, rest []int
 	choices := make([]int, len(slots))
 	for i, s := range slots {
@@ -253,8 +253,8 @@ func drawDay(b *bank.Bank, day string, used, answered, recent map[string]bool, r
 		taken[q.Base().ID] = true
 		name(q, 1)
 	}
-	// place puts q in a place it fits just so, keeping the day's topics one each: its own topic's place, or another
-	// whose topic then takes q's topic's place (with a question of its own that fits that place just so). It says
+	// place puts q in a place it fits just so, keeping the day's chapters one each: its own chapter's place, or another
+	// whose chapter then takes q's chapter's place (with a question of its own that fits that place just so). It says
 	// which place, or -1.
 	place := func(q bank.Question) int {
 		cat := q.Base().Category
@@ -321,9 +321,9 @@ func drawDay(b *bank.Bank, day string, used, answered, recent map[string]bool, r
 			if kept[i] || chosen[i] == nil || chosen[i].Extra().BG {
 				continue
 			}
-			s, topic := slots[i], assigned[i]
+			s, chapter := slots[i], assigned[i]
 			for _, q := range candidates(func(q bank.Question) bool {
-				return q.Extra().BG && q.Base().Category == topic && matches(q, s, true, true) && !clash(q, chosen[i]) &&
+				return q.Extra().BG && q.Base().Category == chapter && matches(q, s, true, true) && !clash(q, chosen[i]) &&
 					(!b.Estimate(chosen[i]) || b.Estimate(q)) && wish(q)
 			}) {
 				put(i, q)
@@ -410,7 +410,7 @@ func metFirst(wishes []func(bank.Question) bool, met map[string]bool) []func(ban
 	return append(out, isMet)
 }
 
-// sharedKinds are the kinds that take turns at a chapter's game's one slot for them ("split" in topicSlots), and
+// sharedKinds are the kinds that take turns at a chapter's game's one slot for them ("split" in chapterSlots), and
 // newKinds those of them the game deals (bank.KindOn): one or the other in each run. „Подсказки“ are off (bank.Off), so
 // the slot is a split's in every run; a day drawn before with clues has a split in their place (mendDay).
 var (
@@ -570,21 +570,21 @@ func matches(q bank.Question, s slot, typ, pictures bool) bool {
 	return !pictures || s.picture == eitherWay || has == (s.picture == withPicture)
 }
 
-// Draw draws ten questions of a topic (MixTopic for all topics: a duel's) for players
-// of an ability there (mastery.go; 0 for one who knows as much as most): questions none of them has seen before those
-// one has, and so on (seen: seenAmong); never one barred (the day's: DayQuestions). Choices come with a picture or without, whichever is drawn, and the number an estimate
-// where one is left (wishes). Of the questions as fresh to them and as fitting, one somebody has answered already (met:
-// dayBars.met) before one nobody has, which the days to come take first (ahead.go): what a player meets here is then
-// rarely an issue's question later, whose ink they'd lose. Every run goes from easy to hard, its special questions in
-// places drawn within their difficulty (inBands). Topic runs and duels draw this way. The questions due for review are
-// among the barred (DayQuestions).
-func Draw(b *bank.Bank, category string, ability float64, seen map[string]int, barred, met map[string]bool,
+// Draw draws ten questions of a chapter (MixChapter for all chapters: a duel's) for players of an ability there
+// (mastery.go; 0 for one who knows as much as most): questions none of them has seen before those one has, and so on
+// (seen: seenAmong); never one barred (the day's: DayQuestions). Choices come with a picture or without, whichever is
+// drawn, and the number an estimate where one is left (wishes). Of the questions as fresh to them and as fitting, one
+// somebody has answered already (met: dayBars.met) before one nobody has, which the days to come take first (ahead.go):
+// what a player meets here is then rarely an issue's question later, whose ink they'd lose. Every run goes from easy to
+// hard, its special questions in places drawn within their difficulty (inBands). Chapter runs and duels draw this way.
+// The questions due for review are among the barred (DayQuestions).
+func Draw(b *bank.Bank, chapter string, ability float64, seen map[string]int, barred, met map[string]bool,
 	r *rand.Rand) []Pick {
-	pool := topicPool(b, category)
+	pool := chapterPool(b, chapter)
 	taken := map[string]bool{}
 	allowed := func(q bank.Question) bool { return !taken[q.Base().ID] && !barred[q.Base().ID] }
 	var picks []Pick
-	for _, s := range inBands(newKind(topicSlots(ability), r), r) {
+	for _, s := range inBands(newKind(chapterSlots(ability), r), r) {
 		if q := choose(pool, s, allowed, seenCount(seen), metFirst(wishes(b, s), met), r); q != nil {
 			taken[q.Base().ID] = true
 			picks = append(picks, Pick{ID: q.Base().ID, Seed: r.Uint64()})

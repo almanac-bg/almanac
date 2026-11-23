@@ -358,7 +358,7 @@ func TestPages(t *testing.T) {
 		"/privacy": 200, "/.well-known/security.txt": 200,
 		// An app's page with a slash after it is that page; the slash after anything else isn't.
 		"/almanac/": 200, "/almanac/history/": 200, "/almanac/nosuch/": 404, "/nowhere/": 404,
-		// Every topic at once and Bulgaria's are no game and no chapter of the book.
+		// Every chapter at once and Bulgaria's are no game and no chapter of the book.
 		"/almanac/mix": 404, "/almanac/bulgaria": 404,
 	} {
 		res, err := http.Get(g.url + path)
@@ -432,7 +432,7 @@ func TestBootDataIsSafeInTheScript(t *testing.T) {
 	end := strings.Index(string(body)[start:], "</script>")
 	boot := string(body)[start+len(`<script type="application/json" id="boot">`) : start+end]
 	var v map[string]any
-	if err := json.Unmarshal([]byte(boot), &v); err != nil || v["user"] == nil || v["categories"] == nil {
+	if err := json.Unmarshal([]byte(boot), &v); err != nil || v["user"] == nil || v["chapters"] == nil {
 		t.Fatalf("boot data %q: %v", boot, err)
 	}
 }
@@ -480,11 +480,11 @@ func TestPlayingOverHTTP(t *testing.T) {
 		t.Fatalf("start: %d %v", status, run)
 	}
 	id := strconv.Itoa(int(run["id"].(float64)))
-	// A topic left with its question showing, to come back to (the day is no such game: Начало has it).
-	_, topic := p.call("POST", "/api/topic", map[string]any{"category": "history"})
-	p.call("POST", "/api/runs/"+strconv.Itoa(int(topic["id"].(float64)))+"/show", map[string]any{})
+	// A chapter left with its question showing, to come back to (the day is no such game: Днес has it).
+	_, chapter := p.call("POST", "/api/chapter", map[string]any{"chapter": "history"})
+	p.call("POST", "/api/runs/"+strconv.Itoa(int(chapter["id"].(float64)))+"/show", map[string]any{})
 	if status, out := p.call("GET", "/api/runs/left", nil); status != 200 || len(out["runs"].([]any)) != 1 ||
-		out["runs"].([]any)[0].(map[string]any)["category"] != "history" || out["runs"].([]any)[0].(map[string]any)["open"] != true {
+		out["runs"].([]any)[0].(map[string]any)["chapter"] != "history" || out["runs"].([]any)[0].(map[string]any)["open"] != true {
 		t.Fatalf("left: %d %v", status, out)
 	}
 	for n := range 10 {
@@ -526,7 +526,7 @@ func TestPlayingOverHTTP(t *testing.T) {
 	if today["run"].(map[string]any)["done"] != true || today["streak"] != float64(1) || today["firstDay"] != true {
 		t.Fatalf("today: %v", today)
 	}
-	// Nothing adds up but the book and the streak: Начало has no level.
+	// Nothing adds up but the book and the streak: Днес has no level.
 	if lv, ok := today["level"]; ok {
 		t.Fatalf("today's level: %v", lv)
 	}
@@ -651,7 +651,7 @@ func TestReportsAndTheAdminPage(t *testing.T) {
 		t.Fatal("the report is still open")
 	}
 	// How the questions go: geo-002 always missed, gen-001 always right, geo-001 too few answers to tell.
-	res2, err := g.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at) SELECT id, 'topic', '[]', 0 FROM users LIMIT 1`)
+	res2, err := g.db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at) SELECT id, 'chapter', '[]', 0 FROM users LIMIT 1`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -680,7 +680,7 @@ func TestReportsAndTheAdminPage(t *testing.T) {
 	}
 }
 
-// fakePushService takes pushes and counts them, with the topic of each path's last; or answers a path with its status
+// fakePushService takes pushes and counts them, with the chapter of each path's last; or answers a path with its status
 // (answer), uncounted.
 type fakePushService struct {
 	mu     sync.Mutex
@@ -820,14 +820,14 @@ func befriend(a, b *player) {
 	acceptAll(a)
 }
 
-// played makes a player one who has finished a game (a topic's, a year ago, so that nothing of today's changes): a
+// played makes a player one who has finished a game (a chapter's, a year ago, so that nothing of today's changes): a
 // guest asks anyone to be friends only then.
 func played(p *player) {
 	p.g.t.Helper()
 	_, me := p.call("GET", "/api/me", nil)
 	at := time.Now().AddDate(-1, 0, 0).UnixMilli()
-	if _, err := p.g.db.Write.Exec(`INSERT INTO runs (user_id, kind, category, questions, started_at, finished_at)
-		VALUES (?, 'topic', 'history', '[]', ?, ?)`, me["user"].(map[string]any)["id"], at, at); err != nil {
+	if _, err := p.g.db.Write.Exec(`INSERT INTO runs (user_id, kind, chapter, questions, started_at, finished_at)
+		VALUES (?, 'chapter', 'history', '[]', ?, ?)`, me["user"].(map[string]any)["id"], at, at); err != nil {
 		p.g.t.Fatal(err)
 	}
 }
@@ -1182,7 +1182,7 @@ func TestProfilesOverHTTP(t *testing.T) {
 	_, a := ana.call("POST", "/api/guest", map[string]any{})
 	bo.call("POST", "/api/guest", map[string]any{})
 	anaTag := a["user"].(map[string]any)["tag"].(string)
-	_, run := ana.call("POST", "/api/topic", map[string]string{"category": "music"})
+	_, run := ana.call("POST", "/api/chapter", map[string]string{"chapter": "music"})
 	id := strconv.Itoa(int(run["id"].(float64)))
 	for n := range 10 {
 		ana.call("POST", "/api/runs/"+id+"/show", map[string]any{})
@@ -1208,7 +1208,7 @@ func TestProfilesOverHTTP(t *testing.T) {
 		t.Fatalf("a tag that can't be: %d", status)
 	}
 
-	// A profile shows no achievements, no title, no level: they're gone (DECISIONS.md, „The redesign“).
+	// A profile shows no achievements, no title, no level: they're gone (DECISIONS.md, „The direction“).
 	for _, gone := range []string{"achievements", "of", "title", "level", "mastery", "games", "answers", "days"} {
 		if v, ok := p[gone]; ok {
 			t.Errorf("Ana's profile has %s: %v", gone, v)

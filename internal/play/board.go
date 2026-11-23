@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// A day's board is everyone who finished the day, and Начало shows it to each player who opens it: counted for each,
+// A day's board is everyone who finished the day, and Днес shows it to each player who opens it: counted for each,
 // it would cost as much as the day has players, every time. So it's counted once and kept a little while for all
 // (boardCache), and each viewer's own game is set into it exactly, whenever it finished: a player who has just
 // played sees their result and place at once; only the others' come in a moment later.

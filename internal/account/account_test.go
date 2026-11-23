@@ -801,7 +801,7 @@ func TestCleanUpIdleGuests(t *testing.T) {
 	}
 	idle, recent := guest(old), guest(store.Now())
 	played, friended, asked := guest(old), guest(old), guest(old)
-	exec(`INSERT INTO runs (user_id, kind, questions, started_at) VALUES (?, 'topic', '[]', ?)`, played, old)
+	exec(`INSERT INTO runs (user_id, kind, questions, started_at) VALUES (?, 'chapter', '[]', ?)`, played, old)
 	exec(`INSERT INTO friends (user_id, friend_id, since) VALUES (?, ?, ?), (?, ?, ?)`, friended, recent, old, recent, friended, old)
 	exec(`INSERT INTO friend_requests (from_id, to_email, at) VALUES (?, 'x@example.com', ?)`, asked, old)
 	c := code(t, a, out, in, "kept@example.com")
@@ -834,7 +834,7 @@ func TestCleanUpKeepsTheSuspended(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.Write.ExecContext(ctx, `INSERT INTO runs (user_id, kind, questions, started_at) VALUES (?, 'topic', '[]', ?)`,
+	if _, err := db.Write.ExecContext(ctx, `INSERT INTO runs (user_id, kind, questions, started_at) VALUES (?, 'chapter', '[]', ?)`,
 		u.ID, store.Now()); err != nil {
 		t.Fatal(err)
 	}

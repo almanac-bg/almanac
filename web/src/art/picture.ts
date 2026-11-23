@@ -1,6 +1,6 @@
 // A picture from the game's illustrations (art/pictures.ts): an <svg> that fills itself once the pictures have
 // loaded. They come as a file of their own, asked for as the game starts, so the first screen never waits on them;
-// until they're here, a picture is its empty box (an avatar shows its tone, a topic its card).
+// until they're here, a picture is its empty box (an avatar shows its tone, a chapter its card).
 
 const svgNS = "http://www.w3.org/2000/svg";
 
@@ -22,7 +22,7 @@ export function loadPictures(): Promise<Record<string, string>> {
   return loading;
 }
 
-/** A picture by its id ("fox", "topic-science", "mode-duel", "flame"), as decoration: its words are beside
+/** A picture by its id ("fox", "chapter-science", "flame"), as decoration: its words are beside
  * it. */
 export function picture(id: string, cls = ""): SVGSVGElement {
   const svg = document.createElementNS(svgNS, "svg");

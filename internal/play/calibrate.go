@@ -10,7 +10,7 @@ import (
 )
 
 // Calibration checks each question's difficulty against what players have done with it. A label is a writer's
-// judgement; answers are the truth. The game leans on difficulty — a run goes from easy to hard, a topic run follows
+// judgement; answers are the truth. The game leans on difficulty — a run goes from easy to hard, a chapter run follows
 // how well a player knows it — so a label that disagrees with the answers is
 // worth judging again. The answers are people's: a game played at a script's speed says nothing of how hard a
 // question is (fair.go).

@@ -172,19 +172,19 @@ func (w *world) dayRun(p *player) error {
 	return nil
 }
 
-// topicRun is a game of a chapter, maybe left half-way; it says the run.
-func (w *world) topicRun(p *player) (play.State, error) {
+// chapterRun is a game of a chapter, maybe left half-way; it says the run.
+func (w *world) chapterRun(p *player) (play.State, error) {
 	cats := w.b.Categories
 	if len(cats) == 0 {
 		return play.State{}, nil
 	}
-	topic := cats[w.r.IntN(len(cats))].ID
-	s, err := w.g.StartTopic(w.as(p), p.id, topic)
+	chapter := cats[w.r.IntN(len(cats))].ID
+	s, err := w.g.StartChapter(w.as(p), p.id, chapter)
 	if errors.Is(err, play.ErrNoQuestion) {
 		return s, nil
 	}
 	if err != nil {
-		return s, fmt.Errorf("topic %q: %w", topic, err)
+		return s, fmt.Errorf("chapter %q: %w", chapter, err)
 	}
 	stop := -1
 	if w.chance(0.05) {
@@ -192,7 +192,7 @@ func (w *world) topicRun(p *player) (play.State, error) {
 	}
 	s, err = w.playRun(p, s, stop)
 	if err != nil {
-		return s, fmt.Errorf("topic %q: %w", topic, err)
+		return s, fmt.Errorf("chapter %q: %w", chapter, err)
 	}
 	return s, nil
 }

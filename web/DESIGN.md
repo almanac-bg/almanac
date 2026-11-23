@@ -276,7 +276,7 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
 | `--danger`                 | `#b3261e`             | `#ff8f80`             | something gone wrong, a step that can't be undone      |
 | `--gold`, `--petal`        | `#e0a81e`, `#16132b`  | `#e0a81e`, `#f5f3ff`  | the mark's petals                                      |
 
-**The chapters** each have three colours, set as `--tv`, `--td` and `--ts` by `.t-<topic>`:
+**The chapters** each have three colours, set as `--tv`, `--td` and `--ts` by `.ch-<chapter>`:
 
 | Chapter    | Vivid `--t-` (both) | Deep `--d-` day / night | Sheet `--s-` night |
 | ---------- | ------------------- | ----------------------- | ------------------ |
@@ -600,9 +600,9 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
 - **Buttons are verbs:** „Започни“, „Продължи“, „Напред“, „Сподели“, „Играй 10 въпроса“.
 - **The nouns are a closed list** (DECISIONS.md): Брой, близо, серия, тема, Алманах (глави, факти, мастило), печат, игра
   по тема, приятели, класация, дуел, споделяне, профил, напомняне. What questions are about is a „тема“; „глава“ only
-  in the Алманах itself („Глава 1“ over a topic's name), never out of the book (`language.test.ts`). A rank's six names are the
+  in the Алманах itself („Глава 1“ over a chapter's name), never out of the book (`language.test.ts`). A rank's six names are the
   seal's states; „звание“ is not a word the game uses.
-- **A topic's name is in quotes only right after the word „тема“ (or „глава“ in the book):** „тема „История““,
+- **A chapter's name is in quotes only right after the word „тема“ (or „глава“ in the book):** „тема „История““,
   „Носиш печата на тема „Наука““. Standing alone it's bare: „Печат: История“, „Печатът на История“
   (`language.test.ts`).
 - **Copy promises nothing the game doesn't do:** ink is „вярно отговорени“ in the issue, never „знаеш“; a counter at

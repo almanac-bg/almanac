@@ -172,14 +172,14 @@ const givenUpKey = "almanac.givenUp";
 interface GivenUp {
   run: number;
   n: number;
-  category: string;
+  chapter: string;
   view: View;
   reveal: Reveal;
 }
 
 function keepGivenUp(run: number, q: Shown, reveal: Reveal): void {
   try {
-    localStorage.setItem(givenUpKey, JSON.stringify({ run, n: q.n, category: q.category, view: q.view, reveal }));
+    localStorage.setItem(givenUpKey, JSON.stringify({ run, n: q.n, chapter: q.chapter, view: q.view, reveal }));
   } catch {
     // no storage here: it's in the game's review all the same
   }
@@ -207,7 +207,7 @@ function givenUp(g: GivenUp, total: number, on: () => void): Child {
   return h(
     "article",
     { class: "question given-up" },
-    h("p", { class: "kicker" }, `Въпрос ${g.n + 1} от ${total} · ${topicName(g.category)}`),
+    h("p", { class: "kicker" }, `Въпрос ${g.n + 1} от ${total} · ${chapterName(g.chapter)}`),
     h("p", { class: "muted" }, "Излезе, без да отговориш. Ето верния отговор."),
     h("h1", { class: "ask" }, wholeWords(g.view.text)),
     picture(g.view),
@@ -332,7 +332,7 @@ function stuckAt(s: State, err: unknown, retry: () => void): Child {
   );
 }
 
-/** Where a run that can't go on leads: a day's run past its day (play.ErrDayOver), to Начало and today's questions;
+/** Where a run that can't go on leads: a day's run past its day (play.ErrDayOver), to Днес and today's questions;
  * otherwise nowhere but the run's own arrow out. */
 function wayOut(err: unknown): [href: string, label: string] | null {
   return (err as ApiError).code === "day_over" ? ["/", "Към Днес"] : null;
@@ -344,7 +344,7 @@ export function trail(marks: Mark[], total: number, now = -1, tone = ""): HTMLEl
   const words: Record<string, string> = { right: "вярно", partial: "близо", wrong: "грешно", void: "не се брои" };
   return h(
     "ol",
-    { class: tone ? `trail t-${tone}` : "trail", "aria-label": `${marks.length} от ${total} въпроса` },
+    { class: tone ? `trail ch-${tone}` : "trail", "aria-label": `${marks.length} от ${total} въпроса` },
     Array.from({ length: total }, (_, i) => {
       const m = marks[i];
       const how = !m ? (i === now ? "now" : "") : m.void ? "void" : m.right ? "right" : m.close ? "partial" : "wrong";
@@ -352,8 +352,6 @@ export function trail(marks: Mark[], total: number, now = -1, tone = ""): HTMLEl
     }),
   );
 }
-
-const topicName = chapterName;
 
 /** While leaving would cost the player something (`costs`: a question with its time running),
  * every way out (a link, back, the game's arrow) first asks, in a sheet over the game at the screen's foot: what it
@@ -408,7 +406,7 @@ export function guardLeaving(
   );
 }
 
-/** The top of a question: the way out, what's played (the day's issue, or the topic: `aside`; in a duel, with whom:
+/** The top of a question: the way out, what's played (the day's issue, or the chapter: `aside`; in a duel, with whom:
  * `versus`), and which one of how many. A game has the whole screen, the header with it, so the
  * way out is here: a cross to the place the game is played from (`out`): Днес for the day's ten and a duel (on Днес
  * itself too: it opens afresh, the day waiting there), the Алманах for a chapter's game, where the
@@ -653,7 +651,7 @@ function question(
       rest = [
         theirLine(them, res.state.against?.[q.n]),
         // Ink, said where it was written, as the server says it was (in the issue, met there first): grey isn't said.
-        res.ink && res.reveal.fact ? filed(q.category) : null,
+        res.ink && res.reveal.fact ? filed(q.chapter) : null,
         fact(res.reveal.fact, res.reveal.day),
         res.reveal.credit ? pictureCredit(res.reveal.credit) : null,
         res.reveal.credits?.length ? h("p", { class: "credit" }, creditsWords(res.reveal.credits)) : null,
@@ -748,35 +746,35 @@ function question(
 
   // On a phone the question is a column the screen's height: the head, the pips and the clock at the top, the
   // question on its chapter's sheet under them, and what answers it at the foot, under the thumb (app.css).
-  const topicWords = q.onThisDay ? `${topicName(q.category)} · На този ден` : topicName(q.category);
+  const chapterWords = q.onThisDay ? `${chapterName(q.chapter)} · На този ден` : chapterName(q.chapter);
   const head = stays(
     questionHead(
       q.n,
       s.total,
-      s.kind === "day" && s.day ? `Брой ${issueOf(s.day)}` : topicName(s.category ?? q.category),
+      s.kind === "day" && s.day ? `Брой ${issueOf(s.day)}` : chapterName(s.chapter ?? q.chapter),
       versus,
-      s.kind === "topic" && !versus ? ["/almanac", "Към Алманаха"] : undefined,
+      s.kind === "chapter" && !versus ? ["/almanac", "Към Алманаха"] : undefined,
     ),
     progress,
     timer(q.leftMs, q.limitMs, ans.left, ans.stopped),
   );
   const page = h(
     "article",
-    { class: `question run-question t-${q.category}` },
+    { class: `question run-question ch-${q.chapter}` },
     head.node,
     leaf(
-      q.category,
+      q.chapter,
       [
         h(
           "div",
           { class: "q-tags" },
-          chip(q.category, h("span", { class: "chip-name" }, topicWords)),
+          chip(q.chapter, h("span", { class: "chip-name" }, chapterWords)),
           // The day ends on its hard number: said on its sheet.
           s.kind === "day" && q.n === s.total - 1 && q.view.type === "number"
             ? h("span", { class: "hard-tag" }, "Най-трудният: число")
             : null,
         ),
-        glyph(q.category, 32, "q-mini"),
+        glyph(q.chapter, 32, "q-mini"),
         // It takes the focus as it opens, so a screen reader reads it first (no ring for it: app.css, h1).
         ans.heading,
       ],
@@ -1003,7 +1001,7 @@ interface Head {
   stuckAt(dy: number): boolean;
 }
 
-/** The top of a question (its count and topic, the pips and the clock), kept in view at the top of the screen
+/** The top of a question (its count and chapter, the pips and the clock), kept in view at the top of the screen
  * while the question and its answer scroll, and smaller there. The room it gives up stays as a margin, so nothing
  * under it jumps. It's stuck once the page has moved a few pixels past it, and comes back only near the page's top:
  * a page moving by a pixel or two at the edge doesn't make it flicker. On a short screen (a phone on its side,

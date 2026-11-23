@@ -47,7 +47,7 @@ func TestDayBoardNamesOnlyThoseWhoPlayedIt(t *testing.T) {
 	}
 	visitor := g.player()
 	if day, _ := bootOf(t, visitor, "/")["day"].(map[string]any); len(top(day)) != 0 {
-		t.Fatalf("a visitor's Начало names who played: %v", top(day))
+		t.Fatalf("a visitor's Днес names who played: %v", top(day))
 	}
 	_, day := visitor.call("GET", "/api/day", nil)
 	if len(top(day)) != 0 || day["board"].(map[string]any)["players"] != float64(1) {
@@ -62,13 +62,13 @@ func TestDayBoardNamesOnlyThoseWhoPlayedIt(t *testing.T) {
 	}
 }
 
-// Начало's page has the day in it, as GET /api/day has it: the page draws it without asking first. Other pages don't
+// Днес's page has the day in it, as GET /api/day has it: the page draws it without asking first. Other pages don't
 // carry it. Every page has the server's clock, for the page's own until an answer comes.
 func TestNachaloHasTheDayInItsPage(t *testing.T) {
 	g := start(t)
 	visitor := g.player()
 	if day, ok := bootOf(t, visitor, "/")["day"].(map[string]any); !ok || day["day"] != g.srv.game.Today() || day["board"] == nil {
-		t.Fatalf("a visitor's Начало: %v", day)
+		t.Fatalf("a visitor's Днес: %v", day)
 	}
 	p := g.player()
 	p.call("POST", "/api/guest", map[string]any{})
@@ -137,10 +137,10 @@ func TestPagesAskForTheirFilesAtOnce(t *testing.T) {
 	}
 	res, body = get("/")
 	if strings.Contains(body, "settings") || strings.Contains(res.Header.Get("Link"), "settings") {
-		t.Errorf("Начало asks for a screen of its own: %q", res.Header.Get("Link"))
+		t.Errorf("Днес asks for a screen of its own: %q", res.Header.Get("Link"))
 	}
 	if !strings.Contains(res.Header.Get("Link"), "</assets/pictures-P.js>; rel=modulepreload") {
-		t.Errorf("Начало doesn't ask for the pictures at once: %q", res.Header.Get("Link"))
+		t.Errorf("Днес doesn't ask for the pictures at once: %q", res.Header.Get("Link"))
 	}
 }
 

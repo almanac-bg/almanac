@@ -87,8 +87,8 @@ func (w *world) plan() ([]session, error) {
 		at := w.dayAt(w.day, p.hour, 0).Add(w.between(0, 90*time.Minute) - 30*time.Minute)
 		day := w.chance(0.97) || p.played[w.day-1] || p.id == 0
 		out = append(out, session{at: at, p: p, day: day})
-		// Some come back later in the day, for a duel or a topic.
-		if p.duels+p.topics > 2 && w.chance(0.4) {
+		// Some come back later in the day, for a duel or a chapter.
+		if p.duels+p.chapters > 2 && w.chance(0.4) {
 			out = append(out, session{at: at.Add(w.between(2*time.Hour, 8*time.Hour)), p: p})
 		}
 	}
@@ -99,7 +99,7 @@ func (w *world) plan() ([]session, error) {
 // lapsesFrom says whether a streak missed from day i on (left of its week's Forgives left that day) ends as late as
 // one can before today: by yesterday, where missed from the day after it wouldn't have ended yet. Yesterday itself,
 // unless the week was too young to have spent its forgiving (a Monday or a Tuesday): then the Sunday before, which
-// Начало still tells (latelyEnded).
+// Днес still tells (latelyEnded).
 func (w *world) lapsesFrom(i, left int) bool {
 	next := left // what the day after has left, played on day i
 	if w.dayAt(i+1, 0, 0).Weekday() == time.Monday {
@@ -156,8 +156,8 @@ func (w *world) visit(s session) error {
 			return err
 		}
 	}
-	for range min(4, w.count(p.topics)) {
-		if _, err := w.topicRun(p); err != nil {
+	for range min(4, w.count(p.chapters)) {
+		if _, err := w.chapterRun(p); err != nil {
 			return err
 		}
 	}

@@ -1,4 +1,4 @@
-// Signing in by email, with a code: on a page of its own (`/signin`, „Вход“: signInPage), in Настройки, on Начало
+// Signing in by email, with a code: on a page of its own (`/signin`, „Вход“: signInPage), in Настройки, on Днес
 // (come from the streak's mail, signed out), on Профил (a guest keeping their game), and wherever a game asks for a
 // profile (a duel with a friend). The same code keeps a guest's game with the email, or signs in to the profile the
 // email has (which the guest's game here then joins): what came of it is said (lib/keep.ts, keptWords) to `done`.
@@ -16,7 +16,7 @@ export interface SignInOptions {
   /** Which form it is, of the game's („settings“, „remind-mail“…): a code it sent is kept by it, for a reload to come
    * back to the step that takes it there, and only there. */
   form: string;
-  /** Its first button gold (Настройки), or plain (Начало, a card's). */
+  /** Its first button gold (Настройки), or plain (Днес, a card's). */
   primary?: boolean;
   /** The first button's words, which send the code: „Прати ми код“ unless said. */
   send?: string;

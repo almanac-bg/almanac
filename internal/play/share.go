@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Sharing the day's result (DECISIONS.md, „The redesign“): the score and its shape, never the answers, with a way
+// Sharing the day's result (DECISIONS.md, „The direction“): the score and its shape, never the answers, with a way
 // into the game. A player's finished day gets a link of its own the first time they share it (Share): /d/<issue>-
 // <code>, the code eight random letters and digits (shares), so that nobody finds another's by counting, and nothing
 // in it says whose it is. Whose it is stays with the run, and goes with it: a player who deletes their profile takes

@@ -23,10 +23,10 @@ What to answer, by kind:
 For each, also `sure`: `true` only when you would bet on it (you know it, not a good guess); otherwise `false`.
 Always give your best answer, sure or not.
 
-Each question also has its `topic`, as the game files it (История, Технологии и игри…). A day takes one question a
-topic, so one filed under the wrong topic takes another's place. Where a player of that topic plainly wouldn't expect
+Each question also has its `category`, as the game files it (История, Технологии и игри…). A day takes one question a
+category, so one filed under the wrong category takes another's place. Where a player of that category plainly wouldn't expect
 the question there (a statesman's birthplace under Технологии и игри, a city's gate under Изкуство и литература), add
-`"topic": "<the game's topic it belongs under>"`, one of: Обща култура, Наука, История, География, Кино и
+`"category": "<the game's category it belongs under>"`, one of: Обща култура, Наука, История, География, Кино и
 телевизия, Музика, Спорт, Технологии и игри, Изкуство и литература, Природа и животни. Leave it out otherwise.
 
 Write one JSON object to the answers file, every id on the sheet: `{"<id>": {"a": <answer>, "sure": <bool>}, …}`.

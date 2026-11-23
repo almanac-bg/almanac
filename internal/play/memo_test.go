@@ -8,7 +8,7 @@ func TestKeptWhileTheGamesStand(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
-	first, _ := w.g.startTopic(ctx, ana, MixTopic)
+	first, _ := w.g.startChapter(ctx, ana, MixChapter)
 	w.play(ana, first.ID, repeat(w.wrong, Length)...)
 	mastery := func(finished bool) int {
 		t.Helper()
@@ -31,7 +31,7 @@ func TestKeptWhileTheGamesStand(t *testing.T) {
 	}
 
 	// One wrong answer in a game under way: it's in at once (its game unfinished: not in what others see).
-	next, _ := w.g.StartTopic(ctx, ana, w.b.Categories[1].ID)
+	next, _ := w.g.StartChapter(ctx, ana, w.b.Categories[1].ID)
 	w.play(ana, next.ID, w.wrong)
 	if n := mastery(false); n != Length+1 {
 		t.Fatalf("the mastery after an answer: %d", n)
@@ -47,7 +47,7 @@ func TestKeptWhileTheGamesStand(t *testing.T) {
 
 	// A guest's game, merged into the account: what's kept is what going over the answers again makes of them.
 	guest := w.user()
-	other, _ := w.g.StartTopic(ctx, guest, w.b.Categories[2].ID)
+	other, _ := w.g.StartChapter(ctx, guest, w.b.Categories[2].ID)
 	w.play(guest, other.ID, repeat(w.wrong, Length)...)
 	before := mastery(false)
 	w.fold(guest, ana)

@@ -596,7 +596,7 @@ func TestNumberRank(t *testing.T) {
 	if got := ranked(even...); len(got) != 0 {
 		t.Errorf("even: %v", got)
 	}
-	// The bank and its one topic, both skewed: a warning each, at the newest question of the most common rank.
+	// The bank and its one category, both skewed: a warning each, at the newest question of the most common rank.
 	if got := ranked(middle...); len(got) != 2 || got[0] != "number-rank gen-78" {
 		t.Errorf("all in the middle: %v", got)
 	}

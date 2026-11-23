@@ -124,7 +124,7 @@ func (s *Server) duelOne(w http.ResponseWriter, r *http.Request) error {
 
 // duelNews tells a player of a friend's duel (play.Game.DuelNews): sent to them, or played back, its result in. It
 // goes through notifyFrom, as anything one player sends another: once a day from one player at most, a few a day in
-// all; Приятели and Начало say it whatever the push does.
+// all; Приятели and Днес say it whatever the push does.
 func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 	if s.push == nil {
 		return
@@ -141,7 +141,7 @@ func (s *Server) duelNews(ctx context.Context, n play.DuelNews) {
 	s.notifyFrom(context.WithoutCancel(ctx), n.From, m, n.To)
 }
 
-// almanac is a page of the player's book: of a chapter (?topic=, or all), from where the page before ended (?from=,
+// almanac is a page of the player's book: of a chapter (?chapter=, or all), from where the page before ended (?from=,
 // its next) or by its number (?page=, from 0), its facts found by words (?q=).
 func (s *Server) almanac(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
@@ -150,7 +150,7 @@ func (s *Server) almanac(w http.ResponseWriter, r *http.Request) error {
 	}
 	q := r.URL.Query()
 	page, _ := strconv.Atoi(q.Get("page"))
-	a, err := s.game.AlmanacOf(r.Context(), u.ID, play.AlmanacQuery{Topic: q.Get("topic"), From: q.Get("from"),
+	a, err := s.game.AlmanacOf(r.Context(), u.ID, play.AlmanacQuery{Chapter: q.Get("chapter"), From: q.Get("from"),
 		Search: q.Get("q"), Fact: q.Get("fact"), Page: min(max(page, 0), 10_000), Limit: play.AlmanacPage})
 	if err != nil {
 		return err

@@ -25,7 +25,7 @@ import (
 )
 
 // The app is one page: the server sends it for every path the app knows (and a 404 with it for the rest, which the
-// app shows as such), with what it needs to start in it, so it draws at once without asking for anything: Начало's
+// app shows as such), with what it needs to start in it, so it draws at once without asking for anything: Днес's
 // page has the day in it too (GET /api/day's answer), and every page asks for its style, its script and the font its
 // first paint is in at once, in its head and in a Link header (which Cloudflare also sends ahead as Early Hints).
 var appPaths = []*regexp.Regexp{
@@ -194,11 +194,11 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	b := s.bank.Load()
 	m := assets.Manifest(s.client)
 	start := map[string]any{
-		"user":       u,
-		"categories": b.Categories,
-		"version":    s.cfg.Version,
-		"push":       s.pushKey(),
-		"now":        time.Now().UnixMilli(), // the clock the page keeps until the API's first answer (lib/api.ts)
+		"user":     u,
+		"chapters": b.Categories,
+		"version":  s.cfg.Version,
+		"push":     s.pushKey(),
+		"now":      time.Now().UnixMilli(), // the clock the page keeps until the API's first answer (lib/api.ts)
 	}
 	// The player's avatar, in the corner of every page (web/src/app.ts): without it, the corner would wait on a
 	// question.
@@ -209,7 +209,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	}
 	// Днес draws the day as the page comes, without asking for it first: a round trip less on every visit. Should
 	// it fail, the page asks for it as any other.
-	// A shared day's link is Начало too, with the day shared: its issue, its date and its shape.
+	// A shared day's link is Днес too, with the day shared: its issue, its date and its shape.
 	if (r.URL.Path == "/" || isShared) && r.Method == http.MethodGet {
 		if day, err := s.todayOf(r.Context(), u); err == nil {
 			start["day"] = day
@@ -248,7 +248,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(out.Bytes())
 }
 
-// there is whether what a page of the app is of is there, where the server can tell: a topic's games, a duel, a
+// there is whether what a page of the app is of is there, where the server can tell: a chapter's games, a duel, a
 // player. One that isn't is a 404 (as for a path the app doesn't know), which its screen says in words. A failure to
 // tell is taken as there: the screen finds out.
 func (s *Server) there(r *http.Request) bool {
@@ -257,10 +257,10 @@ func (s *Server) there(r *http.Request) bool {
 	var err error
 	switch {
 	case strings.HasPrefix(p, "/play/"):
-		return s.game.IsTopic(strings.TrimPrefix(p, "/play/"))
+		return s.game.IsChapter(strings.TrimPrefix(p, "/play/"))
 	case strings.HasPrefix(p, "/almanac/"):
-		// A chapter of the book: one of the bank's topics.
-		return s.game.IsTopic(strings.TrimPrefix(p, "/almanac/"))
+		// A chapter of the book: one of the bank's chapters.
+		return s.game.IsChapter(strings.TrimPrefix(p, "/almanac/"))
 	case strings.HasPrefix(p, "/duel/"):
 		id, _ := strconv.ParseInt(strings.TrimPrefix(p, "/duel/"), 10, 64)
 		yes, err = s.game.DuelExists(ctx, id)

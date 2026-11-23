@@ -2,7 +2,7 @@
 // that a review or a look at a screen sees what a long-time player sees, not a new guest's empty pages.
 //
 // It plays the history through the game's own functions, on a clock of its own that walks from Options.Days ago to
-// now: players arrive (account.Accounts.Guest, named and given an email by some), play the day's ten and topics
+// now: players arrive (account.Accounts.Guest, named and given an email by some), play the day's ten and chapters
 // (play.Game: Show, Start, Answer), and duels with their friends (sent, played back, some let lapse: DuelFriend,
 // PlayDuel); they ask each other to be friends, accept, say no, choose their
 // avatar. Whatever follows from that, the game works out itself: scores, streaks, duels' results and records, the
@@ -123,7 +123,7 @@ func Seed(ctx context.Context, db *store.DB, b *bank.Bank, o Options) ([]Persona
 	w.cast(o.Players)
 	if o.small {
 		for _, p := range w.players {
-			p.topics, p.duels = p.topics/3, p.duels/3
+			p.chapters, p.duels = p.chapters/3, p.duels/3
 		}
 	}
 	if err := w.history(); err != nil {

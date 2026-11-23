@@ -46,7 +46,7 @@ let {
   mailAsk,
 } = {} as Kit;
 
-/** Signed out just now: said here, where it was done, and only here (Начало, next, doesn't say it again). */
+/** Signed out just now: said here, where it was done, and only here (Днес, next, doesn't say it again). */
 let signedOut: Signal<boolean>;
 /** What came of a code put in here just now (signIn: a game kept, a profile signed in to), said under the profile. */
 let signedIn: Signal<string>;
@@ -554,7 +554,7 @@ function deleteAccount(): Child {
                   // (pushOn tells the server of them again). The server forgets them with the player.
                   if (pushable()) await turnOff().catch(() => {});
                   await api("DELETE", "/api/me");
-                  // Nothing is left here: Начало, as for someone new, says so once.
+                  // Nothing is left here: Днес, as for someone new, says so once.
                   notice.set("Профилът е изтрит.");
                   user.set(null);
                   go("/", true);

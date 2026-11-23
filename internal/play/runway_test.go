@@ -114,7 +114,7 @@ func TestBulgariaRunway(t *testing.T) {
 	}
 }
 
-// The day's number comes from a topic that still has an estimate, though every topic has a hard number: a year or a
+// The day's number comes from a chapter that still has an estimate, though every chapter has a hard number: a year or a
 // small count is a choice in disguise. With the estimates spent, the day still ends on a hard number, and says the
 // place is short.
 func TestDayNumberIsAnEstimate(t *testing.T) {
@@ -125,7 +125,7 @@ func TestDayNumberIsAnEstimate(t *testing.T) {
 		if n.Category == "science" {
 			estimates = append(estimates, n.ID)
 		} else {
-			n.Unit = "" // every other topic's: a year
+			n.Unit = "" // every other chapter's: a year
 		}
 	}
 	if len(estimates) == 0 {
@@ -149,8 +149,8 @@ func TestDayNumberIsAnEstimate(t *testing.T) {
 	}
 }
 
-// A topic's game finishes on an estimate too, where its topic has one left.
-func TestTopicNumberIsAnEstimate(t *testing.T) {
+// A chapter's game finishes on an estimate too, where its chapter has one left.
+func TestChapterNumberIsAnEstimate(t *testing.T) {
 	b := biggerSample(t, 20)
 	var estimates []string
 	for i, n := range hardNumbers(b) {

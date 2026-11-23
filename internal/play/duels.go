@@ -17,7 +17,7 @@ import (
 // own clock, a question at a time); more right answers wins, and between the same, what breaks a tie on the day's
 // board (tiebreak: how close the hard number came); even in both, it's a draw, as the board would share their place
 // (duelScore): time never counts (DECISIONS.md, „The direction“). Nothing moves but the record between two people:
-// there's no rating (owner, 2026-11-20, DECISIONS.md „The redesign“).
+// there's no rating (owner, 2026-11-20, DECISIONS.md „The direction“).
 //
 // A duel is with a friend (DuelFriend), challenged directly: from their row in Приятели or their profile (owner,
 // 2026-11-22: the duel against a recording of another's game is gone, and „Нов дуел“ with it). The player plays ten
@@ -50,7 +50,8 @@ const (
 	// a bound on what one player can send others.
 	DuelsADay = 20
 	// DuelUnbegun is how long a duel the player made and left before its first question showed is kept (unlisted, to be
-	// gone on with by a tap on the same duel again) before it goes: long past its count, should its screen still be open.
+	// gone on with by a tap on the same duel again) before it goes: long past its count, should its screen still be
+	// open.
 	DuelUnbegun = 10 * time.Minute
 )
 
@@ -257,7 +258,7 @@ func (g *Game) PlayDuel(ctx context.Context, userID, duelID int64) (int64, error
 }
 
 // past is what a draw needs from its players' history: the questions they've seen (how many of them has each:
-// seenAmong), and how well they know them (on average over the players; in a topic, or all of them for ""). It's read
+// seenAmong), and how well they know them (on average over the players; in a chapter, or all of them for ""). It's read
 // before the write the draw goes into: it grows with every game they've played, and the game's one writer
 // (store.DB.Write) mustn't wait on it.
 type past struct {
@@ -265,14 +266,14 @@ type past struct {
 	ability float64
 }
 
-func (g *Game) pastOf(ctx context.Context, category string, users ...int64) (past, error) {
+func (g *Game) pastOf(ctx context.Context, chapter string, users ...int64) (past, error) {
 	seen, err := g.seenAmong(ctx, users)
 	if err != nil {
 		return past{}, err
 	}
 	p := past{seen: seen}
 	for _, id := range users {
-		a, err := g.ability(ctx, g.DB.Read, id, category)
+		a, err := g.ability(ctx, g.DB.Read, id, chapter)
 		if err != nil {
 			return p, err
 		}
@@ -281,14 +282,14 @@ func (g *Game) pastOf(ctx context.Context, category string, users ...int64) (pas
 	return p, nil
 }
 
-// drawFor draws a duel's ten questions for its players (their past): all topics, shaped by how well they know them,
+// drawFor draws a duel's ten questions for its players (their past): all chapters, shaped by how well they know them,
 // questions neither has seen first.
 func (g *Game) drawFor(tx *sql.Tx, p past) ([]Pick, error) {
 	bars, err := g.days(tx)
 	if err != nil {
 		return nil, err
 	}
-	picks := Draw(g.Bank(), MixTopic, p.ability, p.seen, bars.all, bars.met, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+	picks := Draw(g.Bank(), MixChapter, p.ability, p.seen, bars.all, bars.met, mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 	if len(picks) == 0 {
 		return nil, ErrNoQuestion
 	}
@@ -312,8 +313,8 @@ func seenBy(ctx context.Context, db querier, userID int64, seen map[string]bool)
 	return rows.Err()
 }
 
-// seenAmong is how stale each question is to a game for players (choose: the least first, those missing none): of
-// those any of them has answered (in any game: the day, a topic's, a duel), one for each of them who has, so that no game
+// seenAmong is how stale each question is to a game for players (choose: the least first, those missing none): of those
+// any of them has answered (in any game: the day, a chapter's, a duel), one for each of them who has, so that no game
 // deals anyone again what they've played while the bank has questions they haven't.
 func (g *Game) seenAmong(ctx context.Context, players []int64) (map[string]int, error) {
 	stale := map[string]int{}

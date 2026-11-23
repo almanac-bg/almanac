@@ -569,7 +569,7 @@ func balance(b *bank.Bank) string {
 		fmt.Fprintf(&s, " %s %.1f%% (aim %.1f)", t, share, 100*bank.TypeMix[t])
 	}
 	s.WriteString("\n")
-	// Each category's kinds against its TypeMix share: what the topic games draw from.
+	// Each category's kinds against its TypeMix share: what the chapter games draw from.
 	if bal.Off == 0 {
 		s.WriteString("kinds mix    every category at its share of every kind\n")
 		return s.String()

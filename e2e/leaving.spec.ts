@@ -22,14 +22,14 @@ test("the browser's back asks in the day's ten, opened from outside, and never l
   await answer(page);
   await moveOn(page);
   await expect(page.locator(".question-head")).toContainText("2 от 10", { timeout: 10_000 });
-  // Back again, and „Излез“: the question given up, Начало waits with the rest of the day, in the game still.
+  // Back again, and „Излез“: the question given up, Днес waits with the rest of the day, in the game still.
   await page.goBack();
   await page.getByRole("button", { name: "Излез" }).click();
   await expect(page.locator(".issue")).toContainText("Следва въпрос 3 от 10.");
   await expect(page).toHaveURL(/\/$/);
 });
 
-test("the browser's back in a topic asks, its address kept while it does; „Излез“ comes to its chapter", async ({
+test("the browser's back in a chapter asks, its address kept while it does; „Излез“ comes to its chapter", async ({
   page,
 }) => {
   await page.goto("/almanac/history");
@@ -49,14 +49,14 @@ test("the browser's back in a topic asks, its address kept while it does; „И�
   await expect(page.getByRole("link", { name: "Продължи играта" })).toBeVisible();
 });
 
-test("a topic counts in only after a tap; a reload goes back to its question, and keeps its result", async ({
+test("a chapter counts in only after a tap; a reload goes back to its question, and keeps its result", async ({
   page,
 }) => {
   test.setTimeout(120_000);
   await page.goto("/almanac/history");
   await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
-  // A reload in the count starts nothing: the topic waits for „Започни“.
+  // A reload in the count starts nothing: the chapter waits for „Започни“.
   await page.reload();
   await expect(page.getByRole("button", { name: "Започни", exact: true })).toBeVisible();
   await page.waitForTimeout(3500);
@@ -99,7 +99,7 @@ test("a topic counts in only after a tap; a reload goes back to its question, an
   await expect(page.locator(".summary .score-n")).toHaveText(score);
 });
 
-test("„Отказ“ on the count of a topic opened from outside comes back to its start, not to Начало", async ({ page }) => {
+test("„Отказ“ on the count of a chapter opened from outside comes back to its start, not to Днес", async ({ page }) => {
   await page.goto("/play/history");
   const begin = page.getByRole("button", { name: "Започни", exact: true });
   for (const out of ["click", "Escape"]) {
@@ -116,7 +116,7 @@ test("„Отказ“ on the count of a topic opened from outside comes back to
   }
 });
 
-test("a topic left half-way says so on its tile; another tab waits for „Продължи“", async ({ page, context }) => {
+test("a chapter left half-way says so on its tile; another tab waits for „Продължи“", async ({ page, context }) => {
   test.setTimeout(60_000);
   await openGame(page, "/play/history");
   await answer(page);
@@ -191,7 +191,7 @@ test("a game's page left before it's ready holds nothing over the page come to",
   await page.evaluate(() => fetch("/api/guest", { method: "POST", body: "{}" }));
   await page.reload();
   await expect(page.locator(".issue")).toBeVisible();
-  // The topic's start-up waits for the games left today; meanwhile the player goes back to Начало.
+  // The chapter's start-up waits for the games left today; meanwhile the player goes back to Днес.
   let free = () => {};
   const held = new Promise<void>((on) => {
     free = on;
@@ -207,7 +207,7 @@ test("a game's page left before it's ready holds nothing over the page come to",
   await expect(page).toHaveURL(/\/almanac\/history$/);
   free();
   await page.waitForTimeout(1000);
-  // The topic's count never came: no game's entry over Начало, and the header and the places are there.
+  // The chapter's count never came: no game's entry over Днес, and the header and the places are there.
   expect(await page.evaluate(() => history.state?.game)).toBeUndefined();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
   await expect(page.locator("nav.places-foot")).toBeVisible();

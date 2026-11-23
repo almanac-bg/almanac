@@ -99,7 +99,7 @@ func TestHandoff(t *testing.T) {
 	// link from someone else brings nothing of theirs (their friends) into it; the link still works where it was meant
 	// to.
 	other, otherSession, _ := a.Guest(ctx)
-	if _, err := db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at) VALUES (?, 'topic', '[]', 0)`,
+	if _, err := db.Write.Exec(`INSERT INTO runs (user_id, kind, questions, started_at) VALUES (?, 'chapter', '[]', 0)`,
 		other.ID); err != nil {
 		t.Fatal(err)
 	}

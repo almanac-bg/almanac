@@ -149,7 +149,7 @@ export interface Mark {
 
 export interface Shown {
   n: number;
-  category: string;
+  chapter: string;
   view: View;
   limitMs: number;
   leftMs: number;
@@ -157,15 +157,15 @@ export interface Shown {
   moreMs?: number;
   /** How soon its time starts by itself, while it waits for its pictures: the screen starts it once they're in. */
   startsMs?: number;
-  /** A day's question that belongs to its date: „На този ден“ beside its topic. */
+  /** A day's question that belongs to its date: „На този ден“ beside its chapter. */
   onThisDay?: boolean;
 }
 
 export interface State {
   id: number;
-  kind: "day" | "topic";
+  kind: "day" | "chapter";
   day?: string;
-  category?: string;
+  chapter?: string;
   total: number;
   /** How many of the `total` count for nobody (Mark.void): the game is of `total − void` questions. */
   void?: number;
@@ -200,7 +200,7 @@ export interface Result {
 
 export interface Reviewed {
   n: number;
-  category: string;
+  chapter: string;
   view: View;
   reveal: Reveal;
   given: Answer | null;

@@ -113,7 +113,7 @@ func carry(from, to string, now time.Time) error {
 }
 
 // Dropped are the questions the bank in dir (an earlier copy) has that b doesn't, as errors. A question leaves play by
-// being retired, never by going from the bank: players' answers, reviews and stats, the day's ten, and Моят Алманах
+// being retired, never by going from the bank: players' answers, reviews and stats, the day's ten, and the Алманах
 // point at it by its id for good, and a retired question stays so that they keep its text. A server doesn't play a
 // bank that drops one (cmd/almanac): it keeps the one it has.
 func Dropped(dir string, b *Bank) []Problem {

@@ -25,7 +25,7 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
   - `almanac bank used`, on the server, prints the question ids the days have had (played and drawn ahead) and the
     last day drawn, nothing of a player's; fetch it into a file for `-used` (the `new-questions` skill shows the ssh
     line);
-  - `go run ./cmd/almanac bank plan [-n N] [-json] [-used file] private` plans a batch of N a topic: the cells to
+  - `go run ./cmd/almanac bank plan [-n N] [-json] [-used file] private` plans a batch of N a category: the cells to
     write (the day's shortest runway first, at most a third of the batch in one place), how many about Bulgaria (30%,
     per cell: `bg`), the dates with the fewest questions left, the ids and the subjects to avoid;
   - `go run ./cmd/almanac bank add [-check] [-checked-by P] <batch> private` puts a batch into the bank: new
@@ -93,7 +93,7 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
   90 drawn ahead, 60 to write the batch). Never by
   filler (an "easy number" whose answer is 5 is a choice in disguise; an honest hard question beats a forced place). A retired question is still replaced in its place in the same commit.
 - **The categories about the same size:** within 2% of the mean (`bank.SizeSlack`; `bank check` fails past it). No
-  topic outweighs another, so a batch adds about as many to every category, and never to one that is ahead while
+  category outweighs another, so a batch adds about as many to every category, and never to one that is ahead while
   another is behind.
 - **Every question has a fact** („Знаеше ли?“), **the date it was added** and **the date it last changed**
   (`added`, `updated`, both YYYY-MM-DD). The checker refuses a question added since `RulesFrom` (2026-11-14)
@@ -135,7 +135,7 @@ enough to be worth a look, not always.
 | `own-number` † | A number question's text, and a name it quotes, shows no number (in figures or words) within the tolerance of its answer: „Стоте дни“ asked as 110 with 33 answers itself |
 | `order-gap` | An order's measured values (м, км², кг, жители, %, …: `measured` in order.go) stand 10% apart; exact ones (years, counts, coordinates) only differ |
 | `options` | No option stands out by its form: only the answer with a regnal numeral (Симеон I), only the answer in Latin or in Cyrillic letters (bTV among БНТ, Нова), quotes on some options only |
-| `number-rank` (hint) | Across the bank, and within a topic, a choice of numbers has its answer about as often the smallest, the second, the third and the largest of its four: never mostly in the middle, where a player who doesn't know picks. Write the wrong numbers on either side as the question allows (all above, all below), not always around the answer |
+| `number-rank` (hint) | Across the bank, and within a category, a choice of numbers has its answer about as often the smallest, the second, the third and the largest of its four: never mostly in the middle, where a player who doesn't know picks. Write the wrong numbers on either side as the question allows (all above, all below), not always around the answer |
 | `long-answer` (hint) | The answer isn't half again as long as every wrong option and 10 letters longer |
 | `answer-word` | No clue, and no question text, shares a word with the answer that no wrong option has („Кой е този водопад?“ — „Ниагарският водопад“; „френски лекари“ — „Лекари без граници“) |
 | `dated` | A question for a day (`on`) has its day's line (`day`), ending in a period, and the line names the date („На 3 март 1878 г. …“; a moving feast's names the feast). One whose text names its date may go without it |
@@ -158,14 +158,14 @@ in the game's repo, with a pull request.
 
 ## Difficulty: the rubric
 
-Difficulty is gameplay, not decoration: a run goes from easy to hard, a topic run follows how well a player knows the
-topic. So every label means the same thing, by these rules, for players in
+Difficulty is gameplay, not decoration: a run goes from easy to hard, a chapter's game follows how well a player knows the
+chapter. So every label means the same thing, by these rules, for players in
 Bulgaria (not for the writer).
 
 | | Who gets it | What it asks | The wrong options |
 | --- | --- | --- | --- |
-| **easy** | three of four adults, with no interest in the topic | what school to the 7th grade, everyday life, the news or a famous name gives everyone: national holidays and symbols, famous people, places and works, a round famous number | clearly of another kind or era: someone who knows the topic a little gets it |
-| **medium** | about one in two: a well-read person, someone with a passing interest | high-school level, or a known fact taken one step further: the year of a major event, the author of a known (not the best-known) work, the capital of a mid-sized country | plausible, of the same kind; knowing the answer is needed, not just the topic |
+| **easy** | three of four adults, with no interest in the subject | what school to the 7th grade, everyday life, the news or a famous name gives everyone: national holidays and symbols, famous people, places and works, a round famous number | clearly of another kind or era: someone who knows the category a little gets it |
+| **medium** | about one in two: a well-read person, someone with a passing interest | high-school level, or a known fact taken one step further: the year of a major event, the author of a known (not the best-known) work, the capital of a mid-sized country | plausible, of the same kind; knowing the answer is needed, not just the category |
 | **hard** | one in four or fewer: an enthusiast | a detail: a lesser event's year, a secondary work, a record, a term, a smaller place | close to each other: only knowing it exactly gets it |
 
 By kind:
@@ -181,7 +181,7 @@ By kind:
 - **Order:** easy has familiar things with values far apart (centuries); hard has values close together, or
   unfamiliar things.
 - **Clues** (off: none is written): the label is for the first clue's answer only if the last clue makes it easy: easy is a famous answer
-  whose last clue gives it to anyone; hard is one whose last clue still needs knowing the topic.
+  whose last clue gives it to anyone; hard is one whose last clue still needs knowing the subject.
 - **Split:** easy groups are what most people tell apart already (a mammal or not); hard ones need the detail
   (Ботев or Вазов by a lesser poem), with items that look alike across the groups.
 - **Match:** easy pairs are what most people associate already; hard ones need specific knowledge, with lefts (or
@@ -210,10 +210,13 @@ Every question is one JSON object in its category's file:
 | `checked`, `checkedBy` | When it was last checked against its sources, and by what: a process and its model (`"new-questions fable-5.2"`), or for older questions the bank commit that added or last changed it (`"bank 7bb2938"`: its message and report say how). Required with `sources` |
 | `reviewBy`           | For an answer that may stop being true (an office holder, a record): when to check it. From that day no game deals it (`bank check` warns, the server logs it) until it is checked and the date moved |
 | `image`              | A picture (see below)                                                                    |
-| `retired`            | `true`: never dealt again, kept for history and stats; with `retiredWhy` (`wrong`, `stale`, `weak`, `twin`, `giveaway`, `rule`) and `replacedBy` (the id that took its place). A question retired as `wrong` or `stale` also leaves what players learned (Моят Алманах) |
+| `retired`            | `true`: never dealt again, kept for history and stats; with `retiredWhy` (`wrong`, `stale`, `weak`, `twin`, `giveaway`, `rule`) and `replacedBy` (the id that took its place). A question retired as `wrong` or `stale` also leaves the players' Алманах |
 | `on`                 | The days it belongs to: `"03-03"` every year, `"2027-05-02"` that year only (Великден). On such a day it goes into the day's ten as „На този ден“ |
-| `day`                | With `on`, required (unless the text itself names the date it asks about): one short line (at most 100 characters, ending in a period) saying what happened on that day and naming the date: „На 16 декември 1982 г. умира Колин Чапман.“ The player reads it with the answer, only when the question is dealt on its date (never before answering: it could give the answer away; never in a topic's game). See „A question for a day“ below |
+| `day`                | With `on`, required (unless the text itself names the date it asks about): one short line (at most 100 characters, ending in a period) saying what happened on that day and naming the date: „На 16 декември 1982 г. умира Колин Чапман.“ The player reads it with the answer, only when the question is dealt on its date (never before answering: it could give the answer away; never in a chapter's game). See „A question for a day“ below |
 | `bg`                 | `true` for a question about Bulgaria (people, places, history, culture, language, sport): every day has at least three |
+
+How long each kind is shown is the game's, never a number written here: `play.Limit`, a base for the kind and the
+time a slow reader takes to read the question. A long question runs long for everyone (the `length` rule).
 
 By type:
 
@@ -226,10 +229,12 @@ By type:
 - **`number`:** an **estimate** (the owner's rule, 16 Nov 2026): a year, or a quantity of more than 20 steps. A
   small count (4 evangelists, 7 times, the 15th of August) is a choice. `answer`, `unit` (empty for a year), `step`
   (1 for whole numbers; 0.1 for one decimal), `scale` (`linear`, or `log` across orders of magnitude) and `tolerance`
-  (how far off scores nothing; on a log scale, a factor above 1). It's typed on a pad, and the player isn't told a
-  range. Only a temperature (°C) may be below 0. **The tolerance is one formula** (`bank.Tolerance`), the same at
-  every difficulty, so that a well-read guess scores about half (a guess half the tolerance off does):
-  - a quantity, linear: 3/10 of the answer (15% off scores half; within 6% counts right);
+  (how far off is no longer „близо“; on a log scale, a factor above 1). It's typed on a pad, and the player isn't
+  told a range. Only a temperature (°C) may be below 0. A guess within a fifth of the tolerance is right
+  (`bank.RightFrom`); one further off but within the tolerance is „близо“, which counts as not right; past it, wrong.
+  **The tolerance is one formula** (`bank.Tolerance`), the same at every difficulty, so that a well-read guess lands
+  about half the tolerance off, „близо“:
+  - a quantity, linear: 3/10 of the answer (within 6% is right, within 30% „близо“);
   - a year: 3·∛(years since it), at least 3 (1990: 10; 1878: 16; 1519: 24; 681: 33);
   - a log scale: 3;
   - an offset scale (°C, °, points, a rating): by judgement, under 1/5 of the answer (the formula's proportion means
@@ -241,34 +246,32 @@ By type:
   not: one arrangement of 24.
 - **`truefalse`:** the text is a statement ending with a period, and `answer` is `true` or `false`. Write about as
   many false ones as true, each false by one clear fact, not by a trick of wording. **A false statement's fact starts
-  with what is true** („Монако граничи с Италия.“ — „Монако граничи по суша само с Франция…“), then the rest. 10
-  seconds to answer.
+  with what is true** („Монако граничи с Италия.“ — „Монако граничи по суша само с Франция…“), then the rest.
 - **`clues`:** „Подсказки“, **switched off since 2026-11-23: never write a new one** (the format below is for the
   old ones the bank keeps). The text asks what to name („Кой е този човек?“, „Коя е тази държава?“), three `clues`
   (each at most 110 characters, a sentence ending with a period), `answer` and three `wrong` like a choice. The clues
   go from the hardest to the easiest: the first one only an expert knows, the second narrows it to a well-read
-  person, the third gives it to almost anyone who knows the topic at all. Every clue is true of the answer only, and
+  person, the third gives it to almost anyone who knows the subject at all. Every clue is true of the answer only, and
   none names it or gives it away by a word from it. The wrong options fit the first clue's kind (all people, all
-  countries) and some of them fit a clue taken alone, so that guessing early costs. The clues come 10 seconds apart;
-  an answer is worth all of its points on the first clue, 60% on the second, 30% on the third. 30 seconds.
+  countries) and some of them fit a clue taken alone, so that one clue isn't enough.
 - **`split`:** „Раздели“. The text asks the one question that sorts („Бозайник ли е животното?“, „Чия е
   творбата: на Ботев или на Вазов?“), `groups` are the two answers to it (each at most 24 characters, left first),
   and six `items` (`text` at most 45 characters, `group` 0 or 1), at least two in each group. Every item belongs to
   its group under every source, and to only that one: a pair of groups that leaves room for „both“ or „neither“
-  („Европа или Азия?“ for Турция) is not a split. The game shows the items one by one in its own order. 30 seconds.
+  („Европа или Азия?“ for Турция) is not a split. The game shows the items one by one in its own order.
 - **`match`:** the text says what to join („Свържи държавата със столицата ѝ:“), four `pairs` of `left` and
   `right`, and a `decoy`: a fifth right that fits no left, each at most 30 characters. Every left has exactly one
   right that fits, under every source, and the decoy fits none of them (check it as hard as an answer). The decoy is
   of the same kind as the rights and tempting: the city people take for the capital („Сидни“), a neighbour of the
   answer, a name from the same school. Without it, whoever knows three pairs gets the fourth for nothing. The
-  checker refuses a match added since `bank.DecoysFrom` (2026-11-15) without one. 30 seconds.
+  checker refuses a match added since `bank.DecoysFrom` (2026-11-15) without one.
 
 ## Writing a question
 
 - **One right answer,** defensible under every reliable source. The wrong options are plausible and of the same
   kind and form as the answer (all cities, all years; no odd one out by length, quotes or wording).
 - **Nothing gives the answer away:** not in the text, not in the picture, and not in another question or fact
-  (games mix topics). Grep the bank for the answer and the key words before adding.
+  (games mix chapters). Grep the bank for the answer and the key words before adding.
 - **Nothing goes stale.** No „сегашният“, „последният“ or „най-новият“ unless pinned to a date („към 2026 г.“), and
   add `reviewBy` for anything that can change (the `stale` rule finds the wording that needs it).
 - **No near-duplicates.** Grep the bank for the subject first. The checker catches identical texts, the same
@@ -292,9 +295,9 @@ By type:
   (a series' episodes, a hall's seats, a council's members, a dictionary's words, prize money, a fine, the species in
   a park's management plan, the walkers on one march) is a guess, not an estimate: the `anchor` hint flags the
   common ones and the `countable` rule the counts of a list; the checker judges the rest. Ask such a subject as a choice, or ask what about it can be placed.
-- **It belongs under its topic.** A day takes one question a topic: a question filed under the wrong one („Правец е
-  родното място на кой държавен ръководител?“ under technology, for the computers) takes that topic's place with
-  another's question. Ask of each: would a player of this topic expect it here?
+- **It belongs under its category.** A day takes one question a category: a question filed under the wrong one („Правец е
+  родното място на кой държавен ръководител?“ under technology, for the computers) takes that category's place with
+  another's question. Ask of each: would a player of this category expect it here?
 - **Orders:** exact, sourced values in the same order under every source. Measurements that sources give
   differently (areas, lengths, populations, heights) need at least 10% between neighbours; exact values (years,
   dates) only need to be distinct and undisputed. The reveal shows every value, so none of them may be another
@@ -314,14 +317,14 @@ By type:
 
 ## A question for a day
 
-A question with `on` is dealt on its date as „На този ден“ (its topic and „На този ден“ over it), and its `day` line
+A question with `on` is dealt on its date as „На този ден“ (its chapter and „На този ден“ over it), and its `day` line
 shows with the answer, over the fact: the player learns why the day. (The owner's decision B, 16 Nov 2026.)
 
 - **The `day` line** says what happened on that day and names the date, in one short sentence (at most 100
   characters, ending in a period): „На 16 декември 1982 г. умира Колин Чапман.“, „На 3 март 1878 г. е подписан
   Санстефанският мирен договор.“ A moving feast's line (`on` with years) names the feast and what it marks instead
   of a date („На Великден християните празнуват Възкресението Христово.“). It shows only after the answer, so it may
-  name what the question asks; it never shows in a topic's game.
+  name what the question asks; it never shows in a chapter's game.
 - **The text names the date only when the date is what's asked.** Not „Колин Чапман, починал на 16 декември
   1982 г., основава коя марка…“, but „Кой основава марката „Лотус“?“: the day's line says the date. A question that
   does ask about its date („Коя държава празнува националния си ден на 1 юли?“) may go without a day's line, and
@@ -337,7 +340,7 @@ shows with the answer, over the fact: the player learns why the day. (The owner'
 - **A date takes one question a year, and waits for it.** A day never deals a question twice, so a date with one
   question is blank the year after: `bank check` warns of every date of the year ahead with fewer than two that no day
   has had, and batches write for the thinnest dates (`bank plan` gives them). Until a day deals it, a dated question
-  is kept out of every other game (topic games, duels: `play.waiting`), so it isn't spent early.
+  is kept out of every other game (chapter games, duels: `play.waiting`), so it isn't spent early.
 - **The national days come first** (`bank.NationalDays`: the Liberation, the Unification, Independence, Левски's
   birth and death, Ботев, the 24th of May, the Enlighteners, Гергьовден, the students' day, the feasts): each has
   questions about Bulgaria on its own theme, two or three of them (`bank check` fails while one has none). A date's
@@ -374,7 +377,7 @@ shows with the answer, over the fact: the player learns why the day. (The owner'
 
 **A new batch is `/new-questions`** (`.claude/skills/new-questions/`): it runs these steps with the plan from
 `almanac bank plan` (what to write, for the day's shortest runway and the dates with the fewest questions, the same in
-every topic), writers and independent checkers on fixed models, a cross-check over all topics, and `almanac bank add`
+every category), writers and independent checkers on fixed models, a cross-check over all categories, and `almanac bank add`
 (all of the batch, or nothing). **Fixes by the rules are `/fix-questions`**: what `bank lint` flags (or a rule code can't check, judged by
 selector), fixed a chunk at a time by a fixer and an independent checker, and added through `bank add`. A new rule is
 a check in `internal/bank/rules.go` first, then a `/fix-questions` pass over what it flags: never a pass over the whole

@@ -23,8 +23,8 @@ func TestDayQuestionsKeptOut(t *testing.T) {
 	ctx := t.Context()
 	ana, bo := w.user(), w.user()
 
-	// Before anyone plays the day, a topic run draws it, and keeps out of it.
-	topic, err := w.g.startTopic(ctx, bo, MixTopic)
+	// Before anyone plays the day, a chapter run draws it, and keeps out of it.
+	chapter, err := w.g.startChapter(ctx, bo, MixChapter)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,22 +36,22 @@ func TestDayQuestionsKeptOut(t *testing.T) {
 	if err != nil || len(today) != Length || overlap(w.picks(day.ID), today) != Length {
 		t.Fatalf("today's questions: %v %v", today, err)
 	}
-	if n := overlap(w.picks(topic.ID), today); n != 0 {
-		t.Fatalf("a topic run drawn before the day dealt %d of its questions", n)
+	if n := overlap(w.picks(chapter.ID), today); n != 0 {
+		t.Fatalf("a chapter run drawn before the day dealt %d of its questions", n)
 	}
 
 	w.play(ana, day.ID, repeat(w.right, Length)...)
 	w.befriend(ana, bo)
 
-	// No draw deals them: topics, duels.
+	// No draw deals them: chapters, duels.
 	for range 20 {
-		for _, c := range []string{MixTopic, "science"} {
-			s, err := w.g.startTopic(ctx, bo, c)
+		for _, c := range []string{MixChapter, "science"} {
+			s, err := w.g.startChapter(ctx, bo, c)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if n := overlap(w.picks(s.ID), today); n != 0 {
-				t.Fatalf("a topic run (%q) dealt %d of today's questions", c, n)
+				t.Fatalf("a chapter run (%q) dealt %d of today's questions", c, n)
 			}
 		}
 		duel, err := w.g.DuelFriend(ctx, ana, bo)
@@ -151,10 +151,10 @@ func TestMergeBringsProgress(t *testing.T) {
 	}
 }
 
-// mustStart starts a topic run for a player, its id.
+// mustStart starts a chapter run for a player, its id.
 func mustStart(t *testing.T, w *world, user int64) int64 {
 	t.Helper()
-	s, err := w.g.startTopic(t.Context(), user, MixTopic)
+	s, err := w.g.startChapter(t.Context(), user, MixChapter)
 	if err != nil {
 		t.Fatal(err)
 	}

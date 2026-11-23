@@ -106,7 +106,7 @@ func TestGradedAsShown(t *testing.T) {
 
 	// A game of one's own: shown under the bank before, answered under the fixed one.
 	ana := w.user()
-	run := w.runOf(ana, "topic", "geo-960", "geo-001")
+	run := w.runOf(ana, "chapter", "geo-960", "geo-001")
 	if s := w.show(ana, run); s.Question == nil || !strings.Contains(string(mustJSON(t, s.Question.View)), "Мусала") {
 		t.Fatalf("shown: %+v", s.Question)
 	}
@@ -146,7 +146,7 @@ func TestGradedAsShown(t *testing.T) {
 	// After a restart, with only the fixed bank loaded: the version shown is read back as it was kept.
 	bo := w.user()
 	w.reload(before)
-	run = w.runOf(bo, "topic", "geo-960")
+	run = w.runOf(bo, "chapter", "geo-960")
 	w.show(bo, run)
 	w.g.AftersDone(ctx)
 	w.use(fixed)
@@ -164,7 +164,7 @@ func TestGradedAsShown(t *testing.T) {
 	// Di, who plays it after, plays the version before, and is graded against it.
 	gal, di := w.user(), w.user()
 	w.reload(before)
-	run = w.runOf(gal, "topic", "geo-960")
+	run = w.runOf(gal, "chapter", "geo-960")
 	w.show(gal, run)
 	sent, err := w.db.Write.Exec(`INSERT INTO duels (questions, a_id, a_run, b_id, created_at, sent_at, expires_at)
 		VALUES ('[]', ?, ?, ?, 0, 0, ?)`, gal, run, di, store.Ms(w.now.Add(time.Hour)))
@@ -213,14 +213,14 @@ func TestUntrueLeavesMastery(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
-	s, err := w.g.StartTopic(ctx, ana, "geography")
+	s, err := w.g.StartChapter(ctx, ana, "geography")
 	if err != nil {
 		t.Fatal(err)
 	}
 	w.play(ana, s.ID, repeat(w.right, Length)...)
 	h, _ := w.g.hardness(ctx)
-	topics, _, _ := w.g.abilities(ctx, w.db.Read, h, ana, 0, false)
-	all := topics["geography"].answers
+	chapters, _, _ := w.g.abilities(ctx, w.db.Read, h, ana, 0, false)
+	all := chapters["geography"].answers
 	picked := w.picks(s.ID)
 	w.reload(editedSample(t, func(id string, q map[string]any) {
 		switch id {
@@ -237,8 +237,8 @@ func TestUntrueLeavesMastery(t *testing.T) {
 	if _, ok := h.byID[picked[0].ID]; ok {
 		t.Fatal("a question retired as untrue has a hardness")
 	}
-	topics, _, _ = w.g.abilities(ctx, w.db.Read, h, ana, 0, false)
-	if got := topics["geography"].answers; got != all-1 {
+	chapters, _, _ = w.g.abilities(ctx, w.db.Read, h, ana, 0, false)
+	if got := chapters["geography"].answers; got != all-1 {
 		t.Fatalf("answers in the mastery: %d, want %d (the untrue one out, the weak one in)", got, all-1)
 	}
 }
@@ -250,7 +250,7 @@ func TestCountsStandOverAReload(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	ana := w.user()
-	s, _ := w.g.startTopic(ctx, ana, MixTopic)
+	s, _ := w.g.startChapter(ctx, ana, MixChapter)
 	w.play(ana, s.ID, repeat(w.right, Length)...)
 	if err := w.g.Count(ctx); err != nil {
 		t.Fatal(err)

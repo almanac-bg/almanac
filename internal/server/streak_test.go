@@ -21,7 +21,7 @@ func (g *game) daysPlayed(userID int64, back ...int) {
 	}
 }
 
-// Начало hears of a streak just ended, once, on whichever device; the day's reminder then only asks for today's. The
+// Днес hears of a streak just ended, once, on whichever device; the day's reminder then only asks for today's. The
 // same at noon and in the minutes after midnight, while yesterday's runs can still be finished (play.DayGrace).
 func TestStreakEndedOnTheDay(t *testing.T) {
 	for name, now := range map[string]time.Time{
@@ -58,14 +58,14 @@ func streakEndedOnTheDay(t *testing.T, now time.Time) {
 	if status, _ := ana.call("POST", "/api/me/streak-told", map[string]any{"key": "ended:soon"}); status != 400 {
 		t.Fatalf("a notice that isn't one: %d", status)
 	}
-	// Told once: Начало, on another device, doesn't tell it again.
+	// Told once: Днес, on another device, doesn't tell it again.
 	if _, today = ana.call("GET", "/api/day", nil); today["ended"] != nil {
 		t.Fatalf("told again: %v", today["ended"])
 	}
 }
 
 // Yesterday's questions, finished in the minutes after midnight (play.DayGrace), count for yesterday: the streak goes
-// on, and Начало tells of no day missed.
+// on, and Днес tells of no day missed.
 func TestStreakFinishedAfterMidnight(t *testing.T) {
 	g := start(t)
 	now := time.Date(2026, 12, 10, 0, 5, 0, 0, play.Bulgaria)

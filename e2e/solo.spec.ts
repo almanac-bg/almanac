@@ -5,7 +5,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   test.setTimeout(120_000);
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Десет въпроса за днес" })).toBeVisible();
-  // A new visitor's cover is the day alone: no places, no streak, no topics.
+  // A new visitor's cover is the day alone: no places, no streak, no chapters.
   await expect(page.locator(".places-foot")).toBeHidden();
   await expect(page.locator(".streak-chip")).toHaveCount(0);
   await expect(page.getByRole("link", { name: /История/ })).toHaveCount(0);
@@ -15,7 +15,7 @@ test("the day: ten questions, the result, the review, and one try only", async (
   // A first result is quiet: the right answers, no points, XP, level or goals (the game has none).
   await expect(page.locator(".screen")).not.toContainText(/XP|[Нн]иво \d|Цели за деня|точк/);
   // The first result's action sits right under the score: keeping the game and being reminded (or, until that's there
-  // to ask, sharing it). Topics are played from the Алманах, duels from Приятели.
+  // to ask, sharing it). Chapters are played from the Алманах, duels from Приятели.
   await expect(page.locator(".result-main > .result-score + .result-share.result-first")).toBeVisible();
   // The questions gone over, in their dialog: by the button, each question with its answers.
   const review = page.getByRole("dialog", { name: "Въпросите" });
@@ -131,7 +131,7 @@ test("the day says how its other players did with each question: under the verdi
   await expect(page.locator(".reviewed").first().locator(".crowd-says")).toHaveText(/от играчите\u00a0днес\.$|^Днес /);
 });
 
-test("a topic, ten questions, a question reported, and ten more", async ({ page }) => {
+test("a chapter, ten questions, a question reported, and ten more", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto("/almanac/history");
   await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
@@ -159,7 +159,7 @@ test("a topic, ten questions, a question reported, and ten more", async ({ page 
   await page.getByRole("button", { name: "Още десет въпроса" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10");
 });
-test("a topic's count can be backed out of, or cut short", async ({ page }) => {
+test("a chapter's count can be backed out of, or cut short", async ({ page }) => {
   await page.goto("/almanac/history");
   await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
@@ -203,7 +203,7 @@ test("the day's count can be backed out of, and nothing starts; let run, it star
   await expect(page.locator(".question-head")).toContainText("1 от 10", { timeout: 6000 });
 });
 
-test("the day left after its third question waits on Начало, and goes on from the fourth", async ({ page }) => {
+test("the day left after its third question waits on Днес, and goes on from the fourth", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto("/");
   await startDay(page);
@@ -240,7 +240,9 @@ test("the day left after its third question waits on Начало, and goes on f
   expect(questions.every((q: { given: unknown }) => q.given !== null)).toBe(true);
 });
 
-test("a question left while its time runs: asked first, given up, and the topic goes on after it", async ({ page }) => {
+test("a question left while its time runs: asked first, given up, and the chapter goes on after it", async ({
+  page,
+}) => {
   test.setTimeout(60_000);
   await openGame(page, "/play/history");
   await expect(page.locator(".question-head")).toContainText("1 от 10");
@@ -301,7 +303,7 @@ test("the day left at its last question comes back done, with what it earned tol
 test.describe("on a computer", () => {
   test.use({ viewport: { width: 1280, height: 800 }, isMobile: false, hasTouch: false });
 
-  test("the keys play a topic, and Начало takes the width", async ({ page }) => {
+  test("the keys play a chapter, and Днес takes the width", async ({ page }) => {
     test.setTimeout(120_000);
     await page.goto("/play/history");
     await page.getByRole("button", { name: "Започни", exact: true }).click();

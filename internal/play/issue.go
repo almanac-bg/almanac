@@ -9,8 +9,8 @@ import (
 )
 
 // The day's ten are the game's issue of the day, as an almanac's: numbered from the first day they were played as the
-// game plays them now (the rebuild went live that evening), the same number for everyone. Начало heads the day with
-// it, the day's result carries it („Брой 6“), and Моят Алманах heads each day's facts with it.
+// game plays them now (the rebuild went live that evening), the same number for everyone. Днес heads the day with it,
+// the day's result carries it („Брой 6“), and the Алманах names it beside each fact the day wrote.
 
 // FirstIssue is the day of Брой 1 (YYYY-MM-DD, in Bulgaria).
 const FirstIssue = "2026-11-12"
@@ -34,9 +34,9 @@ func IssueDay(issue int) string {
 	return first.AddDate(0, 0, issue-1).Format(time.DateOnly)
 }
 
-// IssueTopics are a day's topics in the order its ten are asked („В броя“ on Днес): what the issue holds, never which
-// questions. None while the day isn't drawn yet (ahead.go draws it before it comes).
-func (g *Game) IssueTopics(ctx context.Context, day string) ([]string, error) {
+// IssueChapters are a day's chapters in the order its ten are asked („В броя“ on Днес): what the issue holds, never
+// which questions. None while the day isn't drawn yet (ahead.go draws it before it comes).
+func (g *Game) IssueChapters(ctx context.Context, day string) ([]string, error) {
 	var raw string
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT questions FROM days WHERE day = ?`, day).Scan(&raw)
 	if errors.Is(err, sql.ErrNoRows) {

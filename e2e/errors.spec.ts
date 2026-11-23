@@ -26,7 +26,7 @@ test("a page that isn't there says so, with a way on", async ({ page }) => {
   await page.goto("/c/abc234");
   await expect(page.getByRole("heading", { name: "Няма такава страница" })).toBeVisible();
 
-  // A topic the game doesn't have (an old link): said so, not a blank page.
+  // A chapter the game doesn't have (an old link): said so, not a blank page.
   await page.goto("/play/nothing");
   await expect(page.getByRole("heading", { name: "Няма такава страница" })).toBeVisible();
   await page.getByRole("link", { name: "Към днешния брой" }).click();

@@ -170,11 +170,11 @@ func TestFriendDuel(t *testing.T) {
 	}
 	// A duel's questions are gone over on any day, by each side its own game (Review), never by anyone else; a
 	// chapter's game, played the same day, only on its day.
-	topic, err := w.g.StartTopic(ctx, ana, "history")
+	chapter, err := w.g.StartChapter(ctx, ana, "history")
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.play(ana, topic.ID, repeat(w.right, len(w.picks(topic.ID)))...)
+	w.play(ana, chapter.ID, repeat(w.right, len(w.picks(chapter.ID)))...)
 	w.wait(48 * time.Hour)
 	d, _ = w.g.DuelOf(ctx, ana, re)
 	if r, err := w.g.Review(ctx, ana, d.RunID); err != nil || len(r) != Length || r[0].Right {
@@ -192,7 +192,7 @@ func TestFriendDuel(t *testing.T) {
 	if _, err := w.g.Review(ctx, cy, d.RunID); !errors.Is(err, ErrNoRun) {
 		t.Fatalf("Cy went over Ana's game: %v", err)
 	}
-	if _, err := w.g.Review(ctx, ana, topic.ID); !errors.Is(err, ErrReviewOver) {
+	if _, err := w.g.Review(ctx, ana, chapter.ID); !errors.Is(err, ErrReviewOver) {
 		t.Fatalf("a chapter's game two days later: %v", err)
 	}
 }

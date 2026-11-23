@@ -52,7 +52,7 @@ In `<batch>/final/` (nothing else in it but these):
   wrong, the source), for the owner's session to fix.
 
 Check the whole batch against the real bank: it must pass (every rule of the bank holds for a new question: an error
-otherwise; a give-away across the ten topics too), with the categories within 2% of their mean after it:
+otherwise; a give-away across the ten categories too), with the categories within 2% of their mean after it:
 
 ```bash
 cd <repo> && go run ./cmd/almanac bank add -check <batch>/final <bank>

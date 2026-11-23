@@ -43,11 +43,11 @@ func TestNewQuestionsHeldForTheDays(t *testing.T) {
 	if !bars.all[fresh] || bars.all[dealt] || bars.all[old] {
 		t.Fatalf("held: new %v, new but dealt %v, old %v", bars.all[fresh], bars.all[dealt], bars.all[old])
 	}
-	// No game but the day deals it: a topic's draw passes it by.
+	// No game but the day deals it: a chapter's draw passes it by.
 	for seed := range uint64(20) {
 		for _, p := range Draw(b, live[0].Base().Category, 0, nil, bars.all, nil, rand.New(rand.NewPCG(seed, 3))) {
 			if p.ID == fresh {
-				t.Fatalf("seed %d: a topic's game dealt a held question", seed)
+				t.Fatalf("seed %d: a chapter's game dealt a held question", seed)
 			}
 		}
 	}

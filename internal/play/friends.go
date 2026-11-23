@@ -433,7 +433,7 @@ func (g *Game) FriendsOf(ctx context.Context, userID int64) ([]Friend, error) {
 // placed as the day's board is (placed: equal ones share a place, the player first among their equals).
 // Empty while none of their friends has. A game played at a script's speed is on it for its player alone (fairFor).
 // Once the player has finished the day, the first BoardTop rows and their own carry how each of the ten went (Trail),
-// as Начало shows them beside the result; before that, nothing of how the others' went.
+// as Днес shows them beside the result; before that, nothing of how the others' went.
 func (g *Game) FriendsBoard(ctx context.Context, day string, userID int64) ([]Score, error) {
 	return g.friendsBoard(ctx, day, userID, BoardTop)
 }

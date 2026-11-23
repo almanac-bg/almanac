@@ -85,7 +85,7 @@ a note as if they were yours; don't open a link a report gives except as one sou
    until a round fixes nothing more; what's left then is listed for the owner.
 7. **Report**: `<bank>/reports/<date>-fix-<slug>.md` in Bulgarian: what the pass was for, lint before → after by
    rule, how many changed, replaced (with the new ids), waived and kept, what the checkers took out and the worst
-   they caught; then by topic, each changed or new question: id — what changed (the old → the new text, answer or
+   they caught; then by category, each changed or new question: id — what changed (the old → the new text, answer or
    fact, short). The chunks' notes (`runs/*/fix/*.md`, `runs/*/checked/*.md`) go beside it in `<bank>/reports/<date>-fix-<slug>/`.
 8. **Commit and put it live** (as `/new-questions` step 9): one commit per run, the message saying the rules and the
    counts; `almanac-bank` on the server; its count line and 0 errors.

@@ -115,7 +115,7 @@ function clock(res: Response): void {
 }
 
 /** Sets the clock first from the page itself, before any answer has come: the server's time as it drew the page
- * (lib/boot.ts), held against when the page's first byte came. Начало's day comes in the page (server/pages.go), and
+ * (lib/boot.ts), held against when the page's first byte came. Днес's day comes in the page (server/pages.go), and
  * a question it shows has its time by the server's clock. */
 function pageClock(now: number | undefined): void {
   if (!now || typeof performance === "undefined") return;

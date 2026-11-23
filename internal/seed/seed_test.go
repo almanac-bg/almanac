@@ -33,7 +33,7 @@ type discard struct{}
 func (discard) Send(context.Context, string, mail.Message) error { return nil }
 
 // The lapsed persona is there whatever day of the week the history ends: a player who stops on the day the history
-// chooses (lapsesFrom) has, by the game's own streak, one that ended lately as Начало tells it (latelyEnded), though a
+// chooses (lapsesFrom) has, by the game's own streak, one that ended lately as Днес tells it (latelyEnded), though a
 // week's first two days missed are forgiven and no streak ends on a Monday or a Tuesday. TestSeededGame sees only
 // the day it runs on.
 func TestLapsedEveryWeekday(t *testing.T) {
@@ -100,7 +100,7 @@ func TestSeededGame(t *testing.T) {
 	// The history has what the screens show: every kind of game, friends.
 	for what, q := range map[string]string{
 		"day runs":         `SELECT count(*) FROM runs WHERE kind = 'day' AND finished_at IS NOT NULL`,
-		"topic runs":       `SELECT count(*) FROM runs WHERE kind = 'topic'`,
+		"chapter runs":     `SELECT count(*) FROM runs WHERE kind = 'chapter'`,
 		"friends' duels":   `SELECT count(*) FROM duels WHERE outcome IN ('a', 'b', 'draw')`,
 		"duels waiting":    `SELECT count(*) FROM duels WHERE sent_at IS NOT NULL AND ended_at IS NULL`,
 		"friends":          `SELECT count(*) FROM friends`,
@@ -196,7 +196,7 @@ func TestSeededGame(t *testing.T) {
 	}
 	_, day := get(by[keyLapsed], "/api/day")
 	if day["ended"] == nil {
-		t.Errorf("the lapsed persona's streak isn't told as ended on Начало: %v", day)
+		t.Errorf("the lapsed persona's streak isn't told as ended on Днес: %v", day)
 	}
 	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/admin", nil)
 	req.AddCookie(&http.Cookie{Name: "sid", Value: by[keyAdmin].Token})

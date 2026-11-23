@@ -106,7 +106,7 @@ export function testBank(make: boolean): string {
     const qs = files(served);
     const ids = new Set([...qs.values()].flat().map((q) => q.id));
     // Each waiting for a day far ahead (bank.Tail.On; play's `waiting`): dealt to a test by its id, never drawn by the
-    // game, into a day's issue, a topic's game or a duel, so that whatever the tests play by chance is the sample's,
+    // game, into a day's issue, a chapter's game or a duel, so that whatever the tests play by chance is the sample's,
     // here as on CI. Its day far ahead has no line of its own (bank's rule „dated“): kept a warning, as for a question
     // added before the rules were strict, whenever it was added.
     for (const [f, q] of add)

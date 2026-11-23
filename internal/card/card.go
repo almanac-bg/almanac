@@ -1,6 +1,6 @@
 // Package card draws the pictures a link to the game shows where it's sent (Viber, Messenger, WhatsApp: its Open Graph
-// image, 1200 × 630), in the game's look, „a bright almanac“ (DECISIONS.md), always by day, whatever the theme of whoever
-// opens it:
+// image, 1200 × 630), in the game's look, „a bright almanac“ (DECISIONS.md), always by day, whatever the theme of
+// whoever opens it:
 //
 //   - a shared day's card (Draw), the picture a shared day's link shows and the browser shares as the day is shared
 //     (web/src/game/share.ts, cardFile): the mark and the name, „Брой“ and the issue's number big with its date (and
@@ -49,8 +49,8 @@ type Card struct {
 	Issue    int
 	Date     string
 	National string
-	// Topics are the issue's ten chapters in the order they're asked (play.Game.IssueTopics).
-	Topics []string
+	// Chapters are the issue's ten chapters in the order they're asked (play.Game.IssueChapters).
+	Chapters []string
 	// Shape is how each of the issue's ten went, in its order (play.Share.Shape): '1' right, '2' близо, '3' one that
 	// counts for nobody, anything else wrong.
 	Shape string
@@ -130,7 +130,7 @@ func Draw(c Card) ([]byte, error) {
 		size *= (Width - 2*64) / w
 	}
 	p.write(p.face("sofia-sans-800", size), ink, 64, 530, date, 0)
-	if err := p.tiles(c.Topics, c.Shape); err != nil {
+	if err := p.tiles(c.Chapters, c.Shape); err != nil {
 		return nil, err
 	}
 	return p.png()
@@ -138,7 +138,7 @@ func Draw(c Card) ([]byte, error) {
 
 // The site's picture: the ten chapters of the game as a day's tiles, mostly right, one близо, two not.
 var (
-	siteTopics = []string{"general", "science", "history", "geography", "movies", "music", "sports", "technology",
+	siteChapters = []string{"general", "science", "history", "geography", "movies", "music", "sports", "technology",
 		"literature", "nature"}
 	siteShape = "1120111101"
 )
@@ -155,7 +155,7 @@ func Site() ([]byte, error) {
 		p.write(line, ink, 64, y, l, 0)
 		y += 58
 	}
-	if err := p.tiles(siteTopics, siteShape); err != nil {
+	if err := p.tiles(siteChapters, siteShape); err != nil {
 		return nil, err
 	}
 	return p.png()
@@ -213,26 +213,26 @@ func (p *picture) png() ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-// tiles draws the ten tiles, two rows of five at the right, as the screen's are: topics are their chapters, shape how
-// each went (Card.Shape).
-func (p *picture) tiles(topics []string, shape string) error {
+// tiles draws the ten tiles, two rows of five at the right, as the screen's are: chapters are their colours and glyphs,
+// shape how each went (Card.Shape).
+func (p *picture) tiles(chapters []string, shape string) error {
 	const size, gap = 120.0, 18.0
 	const x0, y0 = Width - 64 - 5*size - 4*gap, (Height - 2*size - gap) / 2
 	const r = size * 0.24
 	for i := range 10 {
-		topic := "mix"
-		if i < len(topics) {
-			topic = topics[i]
+		chapter := "mix"
+		if i < len(chapters) {
+			chapter = chapters[i]
 		}
 		mark := byte('0')
 		if i < len(shape) {
 			mark = shape[i]
 		}
-		tone, ok := vivid[topic]
+		tone, ok := vivid[chapter]
 		if !ok {
 			tone = vivid["mix"]
 		}
-		edge, ok := deep[topic]
+		edge, ok := deep[chapter]
 		if !ok {
 			edge = ink
 		}
@@ -279,7 +279,7 @@ func (p *picture) tiles(topics []string, shape string) error {
 		if right || near {
 			a = 1
 		}
-		if err := glyph(p.img, topic, tone, x+(size-g)/2, y+(size-g)/2, g, a); err != nil {
+		if err := glyph(p.img, chapter, tone, x+(size-g)/2, y+(size-g)/2, g, a); err != nil {
 			return err
 		}
 	}

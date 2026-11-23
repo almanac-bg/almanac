@@ -5,7 +5,7 @@
 // browser takes), plus web/public as it is. It writes a manifest of what each became (app.js → assets/app-3F2A9C.js;
 // a font by its own name, sofia-sans.woff2 → assets/sofia-sans-7C1D0E.woff2), says how big each is as a browser
 // gets it, and fails past three lines: the first screen's budget (what every visit after a release downloads before
-// Начало draws), the fonts' ceiling and the whole client's. The ceilings are guards against an accident (a library
+// Днес draws), the fonts' ceiling and the whole client's. The ceilings are guards against an accident (a library
 // pulled in, data built into the code), not limits to write around; the budget is the one to keep in mind.
 //
 // A release has no source maps: nobody but a developer reads one, and the build is the same from the same commit (to
@@ -36,12 +36,12 @@ import (
 	"github.com/almanac-bg/almanac/internal/assets"
 )
 
-// firstScreen is how big, brotli-compressed as it's sent, what Начало needs before it draws may be: firstFiles and the
+// firstScreen is how big, brotli-compressed as it's sent, what Днес needs before it draws may be: firstFiles and the
 // fonts the page preloads (assets.FirstFonts). Every daily player downloads it again after each release. A screen a
 // daily visit doesn't open loads on its own (web/src/kit.ts) and doesn't count here.
 const firstScreen = 110 << 10
 
-// firstFiles are the scripts and styles Начало draws with: the app, and the scripts every page loads as it starts
+// firstFiles are the scripts and styles Днес draws with: the app, and the scripts every page loads as it starts
 // (assets.FirstScripts: the pictures, whose are the cover's ten glyphs).
 var firstFiles = append([]string{"app.js", "app.css"}, assets.FirstScripts...)
 
@@ -275,7 +275,7 @@ func checkSize(out string) error {
 	}
 	switch {
 	case first > firstScreen:
-		return fmt.Errorf("the first screen is %d kB as sent, past its budget of %d kB: load what Начало doesn't draw on its own (web/src/kit.ts)", first>>10, firstScreen>>10)
+		return fmt.Errorf("the first screen is %d kB as sent, past its budget of %d kB: load what Днес doesn't draw on its own (web/src/kit.ts)", first>>10, firstScreen>>10)
 	case fonts > fontCeiling:
 		return fmt.Errorf("the fonts for Bulgarian are %d kB, past their ceiling of %d kB: cut them to what the texts use (web/src/fonts/subset.sh)", fonts>>10, fontCeiling>>10)
 	case all > ceiling:

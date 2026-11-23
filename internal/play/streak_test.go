@@ -21,7 +21,7 @@ func (w *world) daysPlayed(user int64, back ...int) {
 	}
 }
 
-// playDay plays today's ten, and topic plays a game of a topic: each a game played through, as a player plays it.
+// playDay plays today's ten, and chapter plays a game of a chapter: each a game played through, as a player plays it.
 func (w *world) playDay(user int64) {
 	w.t.Helper()
 	s, err := w.g.StartDay(w.t.Context(), user)

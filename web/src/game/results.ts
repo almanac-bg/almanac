@@ -6,7 +6,7 @@ import { api, errorText } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { calm } from "../lib/prefs.ts";
 import { feelKit, play } from "../lib/sound.ts";
-import { categories } from "../state.ts";
+import { chapters } from "../state.ts";
 import { avatar, chapterName, chip, fact, type Look, leaf, tiles, who } from "../ui.ts";
 import { type FriendDay, fewFriends, friendsLine, groupWords, markAt, shortName } from "./knew.ts";
 import { closeLine, closeWords } from "./numbers.ts";
@@ -319,11 +319,11 @@ function reviewed(all: Reviewed[], versus?: Versus, friends: FriendDay[] = []): 
         note.setAttribute("aria-label", `${note.getAttribute("aria-label")} Въпрос ${it.n + 1}`);
       return h(
         "article",
-        { class: `reviewed ${kind === "missed" ? "wrong" : kind} t-${it.category}`, "data-n": it.n },
+        { class: `reviewed ${kind === "missed" ? "wrong" : kind} ch-${it.chapter}`, "data-n": it.n },
         h(
           "p",
           { class: "reviewed-head" },
-          h("span", { class: "kicker" }, `${it.n + 1} · ${categories.find((c) => c.id === it.category)?.name ?? ""}`),
+          h("span", { class: "kicker" }, `${it.n + 1} · ${chapters.find((c) => c.id === it.chapter)?.name ?? ""}`),
           versus ? null : h("span", { class: "reviewed-says" }, verdicts[kind][1]),
         ),
         h("h3", { class: "ask" }, it.view.text),
@@ -458,7 +458,7 @@ export function boardRow(
     { class: cls },
     h("span", { class: "place" }, String(place)),
     who(name, opts.look, opts.me ? h("span", { class: "you" }, "ти") : null, name, opts.tag),
-    h("span", { class: "pts" }, score),
+    h("span", { class: "rights" }, score),
   );
 }
 

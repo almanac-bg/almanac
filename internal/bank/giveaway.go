@@ -7,7 +7,7 @@ import (
 	"unicode"
 )
 
-// Give-aways across the bank: games mix topics, so one question's words can answer another's. Four rules look for
+// Give-aways across the bank: games mix chapters, so one question's words can answer another's. Four rules look for
 // it: a value asked (a number's answer, a year a choice asks, an order's values) that another question shows next to
 // the same subject (ruleGiveaway); a choice's answer that another shows as true next to its subject
 // (ruleAnswerGiveaway); both sides of a match's pair shown together by another question

@@ -1,12 +1,12 @@
 export const meta = {
   name: 'new-questions',
-  description: "A batch of new questions for АЛМАНАХ's bank: a writer and an independent checker per topic, then one cross-check of all ten",
+  description: "A batch of new questions for АЛМАНАХ's bank: a writer and an independent checker per category, then one cross-check of all ten",
   whenToUse: 'Run by the /new-questions skill, with the plan from `almanac bank plan -json`.',
   phases: [
-    { title: 'Write', detail: 'one writer per topic, by the plan', model: 'opus' },
-    { title: 'Verify', detail: 'one independent checker per topic, on another model', model: 'fable' },
+    { title: 'Write', detail: 'one writer per category, by the plan', model: 'opus' },
+    { title: 'Verify', detail: 'one independent checker per category, on another model', model: 'fable' },
     { title: 'Blind', detail: 'the checked questions answered without the key, on a third model', model: 'sonnet' },
-    { title: 'Cross', detail: 'pairs across the topics, the sizes, the final batch', model: 'fable' },
+    { title: 'Cross', detail: 'pairs across the categories, the sizes, the final batch', model: 'fable' },
   ],
 }
 
@@ -62,8 +62,8 @@ const CROSSED = {
   required: ['each', 'pairs', 'dropped', 'passes', 'worst'],
 }
 
-// Each topic goes on to its checker as soon as its writer is done.
-const topics = await pipeline(
+// Each category goes on to its checker as soon as its writer is done.
+const categories = await pipeline(
   plan.categories,
   (c) =>
     agent(
@@ -82,10 +82,10 @@ const topics = await pipeline(
   },
 )
 
-const missing = plan.categories.filter((c, i) => !topics[i]?.checked).map((c) => c.id)
+const missing = plan.categories.filter((c, i) => !categories[i]?.checked).map((c) => c.id)
 if (missing.length) {
   log(`not done: ${missing.join(', ')}; resume this run to finish them (the rest is kept)`)
-  return { done: false, missing, topics: topics.filter(Boolean) }
+  return { done: false, missing, categories: categories.filter(Boolean) }
 }
 
 phase('Blind')
@@ -96,7 +96,7 @@ const made = await agent(
 )
 if (!made?.sheets) {
   log('the blind sheets were not made; resume this run')
-  return { done: false, missing: ['blind'], topics }
+  return { done: false, missing: ['blind'], categories }
 }
 const sheets = Array.from({ length: made.sheets }, (_, i) => i + 1)
 const answered = await parallel(
@@ -109,14 +109,14 @@ const answered = await parallel(
 )
 if (answered.some((r) => !r)) {
   log('a blind sheet was not answered; resume this run')
-  return { done: false, missing: ['blind'], topics }
+  return { done: false, missing: ['blind'], categories }
 }
 
 phase('Cross')
-const bankProblems = topics.flatMap((t) => t.written.bankProblems.map((p) => `${t.id}: ${p}`))
+const bankProblems = categories.flatMap((t) => t.written.bankProblems.map((p) => `${t.id}: ${p}`))
 const crossed = await agent(
   `You make the final batch. Read ${skill}/CROSS.md and follow it exactly.\n\n${where}\n<fix> = ${fix}` +
     (bankProblems.length ? `\n\nThe writers found these in questions already in the bank:\n- ${bankProblems.join('\n- ')}` : ''),
   { ...CHECKER, label: 'cross', phase: 'Cross', schema: CROSSED },
 )
-return { done: Boolean(crossed?.passes), topics, crossed }
+return { done: Boolean(crossed?.passes), categories, crossed }

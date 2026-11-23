@@ -9,7 +9,7 @@ import (
 )
 
 // finish is the history's last hours: the regular with friends, a friend's duel waiting for them and one of theirs
-// waiting for a friend (as Приятели and Начало show them), then the clock at the end, and the server's sweeps once
+// waiting for a friend (as Приятели and Днес show them), then the clock at the end, and the server's sweeps once
 // more.
 func (w *world) finish() error {
 	w.rewind(w.end.Add(-230 * time.Minute))
@@ -98,7 +98,7 @@ func (w *world) personas() ([]Persona, error) {
 	}
 	out = append(out, Persona{Key: keyGuest, ID: u.ID, Name: u.Name, Tag: u.Tag, Token: token,
 		About: "a new guest: nothing played, as a browser that's never been here"})
-	// The lapsed one: whichever of its candidates' streaks ended lately, as Начало tells it.
+	// The lapsed one: whichever of its candidates' streaks ended lately, as Днес tells it.
 	var lapsed *player
 	for _, p := range w.players {
 		if p.kind == lapsing && p.id != 0 && lapsed == nil {
@@ -141,7 +141,7 @@ func (w *world) personas() ([]Persona, error) {
 	return out, nil
 }
 
-// latelyEnded is a player's streak that ended lately, as Начало tells it (two days or more, on one of the last three:
+// latelyEnded is a player's streak that ended lately, as Днес tells it (two days or more, on one of the last three:
 // server/game.go), nil for none: yesterday, or on a Tuesday or a Wednesday the Sunday before (history.go), as a
 // week's first two days missed are forgiven and no streak ends on them.
 func (w *world) latelyEnded(p *player) (*play.Ended, error) {
@@ -213,7 +213,7 @@ func (w *world) about(p *player) (string, error) {
 		if err != nil || e == nil {
 			return fail("has no streak that ended lately")
 		}
-		return fmt.Sprintf("a streak of %d that broke on %s, the day missed, told on Начало; %s", e.Days, e.On, facts), nil
+		return fmt.Sprintf("a streak of %d that broke on %s, the day missed, told on Днес; %s", e.Days, e.On, facts), nil
 	case keyLegend:
 		return "the strongest player, a streak from the first day; " + facts, nil
 	case keyAdmin:

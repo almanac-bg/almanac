@@ -21,12 +21,12 @@ type player struct {
 	until  int // the last day they play (-1: to the end)
 	rate   float64
 
-	skill  float64       // the chance of a right answer to a medium question
-	pace   time.Duration // how long an answer takes them, about
-	hour   int           // when in the day they usually play
-	topics float64       // topic games on a day they play, on average
-	duels  float64       // duels started with a friend
-	social float64       // how readily they make friends
+	skill    float64       // the chance of a right answer to a medium question
+	pace     time.Duration // how long an answer takes them, about
+	hour     int           // when in the day they usually play
+	chapters float64       // chapter games on a day they play, on average
+	duels    float64       // duels started with a friend
+	social   float64       // how readily they make friends
 
 	profile int // the day they give an email (-1: a guest throughout)
 	named   bool
@@ -66,48 +66,48 @@ func (w *world) cast(n int) {
 		w.players = append(w.players, p)
 	}
 	// The personas played in the history (the new guest comes at the end: personas).
-	add(&player{kind: keyDay2, persona: keyDay2, joined: last - 1, until: -1, rate: 1, skill: 0.6, topics: 0.6,
+	add(&player{kind: keyDay2, persona: keyDay2, joined: last - 1, until: -1, rate: 1, skill: 0.6, chapters: 0.6,
 		profile: -1, hour: 19})
-	add(&player{kind: keyRegular, persona: keyRegular, joined: last - 29, until: -1, rate: 1, skill: 0.78, topics: 1.2,
+	add(&player{kind: keyRegular, persona: keyRegular, joined: last - 29, until: -1, rate: 1, skill: 0.78, chapters: 1.2,
 		duels: 1.6, social: 1, profile: last - 26, named: true, hour: 8, pace: 6 * time.Second})
-	add(&player{kind: keyLegend, persona: keyLegend, joined: 0, until: -1, rate: 1, skill: 0.95, topics: 1.5,
+	add(&player{kind: keyLegend, persona: keyLegend, joined: 0, until: -1, rate: 1, skill: 0.95, chapters: 1.5,
 		duels: 6, social: 0.6, profile: 1, named: true, hour: 20, pace: 4 * time.Second})
-	add(&player{kind: keyAdmin, persona: keyAdmin, joined: 0, until: -1, rate: 0.9, skill: 0.7, topics: 0.8,
+	add(&player{kind: keyAdmin, persona: keyAdmin, joined: 0, until: -1, rate: 0.9, skill: 0.7, chapters: 0.8,
 		duels: 0.5, social: 0.5, profile: 0, named: true, hour: 9})
 	// Those who might be the lapsed one: streaks that end as late as they can before today (yesterday, or on a Tuesday
 	// or a Wednesday the Sunday before: history.go), by whichever days their weeks forgive; the first whose streak did
 	// is the persona.
 	for i := range 4 {
-		add(&player{kind: lapsing, joined: last - 12 - 4*i, until: -1, rate: 1, skill: 0.62, topics: 0.4,
+		add(&player{kind: lapsing, joined: last - 12 - 4*i, until: -1, rate: 1, skill: 0.62, chapters: 0.4,
 			duels: 0.3, social: 0.5, profile: last - 10, named: true, hour: 21})
 	}
 	// A few who never miss a day: the long streaks.
 	for i := range 4 {
-		add(&player{kind: "devoted", joined: i, until: -1, rate: 1, skill: 0.6 + 0.1*float64(i), topics: 0.8,
+		add(&player{kind: "devoted", joined: i, until: -1, rate: 1, skill: 0.6 + 0.1*float64(i), chapters: 0.8,
 			duels: 1 + float64(i), social: 0.7, profile: i + 2, named: true})
 	}
 	for len(w.players) < n {
 		p := &player{until: -1, profile: -1}
 		switch x := w.r.Float64(); {
 		case x < 0.06:
-			p.kind, p.rate, p.topics, p.duels = "devoted", 0.96, 1, 1.5
+			p.kind, p.rate, p.chapters, p.duels = "devoted", 0.96, 1, 1.5
 			p.joined = w.r.IntN(12)
 		case x < 0.28:
-			p.kind, p.rate, p.topics, p.duels = "regular", 0.8, 0.6, 0.6
+			p.kind, p.rate, p.chapters, p.duels = "regular", 0.8, 0.6, 0.6
 			p.joined = w.r.IntN(max(1, last-10))
 		case x < 0.58:
-			p.kind, p.rate, p.topics, p.duels = "casual", 0.4, 0.4, 0.25
+			p.kind, p.rate, p.chapters, p.duels = "casual", 0.4, 0.4, 0.25
 			p.joined = w.r.IntN(last)
 		case x < 0.80:
-			p.kind, p.rate, p.topics, p.duels = "tried", 1, 0.4, 0.2
+			p.kind, p.rate, p.chapters, p.duels = "tried", 1, 0.4, 0.2
 			p.joined = w.r.IntN(last)
 			p.until = p.joined + w.r.IntN(3)
 		case x < 0.92:
-			p.kind, p.rate, p.topics, p.duels = "lapsed", 0.85, 0.6, 0.5
+			p.kind, p.rate, p.chapters, p.duels = "lapsed", 0.85, 0.6, 0.5
 			p.joined = w.r.IntN(max(1, last-25))
 			p.until = p.joined + 7 + w.r.IntN(max(1, last-p.joined-9))
 		default:
-			p.kind, p.rate, p.topics, p.duels = "newcomer", 0.9, 0.6, 0.3
+			p.kind, p.rate, p.chapters, p.duels = "newcomer", 0.9, 0.6, 0.3
 			p.joined = last - w.r.IntN(5)
 		}
 		// Strength: most about the middle, a few strong, a few weak.

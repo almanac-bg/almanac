@@ -1,11 +1,9 @@
-// Pictures: the game's illustrations — the avatars, the topics, the ways to play and
-// the streak's flame — drawn by hand as paths on a 64 × 64 grid, in one style, so that they belong
-// together (web/DESIGN.md, Pictures).
+// Pictures: the game's illustrations — the avatars, the chapters and the streak's flame — drawn by hand as paths on a
+// 64 × 64 grid, in one style, so that they belong together (web/DESIGN.md, Pictures).
 //
 // The style: flat shapes with depth, no outlines, lit from the top left. Every picture is painted from one ramp of
-// its tone (the topic's, the avatar's, the mode's) with the night ink and white, so a
-// picture always sits in the colours around it and follows the theme. The inks are classes coloured in app.css
-// (.pic):
+// its tone (the chapter's, the avatar's) with the night ink and white, so a picture always sits in the colours around
+// it and follows the theme. The inks are classes coloured in app.css (.pic):
 //
 //   k0 night ink · k1 deep · k2 shade · k3 the tone itself · k4 light · k5 pale · kw white
 //   ks a shadow over what's below · kh a light over it · kt a tint of the tone (a ground behind a picture)
@@ -83,18 +81,6 @@ const chest = "M25 66C25.5 57 28.5 52.5 32 52.5C35.5 52.5 38.5 57 39 66V72H25Z";
 /** The head's shadow on the chest. */
 const chinShadow = E(33, 51.5, 13.5, 4.4);
 const chin: Layer = ["ks", chinShadow];
-
-/** A sword standing on the middle, turned by `deg` (crossed swords are two). */
-const sword = (deg: number): Layer[] => {
-  const t = `transform="rotate(${deg} 32 34)"`;
-  return [
-    ["ks", "M32 4L35.2 9.5V41H28.8V9.5Z", `transform="rotate(${deg} 32 34) translate(1 2)"`],
-    ["k5", "M32 4L35.2 9.5V41H28.8V9.5Z", t],
-    ["k4", "M32 4L35.2 9.5V41H32Z", t],
-    ["k1", "M23 41H41Q43 41 43 43V44Q43 46 41 46H23Q21 46 21 44V43Q21 41 23 41ZM30.2 46H33.8V56H30.2Z", t],
-    ["k2", C(32, 58.6, 3), t],
-  ];
-};
 
 // ---- Avatars: fifteen animals, each anyone's from the first day (play.Animals). Each is a bust on a tile of its
 // scene, in its own colours (app.css, .tone-natural.sh-<shape>: k1 its darkest fur, k2 its fur, k4 and k5 its pale
@@ -418,7 +404,7 @@ const avatars: Record<string, Layer[]> = {
   ],
 };
 
-// ---- Marks: pictures of what isn't a player, a topic or a way to play: the streak's flame.
+// ---- Marks: pictures of what isn't a player or a chapter: the streak's flame.
 
 const marks: Record<string, Layer[]> = {
   flame: [
@@ -442,14 +428,14 @@ const marks: Record<string, Layer[]> = {
   ],
 };
 
-// ---- Topics: one picture each, on a soft disc of the topic's tone, over the card (not on a tile of the tone), so
+// ---- Chapters: one picture each, on a soft disc of the chapter's tone, over the card (not on a tile of the tone), so
 // the tone itself (k3) is the picture's main colour.
 
 const ground: Layer = ["kt", C(32, 32, 30)];
 /** A petal of the game's rosette (the logo, favicon.svg), upright: turned about the centre for the others. */
 const petal = "M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z";
 
-const topics: Record<string, Layer[]> = {
+const chapters: Record<string, Layer[]> = {
   general: [
     ground,
     ["l3", "M32 2.5V6.5M12.5 10.5L15.5 13.5M51.5 10.5L48.5 13.5M5.5 28H9.5M54.5 28H58.5", 'stroke-width="2.6"'],
@@ -655,81 +641,19 @@ const topics: Record<string, Layer[]> = {
     ["l0", "M31 12.5C29 7.5 26 5.5 22.5 5.5M33 12.5C35 7.5 38 5.5 41.5 5.5", 'stroke-width="1.4"'],
     ["k0", C(22.5, 5.5, 1.5) + C(41.5, 5.5, 1.5)],
   ],
-  // „Микс“, every topic at once: the game's own rosette, four answers and one of them right, the lightest.
+  // „Микс“, every chapter at once: the game's own rosette, four answers and one of them right, the lightest.
   mix: [
     ground,
     ...[45, 135, 225, -45].map((deg): Layer => [deg < 0 ? "k4" : "k2", petal, `transform="rotate(${deg} 32 32)"`]),
   ],
 };
 
-// ---- Ways to play: the cards on Начало, each in its mode's tone, over the card.
-
-/** An avatar's head as a friend on a card: the animal without its tile or its shoulders, set down at (x, y), `s` of
- * its size, turned by `deg`. In front it's one ink lighter than on its tile, so the tone is its main colour, as on the
- * other cards; behind, it keeps its tile's darker inks. */
-const lighter: Record<string, string> = { k1: "k2", k2: "k3", k4: "k5", l1: "l2" };
-const head = (id: string, x: number, y: number, s: number, deg: number, front: boolean): Layer[] => {
-  const t = `transform="translate(${x} ${y}) rotate(${deg}) scale(${s}) translate(-32 -32)"`;
-  return (avatars[id] ?? [])
-    .filter(([, d]) => d !== shoulders && d !== chest && d !== chinShadow)
-    .map(([ink, d, attrs]) => [(front && lighter[ink]) || ink, d, attrs ? `${t} ${attrs}` : t]);
-};
-
-/** An open book, for Моят Алманах. */
-const book: Layer[] = [
-  lift("M5 22C14 19.5 24 19.5 32 23.5C40 19.5 50 19.5 59 22V53C50 50.5 40 50.5 32 54.5C24 50.5 14 50.5 5 53Z"),
-  ["k1", "M5 22C14 19.5 24 19.5 32 23.5C40 19.5 50 19.5 59 22V53C50 50.5 40 50.5 32 54.5C24 50.5 14 50.5 5 53Z"],
-  ["kw", "M9 17.5C17.5 15.5 26 16.5 31 20.5V49.5C26 46 17.5 45 9 47Z"],
-  ["k5", "M55 17.5C46.5 15.5 38 16.5 33 20.5V49.5C38 46 46.5 45 55 47Z"],
-  [
-    "l4",
-    "M13.5 23.5C18 22.6 23 23 27 25M13.5 29C18 28.1 23 28.5 27 30.5M13.5 34.5C18 33.6 23 34 27 36M37 25C41 23 46 22.6 50.5 23.5M37 30.5C41 28.5 46 28.1 50.5 29M37 36C41 34 46 33.6 50.5 34.5",
-    'stroke-width="1.6"',
-  ],
-  ["k0", "M41 46.4V59L44 56L47 59V45.8Z"],
-];
-
-const modes: Record<string, Layer[]> = {
-  almanac: [ground, ...book],
-  // Two friends side by side, the fox and the bear (the avatars are the players' faces), their heads leaning
-  // together with a little space between them, both well inside the disc; the bear, a step behind, in darker inks.
-  // Their shoulders and the fox's white chest are the avatars' own, set down with the heads and cut at the disc's edge.
-  friends: [
-    ground,
-    ["k1", "M31 46.32C31.48 40.56 36.76 37.68 43 37.68C49.24 37.68 54.52 40.56 55 46.32V51.26A30 30 0 0 1 31 61.98Z"],
-    ...head("bear", 43, 30, 0.48, -4, false),
-    ["k2", "M9 50C9.5 44 15 41 21.5 41C28 41 33.5 44 34 50V61.93A30 30 0 0 1 9 51.26Z"],
-    ["k5", "M18 50C18.25 45.5 19.75 43.25 21.5 43.25C23.25 43.25 24.75 45.5 25 50V61.17A30 30 0 0 1 18 58.53Z"],
-    ...head("fox", 21.5, 33, 0.5, 4, true),
-  ],
-  duel: [ground, ...sword(-42), ...sword(42), ["k5", sparkle(32, 14, 5)]],
-  arena: [
-    ground,
-    ["l2", "M22 18V8M42 18V8", 'stroke-width="1.6"'],
-    ["k4", "M22 8L29 10.5L22 13ZM42 8L49 10.5L42 13Z"],
-    ["k3", "M8 20Q32 13 56 20V55H8Z"],
-    ["kh", "M8 20Q32 13 56 20V24Q32 17 8 24Z"],
-    ["k1", [13, 21, 29, 37, 45].map((x) => `M${x} 34V31Q${x} 28 ${x + 3} 28Q${x + 6} 28 ${x + 6} 31V34Z`).join("")],
-    [
-      "k1",
-      [11.5, 19.5, 27.5, 35.5, 43.5]
-        .map((x) => `M${x} 54V45Q${x} 40.5 ${x + 4.5} 40.5Q${x + 9} 40.5 ${x + 9} 45V54Z`)
-        .join(""),
-    ],
-    ["k2", "M8 36.5H56V38.5H8Z"],
-    ["ks", "M44 20.6Q50 21.6 56 22V55H48Q52 40 44 20.6Z"],
-    ["k1", "M4 55H60V59H4Z"],
-  ],
-};
-
 const draw = (layers: Layer[]) =>
   layers.map(([ink, d, attrs]) => `<path class="${ink}" d="${d}"${attrs ? ` ${attrs}` : ""}/>`).join("");
 
-/** Every picture's paths, by its id: an avatar's shape ("fox"), "topic-<id>", "mode-<id>" or the
- * streak's "flame". */
+/** Every picture's paths, by its id: an avatar's shape ("fox"), "chapter-<id>" or the streak's "flame". */
 export const pictures: Record<string, string> = {
   ...Object.fromEntries(Object.entries(avatars).map(([id, l]) => [id, draw(l)])),
-  ...Object.fromEntries(Object.entries(topics).map(([id, l]) => [`topic-${id}`, draw(l)])),
-  ...Object.fromEntries(Object.entries(modes).map(([id, l]) => [`mode-${id}`, draw(l)])),
+  ...Object.fromEntries(Object.entries(chapters).map(([id, l]) => [`chapter-${id}`, draw(l)])),
   ...Object.fromEntries(Object.entries(marks).map(([id, l]) => [id, draw(l)])),
 };

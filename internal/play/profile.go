@@ -10,7 +10,7 @@ import (
 // chapter (rank.go: kept as each day's issue finishes, never as they play) (DECISIONS.md, „The direction“), and their
 // streak as it is now (runs.go: its days, nothing more): never an ended one's, nor the longest (an ended streak's
 // number is never named), nor what their week has forgiven (theirs). No lifetime totals, and nothing of how well they
-// know a topic (mastery is the game's own). What only they see stays theirs: their games one by one, their Алманах,
+// know a chapter (mastery is the game's own). What only they see stays theirs: their games one by one, their Алманах,
 // their email, their friends, and when they started (the streak says how long they've kept at it).
 // The privacy page says what it shows; the server limits how many anyone looks at (server.profileOf).
 

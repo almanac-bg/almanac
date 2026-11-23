@@ -12,7 +12,7 @@ test("Профил: one list of seals, never chosen, none on the avatar; only an
   const rows = page.locator(".me-seals .seal-list .seal-row");
   await expect(rows).toHaveCount(10);
   const history = rows.filter({ hasText: "История" });
-  await expect(history.locator(".seal")).toHaveClass(/\bt-history\b/);
+  await expect(history.locator(".seal")).toHaveClass(/\bch-history\b/);
   await expect(history.locator(".seal-row-name")).toHaveText("История");
   await expect(history.locator(".seal-row-ink")).toHaveText("20 с мастило");
   await expect(history.locator(".standing-now")).toHaveText("Тетрадка");
@@ -94,7 +94,7 @@ test("a player's profile: asked to be friends from it, and friends there", async
   const a = await (await browser.newContext()).newPage();
   const b = await (await browser.newContext()).newPage();
 
-  // Ana plays a topic.
+  // Ana plays a chapter.
   await a.goto("/almanac/history");
   await a.getByRole("link", { name: "Играй 10 въпроса" }).click();
   await playRun(a);
@@ -110,7 +110,7 @@ test("a player's profile: asked to be friends from it, and friends there", async
   await expect(b.locator(".me-line")).toHaveCount(0);
   // Her avatar is hers to change, not his: no way to it here.
   await expect(b.getByRole("button", { name: "Смени аватара" })).toHaveCount(0);
-  // A topic's game writes no rank and no streak: nothing yet, and no lifetime totals nor how well she knows a topic.
+  // A chapter's game writes no rank and no streak: nothing yet, and no lifetime totals nor how well she knows a chapter.
   await expect(b.getByText("Още няма печат.")).toBeVisible();
   await expect(b.locator(".me-streak")).toHaveCount(0);
   await expect(b.locator(".me-head")).not.toContainText("Ниво");

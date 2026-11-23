@@ -28,7 +28,7 @@ const (
 	ImagesDir      = "images"
 )
 
-// Category is a subject questions are about: a topic.
+// Category is a subject questions are about: a chapter of the game (the package's doc).
 type Category struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`

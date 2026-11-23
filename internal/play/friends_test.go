@@ -278,12 +278,12 @@ func TestFriendsOnTheDaysQuestions(t *testing.T) {
 		t.Fatalf("the day after: %v", err)
 	}
 	// A chapter's game: nobody beside its questions.
-	topic, err := w.g.StartTopic(ctx, ana, "history")
+	chapter, err := w.g.StartChapter(ctx, ana, "history")
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.play(ana, topic.ID, repeat(w.right, len(w.picks(topic.ID)))...)
-	if on, err := w.g.FriendsOn(ctx, ana, topic.ID); err != nil || len(on) != 0 {
+	w.play(ana, chapter.ID, repeat(w.right, len(w.picks(chapter.ID)))...)
+	if on, err := w.g.FriendsOn(ctx, ana, chapter.ID); err != nil || len(on) != 0 {
 		t.Fatalf("a chapter's game: %+v %v", on, err)
 	}
 }

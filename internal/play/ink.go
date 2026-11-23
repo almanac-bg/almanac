@@ -158,8 +158,8 @@ func writtenIn(ctx context.Context, db querier, b *bank.Bank, userID int64, asOf
 // writtenShows is whether the book shows a question's fact: it has one, and it's so (one retired as untrue isn't).
 func writtenShows(q bank.Question) bool { return q.Extra().Fact != "" && !q.Extra().Untrue() }
 
-// InkOf is how many facts a player's book has in ink in each chapter: the bank's topics (a chapter is a topic; a game
-// across topics has no chapter of its own).
+// InkOf is how many facts a player's book has in ink in each chapter: the bank's (a game
+// across chapters has no chapter of its own).
 func (g *Game) InkOf(ctx context.Context, userID int64) (map[string]int, error) {
 	return inkIn(ctx, g.DB.Read, g.Bank(), userID, time.Time{})
 }
@@ -176,7 +176,7 @@ func inkIn(ctx context.Context, db querier, b *bank.Bank, userID int64, asOf tim
 	return ink, err
 }
 
-// countIn counts a question in its chapter, its topic.
+// countIn counts a question in its chapter.
 func countIn(by map[string]int, q bank.Question) {
 	by[q.Base().Category]++
 }

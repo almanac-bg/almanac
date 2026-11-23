@@ -110,7 +110,7 @@ function inkLine(ink: number, chapters: ChapterInk[]): Child {
               h(
                 "a",
                 {
-                  class: `ink-chapter t-${c.chapter}`,
+                  class: `ink-chapter ch-${c.chapter}`,
                   href: factsHref(c),
                   "aria-label": `${chapterName(c.chapter)}: +${c.ink}`,
                   title: chapterName(c.chapter),
@@ -118,8 +118,8 @@ function inkLine(ink: number, chapters: ChapterInk[]): Child {
                 // As the score's tiles have a right answer: the glyph on its chapter's colour.
                 h(
                   "span",
-                  { class: `tile right t-${c.chapter}`, "aria-hidden": "true" },
-                  h("span", { class: "tile-pic" }, picture(`topic-${c.chapter}`)),
+                  { class: `tile right ch-${c.chapter}`, "aria-hidden": "true" },
+                  h("span", { class: "tile-pic" }, picture(`chapter-${c.chapter}`)),
                 ),
                 h("b", { class: "num" }, `+${c.ink}`),
               ),
@@ -186,7 +186,7 @@ function rankUp(r: NonNullable<News["rose"]>): Child {
   const others = r.ranks.slice(1);
   return h(
     "section",
-    { class: `rankup t-${top.chapter}`, role: "status" },
+    { class: `rankup ch-${top.chapter}`, role: "status" },
     h("p", { class: "kicker" }, "Нов печат"),
     seal(top.chapter, level, 96, "rimmed rankup-seal"),
     h("h2", { class: "rankup-name" }, level > 0 ? rankName(level) : top.name),
