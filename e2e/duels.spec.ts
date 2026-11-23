@@ -179,6 +179,32 @@ test("a duel with a friend: played first and sent, played back when they can, it
   await expect(sheet.getByRole("alert")).toHaveCount(0);
 });
 
+test("a duel opened from its link (a notification, a chat) ends on its card in Приятели, never back out of the site", async ({
+  browser,
+}) => {
+  test.setTimeout(240_000);
+  const a = await (await browser.newContext()).newPage();
+  const b = await (await browser.newContext()).newPage();
+  await befriend(a, b);
+  await a.goto("/friends");
+  await a.locator(".friend").getByRole("button", { name: /^Дуел/ }).click();
+  await meetAs(a, "Ана");
+  await countIn(a);
+  await playRun(a);
+  await expect(a).toHaveURL(/\/friends\?duel=\d+$/);
+  const id = new URL(a.url()).searchParams.get("duel");
+
+  // Bo opens its link in a tab of its own, from outside the game (the page before it is no page of the game's): the
+  // game's end goes back from its own entry once, not twice (bug hunt 2026-11-23: „…“ for good, or the page before).
+  const link = await b.context().newPage();
+  await link.goto(`/duel/${id}`);
+  await link.getByRole("button", { name: "Започни", exact: true }).click();
+  await countIn(link);
+  await playSecond(link, "Ана");
+  await expect(link).toHaveURL(new RegExp(`/friends\\?duel=${id}$`), { timeout: 10_000 });
+  await expect(link.locator(".duel-card.landed")).toHaveClass(/s-(won|lost|draw)/);
+});
+
 test("every duel to play is in one stack, the first challenged on top, played from it; played back, first of the played", async ({
   browser,
 }) => {

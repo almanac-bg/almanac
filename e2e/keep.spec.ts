@@ -38,6 +38,48 @@ test("from the second day, where no notification comes, the reminder by mail ask
   await expect(page.getByRole("switch", { name: "Напомняне по имейл" })).toHaveAttribute("aria-checked", "true");
 });
 
+test("a guest who signs in to another profile from the reminder under the result: Днес is theirs at once", async ({
+  page,
+  browser,
+}, info) => {
+  test.setTimeout(120_000);
+  // Ана, with a profile of her own, kept on another device.
+  const email = `elsewhere-${info.project.name}-${Date.now()}@example.com`;
+  const other = await (await browser.newContext()).newPage();
+  await other.goto("/");
+  await daysPlayed(other, 1);
+  await other.request.patch("/api/me", { data: { name: "Ана" } });
+  await other.goto("/settings");
+  await other.getByLabel("Имейл").fill(email);
+  await other.getByRole("button", { name: "Прати ми код" }).click();
+  await expect.poll(() => mailedCode(email)).not.toBe("");
+  await other.getByLabel("Код").fill(mailedCode(email));
+  await other.getByRole("button", { name: "Потвърди" }).click();
+  await expect(other.getByText(`Играта ти е запазена с имейла ${email}`)).toBeVisible();
+  await other.context().close();
+
+  // Here, as a guest, the day played; the reminder's ask takes her email, and its code signs her in.
+  await page.goto("/");
+  await daysPlayed(page, 1);
+  await page.reload();
+  await startDay(page);
+  await playRun(page);
+  const guest = (await (await page.request.get("/api/me")).json()).user.name as string;
+  const asks = page.locator(".asks");
+  await asks.getByLabel("Имейл").fill(email);
+  await asks.getByRole("button", { name: "Напомняй ми по имейл" }).click();
+  await expect.poll(() => mailedCode(email)).not.toBe("");
+  await asks.getByLabel("Код").fill(mailedCode(email));
+  await asks.getByRole("button", { name: "Потвърди" }).click();
+  // Днес drawn again as hers (bug hunt 2026-11-23: the guest's row stayed on the board till a reload), and what came
+  // of it said once, over it: yesterday's issue, which both played, stays hers (play.DaysLeft), today's comes along.
+  await expect(page.locator(".notice")).toHaveText(
+    "Влезе като Ана. Играта оттук е добавена към профила ти, без един брой: в него профилът вече има своя игра. Ще ти напомняме по имейл, ако броят още те чака.",
+  );
+  await expect(page.locator(".summary .score-n")).toBeVisible();
+  await expect(page.locator("main")).not.toContainText(guest);
+});
+
 test("a player with a profile is asked under the result to be reminded while it's off, never as a second action", async ({
   page,
 }, info) => {

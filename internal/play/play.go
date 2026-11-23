@@ -294,7 +294,11 @@ type Result struct {
 	Ink      bool `json:"ink,omitempty"`
 	TimedOut bool `json:"timedOut,omitempty"`
 	// Given is the answer as it shows (the player's screen has it already).
-	Given  json.RawMessage `json:"-"`
+	Given json.RawMessage `json:"-"`
+	// Taken is, of an answer sent again (again), the answer the server took the first time, as it shows (null: none,
+	// the time up or the question given up), which the screen shows: it may not be the one sent now (the same question
+	// answered in another tab first).
+	Taken  json.RawMessage `json:"taken,omitempty"`
 	Reveal any             `json:"reveal"`
 	State  State           `json:"state"`
 }
@@ -678,8 +682,10 @@ func (g *Game) again(tx *sql.Tx, r *run, n int) (Result, bank.Dealt, error) {
 		return res, nil, err
 	}
 	took := time.Duration(ms) * time.Millisecond
+	res.Taken = json.RawMessage("null")
 	if given.Valid {
 		res.Given = json.RawMessage(shown.String)
+		res.Taken = res.Given
 		if gr, err := bank.GradeAt(d, json.RawMessage(given.String), took); err == nil {
 			res.Exact = gr.Exact
 		}

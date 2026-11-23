@@ -68,7 +68,7 @@ func (s *Server) takeHandoff(w http.ResponseWriter, r *http.Request) error {
 	if token != "" {
 		s.setSession(w, token)
 	}
-	return ok(w, map[string]any{"user": u})
+	return s.signedIn(w, r, u, 0)
 }
 
 // The day's questions played in this browser: a cookie holds the day this browser last started them, whoever it was

@@ -194,6 +194,9 @@ export interface Result {
    * is said of which (play/ink.go). */
   ink?: boolean;
   timedOut?: boolean;
+  /** Of an answer sent again, the one the server took the first time (null: none), shown in place of the one sent now:
+   * the same question may have been answered in another tab first (play.Result.Taken). */
+  taken?: Answer | null;
   reveal: Reveal;
   state: State;
 }

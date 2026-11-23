@@ -678,21 +678,21 @@ func (g *Game) DuelsPlayed(ctx context.Context, userID int64, page int) (PlayedP
 // first to lapse), then those ended, the latest first. A friend's duel shows to the one it's sent to once it's sent.
 func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, error) {
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, d.mine, d.created_at, coalesce(d.ended_at, 0),
-			d.expires_at, d.sent_at IS NOT NULL, coalesce(d.outcome, ''),
+			d.expires_at, d.sent_at IS NOT NULL, coalesce(d.expires_at >= d.sent_at + ?3, 0), coalesce(d.outcome, ''),
 			coalesce(CASE WHEN d.mine THEN d.a_run ELSE d.b_run END, 0),
 			coalesce(CASE WHEN d.mine THEN d.b_run ELSE d.a_run END, 0),
 			coalesce(CASE WHEN d.mine THEN d.b_id ELSE d.a_id END, 0)
 		FROM (SELECT *, coalesce(a_id = ?1, 0) AS mine FROM duels
 			WHERE (a_id = ?1 OR (b_id = ?1 AND sent_at IS NOT NULL)) AND (?2 = 0 OR id = ?2)) d
 		ORDER BY d.ended_at IS NOT NULL, CASE WHEN d.ended_at IS NULL THEN d.expires_at ELSE -d.ended_at END
-		LIMIT 200`, userID, only)
+		LIMIT 200`, userID, only, DuelFor.Milliseconds())
 	if err != nil {
 		return nil, err
 	}
 	type row struct {
 		v                       DuelView
 		outcome                 string
-		sent                    bool
+		sent, fullWeek          bool
 		myRun, theirRun, theirs int64
 		expires                 int64
 	}
@@ -700,7 +700,7 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 	for rows.Next() {
 		var r row
 		if err := rows.Scan(&r.v.ID, &r.v.First, &r.v.CreatedAt, &r.v.EndedAt, &r.expires, &r.sent,
-			&r.outcome, &r.myRun, &r.theirRun, &r.theirs); err != nil {
+			&r.fullWeek, &r.outcome, &r.myRun, &r.theirRun, &r.theirs); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -747,8 +747,9 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 			v.State = DuelLost
 		default:
 			v.State = DuelExpired
-			if r.sent {
-				// Lapsed: the friend never played it (or it's from before, cut off live: both had played some).
+			if r.sent && r.fullWeek {
+				// Lapsed: the friend never played it (or it's from before, cut off live: both had played some). One
+				// ended before its week was out ended with the friendship (Unfriend): no one let it lapse.
 				switch {
 				case mine && r.theirRun == 0:
 					v.Lapsed = "they"

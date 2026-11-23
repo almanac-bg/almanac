@@ -3,6 +3,7 @@ package play
 import (
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -285,5 +286,38 @@ func TestFriendsOnTheDaysQuestions(t *testing.T) {
 	w.play(ana, chapter.ID, repeat(w.right, len(w.picks(chapter.ID)))...)
 	if on, err := w.g.FriendsOn(ctx, ana, chapter.ID); err != nil || len(on) != 0 {
 		t.Fatalf("a chapter's game: %+v %v", on, err)
+	}
+}
+
+// Two players asking each other at the same moment are friends, as when one asked first: never each left with a
+// request in and one out (bug hunt 2026-11-23: 1 race in 6, the check that the other asked was outside the write).
+func TestFriendsAskingAtOnce(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	tag := func(id int64) string {
+		var s string
+		if err := w.db.Read.QueryRow(`SELECT tag FROM users WHERE id = ?`, id).Scan(&s); err != nil {
+			t.Fatal(err)
+		}
+		return s
+	}
+	for range 20 {
+		ana, bo := w.user(), w.user()
+		var wg sync.WaitGroup
+		for _, p := range [][2]int64{{ana, bo}, {bo, ana}} {
+			to := tag(p[1])
+			wg.Go(func() {
+				if _, err := w.g.Request(ctx, p[0], to, false); err != nil {
+					t.Error(err)
+				}
+			})
+		}
+		wg.Wait()
+		if _, err := w.g.Friend(ctx, ana, bo); err != nil {
+			t.Fatalf("asked each other at once, and not friends: %v", err)
+		}
+		if n := w.count(`SELECT count(*) FROM friend_requests WHERE from_id IN (?1, ?2)`, ana, bo); n != 0 {
+			t.Fatalf("%d requests left between friends", n)
+		}
 	}
 }

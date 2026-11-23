@@ -18,10 +18,14 @@ interface Who {
 
 /** What came of a code put in (account.Verify), said where it was (`before`: the player until then, if anyone; `after`
  * as the server sends them back): a guest's game kept with the email, or the profile signed in to, which a guest's
- * game here joins. */
-export function keptWords(before: Who | null | undefined, after: Who): string {
+ * game here joins, all but the issues the profile has a game of its own in (`daysLeft`: play.DaysLeft). */
+export function keptWords(before: Who | null | undefined, after: Who, daysLeft = 0): string {
   if (before && !before.email && before.id === after.id)
     return `Готово. Играта ти е запазена с имейла ${after.email}. Влизай с него на всяко устройство.`;
+  if (before && !before.email && daysLeft === 1)
+    return `Влезе като ${after.name}. Играта оттук е добавена към профила ти, без един брой: в него профилът вече има своя игра.`;
+  if (before && !before.email && daysLeft > 1)
+    return `Влезе като ${after.name}. Играта оттук е добавена към профила ти, без ${daysLeft}\u00a0броя: в тях профилът вече има своя игра.`;
   if (before && !before.email) return `Влезе като ${after.name}. Играта оттук е добавена към профила ти.`;
   return `Влезе като ${after.name}.`;
 }

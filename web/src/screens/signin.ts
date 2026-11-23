@@ -9,7 +9,7 @@ import { embedded } from "../lib/embedded.ts";
 import { keptWords } from "../lib/keep.ts";
 import { pushable, pushOn } from "../lib/push.ts";
 import { entry, go, leave, title } from "../lib/router.ts";
-import { notice, type User, user } from "../state.ts";
+import { notice, setLook, type User, user } from "../state.ts";
 import { back, emailWords, inSight } from "../ui.ts";
 
 export interface SignInOptions {
@@ -153,12 +153,13 @@ export function signIn({
             e.preventDefault();
             if (code.peek().length !== digits.peek()) return missing(`Кодът е от ${digits.peek()} цифри.`, codeField);
             run(async () => {
-              const r = await api<{ user: User }>("POST", "/api/auth/verify", {
+              const r = await api<{ user: User; avatar?: string; daysLeft?: number }>("POST", "/api/auth/verify", {
                 email: email.peek(),
                 code: code.peek(),
               });
               keepSent(null);
-              done?.(keptWords(user.peek(), r.user), r.user);
+              done?.(keptWords(user.peek(), r.user, r.daysLeft), r.user);
+              setLook(r.avatar ?? "", r.user.id);
               user.set(r.user);
               // The browser has a new session, and its notifications went along with it (account.Verify); any it
               // turned on before they were kept with a session are told again, to be kept with this one.

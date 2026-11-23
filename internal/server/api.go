@@ -424,6 +424,13 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) error {
 	// Only by the browser the code is for (its ask cookie). Its session is replaced by a new one (account.Verify),
 	// its notifications brought along.
 	proof := account.Proof{Email: in.Email, Code: in.Code, Asked: s.asked(r)}
+	// A guest's games of the day, to say after which of them the account had played itself (play.DaysLeft).
+	var guest *account.User
+	var days []int64
+	if g, err := s.user(r); err == nil && g != nil && g.Guest() {
+		guest = g
+		days, _ = s.game.DayRuns(r.Context(), g.ID)
+	}
 	u, token, err := s.accounts.Verify(r.Context(), proof, s.session(r))
 	if wrong := (account.WrongCode{}); errors.As(err, &wrong) {
 		return &apiError{http.StatusBadRequest, "bad_code", wrongCodeWords(wrong.Left)}
@@ -434,7 +441,25 @@ func (s *Server) verify(w http.ResponseWriter, r *http.Request) error {
 	http.SetCookie(w, &http.Cookie{Name: s.askCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: s.secure,
 		SameSite: http.SameSiteStrictMode})
 	s.setSession(w, token)
-	return ok(w, map[string]any{"user": u})
+	left := 0
+	if guest != nil && guest.ID != u.ID {
+		left, _ = s.game.DaysLeft(r.Context(), u.ID, days)
+	}
+	return s.signedIn(w, r, u, left)
+}
+
+// signedIn answers a sign-in (verify, takeHandoff) with the player now signed in and their avatar: the page's corner
+// had the one before's, a guest's or another profile's (web/src/state.ts, look); and how many of the guest's games of
+// the day stayed out of it (`daysLeft`: the profile had played those days itself; web/src/lib/keep.ts, keptWords).
+func (s *Server) signedIn(w http.ResponseWriter, r *http.Request, u account.User, daysLeft int) error {
+	out := map[string]any{"user": u}
+	if daysLeft > 0 {
+		out["daysLeft"] = daysLeft
+	}
+	if look, err := s.game.LookOf(r.Context(), u.ID); err == nil {
+		out["avatar"] = look.Avatar
+	}
+	return ok(w, out)
 }
 
 // signOut ends this browser's session, and with it the notifications turned on here (account.SignOut): whatever the

@@ -53,18 +53,21 @@ export function player(): Promise<User> {
 /** The animals a new player is given one of, by their id (play.Starters): their avatar until they choose one. */
 const starters = ["fox", "bear", "cat", "hare", "hedgehog", "dog", "deer", "stork", "frog"];
 
-/** The player's avatar as the server last said it (the page's, a choice made since: screens/avatar.ts), or "". */
-const avatarSaid = signal(boot.avatar ?? "");
+/** The player's avatar as the server last said it (the page's, a sign-in's, a choice made since: screens/avatar.ts),
+ * or "", and whose it is: a sign-in, a sign-out, a game brought here make the player another, whose it isn't. */
+const avatarSaid = signal({ id: boot.user?.id ?? 0, avatar: boot.avatar ?? "" });
 
-/** The player's avatar, as the corner of every page shows it: as the server said, or the one a new player is given. */
+/** The player's avatar, as the corner of every page shows it: as the server said for this player, or the one a new
+ * player is given; never the player's before. */
 export const look = (): string => {
   const said = avatarSaid();
   const u = user();
-  return said || (u ? starters[u.id % starters.length] : "") || "";
+  if (!u) return "";
+  return (said.id === u.id && said.avatar) || starters[u.id % starters.length] || "";
 };
 
-/** The player's avatar, chosen just now. */
-export const setLook = (avatar: string) => avatarSaid.set(avatar);
+/** The player's avatar, chosen just now, or said by the server as they signed in (`id`: whose). */
+export const setLook = (avatar: string, id = user.peek()?.id ?? 0) => avatarSaid.set({ id, avatar });
 
 /** Днес is a new visitor's cover (the day alone, before any game begun: screens/today.ts): the frame's places step
  * aside. */

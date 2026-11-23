@@ -327,6 +327,23 @@ test("a game opened from outside, over: the page under it takes its address, ren
   assert.deepEqual(drawn, [], "the result stays on screen as it is");
 });
 
+test("a game opened from outside, over, that opens its result's page at once: that page, in place of the game", async () => {
+  // A friend's duel from its notification: its end goes to its card in Приятели (screens/duel.ts), asked before the
+  // way back out of the game's own entry has arrived.
+  fromOutside("/duel/7");
+  const at = index;
+  router.hold();
+  drawn.length = 0;
+  router.release({ result: 9 });
+  router.go("/friends?duel=7", true);
+  await tick();
+  await tick();
+  assert.equal(index, at, "one step back, not two");
+  assert.equal(location.pathname + location.search, "/friends?duel=7");
+  assert.equal(router.entry().game, undefined);
+  assert.deepEqual(drawn, ["Приятели"]);
+});
+
 test("renamed as its game ends, before the way back has arrived: the page under it takes the new address", async () => {
   router.go("/play/science");
   router.hold(true);

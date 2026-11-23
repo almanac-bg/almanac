@@ -20,6 +20,15 @@ test("the code put in says what came of it: a guest's game kept, or the profile 
   const ana = { id: 3, name: "Ана", email: "ana@example.bg" };
   assert.equal(keptWords(guest, ana), "Влезе като Ана. Играта оттук е добавена към профила ти.");
   assert.equal(keptWords(null, ana), "Влезе като Ана.");
+  // The profile had a game of its own in an issue the guest played too: that one stays the profile's.
+  assert.equal(
+    keptWords(guest, ana, 1),
+    "Влезе като Ана. Играта оттук е добавена към профила ти, без един брой: в него профилът вече има своя игра.",
+  );
+  assert.equal(
+    keptWords(guest, ana, 2),
+    "Влезе като Ана. Играта оттук е добавена към профила ти, без 2\u00a0броя: в тях профилът вече има своя игра.",
+  );
 });
 
 test("the reminder's asks as kept: anything unreadable is none yet", () => {
