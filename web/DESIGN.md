@@ -28,7 +28,9 @@ this file passes the rule for later (DECISIONS.md).
   (`startScreen()`). While leaving costs something (a question's time running), every way out asks first
   (`guardLeaving()`).
 - **Phone first, a spread on a big screen.** Every screen fits a 320px phone with no sideways scroll, at the usual
-  text size and at twice it. From 56.25rem a place is two pages side by side (`.spread`, `.page-1`, `.page-2`).
+  text size and at twice it. From 56.25rem a place is two pages side by side (`.spread`, `.page-1`, `.page-2`); short of
+  that (a tablet, a laptop with its text at twice its size) the phone's column, 40rem in the middle, the places' bar as
+  wide, never a phone's page stretched from edge to edge.
 
 ## Places and their budgets
 

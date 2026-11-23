@@ -922,6 +922,25 @@ test("Настройки' three-way switch: every choice on one line, on a 320px
   }
 });
 
+// Between a phone and a laptop (a tablet upright), the page a phone's column in the middle, the places' bar under it
+// as wide: never a phone's page stretched from edge to edge. (A laptop with the browser's text at twice its size is the
+// same case, its media queries counted in that text; a style on the page, as textAt sets it, doesn't move them.)
+test.describe("a tablet, 768 × 1024", () => {
+  test.use({ viewport: { width: 768, height: 1024 } });
+
+  test("a phone's column, in the middle", async ({ page }) => {
+    for (const path of ["/", "/almanac", "/friends"]) {
+      await page.goto(path);
+      await expect(page.locator("main :is(h1, h2)").first()).toBeAttached();
+      const [main = 0, bar = 0] = await page.evaluate(() =>
+        ["#main", ".places-foot"].map((s) => document.querySelector(s)?.getBoundingClientRect().width ?? 0),
+      );
+      expect.soft(main, `${path}: the column`).toBeLessThanOrEqual(40 * 16 + 1);
+      expect.soft(bar, `${path}: the places' bar`).toBeLessThanOrEqual(40 * 16 + 1);
+    }
+  });
+});
+
 test.describe("on a laptop, Настройки and Вход", () => {
   test.use({ viewport: { width: 1366, height: 900 }, isMobile: false, hasTouch: false });
 

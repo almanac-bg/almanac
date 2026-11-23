@@ -591,11 +591,14 @@
 
   /* The three places on a phone: words at the foot where a thumb is, the current one on a well. */
   /* The places on a phone: a pill that floats over the page, clear of every edge, the home bar under it. */
+  /* Never wider than the page's column (a tablet, large text on a laptop): in the middle, under it. */
   .places-foot {
     position: fixed;
     right: max(12px, env(safe-area-inset-right));
     bottom: max(12px, calc(env(safe-area-inset-bottom) - 8px));
     left: max(12px, env(safe-area-inset-left));
+    max-width: calc(40rem - 24px);
+    margin-inline: auto;
     z-index: 10;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -691,10 +694,16 @@
       max(var(--gutter), env(safe-area-inset-left));
   }
 
-  /* A big screen: the places in the bar, the avatar in the corner. */
+  /* A big screen: the places in the bar, the avatar in the corner. Up to here (a tablet, a laptop with its text at
+     twice its size) the page is a phone's column, 40rem in the middle, never stretched from edge to edge; from here a
+     page that isn't a spread has a little more. */
   @media (min-width: 56.25rem) {
     :root {
       --gutter: 40px;
+    }
+
+    #main {
+      max-width: 48rem;
     }
 
     .bar {
@@ -7222,11 +7231,6 @@
   @media (min-width: 48rem) {
     html {
       scroll-padding-bottom: 0;
-    }
-
-    /* A tablet: the column a little wider than a phone's. */
-    #main {
-      max-width: 48rem;
     }
 
     /* A page's buttons are a hand's width (22rem), not the column's, at its left, the gold one first: the day's, a
