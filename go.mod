@@ -6,7 +6,7 @@ require (
 	filippo.io/age v1.3.2
 	github.com/andybalholm/brotli v1.3.0
 	github.com/evanw/esbuild v0.28.2
-	golang.org/x/image v0.47.0
+	golang.org/x/image v0.48.0
 	modernc.org/sqlite v1.62.0
 )
 
