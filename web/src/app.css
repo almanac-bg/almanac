@@ -920,6 +920,45 @@
       background: var(--action);
       opacity: 0.9;
     }
+
+    /* Everything else that's clicked answers the mouse too, each in its own quiet way: what's outlined takes a
+       surface or a line, a word its full ink, a tile or a card a ring. */
+    .more:hover {
+      background: var(--surface);
+    }
+
+    .segmented button:not([aria-selected="true"], [aria-checked="true"]):hover,
+    .link:hover:not(:disabled),
+    :is(.news-facts, .ink-row, .ink-chapter):hover {
+      color: var(--ink);
+    }
+
+    .link:hover:not(:disabled) {
+      text-decoration-thickness: 3px;
+    }
+
+    :is(.ink-row, .ink-chapter):hover {
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 4px;
+    }
+
+    .switch-row:hover .switch:not([aria-checked="true"]) {
+      box-shadow: inset 0 0 0 2px var(--ink-3);
+    }
+
+    .switch-row:hover .switch[aria-checked="true"] {
+      opacity: 0.9;
+    }
+
+    .tile-tap:hover {
+      outline: 2px solid var(--ink);
+      outline-offset: 2px;
+    }
+
+    a.streak-chip:hover {
+      box-shadow: inset 0 0 0 2px var(--line-2);
+    }
   }
 
   .btn:active:not(:disabled) {
