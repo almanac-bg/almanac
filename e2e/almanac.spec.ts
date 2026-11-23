@@ -321,4 +321,16 @@ test("on a big screen the book's chapters are five across, none over another", a
   for (const [i, a] of boxes.entries())
     for (const b of boxes.slice(i + 1))
       expect(a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1).toBe(false);
+  // Narrower, where names take two lines: each card's foot (its rank and bar) at the card's foot, level along a row.
+  await page.setViewportSize({ width: 1024, height: 768 });
+  const feet = await page
+    .locator(".chapter-card")
+    .evaluateAll((all) =>
+      all.map((c) => [
+        Math.round(c.getBoundingClientRect().top),
+        Math.round(c.querySelector(".card-rank")?.getBoundingClientRect().bottom ?? 0),
+      ]),
+    );
+  for (const [top, foot] of feet)
+    expect(feet.filter(([t]) => t === top).map(([, f]) => f)).toEqual(feet.filter(([t]) => t === top).map(() => foot));
 });

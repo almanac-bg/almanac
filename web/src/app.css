@@ -5023,8 +5023,13 @@
     height: 100%;
   }
 
+  /* A column whose foot (its ink, its rank and bar) sits at the card's foot: a name on two lines never puts one card's
+     numbers lower than its neighbours'. */
   .card-leaf {
     --fold: 34px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
     height: 100%;
     gap: 8px;
     padding: 14px;
