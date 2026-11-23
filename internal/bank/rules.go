@@ -129,7 +129,7 @@ func readWaivers(dir string) ([]Waiver, error) {
 	return ws, nil
 }
 
-// lint runs every rule over a loaded bank's live questions and says what it found: errors for what a question added
+// lint runs every rule over a loaded bank's questions not retired (those of a kind Off too: newLintBank) and says what it found: errors for what a question added
 // since StrictFrom breaks, warnings for the rest, nothing for what a waiver covers. where says each question's file
 // and line. The bank keeps what the waivers lift (Bank.Estimate reads it).
 func (b *Bank) lint(waivers []Waiver, where map[string]Problem) []Problem {

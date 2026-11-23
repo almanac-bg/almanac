@@ -76,12 +76,30 @@ func (b *Bank) InCategory(category string) []Question {
 	return out
 }
 
-// Live lists the questions that may be dealt: not retired, of the category and type asked ("" for any).
+// Off are the kinds the game doesn't deal, each with the day it went off. Their questions stay in the bank as they
+// are, and a play already dealt one (today's issue drawn before, a duel's second side, a review) still shows it; but
+// no draw takes one (Live leaves them out: the day, the chapter games, duels), nothing counts them (the balance, the
+// day's runway, the plan), and no new one is written (check.go, add.go). The rules still read them (newLintBank), so
+// that they stay ready, their waivers with them. „Подсказки“ went off on 2026-11-23 (the owner, DECISIONS.md): with
+// an answer only right or wrong, waiting for a clue was pointless. Switching a kind back on is taking it out of here:
+// nothing else changes.
+var Off = map[string]string{"clues": "2026-11-23"}
+
+// KindOn is whether the game deals questions of a kind: not one Off.
+func KindOn(kind string) bool {
+	_, off := Off[kind]
+	return !off
+}
+
+// Playable is whether a question may be dealt: not retired, and of a kind the game deals (KindOn).
+func Playable(q Question) bool { return !q.Extra().Retired && KindOn(q.Base().Type) }
+
+// Live lists the questions that may be dealt (Playable), of the category and type asked ("" for any).
 func (b *Bank) Live(category, typ string) []Question {
 	var out []Question
 	for _, q := range b.Questions {
 		h := q.Base()
-		if !q.Extra().Retired && (category == "" || h.Category == category) && (typ == "" || h.Type == typ) {
+		if Playable(q) && (category == "" || h.Category == category) && (typ == "" || h.Type == typ) {
 			out = append(out, q)
 		}
 	}

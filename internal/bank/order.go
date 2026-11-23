@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// Order is „Подреди“: things put in order by a number each has (a year, a height), the numbers shown with the answer.
-// The bank keeps four of them (OrderItems); a deal shows three (OrderDealt: Deal).
+// Order is „Подреди“: four things put in order by a number each has (a year, a height), the numbers shown with the
+// answer.
 type Order struct {
 	Head
 	Items []OrderItem `json:"items"`
@@ -25,11 +25,8 @@ type OrderItem struct {
 	Value float64 `json:"value"`
 }
 
-// OrderItems is how many items an order question has in the bank, and OrderDealt how many of them a deal shows.
-const (
-	OrderItems = 4
-	OrderDealt = 3
-)
+// OrderItems is how many items an order question has.
+const OrderItems = 4
 
 func init() { register("order", func() Question { return &Order{} }) }
 
@@ -153,42 +150,27 @@ func (q *Order) right() []int {
 	return order
 }
 
-// Deal shows OrderDealt of the bank's items, which of them and in what order as the seed decides (as a choice's options
-// are dealt), but never in their right order already: „Готово“ untouched is never right. An order is right or not
-// („близо“ is the number's alone), so it shows three: one chronology or ranking still, with two relations to judge and
-// six arrangements, where four were all or nothing over 24. A seed whose deal is in order takes the next that isn't,
-// still from the seed alone, so the day's deal is the same for everyone.
+// Deal shows the items in an order the seed decides (as a choice's options are dealt), all four (the owner,
+// 2026-11-23: three of them were dealt from 21 Nov), but never in their right order already: „Готово“ untouched is
+// never right. An order is right or not („близо“ is the number's alone): one arrangement of 24. A seed whose deal is in
+// order takes the next that isn't, still from the seed alone, so the day's deal is the same for everyone.
 func (q *Order) Deal(seed uint64) Dealt {
-	n, right := min(OrderDealt, len(q.Items)), q.right()
+	right := q.right()
 	for try := uint64(0); ; try++ {
-		order := shuffle(seed+try*0x9e3779b97f4a7c15, len(q.Items))[:n]
-		if n < 2 || !slices.Equal(order, inRight(order, right)) {
+		order := shuffle(seed+try*0x9e3779b97f4a7c15, len(q.Items))
+		if len(order) < 2 || !slices.Equal(order, right) {
 			return &dealtOrder{q: q, order: order}
 		}
 	}
 }
 
-// inRight is some of the bank's items (by their place in it) in their right order, as right has them all.
-func inRight(some, right []int) []int {
-	out := make([]int, 0, len(some))
-	for _, b := range right {
-		if slices.Contains(some, b) {
-			out = append(out, b)
-		}
-	}
-	return out
-}
-
-// dealtOrder shows the bank's item order[i] as item i: OrderDealt of them.
+// dealtOrder shows the bank's item order[i] as item i.
 type dealtOrder struct {
 	q     *Order
 	order []int
 }
 
 func (d *dealtOrder) Question() Question { return d.q }
-
-// right is the items dealt, by their place in the bank, in their right order.
-func (d *dealtOrder) right() []int { return inRight(d.order, d.q.right()) }
 
 func (d *dealtOrder) View() any {
 	items := make([]string, len(d.order))
@@ -208,7 +190,7 @@ type OrderAnswer struct {
 	Order []int `json:"order"`
 }
 
-// Grade: an order is right with every item dealt in its place, and wrong otherwise (Score 1 or 0): never „близо“.
+// Grade: an order is right with every item in its place, and wrong otherwise (Score 1 or 0): never „близо“.
 func (d *dealtOrder) Grade(answer json.RawMessage) (Graded, error) {
 	var a OrderAnswer
 	if err := strictJSON(answer, &a); err != nil {
@@ -228,7 +210,7 @@ func (d *dealtOrder) Grade(answer json.RawMessage) (Graded, error) {
 		bank[i] = d.order[shown]
 	}
 	g := Graded{Given: mustJSON(OrderAnswer{Order: bank}), Shown: mustJSON(OrderAnswer{Order: a.Order})}
-	if slices.Equal(bank, d.right()) {
+	if slices.Equal(bank, d.q.right()) {
 		g.Score, g.Right = 1, true
 	}
 	return g, nil
@@ -239,7 +221,7 @@ func (d *dealtOrder) Reveal(c *Crowd) any {
 	for i, b := range d.order {
 		shownAt[b] = i
 	}
-	right := d.right()
+	right := d.q.right()
 	order := make([]int, len(right))
 	for i, b := range right {
 		order[i] = shownAt[b]
@@ -255,6 +237,3 @@ func (d *dealtOrder) Reveal(c *Crowd) any {
 		reveal
 	}{order, values, d.q.Unit, revealOf(&d.q.Head, &d.q.Tail, c.view(nil))}
 }
-
-// lines are the items dealt in their right order, each with its value (AnswerLines, as this deal showed them).
-func (d *dealtOrder) lines() []string { return orderLines(d.q, d.right()) }

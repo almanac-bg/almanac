@@ -19,7 +19,8 @@ never edit it), `<batch>` (this batch's folder) and your category.
 - **`cells`**: what to write: `count` questions of `kinds` and `difficulty` (with a picture over the question if
   `picture`), `bg` of them about Bulgaria, and `spares` more of the same. Write `count + spares` of each: the
   checker's drops come out of the spares.
-  - `split/clues`: about half of each.
+  - Never a `clues` question: „Подсказки“ are switched off (2026-11-23), and `bank add` refuses one. The place
+    clues shared with splits is a split's.
   - A `number` is an **estimate**: a year, or a quantity of more than 20 of its steps, with one accepted value and
     the tolerance of the skill's formula (`bank check` says the figure). A small count is a choice in disguise. The
     day ends on a hard number, and only a quantity takes that place (a unit, an answer above 20: the day's draw

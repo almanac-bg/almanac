@@ -489,7 +489,7 @@ func subjects(b *bank.Bank, shown int) string {
 // summary counts what a bank holds, by category, type and difficulty.
 func summary(b *bank.Bank) string {
 	var s strings.Builder
-	types := bank.Types()
+	types := bank.TypeOrder // the kinds dealt: those Off are neither played nor counted
 	fmt.Fprintf(&s, "%s: %d questions (%d live)\n", b.Dir, len(b.Questions), len(b.Live("", "")))
 	fmt.Fprintf(&s, "%-12s", "")
 	for _, t := range types {

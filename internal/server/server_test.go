@@ -501,7 +501,7 @@ func TestPlayingOverHTTP(t *testing.T) {
 		case "number":
 			answer = map[string]float64{"value": 1}
 		case "order":
-			answer = map[string][]int{"order": {0, 1, 2}}
+			answer = map[string][]int{"order": {0, 1, 2, 3}}
 		case "truefalse":
 			answer = map[string]bool{"truth": true}
 		case "match":
@@ -792,7 +792,7 @@ func playRun(p *player, run map[string]any) {
 		case "number":
 			a = map[string]any{"value": 1}
 		case "order":
-			a = map[string]any{"order": []int{0, 1, 2}}
+			a = map[string]any{"order": []int{0, 1, 2, 3}}
 		case "truefalse":
 			a = map[string]any{"truth": true}
 		case "match":

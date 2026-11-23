@@ -51,7 +51,8 @@ type Runway struct {
 	// Cover is how many days from today the place holds at Supply times the day's need (the days drawn already among
 	// them): what the warning and the batch plan go by.
 	Cover int
-	// Difficulty, Kinds and Picture say what fits the place ("split" and "clues" share theirs); Questions is how many
+	// Difficulty, Kinds and Picture say what fits the place ("split" and "clues" share theirs, while both are dealt:
+	// newKinds); Questions is how many
 	// fit it that a day can still take (the days drawn ahead have theirs), PerDay how many a day takes.
 	Difficulty bank.Difficulty
 	Kinds      []string
@@ -114,7 +115,7 @@ func DayRunway(b *bank.Bank, used Used, today string) []Runway {
 			}
 		}
 		kinds := []string{s.typ}
-		if s.typ == newKinds[0] {
+		if s.typ == sharedKinds[0] {
 			kinds = newKinds
 		}
 		n := 0
@@ -141,7 +142,7 @@ func BulgariaRunway(b *bank.Bank, used Used, today string) Runway {
 			continue
 		}
 		if slices.ContainsFunc(daySlots, func(s slot) bool {
-			if s.typ == newKinds[0] {
+			if s.typ == sharedKinds[0] {
 				return slices.ContainsFunc(newKinds, func(k string) bool { return fitsPlace(b, q, s, k) })
 			}
 			return fitsPlace(b, q, s, s.typ)

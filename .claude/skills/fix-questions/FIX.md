@@ -28,7 +28,10 @@ never edit it), `<work>` (this pass's folder) and your chunk's name.
   retire it (`why`: wrong, stale, weak, twin, giveaway or rule) and write a new question **in the same cell** (same
   category, kind, difficulty, with a picture if it had one), with the next id from your chunk's `ids`, `added` and
   `updated` today, `sources`, a fact, `day` if dated. Rule `estimate` is the exception: a small count becomes a
-  **choice** about the same subject, in the same difficulty.
+  **choice** about the same subject, in the same difficulty. **Never a `clues` question**, as a replacement or a
+  change: „Подсказки“ are switched off since 2026-11-23 (`bank.Off`; `bank add` refuses one). The bank's old clues
+  questions are never dealt, but `bank lint` still reads them (kept ready, should they come back): a finding on one
+  is fixed in place like any other's. An order keeps four items: a game deals all four.
 - **waive** a hint's false alarm: `answer-giveaway`, `pair-giveaway` and `long-answer` are hints, found by the words
   alone; when the other question is about something else (the answer is only named, not told for that subject), waive
   it and say what each asks. Never to keep a real give-away.

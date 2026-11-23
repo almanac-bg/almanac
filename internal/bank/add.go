@@ -38,11 +38,11 @@ type Added struct {
 
 // Add puts a batch (from) into the bank in dir: its new questions at the end of their categories' files, its changed
 // ones in their places, the questions it retires marked so, its pictures among the bank's. It checks first and writes
-// nothing unless all of it holds: each question decodes strictly; a new one takes the next numbers of its own
-// category's ids; a changed one is a live question of that category, keeps its added, is updated today, and is
-// changed today if and only if what it asks changed (askedChanges); and the bank with the batch in it loads with no
-// errors. The files are written in the bank's format. checkedBy, if set, marks every new or changed question checked
-// today by it (Tail.Checked, CheckedBy) where the batch doesn't say (a changed one: says no other than the bank).
+// nothing unless all of it holds: each question decodes strictly, of a kind the game deals (KindOn: never a new one
+// Off, nor a change into one); a new one takes the next numbers of its own category's ids; a changed one is a live
+// question of that category, keeps its added, is updated today, and is changed today if and only if what it asks
+// changed (askedChanges); and the bank with the batch in it loads with no errors. The files are written in the bank's
+// format. checkedBy, if set, marks every new or changed question checked today by it (Tail.Checked, CheckedBy) where the batch doesn't say (a changed one: says no other than the bank).
 // dry checks only: the bank stays as it is.
 func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 	today := time.Now().Format(time.DateOnly)
@@ -77,6 +77,12 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 				continue
 			}
 			seen[id] = true
+			if typ := item.q.Base().Type; !KindOn(typ) {
+				if old, ok := b.Get(id); !ok || old.Base().Type != typ {
+					fault("%s: no new %s question is written: the kind is off since %s (bank.Off)", at, typ, Off[typ])
+					continue
+				}
+			}
 			if old, ok := b.Get(id); ok {
 				faults := changeFaults(old, item.q, c.ID, today)
 				for _, f := range faults {

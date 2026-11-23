@@ -143,8 +143,15 @@ type lintBank struct {
 	df   map[string]int
 }
 
+// newLintBank is a bank as the rules see it: every question not retired, of a kind Off too (bank.Off), so that one
+// switched back on is ready, its waivers kept.
 func newLintBank(b *Bank) *lintBank {
-	l := &lintBank{bank: b, live: b.Live("", ""), df: map[string]int{}}
+	l := &lintBank{bank: b, df: map[string]int{}}
+	for _, q := range b.Questions {
+		if !q.Extra().Retired {
+			l.live = append(l.live, q)
+		}
+	}
 	for _, q := range l.live {
 		for s := range stemSet(append(q.words(), q.Extra().Fact, q.Extra().Day)...) {
 			l.df[s]++
