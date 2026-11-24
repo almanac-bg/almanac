@@ -124,6 +124,15 @@ func TestStreakMailOff(t *testing.T) {
 	if _, prefs := ana.call("GET", "/api/mail/prefs", nil); prefs["streak"] != false {
 		t.Fatalf("prefs after the link: %v", prefs)
 	}
+	// The link of a player since deleted: nothing left to stop, so done (it was „Нещо се обърка“, the audit of
+	// 2026-11-24), and nothing kept of them.
+	if body := page("POST", s.mailOffURL(anaID+1000, mailStreak)); !strings.Contains(body, "Готово") {
+		t.Fatalf("a deleted player's link: %s", body)
+	}
+	var kept int
+	if _ = g.db.Read.QueryRow(`SELECT count(*) FROM mail_prefs WHERE user_id = ?`, anaID+1000).Scan(&kept); kept != 0 {
+		t.Fatal("a pref kept for a player who isn't there")
+	}
 	if _, prefs := ana.call("PATCH", "/api/mail/prefs", map[string]any{"kind": "streak", "on": true}); prefs["streak"] != true {
 		t.Fatalf("turned on again: %v", prefs)
 	}

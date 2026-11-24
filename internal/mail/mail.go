@@ -281,7 +281,7 @@ func (o *Outbox) sendDue(ctx context.Context) bool {
 	case err == nil:
 		_, err = o.DB.Write.Exec(`DELETE FROM outbox WHERE id = ?`, id)
 	case errors.As(err, &refused):
-		slog.Warn("mail refused, not sent again", "to", m.To, "subject", m.Subject, "err", err, "address", refused.Address)
+		slog.Warn("mail refused, not sent again", "outbox", id, "to", domainOf(m.To), "subject", m.Subject, "err", hidden(err, m.To), "address", refused.Address)
 		if refused.Address {
 			if err := o.suppress(m.To, refused.Error(), time.Now()); err != nil {
 				slog.Error("outbox: suppressing an address", "err", err)
@@ -289,11 +289,11 @@ func (o *Outbox) sendDue(ctx context.Context) bool {
 		}
 		_, err = o.DB.Write.Exec(`DELETE FROM outbox WHERE id = ?`, id)
 	case attempts >= len(retries):
-		slog.Error("mail given up", "to", m.To, "subject", m.Subject, "err", err)
+		slog.Error("mail given up", "outbox", id, "to", domainOf(m.To), "subject", m.Subject, "err", hidden(err, m.To))
 		o.tell("mail: a message was given up after every retry (journalctl: mail given up)")
 		_, err = o.DB.Write.Exec(`DELETE FROM outbox WHERE id = ?`, id)
 	default:
-		slog.Warn("mail failed, will retry", "to", m.To, "in", retries[attempts], "err", err)
+		slog.Warn("mail failed, will retry", "outbox", id, "to", domainOf(m.To), "in", retries[attempts], "err", hidden(err, m.To))
 		_, err = o.DB.Write.Exec(`UPDATE outbox SET attempts = attempts + 1, next_at = ?, last_error = ? WHERE id = ?`,
 			store.Ms(time.Now().Add(retries[attempts])), err.Error(), id)
 	}
@@ -302,6 +302,20 @@ func (o *Outbox) sendDue(ctx context.Context) bool {
 		return false
 	}
 	return true
+}
+
+// domainOf is what a log says of an address: its domain only. The logs keep no player's address (server/privacy.go),
+// and one mail that keeps failing would put it in them at every try.
+func domainOf(to string) string {
+	if i := strings.LastIndexByte(to, '@'); i >= 0 {
+		return "…" + strings.TrimRight(to[i:], ">")
+	}
+	return "…"
+}
+
+// hidden is an error's text with the address taken out: a mail server's refusal often names it.
+func hidden(err error, to string) string {
+	return strings.ReplaceAll(err.Error(), to, domainOf(to))
 }
 
 // Log is the development sender: the message goes to the log, where the sign-in code can be read — and, if Dir is

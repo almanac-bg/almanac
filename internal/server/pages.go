@@ -198,7 +198,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	b := s.bank.Load()
-	m := assets.Manifest(s.client)
+	m := s.files()
 	start := map[string]any{
 		"user":     u,
 		"chapters": b.Categories,
@@ -366,11 +366,21 @@ func (s *Server) sitemap(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte(b.String()))
 }
 
-// The client's fonts and its icon are its own files: say what they are, wherever the server runs (not every system's
+// files is the build's manifest (assets.Manifest): read once in a release, where it's in the program, and every time
+// in development, where the build rewrites it.
+func (s *Server) files() map[string]string {
+	if s.cfg.Dev {
+		return assets.Manifest(s.client)
+	}
+	return s.built()
+}
+
+// The client's fonts, its icon and its manifest are its own files: say what they are, wherever the server runs (not every system's
 // MIME table knows woff2 or ico).
 func init() {
 	_ = mime.AddExtensionType(".woff2", "font/woff2")
 	_ = mime.AddExtensionType(".ico", "image/x-icon")
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
 }
 
 // asset serves the client's built files. Their names change with their content, so they're cached for good. A script
