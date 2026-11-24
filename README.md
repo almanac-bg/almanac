@@ -143,6 +143,11 @@ systemctl start almanac.socket almanac
 и `-unencrypted`, никога като `latest`. Само с age (1.3 или по-нов): `age -d -i ключ.txt копие.db.gz.age | gunzip >
 almanac.db`.
 
+**Изтриване на играч** по негова молба по поща, със същите настройки:
+`systemd-run --pipe --wait --quiet --collect -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac player delete ИМЕЙЛ`
+(или `@потребителско-име`) казва кой е и какво пази базата за него, без да променя нищо; с `-yes` преди имейла го
+изтрива. Без настройките командата не намира базата и отказва.
+
 **Нов сървър:** първо ключ на root за въпросите (`ssh-keygen -t ed25519` като root, публичната част като deploy key
 само за четене на `almanac-questions` в GitHub): без него `setup.sh` не може да изтегли банката. После
 `deploy/setup.sh` и `almanac-harden confirm` от нов вход; `/etc/almanac/env` и `origin.key`/`origin.pem` от мениджъра на

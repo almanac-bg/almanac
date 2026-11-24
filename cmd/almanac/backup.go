@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"log/slog"
 	"maps"
 	"net/http"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/almanac-bg/almanac/internal/backup"
 	"github.com/almanac-bg/almanac/internal/server"
+	"github.com/almanac-bg/almanac/internal/store"
 )
 
 // backupStore is the bucket the environment names (BACKUP_ENDPOINT, BACKUP_BUCKET, BACKUP_ACCESS_KEY,
@@ -542,4 +544,19 @@ func dbPath() string {
 		return p
 	}
 	return "almanac.db"
+}
+
+// openDB opens the game's database for a command that reads or changes what's in it (store.Open: admin, player,
+// bank calibrate/suspects/reports), and refuses one that isn't there: run without the service's settings, such a
+// command would make a new, empty database beside it and answer from that (nobody has that email, no question has
+// reports), as if the game held nothing.
+func openDB() (*store.DB, error) {
+	path := dbPath()
+	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("no database at %s: on the server, run it with the service's settings (README: "+
+			"systemd-run … -p EnvironmentFile=/etc/almanac/env), elsewhere with DB_PATH", path)
+	} else if err != nil {
+		return nil, err
+	}
+	return store.Open(path)
 }
