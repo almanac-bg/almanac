@@ -260,6 +260,8 @@ func TestAssetsGoOutCompressed(t *testing.T) {
 		{"/assets/app-C.css", "br, gzip", "gzip css", "gzip", "text/css; charset=utf-8"},
 		{"/assets/font-F.woff2", "br, gzip", "font", "", "font/woff2"},
 		{"/assets/app-J.js.map", "br, gzip", "404 page not found\n", "", "text/plain; charset=utf-8"},
+		// A folder is no file: nothing lists the client's files.
+		{"/assets/", "br, gzip", "404 page not found\n", "", "text/plain; charset=utf-8"},
 	} {
 		req, _ := http.NewRequest("GET", g.url+c.path, nil)
 		req.Header.Set("Accept-Encoding", c.accept) // set by hand: Go's client then leaves the body as it came
@@ -275,6 +277,10 @@ func TestAssetsGoOutCompressed(t *testing.T) {
 		}
 		if js := strings.HasSuffix(c.path, ".js") || strings.HasSuffix(c.path, ".css"); js != (res.Header.Get("Vary") == "Accept-Encoding") {
 			t.Errorf("%s: Vary %q", c.path, res.Header.Get("Vary"))
+		}
+		// A miss is kept by no cache between (it may be there in a moment, around a rollback).
+		if res.StatusCode == http.StatusNotFound && res.Header.Get("Cache-Control") != "no-store" {
+			t.Errorf("%s: a 404 with Cache-Control %q", c.path, res.Header.Get("Cache-Control"))
 		}
 	}
 }

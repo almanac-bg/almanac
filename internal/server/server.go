@@ -233,6 +233,8 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /robots.txt", s.robots)
 	mux.HandleFunc("GET /sitemap.xml", s.sitemap)
 	mux.HandleFunc("GET /privacy", s.privacy)
+	// With a slash after it too, the one page apart from the app's (page) a link may end so: served in place.
+	mux.HandleFunc("GET /privacy/{$}", s.privacy)
 	mux.HandleFunc("GET /mail/off", s.mailOff)
 	mux.HandleFunc("POST /mail/off", s.mailOff)
 	mux.HandleFunc("GET /admin", s.admin)

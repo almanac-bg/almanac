@@ -12,6 +12,38 @@ import (
 	"testing"
 )
 
+// Every /admin route, as server.go makes it, is not there for anyone but an admin: a player who has played, and no
+// one, get a 404 before anything is read or done. Each handler checks for itself, so this is what holds a new one to it.
+func TestAdminRoutesRefuseOthers(t *testing.T) {
+	src, err := os.ReadFile("server.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	routes := regexp.MustCompile(`mux\.Handle(?:Func)?\("(GET|POST|PATCH|PUT|DELETE) (/admin[^"]*)"`).FindAllStringSubmatch(string(src), -1)
+	if len(routes) < 5 {
+		t.Fatalf("found %d /admin routes in server.go: has the way routes are made changed? Change this test with it", len(routes))
+	}
+	g := start(t)
+	p, _ := g.guest()
+	played(p)
+	for _, who := range []*player{p, g.player()} {
+		who.client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+		for _, m := range routes {
+			path := strings.NewReplacer("{id}", "1", "{act}", "suspend").Replace(m[2])
+			req, _ := http.NewRequest(m[1], g.url+path, strings.NewReader(""))
+			req.Header.Set("Sec-Fetch-Site", "same-origin")
+			res, err := who.client.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			res.Body.Close()
+			if res.StatusCode != http.StatusNotFound {
+				t.Errorf("%s %s as a non-admin: %d, want 404", m[1], path, res.StatusCode)
+			}
+		}
+	}
+}
+
 // clientRoute is a route of the client's router (web/src/app.ts), on one line or more: its path, and the file of its
 // screen when it loads on its own (later(() => import("./screens/<file>.ts")…)).
 var clientRoute = regexp.MustCompile(`\{\s*path: /(.+?)/,\s*view: (?:later\(\(\) => import\("\./screens/(\w+)\.ts"\))?`)
