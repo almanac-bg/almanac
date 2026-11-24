@@ -909,3 +909,46 @@ func TestLineControlCharacters(t *testing.T) {
 		t.Errorf("a clean line: %v", got)
 	}
 }
+
+// A server's Load leaves the bank's rules to Check (`bank check`, their one gate): a bank only a rule finds fault with
+// loads and plays, with its waivers read for what they lift (Estimate); Check refuses it, at the question and the
+// rule. The sample passes both.
+func TestLoadLeavesTheRulesToCheck(t *testing.T) {
+	if b, problems := Check(sample); b == nil {
+		t.Fatalf("the sample fails its rules: %v", problems)
+	}
+	dir := t.TempDir()
+	if err := os.CopyFS(dir, os.DirFS(sample)); err != nil {
+		t.Fatal(err)
+	}
+	write := func(path, data string) {
+		if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	file := filepath.Join(dir, QuestionsDir, "technology.json")
+	data, _ := os.ReadFile(file)
+	const text = "с въгленов микрофон." // tec-965's fact; added since StrictFrom, so what it breaks is an error
+	broken := strings.Replace(string(data), text, strings.TrimSuffix(text, "."), 1)
+	if broken == string(data) {
+		t.Fatalf("no %q in the sample", text)
+	}
+	write(file, broken)
+	write(filepath.Join(dir, WaiversFile), `[{"id": "tec-965", "rule": "countable", "why": "известен сбор"}]`)
+	b, problems := Load(dir)
+	if b == nil {
+		t.Fatalf("Load refused a bank only a rule finds fault with: %v", problems)
+	}
+	if slices.ContainsFunc(problems, func(p Problem) bool { return p.Rule == "fact" }) {
+		t.Errorf("Load ran the rules: %v", problems)
+	}
+	if !b.waived[[2]string{"tec-965", "countable"}] {
+		t.Error("Load didn't read the waivers")
+	}
+	checked, problems := Check(dir)
+	if checked != nil || !slices.ContainsFunc(problems, func(p Problem) bool {
+		return !p.Warning && p.Rule == "fact" && p.ID == "tec-965" && p.File == filepath.Join(QuestionsDir, "technology.json") && p.Line > 0
+	}) {
+		t.Fatalf("Check passed a question that breaks a rule, or didn't place it: %v", problems)
+	}
+}

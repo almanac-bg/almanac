@@ -186,8 +186,9 @@ fi
 
 # The bank the game plays, read by this program before the restart (above). `almanac bank check` says „the server
 # would not play this bank“ of one it can't load (cmd/almanac/bank.go; deploy_test.go holds the two together); what
-# else it fails on (a category's size, a national day) is the bank's keeper's, not a reason to hold a release. A
-# program too old to check a bank says nothing of the kind, and is taken as before.
+# else it fails on (a category's size, a national day, the bank's rules: bank lint's, which the server never runs) is
+# the bank's keeper's, not a reason to hold a release. A program too old to check a bank says nothing of the kind, and
+# is taken as before.
 if [ -f "$bank/categories.json" ]; then
 	reads=$(timeout 300 setpriv --reuid=almanac --regid=almanac --clear-groups "$program" bank check "$bank" 2>&1) || true
 	case $reads in *"the server would not play this bank"*)

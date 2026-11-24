@@ -56,7 +56,8 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
       questions it added, changed and retired, and the warnings left on them. `-check` only checks; `-checked-by`
       marks the new and changed questions checked today by that process (where the batch doesn't say otherwise);
   - `go run ./cmd/almanac bank check [-used file] [-live dir] private` checks everything the server checks before it plays a
-    bank: the format and **every rule below that code can judge**. It prints every error, then the balance report:
+    bank (the format) and **every rule below that code can judge** (the server never runs those: this is their one
+    gate). It prints every error, then the balance report:
     the difficulty and kind mix, facts, dates and sources (how many have them, and the rest by kind), each
     category's kinds against their share, **the day's runway** — how many days from today each place of a day has
     questions for, and the day it runs out on — and **the dates' supply** („На този ден“: the dates of the year
@@ -67,7 +68,8 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
     game plays, as `almanac-bank` runs it, only a national day this bank emptied fails, one empty there too is warned
     of, so an urgent fix is never held up by it; and a question the live bank has that this one dropped, or has as
     another kind, fails it: a hand in the files that `bank add` would have refused), and **warns** of every place under 150 days (`play.RunwayWarn`: the 90 days
-    drawn ahead and 60 to write) and of every thin date. Then **the subjects that come back** (listed, never failed): the answers and names
+    drawn ahead and 60 to write), of every thin date, and (with `-used`) of a question dated for today or tomorrow
+    that those days were drawn without: they're never drawn again, so it waits a year (date it for a later day). Then **the subjects that come back** (listed, never failed): the answers and names
     more than 15 live questions name, by category (`*` over 1% of one); the top 20, all of them with
     `go run ./cmd/almanac bank subjects private`. Its last line counts the errors and the warnings by rule;
   - `go run ./cmd/almanac bank related [-n 10] [-from <batch>,…] [ids…] private` lists, for each question (a batch's, or

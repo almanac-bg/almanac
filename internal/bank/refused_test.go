@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// What `almanac bank add` (and so -check, and the bank's load: bank lint, the server) refuses, a fixture each
+// What `almanac bank add` (and so -check, and Check: bank check, bank lint; the server only its format) refuses, a fixture each
 // (testdata/refused/<case>: a batch, and want.txt, what the refusal says), against one small bank
 // (testdata/refused/bank): broken JSON and a field of the wrong type; a kind the game doesn't know, and one switched
 // off; a theme missing or not the chapter's; no sources; the same question again, and its twin; an answer its own text
