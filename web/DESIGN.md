@@ -610,10 +610,12 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
   the issue, „Брой 112 · 3 март · Освобождението · 8/10“), the squares ■ right, ◩ близо (U+25E9, the upper left half, as the tiles), □ not, and the
   link whole, „https://almanac.bg/d/…“, so that every messenger links it (`game/share.ts`). Unsigned.
 - **The card** (`internal/card`, `/card/<issue>-<shape>.png`), drawn once, by the server, one look in every theme: the
-  picture a shared link's preview shows, and the one the sheet shows and shares. The mark and the name, „Брой N“ big
-  with its date (on a national day „3 март · Освобождението“), the ten tiles two rows of five (filled with the glyph on a white tile, the upper left half, dashed and hollow: they part in
-  grey too), and
-  almanac.bg. No score, no streak, no name. In the same look the site's own picture (`/og.png`): the mark and the name,
+  picture a shared link's preview shows, and the one the sheet shows and shares. The mark and the name, „Брой 9 · 20
+  ноември“ small (on a national day „3 март · Освобождението“ after it), the score big as the result's hero („6 от
+  9“: a thumbnail says it at a glance), „Десет въпроса на ден, едни и същи за цяла България.“ under it (the card
+  alone, with no title, says what it is), the ten tiles two rows of five (filled with the glyph on a white tile, the
+  upper left half, dashed and hollow: they part in grey too), and almanac.bg. No streak, no name, no answer. In the
+  same look the site's own picture (`/og.png`): the mark and the name,
   „Десет въпроса на ден, едни и същи за цяла България.“, a day's ten tiles and almanac.bg.
 - **The sheet** („Сподели резултата“): the card, the text, „Сподели“ (the text with its link, through the device's
   share sheet), „Копирай текста“, and „Сподели картинката“ where the device shares a picture. Never the text and the

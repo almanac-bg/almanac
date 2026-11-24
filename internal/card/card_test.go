@@ -214,8 +214,8 @@ func TestFacesHaveTheLetters(t *testing.T) {
 		dates += d.Name
 	}
 	for name, text := range map[string]string{
-		"sofia-sans-900":                 Name + "Брой" + Line,
-		"sofia-sans-800":                 Address + dates,
+		"sofia-sans-900":                 Name + Line + "от 0123456789",
+		"sofia-sans-800":                 Address + "Брой" + dates,
 		"sofia-sans-extra-condensed-900": "0123456789",
 	} {
 		f, err := opentype.NewFace(all[name], &opentype.FaceOptions{Size: 20, DPI: 72, Hinting: font.HintingNone})
