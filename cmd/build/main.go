@@ -82,7 +82,9 @@ func build(watch, sourceMaps bool) error {
 		Format:        api.FormatESModule,
 		Splitting:     true, // each import() a file of its own
 		Target:        api.ES2022,
-		Engines:       []api.Engine{{Name: api.EngineChrome, Version: "111"}, {Name: api.EngineFirefox, Version: "115"}, {Name: api.EngineSafari, Version: "16.4"}},
+		// The oldest browsers the game is for: what it uses (CSS, JS, the DOM) must be in all three, held by
+		// web/src/engines.test.ts for what tsc can't see.
+		Engines:       []api.Engine{{Name: api.EngineChrome, Version: "111"}, {Name: api.EngineFirefox, Version: "121"}, {Name: api.EngineSafari, Version: "16.4"}},
 		Charset:       api.CharsetUTF8,
 		LegalComments: api.LegalCommentsNone,
 		Loader:        map[string]api.Loader{".woff2": api.LoaderFile}, // the fonts: files of their own, named by content
