@@ -7,6 +7,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"log/slog"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -23,10 +24,10 @@ import (
 // not missing: what it holds is by question id, and a count of the bank before is better than a wait (each user of it
 // says what stands for a question it lacks).
 //
-// A count is kept in the database too (counts, at most every keepEvery), with the commit of the bank it was counted
-// for, and a server that starts again takes up the last one kept: shown at once, and counted again only once it's
-// stale, as if this server had counted it (of another bank, or of a bank whose commit isn't known, it's stale at once,
-// and counted again in the background). So a deploy makes nobody wait, and doesn't count everything again; only a
+// A count is kept in the database too (counts, at most every keepEvery), with the commits of the bank and the program
+// it was counted for, and a server that starts again takes up the last one kept: shown at once, and counted again only
+// once it's stale, as if this server had counted it (of another bank or program, or of a bank whose commit isn't
+// known, it's stale at once, and counted again in the background). So a deploy makes nobody wait, and doesn't count everything again; only a
 // server that has never counted waits for its first count.
 type snapshot[T any] struct {
 	mu      sync.Mutex
@@ -161,7 +162,7 @@ func (s *snapshot[T]) take(c counter[T], b *bank.Bank) {
 		s.keptAt = time.UnixMilli(at)
 		if s.last == nil {
 			s.last = &snapOf[T]{at: s.keptAt, v: v}
-			if b != nil && b.Commit != "" && commit == b.Commit {
+			if k := countedFor(b); k != "" && commit == k {
 				s.last.bank = b
 			}
 		}
@@ -216,10 +217,7 @@ func (s *snapshot[T]) keep(c counter[T], at time.Time, b *bank.Bank, v T) error 
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	commit := ""
-	if b != nil {
-		commit = b.Commit
-	}
+	commit := countedFor(b)
 	if _, err := c.db.Write.ExecContext(ctx, `INSERT INTO counts (name, at, value, bank) VALUES (?, ?, ?, ?)
 		ON CONFLICT (name) DO UPDATE SET at = excluded.at, value = excluded.value, bank = excluded.bank`,
 		c.name, store.Ms(at), raw, commit); err != nil {
@@ -271,3 +269,25 @@ func ungobbed[V any](raw []byte) (V, error) {
 	err := gob.NewDecoder(bytes.NewReader(raw)).Decode(&v)
 	return v, err
 }
+
+// countedFor is what a kept count is of: the bank's commit and the program's (its build's revision), so that a release
+// that counts differently doesn't take up the last one's count. "" (not known: development, tests without a commit)
+// takes up nothing.
+func countedFor(b *bank.Bank) string {
+	if b == nil || b.Commit == "" {
+		return ""
+	}
+	return b.Commit + "@" + program
+}
+
+// program is the revision the program was built from ("" where the build didn't say: go test, go run).
+var program = func() string {
+	if info, ok := debug.ReadBuildInfo(); ok {
+		for _, s := range info.Settings {
+			if s.Key == "vcs.revision" {
+				return s.Value
+			}
+		}
+	}
+	return ""
+}()

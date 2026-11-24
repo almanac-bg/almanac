@@ -5,6 +5,7 @@
 import { pushKey } from "../state.ts";
 import { api } from "./api.ts";
 import { reportProblem } from "./errors.ts";
+import { navigate } from "./router.ts";
 
 /** Whether this browser can take notifications from the game. */
 export const pushable = () =>
@@ -17,9 +18,16 @@ export const needsHomeScreen = () =>
   !matchMedia("(display-mode: standalone)").matches;
 
 /** Registers the service worker as the game opens, so that a tap on „Включи“ finds it ready: on an iPhone the
- * browser asks about notifications only within a moment of the tap, and a worker still installing then costs it. */
+ * browser asks about notifications only within a moment of the tap, and a worker still installing then costs it. A
+ * notification tapped while the game is open on another page is opened here (sw.js), as a tapped link would be. */
 export function preparePush(): void {
-  if (pushable()) navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
+  if (!pushable()) return;
+  navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
+  navigator.serviceWorker.addEventListener("message", (e: MessageEvent) => {
+    const open = (e.data as { open?: unknown } | null)?.open;
+    if (typeof open === "string") navigate(open);
+  });
+  navigator.serviceWorker.startMessages();
 }
 
 async function registration(): Promise<ServiceWorkerRegistration> {

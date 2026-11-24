@@ -739,19 +739,19 @@ export function inSight(el: Element): void {
   requestAnimationFrame(() => el.scrollIntoView({ block: "nearest", behavior: calm.peek() ? "auto" : "smooth" }));
 }
 
+let sheets = 0; // the sheets opened, for their headings' ids
+
 /** A sheet over the page (a <dialog> on the body: from the foot on a phone, centred on a big screen), built in a scope
  * of its own: what it sets up (effects, timers) goes with it. With a `title`, its panel is made here, its head the
  * title and „Затвори“, `build`'s under them; without one, `build` makes the panel, headed by an h2 `#sheet-title`.
+ * The heading's id is made the sheet's own, so a sheet over another is named by its own heading.
  * Esc, a tap beside it or `close` puts it away; put away (by the router too, with its screen), it goes, and `closed`
  * is told. */
 export function sheet(
   o: { class?: string; title?: Child; closed?: () => void },
   build: (close: () => void) => Child,
 ): HTMLDialogElement {
-  const box = h("dialog", {
-    class: o.class ? `sheet ${o.class}` : "sheet",
-    "aria-labelledby": "sheet-title",
-  }) as HTMLDialogElement;
+  const box = h("dialog", { class: o.class ? `sheet ${o.class}` : "sheet" }) as HTMLDialogElement;
   const close = () => box.close();
   const [inside, dispose] = scope(() =>
     o.title === undefined
@@ -769,6 +769,11 @@ export function sheet(
         ),
   );
   append(box, [inside]);
+  const heading = box.querySelector("#sheet-title");
+  if (heading) {
+    heading.id = `sheet-title-${++sheets}`;
+    box.setAttribute("aria-labelledby", heading.id);
+  }
   box.addEventListener("click", (e) => {
     if (e.target === box) close();
   });
