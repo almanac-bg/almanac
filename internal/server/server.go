@@ -14,6 +14,7 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"database/sql"
 	"errors"
 	"io/fs"
 	"log/slog"
@@ -107,6 +108,13 @@ type Server struct {
 	handler      http.Handler
 }
 
+// NewAccounts are the players' accounts on db, with every part of the game that keeps others' history of a player
+// told when one goes (play.Forget): the one way the server and a command (almanac player delete) make them, so no
+// deletion leaves half a player behind. New refuses accounts made otherwise.
+func NewAccounts(db *store.DB, outbox *mail.Outbox, secret []byte) *account.Accounts {
+	return &account.Accounts{DB: db, Outbox: outbox, Secret: secret, Forget: []func(*sql.Tx, int64) error{play.Forget}}
+}
+
 func New(cfg Config, d Deps) (*Server, error) {
 	u, err := url.Parse(cfg.PublicURL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
@@ -155,7 +163,9 @@ func New(cfg Config, d Deps) (*Server, error) {
 	s.push = cfg.Push
 	s.game.DuelNews = s.duelNews
 	d.Accounts.Merge = append(d.Accounts.Merge, s.game.Merge)
-	d.Accounts.Forget = append(d.Accounts.Forget, play.Forget)
+	if len(d.Accounts.Forget) == 0 {
+		return nil, errors.New("server: accounts not made by NewAccounts: a player deleted would leave others' history of them")
+	}
 	s.handler = s.routes()
 	return s, nil
 }

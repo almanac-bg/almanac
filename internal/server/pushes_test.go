@@ -17,7 +17,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/bank/banktest"
 	"github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/push"
@@ -379,7 +378,7 @@ func crowd(t testing.TB, c crowding) (*Server, *slowPush) {
 	out := mail.NewOutbox(db, &inbox{}, "a@almanac.bg")
 	s, err := New(Config{PublicURL: "http://localhost", Push: &push.Sender{Keys: keys, Subject: "mailto:a@b.bg", Client: client,
 		Services: []string{ps.Listener.Addr().String(), sps.Listener.Addr().String()}}},
-		Deps{DB: db, Accounts: &account.Accounts{DB: db, Outbox: out, Secret: []byte("x")}, Outbox: out, Bank: banktest.Sample(t)})
+		Deps{DB: db, Accounts: NewAccounts(db, out, []byte("x")), Outbox: out, Bank: banktest.Sample(t)})
 	if err != nil {
 		t.Fatal(err)
 	}

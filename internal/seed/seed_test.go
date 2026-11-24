@@ -123,7 +123,7 @@ func TestSeededGame(t *testing.T) {
 	out := mail.NewOutbox(db, discard{}, "АЛМАНАХ <no-reply@almanac.bg>")
 	ts := httptest.NewUnstartedServer(nil)
 	srv, err := server.New(server.Config{PublicURL: "http://" + ts.Listener.Addr().String(), Dev: true},
-		server.Deps{DB: db, Accounts: &account.Accounts{DB: db, Outbox: out, Secret: []byte("test")}, Outbox: out, Bank: b})
+		server.Deps{DB: db, Accounts: server.NewAccounts(db, out, []byte("test")), Outbox: out, Bank: b})
 	if err != nil {
 		t.Fatal(err)
 	}

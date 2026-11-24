@@ -14,7 +14,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/almanac-bg/almanac/internal/account"
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/mail"
 	"github.com/almanac-bg/almanac/internal/play"
@@ -160,7 +159,8 @@ func serve([]string) error {
 	defer db.Close()
 
 	outbox := mail.NewOutbox(db, sender, env("MAIL_FROM", "АЛМАНАХ <no-reply@almanac.bg>"))
-	accounts := &account.Accounts{DB: db, Outbox: outbox, Secret: key[:], Unlimited: dev}
+	accounts := server.NewAccounts(db, outbox, key[:])
+	accounts.Unlimited = dev
 	if pub, priv := os.Getenv("PUSH_PUBLIC_KEY"), os.Getenv("PUSH_PRIVATE_KEY"); pub != "" || priv != "" {
 		keys, err := push.ParseKeys(pub, priv)
 		if err != nil {

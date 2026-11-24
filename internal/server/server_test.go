@@ -59,7 +59,7 @@ func start(t *testing.T) *game {
 	b := banktest.Sample(t)
 	in := &inbox{}
 	out := mail.NewOutbox(db, in, "АЛМАНАХ <no-reply@almanac.bg>")
-	accounts := &account.Accounts{DB: db, Outbox: out, Secret: []byte("test")}
+	accounts := NewAccounts(db, out, []byte("test"))
 	ts := httptest.NewUnstartedServer(nil)
 	s, err := New(Config{PublicURL: "http://" + ts.Listener.Addr().String(), Version: "test", MTASTS: []string{"mx.example"}},
 		Deps{DB: db, Accounts: accounts, Outbox: out, Bank: b})
@@ -806,7 +806,7 @@ func pushWorld(t *testing.T) (*Server, *game, *fakePushService, func(p *player, 
 	ts := httptest.NewUnstartedServer(nil)
 	s, err := New(Config{PublicURL: "http://" + ts.Listener.Addr().String(), Push: &push.Sender{Keys: keys, Subject: "mailto:a@b.bg", Client: ps.Client(),
 		Services: []string{ps.Listener.Addr().String()}}},
-		Deps{DB: db, Accounts: &account.Accounts{DB: db, Outbox: out, Secret: []byte("x")}, Outbox: out, Bank: b})
+		Deps{DB: db, Accounts: NewAccounts(db, out, []byte("x")), Outbox: out, Bank: b})
 	if err != nil {
 		t.Fatal(err)
 	}
