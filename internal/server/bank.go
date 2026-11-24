@@ -38,13 +38,6 @@ type RefusedBank struct {
 	At     time.Time `json:"at"`
 }
 
-// SetBank puts a bank in play at once, whatever is under way (its versions kept first: a question showing is graded
-// as it showed). A reload goes through OfferBank instead.
-func (s *Server) SetBank(b *bank.Bank) {
-	s.keep(b)
-	s.bank.Store(b)
-}
-
 // keep keeps a bank's versions of its questions, before it goes into play (play.Game.Keep). One that can't be kept
 // still goes in: a question shown from it is graded as it showed while it's in play, and only once it's gone would
 // that version be lost.

@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -85,9 +86,10 @@ type Server struct {
 	bank          atomic.Pointer[bank.Bank]
 	banks         banks // a bank refused (bank.go)
 	client        fs.FS
-	limits        *limiter // the limits on floods (limits.go)
-	cards         *cards   // the shared days' cards drawn (share.go)
-	guard         *limiter // apart, the limits that keep players safe: codes, guests, reports
+	built         func() map[string]string // the client's manifest, read once outside development (files)
+	limits        *limiter                 // the limits on floods (limits.go)
+	cards         *cards                   // the shared days' cards drawn (share.go)
+	guard         *limiter                 // apart, the limits that keep players safe: codes, guests, reports
 	problems      *problems
 	reminders     reminders     // who is due the day's reminder when, today (remind.go)
 	pushq         pushQueue     // the notifications' queue, as Push sends it (pushes.go)
@@ -126,6 +128,7 @@ func New(cfg Config, d Deps) (*Server, error) {
 		secure: u.Scheme == "https",
 		host:   strings.ToLower(u.Hostname()),
 	}
+	s.built = sync.OnceValue(func() map[string]string { return assets.Manifest(s.client) })
 	// A __Host- cookie is bound to this exact host, over HTTPS, for the whole site: nothing else can set or read it.
 	s.cookie, s.askCookie, s.playedCookie = "sid", "ask", "played"
 	if s.secure {

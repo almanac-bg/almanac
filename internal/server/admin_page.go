@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"html/template"
 	"net/http"
-
-	"github.com/almanac-bg/almanac/internal/assets"
 )
 
 // /admin's pages, as they look: as wide as the game's pages, one column on a phone, the tables that scroll sideways
@@ -42,7 +40,7 @@ var adminFrame = template.Must(template.New("admin-page").Parse(`<!doctype html>
 // adminPage sends one of /admin's pages.
 func (s *Server) adminPage(w http.ResponseWriter, title string, body template.HTML) {
 	var out bytes.Buffer
-	m := assets.Manifest(s.client)
+	m := s.files()
 	if err := adminFrame.Execute(&out, map[string]any{
 		"Title": title, "Body": body, "CSS": m["app.css"], "AdminCSS": m["admin.css"], "Sections": adminSections,
 	}); err != nil {

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"io"
+	"log/slog"
 	"mime"
 	"mime/quotedprintable"
 	"net/textproto"
@@ -69,6 +70,7 @@ func (f *failing) Send(context.Context, string, Message) error {
 // A message that fails is tried again, then given up on; the sends failing in a row, and the giving up, are told
 // (without the address), and the outbox says it's failing until a send goes.
 func TestOutboxRetriesThenGivesUp(t *testing.T) {
+	logged := logs(t)
 	db := storetest.Open(t)
 	f := &failing{}
 	o := NewOutbox(db, f, "a@almanac.bg")
@@ -97,6 +99,9 @@ func TestOutboxRetriesThenGivesUp(t *testing.T) {
 	if len(told) != 2 || !strings.Contains(told[0], "in a row failed") || !strings.Contains(told[1], "given up") ||
 		strings.Contains(strings.Join(told, " "), "x@y.bg") {
 		t.Fatalf("told %q", told)
+	}
+	if strings.Contains(logged.String(), "x@y.bg") || !strings.Contains(logged.String(), "…@y.bg") {
+		t.Fatalf("the logs name the address, or nothing of it:\n%s", logged)
 	}
 	o.Sender = &kept{}
 	_ = db.Tx(t.Context(), func(tx *sql.Tx) error { return o.Enqueue(tx, Message{To: "x@y.bg", Subject: "s", Text: "t"}) })
@@ -234,7 +239,7 @@ func TestOutboxRefusedForGood(t *testing.T) {
 		attempts int // before it's let go
 		off      bool
 	}{
-		{"no such mailbox", &textproto.Error{Code: 550, Msg: "5.1.1 user unknown"}, true, 1, true},
+		{"no such mailbox", &textproto.Error{Code: 550, Msg: "5.1.1 <x@y.bg>: user unknown"}, true, 1, true},
 		{"no such domain", &textproto.Error{Code: 550, Msg: "5.1.2 bad destination system"}, true, 1, true},
 		{"a bare 553", &textproto.Error{Code: 553, Msg: "mailbox name not allowed"}, true, 1, true},
 		{"a spam filter", &textproto.Error{Code: 550, Msg: "5.7.1 message rejected"}, true, 1, false},
@@ -243,6 +248,7 @@ func TestOutboxRefusedForGood(t *testing.T) {
 		{"the network", errors.New("down"), false, len(retries) + 1, false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
+			logged := logs(t)
 			db := storetest.Open(t)
 			f := &refusing{err: c.err, rcpt: c.rcpt}
 			o := NewOutbox(db, f, "a@almanac.bg")
@@ -256,6 +262,9 @@ func TestOutboxRefusedForGood(t *testing.T) {
 			}
 			if f.n != c.attempts {
 				t.Fatalf("%d attempts, want %d", f.n, c.attempts)
+			}
+			if strings.Contains(logged.String(), "x@y.bg") {
+				t.Fatalf("the logs name the address:\n%s", logged)
 			}
 			off := func(at time.Time) (off bool) {
 				_ = db.Tx(t.Context(), func(tx *sql.Tx) (err error) { off, err = Suppressed(tx, "x@y.bg", at); return err })
@@ -327,4 +336,13 @@ func TestOutboxUrgentByRank(t *testing.T) {
 	if got := strings.Join(k.sent, ","); got != "2,4,0,1,3" {
 		t.Fatalf("sent %s", got)
 	}
+}
+
+// logs keeps what the package logs while a test runs (the privacy page: no player's address in them).
+func logs(t *testing.T) *bytes.Buffer {
+	var b bytes.Buffer
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&b, nil)))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return &b
 }

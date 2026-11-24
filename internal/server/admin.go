@@ -359,9 +359,5 @@ func (s *Server) resolveWhere(w http.ResponseWriter, r *http.Request, where stri
 	http.Redirect(w, r, "/admin/questions", http.StatusSeeOther)
 }
 
-func bulgaria() *time.Location {
-	if l, err := time.LoadLocation("Europe/Sofia"); err == nil {
-		return l
-	}
-	return time.UTC
-}
+// bulgaria is the game's time zone (play.Bulgaria, loaded once from the embedded tzdata).
+func bulgaria() *time.Location { return play.Bulgaria }
