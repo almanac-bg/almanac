@@ -288,3 +288,19 @@ func TestPlanThemesAndReport(t *testing.T) {
 		t.Errorf("the plan names no themes:\n%s", p.String())
 	}
 }
+
+// From the repository's root, bank check holds a bank against the public sample (bank.Public): a bank that has the
+// sample's questions live fails, the sample itself (-sample, as CI checks it) doesn't.
+func TestCheckAgainstThePublicSample(t *testing.T) {
+	copied := t.TempDir()
+	if err := os.CopyFS(copied, os.DirFS("../../bank/sample")); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir("../..")
+	if err := bankCheck([]string{copied}); err == nil || !strings.Contains(err.Error(), "the public sample") {
+		t.Fatalf("the sample's questions live in another bank: %v", err)
+	}
+	if err := bankCheck([]string{"-sample", bank.PublicDir}); err != nil {
+		t.Fatalf("the sample by itself: %v", err)
+	}
+}

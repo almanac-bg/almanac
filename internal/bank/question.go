@@ -105,9 +105,10 @@ type Tail struct {
 
 // RetiredWhys are the reasons a question leaves play: wrong (its answer or fact was), stale (it stopped being true),
 // weak (dull, too easy, unfair or badly made), twin (another question asks the same), giveaway (it gave another's
-// answer away, or another gave its), rule (a rule of the bank changed). Wrong and stale ones also leave what players
-// have learned (their Алманах): what they learned there wasn't so.
-var RetiredWhys = []string{"wrong", "stale", "weak", "twin", "giveaway", "rule"}
+// answer away, or another gave its), rule (a rule of the bank changed), public (the public sample asks it too, so
+// its answer is on GitHub: Public). Wrong and stale ones also leave what players have learned (their Алманах): what
+// they learned there wasn't so.
+var RetiredWhys = []string{"wrong", "stale", "weak", "twin", "giveaway", "rule", RulePublic}
 
 // Untrue is whether a retired question left play because it wasn't (or stopped being) true.
 func (t *Tail) Untrue() bool {
