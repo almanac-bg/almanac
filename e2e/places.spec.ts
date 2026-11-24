@@ -42,6 +42,40 @@ test("a place come back to is drawn at once from what it showed last, on a slow 
   await page.unrouteAll({ behavior: "ignoreErrors" });
 });
 
+// The first time too: Днес come back to is drawn at once from the day its page came with, on a slow line and with no
+// line at all (where it once showed „…“, then the line's error).
+test("Днес come back to the first time is drawn at once from the day its page came with, offline too", async ({
+  page,
+  context,
+}) => {
+  const tab = (href: string) => page.locator(`nav.places-foot a[href='${href}']`).click();
+  const away = async () => {
+    await page.goto("/");
+    await expect(page.locator(".issue")).toBeVisible();
+    await tab("/almanac");
+    await expect(page.locator(".chapters")).toBeVisible();
+  };
+  await page.goto("/");
+  await page.evaluate(() => fetch("/api/guest", { method: "POST", body: "{}" })); // a player: the places at the foot
+  await away();
+  await page.route("**/api/**", async (route) => {
+    await new Promise((r) => setTimeout(r, 2000));
+    await route.continue().catch(() => {});
+  });
+  await tab("/");
+  await expect(page.locator(".issue")).toBeVisible({ timeout: 600 });
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+
+  await away();
+  await context.setOffline(true);
+  await tab("/");
+  await expect(page.locator(".issue")).toBeVisible({ timeout: 600 });
+  await page.waitForTimeout(500); // the day asked again, and not had
+  await expect(page.locator(".issue")).toBeVisible();
+  await expect(page.getByText("Няма връзка")).toHaveCount(0);
+  await context.setOffline(false);
+});
+
 // Moving between the places never moves the places: the one here is marked by its well and its ink, never by a
 // heavier weight, which made its name wider and nudged its neighbours (seen on a laptop, 21 Nov).
 for (const [name, size, bar] of [
