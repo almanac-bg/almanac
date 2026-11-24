@@ -177,13 +177,14 @@ func ok(w http.ResponseWriter, v any) error {
 	return nil
 }
 
-// readJSON decodes a small JSON body into v, refusing anything else.
+// readJSON decodes a small JSON body into v, refusing anything else. A field v doesn't have is passed over: a page
+// from the release before a deploy, or after one gone back, sends what this one doesn't know, and refusing it would
+// fail every step of a game until the player left. Lax on the wire, strict in the bank (bank's strictJSON).
 func readJSON(r *http.Request, v any) error {
 	if mt, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mt != "application/json" {
 		return errBadRequest
 	}
 	dec := json.NewDecoder(io.LimitReader(r.Body, 64<<10))
-	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
 		return errBadRequest
 	}

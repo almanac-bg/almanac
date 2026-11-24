@@ -2,7 +2,9 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
@@ -104,13 +106,16 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 		}
 		var runID int64
 		err = s.db.Read.QueryRowContext(ctx, `SELECT id FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, u.ID, day).Scan(&runID)
-		if err == nil {
+		switch {
+		case err == nil:
 			st, err := s.game.State(ctx, u.ID, runID)
 			if err != nil {
 				return nil, err
 			}
 			out["run"] = st
 			done = st.Done
+		case !errors.Is(err, sql.ErrNoRows): // a failure to read is no "not started"
+			return nil, err
 		}
 	}
 	board, err := s.game.BoardOf(ctx, day, viewer)
@@ -132,12 +137,12 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 		out["friends"] = friends
 		// No friend has played yet: whether there's any, for the boards to ask a player with none to add one.
 		if friends == nil {
-			var any bool
+			var has bool
 			if err := s.db.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM friends WHERE user_id = ?)`, u.ID).
-				Scan(&any); err != nil {
+				Scan(&has); err != nil {
 				return nil, err
 			}
-			out["befriended"] = any
+			out["befriended"] = has
 		}
 		// A friend's duel waiting for the player: on the cover under the streak, and the result's action once the day
 		// is played (DECISIONS.md, owner 2026-11-23).
