@@ -140,7 +140,7 @@ func TestAddWritesNothingUnlessAllOfItHolds(t *testing.T) {
 		"retiring a question the bank hasn't": {map[string]string{RetireFile: `[{"id": "gen-99999", "why": "wrong"}]`}, "no such question"},
 		"retiring without a reason":           {map[string]string{RetireFile: `[{"id": "gen-001", "why": "old"}]`}, "why is one of"},
 		"a stray file":                        {map[string]string{"notes.json": `[]`}, "not a category's file"},
-		"a rule a new question breaks":        {map[string]string{"general.json": "[" + strings.NewReplacer("Кое?", "Кое", `"added": "`+today, `"sources": ["https://bg.wikipedia.org"], "checked": "2026-11-17", "checkedBy": "t", "added": "`+StrictFrom, `"updated": "`+today, `"updated": "`+StrictFrom).Replace(question("gen-"+strconv.Itoa(next), good)) + "]"}, "[ending]"},
+		"a rule a new question breaks":        {map[string]string{"general.json": "[" + strings.NewReplacer("Кое?", "Кое", `"added": "`+today, `"sources": ["https://bg.wikipedia.org"], "checked": "`+today+`", "checkedBy": "t", "added": "`+today).Replace(question("gen-"+strconv.Itoa(next), good)) + "]"}, "[ending]"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := sampleCopy(t)
