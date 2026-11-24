@@ -329,7 +329,7 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 	}
 	s.Trail = trailOf(r.picks, r.at, marks)
 	if r.shownAt.Valid && !r.finished && !r.voidNow() {
-		d, ok := g.deal(r.picks[r.at])
+		d, ok := g.deal(tx, r.picks[r.at])
 		if ok {
 			limit := Limit(d.Question())
 			since := g.Now().Sub(time.UnixMilli(r.shownAt.Int64))
@@ -357,14 +357,14 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 // one that counts for nobody (day.go), so the run can go on. It reports whether that ended the run: then, once the
 // transaction is done, the caller follows it with finished, as an answer that ends a run does.
 func (g *Game) settle(tx *sql.Tx, r *run) (bool, error) {
-	if !g.settles(r) {
+	if !g.settles(tx, r) {
 		return false, nil
 	}
 	if r.voidNow() {
 		err := g.passVoid(tx, r)
 		return err == nil && r.finished, err
 	}
-	d, ok := g.deal(r.picks[r.at])
+	d, ok := g.deal(tx, r.picks[r.at])
 	ms := int64(0)
 	if ok {
 		ms = Limit(d.Question()).Milliseconds()
@@ -374,8 +374,8 @@ func (g *Game) settle(tx *sql.Tx, r *run) (bool, error) {
 }
 
 // settles says whether settle has anything to do: a question showing past its time, or gone from the bank; or one that
-// counts for nobody, where the run stands.
-func (g *Game) settles(r *run) bool {
+// counts for nobody, where the run stands. Its question is read through tx, the transaction the caller holds.
+func (g *Game) settles(tx *sql.Tx, r *run) bool {
 	if r.finished {
 		return false
 	}
@@ -385,7 +385,7 @@ func (g *Game) settles(r *run) bool {
 	if !r.shownAt.Valid {
 		return false
 	}
-	d, ok := g.deal(r.picks[r.at])
+	d, ok := g.deal(tx, r.picks[r.at])
 	if !ok {
 		return true
 	}
@@ -464,7 +464,7 @@ func (g *Game) State(ctx context.Context, userID, runID int64) (State, error) {
 		if err != nil {
 			return err
 		}
-		if write = g.settles(r); write {
+		if write = g.settles(tx, r); write {
 			return nil
 		}
 		s, err = g.state(tx, r)
@@ -506,7 +506,7 @@ func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 		}
 		if !r.finished && !r.shownAt.Valid {
 			start := g.Now()
-			d, ok := g.deal(r.picks[r.at])
+			d, ok := g.deal(tx, r.picks[r.at])
 			if ok && bank.HasPictures(d.Question()) {
 				start = start.Add(PictureWait)
 			}
@@ -610,7 +610,7 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 		}
 		defer func() { finished = r.finished }()
 		var ok bool
-		if d, ok = g.deal(r.picks[r.at]); !ok || !r.shownAt.Valid {
+		if d, ok = g.deal(tx, r.picks[r.at]); !ok || !r.shownAt.Valid {
 			return ErrOutOfStep
 		}
 		shownAt := time.UnixMilli(r.shownAt.Int64)
@@ -667,7 +667,7 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 // that: no answer, and timed out if its time ran out.
 func (g *Game) again(tx *sql.Tx, r *run, n int) (Result, bank.Dealt, error) {
 	var res Result
-	d, ok := g.deal(r.picks[n])
+	d, ok := g.deal(tx, r.picks[n])
 	if !ok {
 		return res, nil, ErrOutOfStep
 	}
@@ -768,7 +768,7 @@ func (g *Game) Review(ctx context.Context, userID, runID int64) ([]Reviewed, err
 	}
 	out := []Reviewed{}
 	for _, it := range all {
-		d, ok := g.deal(r.picks[it.N])
+		d, ok := g.deal(g.DB.Read, r.picks[it.N])
 		if !ok {
 			continue // gone from the bank since
 		}
