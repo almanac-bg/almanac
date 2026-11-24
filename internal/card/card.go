@@ -11,6 +11,9 @@
 //   - the site's own picture (Site, /og.png): the mark and the name, „Десет въпроса на ден, едни и същи за цяла
 //     България.“, a day's ten tiles and almanac.bg.
 //
+// It also draws the game's icons in web/public (icon.go: the mark light on its ink tile, its one version), which a test
+// holds equal to the files.
+//
 // It's drawn here, in Go, with the game's own faces (fonts: static TrueType cuts of the client's families, made by
 // web/src/fonts/subset.sh; the SIL Open Font License, fonts/OFL.txt), the mark drawn from web/public/favicon.svg's
 // petal as shapes, and the chapters' glyphs from the client's art (glyph.go). Drawing one takes some milliseconds of
@@ -189,7 +192,7 @@ func newPicture() (*picture, error) {
 	}
 	p := &picture{img: image.NewRGBA(image.Rect(0, 0, Width, Height)), fonts: all}
 	draw.Draw(p.img, p.img.Bounds(), image.NewUniform(page), image.Point{}, draw.Src)
-	rosette(p.img, 64, 58, 52)
+	rosette(p.img, 64, 58, 52, ink)
 	name := p.face("sofia-sans-900", 34)
 	m := name.Metrics()
 	// Set on its middle at 86: half-way between the face's ascent and its descent.
@@ -418,14 +421,14 @@ var petal = [10][2]float64{
 	{42.5, 14.7}, {39.5, 24.7}, {32, 30.2},
 }
 
-// rosette draws the mark, size across from (x, y): four petals about its centre, three in ink and the gold one
-// turned up to the left, as favicon.svg has them, without its tile. Its box is the part of the 64 × 64 the petals
-// fill (5 to 59).
-func rosette(dst draw.Image, x, y, size float64) {
+// rosette draws the mark, size across from (x, y): four petals about its centre, three in `petals` (ink on paper, light on
+// ink: Icon) and the gold one turned up to the left, as favicon.svg has them, without its tile. Its box is the part
+// of the 64 × 64 the petals fill (5 to 59).
+func rosette(dst draw.Image, x, y, size float64, petals color.Color) {
 	scale := size / 54
 	for _, turn := range []float64{45, 135, 225, -45} {
 		sin, cos := math.Sincos(turn * math.Pi / 180)
-		c := ink
+		c := petals
 		if turn < 0 {
 			c = gold
 		}
