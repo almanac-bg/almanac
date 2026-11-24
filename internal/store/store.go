@@ -167,17 +167,21 @@ func OpenReadOnly(path string) (*DB, error) {
 	return &DB{Write: r, Read: r, Scan: r}, nil
 }
 
+// Close closes the database: the read pools first, the writer last. The last connection to close a database
+// checkpoints its write-ahead log into the file and removes it, and only the writer can: a database stopped cleanly is
+// then one whole file, never a file whose latest writes are in a -wal beside it (one that a copy put back in its place
+// would be read with).
 func (db *DB) Close() error {
 	if db.stop != nil {
 		db.stop()
 	}
-	err := db.Write.Close()
+	var err error
 	for _, pool := range []*sql.DB{db.Read, db.Scan} {
 		if pool != nil && pool != db.Write {
 			err = errors.Join(err, pool.Close())
 		}
 	}
-	return err
+	return errors.Join(err, db.Write.Close())
 }
 
 // migrate applies every migration in migrations/ the database hasn't had yet, in the order of their names
@@ -445,12 +449,15 @@ func (db *DB) apply(body, name string) error {
 	return tx.Commit()
 }
 
-// Tx runs fn in a write transaction: committed if fn returns nil, rolled back otherwise.
+// Tx runs fn in a write transaction: committed if fn returns nil, rolled back otherwise, a panic in fn included.
 func (db *DB) Tx(ctx context.Context, fn func(*sql.Tx) error) error {
 	tx, err := db.Write.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
+	// However fn ends: a panic stopped further up (safe, a request's recovery) would otherwise leave the transaction
+	// open, and with it the one write connection, for every write after it, as long as ctx lives (some never end).
+	defer tx.Rollback() //nolint:errcheck // after a commit or a rollback, it only says the transaction is done
 	// A context that ended (the player went away) has rolled the transaction back already, and then each step after
 	// says only that it's done: the context's end is what happened.
 	if err := fn(tx); err != nil {
