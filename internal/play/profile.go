@@ -80,10 +80,12 @@ func (g *Game) relation(ctx context.Context, p *Profile, viewer, id int64) error
 	} else if !errors.Is(err, ErrNotFriends) {
 		return err
 	}
-	// A request either way: the viewer's to them, or theirs to the viewer (by tag, or to the viewer's email).
+	// A request either way: the viewer's to them (not one by a shared link: that names nobody to the viewer, who
+	// would otherwise find whose link it was by opening profiles: AskSharer), or theirs to the viewer (by tag, or to
+	// the viewer's email).
 	var request, from int64
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT r.id, r.from_id FROM friend_requests r
-		WHERE (r.from_id = ?1 AND r.to_id = ?2)
+		WHERE (r.from_id = ?1 AND r.to_id = ?2 AND r.via_issue IS NULL)
 		OR (r.from_id = ?2 AND (r.to_id = ?1 OR r.to_email = (SELECT email FROM users WHERE id = ?1)) AND NOT r.declined)
 		ORDER BY r.from_id = ?2 DESC LIMIT 1`, viewer, id).Scan(&request, &from)
 	if errors.Is(err, sql.ErrNoRows) {

@@ -11,19 +11,20 @@ import (
 // What /admin tells of the players: one plain table, a row a day, of how many played (people only: play.People), how
 // many of them for the first time, how many of that day's issues were shared (a link made for them: share.go), and of
 // the new, how many played again a day, a week and a month after (play.DayCounts). It's read from the days played,
-// the games and the links shared, nothing kept for it: a change is judged by whether players come back (DECISIONS.md,
+// the games and the links shared, nothing kept for it but one count a day, of the new who came by a shared link
+// (play.ByLinkDays: no more than the number): a change is judged by whether players come back (DECISIONS.md,
 // „The rule for later“), and the bet that the share brings players is read as the new beside the days shared.
 
 // AdminDays is how many days /admin's table shows, today with them.
 const AdminDays = 60
 
 // dayRow is a day of /admin's table as it shows it: the day („10.11“), its players and new ones, that day's issues
-// shared, and those of the new back after each of play.Backs („42% (5)“; "—" while that day isn't over, or with none
-// new).
+// shared, the new who came by a shared link, and those of the new back after each of play.Backs („42% (5)“; "—"
+// while that day isn't over, or with none new).
 type dayRow struct {
-	Day                 string
-	Played, New, Shared int
-	Back                [len(play.Backs)]string
+	Day                         string
+	Played, New, Shared, ByLink int
+	Back                        [len(play.Backs)]string
 }
 
 // dayRows are /admin's table, newest first.
@@ -37,9 +38,13 @@ func (s *Server) dayRows(ctx context.Context) ([]dayRow, error) {
 	if err != nil {
 		return nil, err
 	}
+	byLink, err := s.game.ByLinkDays(ctx, from)
+	if err != nil {
+		return nil, err
+	}
 	var rows []dayRow
 	for _, c := range act.DayCounts() {
-		r := dayRow{Day: short(c.Day), Played: c.Played, New: c.New, Shared: shared[c.Day]}
+		r := dayRow{Day: short(c.Day), Played: c.Played, New: c.New, Shared: shared[c.Day], ByLink: byLink[c.Day]}
 		for k := range play.Backs {
 			r.Back[k] = "—"
 			if c.Due[k] && c.New > 0 {

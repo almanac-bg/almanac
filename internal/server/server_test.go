@@ -839,14 +839,17 @@ func pushWorld(t *testing.T) (*Server, *game, *fakePushService, func(p *player, 
 }
 
 // playRun answers each question of a run (any answer will do).
-func playRun(p *player, run map[string]any) {
+func playRun(p *player, run map[string]any) { playRunBy(p, run, "", 3*time.Second) }
+
+// playRunBy plays a run with every answer `took` after its question showed (under a second or so is a script's:
+// play/fair.go), sent from a page opened at a shared day's link (`via`, as the page sends it), if any.
+func playRunBy(p *player, run map[string]any, via string, took time.Duration) {
 	id := strconv.Itoa(int(run["id"].(float64)))
 	for n := range 10 {
 		_, st := p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
-		// Answered at a person's pace, three seconds in, or the game is a script's that only its player sees
-		// (play/fair.go).
+		// Answered `took` after it showed (playRun: three seconds, a person's pace).
 		if _, err := p.g.db.Write.Exec(`UPDATE runs SET shown_at = ? WHERE id = ?`,
-			p.g.srv.game.Now().Add(-3*time.Second).UnixMilli(), id); err != nil {
+			p.g.srv.game.Now().Add(-took).UnixMilli(), id); err != nil {
 			p.g.t.Fatal(err)
 		}
 		view := st["question"].(map[string]any)["view"].(map[string]any)
@@ -863,7 +866,7 @@ func playRun(p *player, run map[string]any) {
 		case "split":
 			a = map[string]any{"sides": []int{0, 1, 0, 1, 0, 1}}
 		}
-		p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": a})
+		p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": n, "answer": a, "via": via})
 	}
 }
 

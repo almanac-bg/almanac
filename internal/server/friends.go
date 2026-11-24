@@ -3,7 +3,9 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -66,15 +68,27 @@ func (s *Server) friends(w http.ResponseWriter, r *http.Request) error {
 // errPlayFirst is a friend request from a guest who has yet to finish a game.
 var errPlayFirst = &apiError{http.StatusForbidden, "play_first", "Първо изиграй една игра, после добавяй приятели."}
 
-// requestFriend asks someone to be friends: by their tag (@tag) or an email address. A guest asks once they've
-// finished a game (errPlayFirst).
+// errNoLink is a request by a shared link (askSharer) that isn't one, or not of a day the player has finished while
+// it's today's.
+var errNoLink = &apiError{http.StatusNotFound, "no_link", "Тази връзка вече не води до днешния брой."}
+
+// errLinkAsked is a request by a shared link that has brought its owner play.SharerAsks requests already.
+var errLinkAsked = &apiError{http.StatusConflict, "link_asked",
+	"По тази връзка вече поискаха приятелство твърде много хора. Поискай потребителското име на човека, който ти я прати."}
+
+// linkOf is a shared day's link as the page sends it, its issue and code („13-k4f2m7qa“: share.go, sharePath).
+var linkOf = regexp.MustCompile(`^([0-9]{1,5})-([a-z2-9]{8})$`)
+
+// requestFriend asks someone to be friends: by their tag (@tag) or an email address, or (link) whoever shared the day
+// the player played by its link (play.AskSharer). A guest asks once they've finished a game (errPlayFirst).
 func (s *Server) requestFriend(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
 		return err
 	}
 	var in struct {
-		To string `json:"to"`
+		To   string `json:"to"`
+		Link string `json:"link"`
 	}
 	if err := readJSON(r, &in); err != nil {
 		return err
@@ -94,6 +108,9 @@ func (s *Server) requestFriend(w http.ResponseWriter, r *http.Request) error {
 			return errPlayFirst
 		}
 	}
+	if in.Link != "" {
+		return s.askSharer(w, r, u, in.Link)
+	}
 	to, byEmail := strings.TrimSpace(in.To), strings.Contains(in.To, "@") && !strings.HasPrefix(strings.TrimSpace(in.To), "@")
 	if byEmail {
 		to, err = account.NormalEmail(to)
@@ -109,6 +126,31 @@ func (s *Server) requestFriend(w http.ResponseWriter, r *http.Request) error {
 	}
 	s.toldOfRequest(r.Context(), u, sent)
 	return ok(w, sent)
+}
+
+// askSharer asks whoever shared the day by the link the player played it by (play.AskSharer), within the limits of
+// any request (requestFriend's) and the link's own (play.SharerAsks). Its answer is the same whoever it went to, and
+// whether a request was made or one stood already: it names nobody (DECISIONS.md, Sharing: unsigned).
+func (s *Server) askSharer(w http.ResponseWriter, r *http.Request, u *account.User, link string) error {
+	m := linkOf.FindStringSubmatch(link)
+	if m == nil {
+		return errNoLink
+	}
+	issue, _ := strconv.Atoi(m[1])
+	sent, err := s.game.AskSharer(r.Context(), u.ID, issue, m[2])
+	switch {
+	case errors.Is(err, play.ErrNoRun):
+		return errNoLink
+	case errors.Is(err, play.ErrSharerAsked):
+		return errLinkAsked
+	case err != nil:
+		return err
+	}
+	if sent.New {
+		s.notifyFrom(context.WithoutCancel(r.Context()), u.ID, push.Message{Title: u.Name + " иска да сте приятели",
+			Body: fmt.Sprintf("По връзката ти от Брой %d. Приеми или откажи в Приятели.", issue), URL: "/friends"}, sent.To)
+	}
+	return ok(w, map[string]bool{"ok": true})
 }
 
 // toldOfRequest tells a player that another has asked them to be friends: by a push the first time (notifyFrom), not

@@ -123,8 +123,11 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      played has come (before, the board names nobody to the player and shows no squares), never for yesterday's issue
      finished late, and never before the day is played: Днес is then the issue alone. Among friends: each who played,
      best first, the player among them; with none, the player's own row and why it's alone (no friends yet: „Още нямаш
-     приятели. Добави приятели и сравнявайте резултатите си всеки ден.“, „Добави приятели“ a link to Приятели; else
-     „Още никой от приятелите ти не е играл днес.“). All България: how it spread (eleven bars, 0 to 10, the player's in
+     приятели. Добави приятели и сравнявайте резултатите си всеки ден.“, „Добави приятели“ a link to Приятели; come by
+     someone else's link to that day, „Още нямаш приятели.“ and in its place one `.btn.inline`, „Покани човека, който ти
+     прати връзката“, a quiet line under it, „Ще види поканата в Приятели. Кой е, ще разбереш, ако я приеме.“, then
+     „Поканата е изпратена. Ако я приеме, ще се появи в приятелите ти.“: the request names nobody to its sender
+     (DECISIONS.md, Friends); else „Още никой от приятелите ти не е играл днес.“). All България: how it spread (eleven bars, 0 to 10, the player's in
      ink with „ти“ over it, the average a thin line with its label in a row over the bars, clear of „ти“; from ten
      players; the ticks no bigger than their columns hold, so „10“ never runs into „9“ with large text), the player's
      place („В България си на 20-о място от 53.“; with none right, on a first day or in the lower half only „Днес
@@ -240,8 +243,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   A duel named in the address (`?duel=<id>`: its game just ended, or an old link to its page) is first in its group,
   brought into sight, and its result lands there once (`feel.duel`: the marks fill pair by pair, the score counts
   up, the chip lands with the end's sound), never again. The record between two is the friend's row's, never a duel's. Friends are added in one field under „Добави приятел“, „име или
-  имейл“; a request by email says no letter goes („Писмо не пращаме.“) and offers „Сподели“: today's issue and the player's username, for one who doesn't play yet; requests sent wait under „Изпратени покани (2)“, each section headed alike (`.sect-head`). A request to the
-  player is a card as every card is, no frame of its own, „Приеми“ and „Откажи“ under the name, on its edge. Only two friends of one name show their @username. The
+  имейл“; a request by email says no letter goes („Писмо не пращаме.“) and offers „Сподели“: today's issue and the player's username, for one who doesn't play yet; requests sent wait under „Изпратени покани (2)“, each section headed alike (`.sect-head`); one by a shared link names nobody, „Който ти прати връзката към Брой 13“. A request to the
+  player is a card as every card is, no frame of its own, „Приеми“ and „Откажи“ under the name, on its edge; one by the player's shared link says so under the name, „Иска да сте приятели. По връзката ти от Брой 13.“ Only two friends of one name show their @username. The
   questions' dialog (above) says under its head whose duel it is and its score, each question with how it went for
   the two.
 - **Профил:** one column, on a big screen too: the avatar with a pencil on its top corner (a phone: always; a big screen: as the pointer

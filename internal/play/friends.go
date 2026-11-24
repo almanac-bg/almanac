@@ -84,6 +84,12 @@ type Sent struct {
 // the address, or signs in with it later, and the sender learns nothing about whether anyone does. to is already a
 // normal tag or email (account.NormalTag, account.NormalEmail); byEmail says which.
 func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool) (Sent, error) {
+	return g.request(ctx, from, to, byEmail, 0)
+}
+
+// request is Request, made by the shared link of the issue via (AskSharer), or (0) by the tag or the email given.
+// Asked by tag after, a request made by a link is one by tag; asked by the link after, one by tag stays so.
+func (g *Game) request(ctx context.Context, from int64, to string, byEmail bool, via int) (Sent, error) {
 	var mine sql.NullString // the sender's email: requests to it are to them
 	if err := g.DB.Read.QueryRowContext(ctx, `SELECT email FROM users WHERE id = ?`, from).Scan(&mine); err != nil {
 		return Sent{}, err
@@ -142,8 +148,9 @@ func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool)
 				ON CONFLICT (from_id, to_email) WHERE to_email IS NOT NULL DO UPDATE SET at = excluded.at`, from, to, now)
 			return err
 		}
-		_, err := tx.Exec(`INSERT INTO friend_requests (from_id, to_id, at) VALUES (?, ?, ?)
-			ON CONFLICT (from_id, to_id) WHERE to_id IS NOT NULL DO UPDATE SET at = excluded.at`, from, other, now)
+		_, err := tx.Exec(`INSERT INTO friend_requests (from_id, to_id, at, via_issue) VALUES (?, ?, ?, nullif(?, 0))
+			ON CONFLICT (from_id, to_id) WHERE to_id IS NOT NULL DO UPDATE SET at = excluded.at,
+				via_issue = iif(excluded.via_issue IS NULL, NULL, friend_requests.via_issue)`, from, other, now, via)
 		return err
 	})
 	if err == nil && crossed {
@@ -168,12 +175,15 @@ type FriendRequest struct {
 	// Email is the address a request went to, shown only to its sender.
 	Email string `json:"email,omitempty"`
 	Look  *Look  `json:"look,omitempty"`
+	// Via is the issue whose shared link the request came by (AskSharer): to the one asked, „по връзката ти от Брой
+	// 13“; to its sender, it stands in for whom it went to, who stays unnamed unless they say yes.
+	Via int `json:"via,omitempty"`
 }
 
 // Requests are a player's friend requests: those waiting for their answer, and those they sent.
 func (g *Game) Requests(ctx context.Context, userID int64) (in, out []FriendRequest, err error) {
 	db := g.DB.Read
-	rows, err := db.QueryContext(ctx, `SELECT r.id, r.at, u.id, u.name, u.tag, `+lookColumns+`
+	rows, err := db.QueryContext(ctx, `SELECT r.id, r.at, coalesce(r.via_issue, 0), u.id, u.name, u.tag, `+lookColumns+`
 		FROM friend_requests r JOIN users u ON u.id = r.from_id
 		WHERE (r.to_id = ?1 OR r.to_email = (SELECT email FROM users WHERE id = ?1)) AND NOT r.declined
 		ORDER BY r.at DESC`, userID)
@@ -185,7 +195,7 @@ func (g *Game) Requests(ctx context.Context, userID int64) (in, out []FriendRequ
 		var r FriendRequest
 		var id int64
 		var avatar string
-		if err := rows.Scan(&r.ID, &r.At, &id, &r.Name, &r.Tag, &avatar); err != nil {
+		if err := rows.Scan(&r.ID, &r.At, &r.Via, &id, &r.Name, &r.Tag, &avatar); err != nil {
 			rows.Close()
 			return nil, nil, err
 		}
@@ -197,7 +207,10 @@ func (g *Game) Requests(ctx context.Context, userID int64) (in, out []FriendRequ
 	if err := rows.Err(); err != nil {
 		return nil, nil, err
 	}
-	rows, err = db.QueryContext(ctx, `SELECT r.id, r.at, coalesce(u.name, ''), coalesce(u.tag, ''), coalesce(r.to_email, '')
+	// One made by a shared link names nobody to its sender (AskSharer).
+	rows, err = db.QueryContext(ctx, `SELECT r.id, r.at, coalesce(r.via_issue, 0),
+			iif(r.via_issue IS NULL, coalesce(u.name, ''), ''), iif(r.via_issue IS NULL, coalesce(u.tag, ''), ''),
+			coalesce(r.to_email, '')
 		FROM friend_requests r LEFT JOIN users u ON u.id = r.to_id WHERE r.from_id = ? ORDER BY r.at DESC`, userID)
 	if err != nil {
 		return nil, nil, err
@@ -206,7 +219,7 @@ func (g *Game) Requests(ctx context.Context, userID int64) (in, out []FriendRequ
 	out = []FriendRequest{}
 	for rows.Next() {
 		var r FriendRequest
-		if err := rows.Scan(&r.ID, &r.At, &r.Name, &r.Tag, &r.Email); err != nil {
+		if err := rows.Scan(&r.ID, &r.At, &r.Via, &r.Name, &r.Tag, &r.Email); err != nil {
 			return nil, nil, err
 		}
 		out = append(out, r)
@@ -293,14 +306,6 @@ func (g *Game) SawFriends(ctx context.Context, userID int64) error {
 	_, err := g.DB.Write.ExecContext(ctx, `UPDATE users SET friends_seen_at = max(friends_seen_at, ?) WHERE id = ?`,
 		store.Ms(g.Now()), userID)
 	return err
-}
-
-// Asked is whether a player's request to another waits for their answer.
-func (g *Game) Asked(ctx context.Context, from, to int64) (bool, error) {
-	var asked bool
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM friend_requests WHERE from_id = ? AND to_id = ?)`,
-		from, to).Scan(&asked)
-	return asked, err
 }
 
 // Unfriend ends a friendship, for both, and the duels open between them with it: their time is up now, and each ends

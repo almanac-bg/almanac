@@ -69,13 +69,15 @@ function showing(run: number): void {
  * in (while it shows: what comes after can be asked for meanwhile). A duel is named over each question as its page
  * names it (`versus`: „Дуел с Мария“); played second (the run's
  * `against`), how the other's answer went (`them`, their name) shows once the player's own is in, never when they gave
- * it: a duel isn't a race. */
+ * it: a duel isn't a race. Played on a page opened at a shared day's link, its answers say it (`via`, „13-k4f2m7qa“): a new
+ * player's first game, ended, counts as one who came by a link, and nothing else is kept of it (server/game.go). */
 export function playRun(
   initial: State,
   done: (s: State) => Child,
   versus = "",
   them = "",
   ending: () => void = () => {},
+  via = "",
 ): Child {
   const screen = slot();
   hold();
@@ -154,10 +156,20 @@ export function playRun(
       const q = s.question;
       showing(s.id);
       screen.show(() =>
-        question(s, q, next, reload, versus, say, them, (now) => {
-          last = now;
-          if (now.done) ending();
-        }),
+        question(
+          s,
+          q,
+          next,
+          reload,
+          versus,
+          say,
+          them,
+          (now) => {
+            last = now;
+            if (now.done) ending();
+          },
+          via,
+        ),
       );
       scrollTo(0, 0);
     } else whenSeen(next);
@@ -581,6 +593,7 @@ function question(
   say: Say,
   them: string,
   taken: (now: State) => void,
+  via: string,
 ): Child {
   const problem = slot();
   const after = h("div", { class: "after", hidden: true });
@@ -642,7 +655,11 @@ function question(
     post: (answer): Promise<Result> => {
       held ||= answer === null ? 1 : performance.now() + holdMs;
       inTime ??= ans.left.ms() > -1000;
-      return api<Result>("POST", `/api/runs/${s.id}/answer`, { n: q.n, answer, inTime });
+      return api<Result>(
+        "POST",
+        `/api/runs/${s.id}/answer`,
+        via ? { n: q.n, answer, inTime, via } : { n: q.n, answer, inTime },
+      );
     },
     open: () => !over,
     tries: 3,

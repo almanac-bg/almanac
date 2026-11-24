@@ -222,7 +222,13 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if isShared {
-		start["shared"] = shared
+		// With its link (to ask whoever shared it to be friends, and to count a new player who came by it: share.go),
+		// and whether it's the player's own: never whose it is.
+		start["shared"] = struct {
+			play.Share
+			Link string `json:"link"`
+			Mine bool   `json:"mine,omitempty"`
+		}{shared, fmt.Sprintf("%d-%s", shared.Issue, shared.Code), u != nil && u.ID == shared.Owner}
 	}
 	boot, _ := json.Marshal(start) // escapes <, > and &: safe inside the script element
 	files := filesOf(m, r.URL.Path)
