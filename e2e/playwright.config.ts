@@ -37,7 +37,10 @@ export default defineConfig({
   outputDir: "../test-results/e2e",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
+  // On CI a test runs once more after failing, so the log tells a flaky test from a broken one; but one that passes
+  // only on its retry still fails the run (and its trace is kept): main's red is the only place anyone sees it.
   retries: process.env.CI ? 1 : 0,
+  failOnFlakyTests: !!process.env.CI,
   reporter: process.env.CI ? [["github"], ["list"]] : "list",
   timeout: 60_000,
   use: { baseURL: `http://127.0.0.1:${port}`, trace: "retain-on-failure", locale: "bg-BG" },
