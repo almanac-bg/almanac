@@ -266,7 +266,9 @@ func (s *Server) health(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, out)
 }
 
-// probeEvery is how long a write probe's answer holds: monitors poll every minute or so, and each probe is a write.
+// probeEvery is how long a write probe's answer holds: monitors poll every minute or so, and each probe is a write. A
+// failed one holds as long, so deploy.sh's health watch polls at least half of it apart (one slow write isn't read as
+// three misses): change the two together.
 const probeEvery = 30 * time.Second
 
 // probe is what the last write probe found (health).

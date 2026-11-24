@@ -11,12 +11,13 @@
 # (cmd/almanac/banks.go), at once (internal/server/bank.go). Then it asks the server (/api/health) what became of it,
 # and its last line says:
 #
-#   live: <commit> <title>      the game plays it
+#   live: <commit> <title>      the game deals and grades from it
 #
-# or, with exit 1, that the server refused it or didn't say. One run at a time, and never beside a deploy (deploy.sh
-# takes the same lock): a second run, or a deploy, waits for the first, as it waits for a deploy. A reload's work (the
-# days ahead drawn again) during a deploy's health watch could pass for the new version's fault, and send it back
-# (23 Nov 2026).
+# or, with exit 1, that the server refused it or didn't say. What the new bank changes in the days follows within the
+# server's next minute (play.KeepDays), after this has ended: today's questions it no longer plays voided, the days
+# ahead drawn again if it changed theirs. One run at a time, and never beside a deploy (deploy.sh takes the same lock):
+# a second run, or a deploy, waits for the first, as it waits for a deploy, so the program that checks a bank here is
+# the one that plays it.
 set -eu
 repo=/srv/almanac-bank
 lock=/run/almanac-deploy.lock # deploy.sh's too
@@ -40,7 +41,7 @@ stage=$work/bank
 mkdir "$stage"
 git -C "$repo" archive "$new" | tar -x -C "$stage"
 set -- -live "$repo"
-if systemd-run --quiet --pipe --wait -p User=almanac -p EnvironmentFile=/etc/almanac/env \
+if systemd-run --quiet --collect --pipe --wait -p User=almanac -p EnvironmentFile=/etc/almanac/env \
 	/usr/local/bin/almanac bank used >"$work/used" 2>/dev/null; then
 	set -- "$@" -used "$work/used"
 else

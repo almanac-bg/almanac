@@ -63,7 +63,8 @@ restart | start)
 	v=$("$LINK" version)
 	echo "$v" >"$W/running"
 	echo $(($(cat "$W/pid") + 1)) >"$W/pid"
-	rm -f "$W/crash-at"
+	echo "$now" >"$W/started"
+	rm -f "$W/crash-at" "$W/probed"
 	if [ "$(cat "$W/behave-$v" 2>/dev/null)" = crash ]; then echo $((now + 30)) >"$W/crash-at"; fi
 	if [ -f "$W/migrates-$v" ] && [ ! -e "$DATA/before-$v.db" ]; then
 		cp "$DATA/almanac.db" "$DATA/before-$v.db"
@@ -88,7 +89,19 @@ case $url in
 */api/health)
 	r=$(cat "$W/running")
 	[ -n "$r" ] || exit 7
-	[ "$(cat "$W/behave-$r" 2>/dev/null)" != never ] || exit 7
+	behave=$(cat "$W/behave-$r" 2>/dev/null || true)
+	[ "$behave" != never ] || exit 7
+	# From some seconds after its start (from-<tag>): one write that takes the probe's 5 s and fails, its 503 then held
+	# 30 s from the probe's start, as /api/health holds it (probeEvery); or every answer 5 s late and none (a hang).
+	case $behave in stall | hang)
+		now=$(cat "$W/clock")
+		if [ $((now - $(cat "$W/started"))) -ge "$(cat "$W/from-$r")" ]; then
+			if [ "$behave" = hang ]; then echo $((now + 5)) >"$W/clock"; exit 28; fi
+			if [ ! -f "$W/probed" ]; then echo "$now" >"$W/probed"; echo $((now + 5)) >"$W/clock"; exit 22; fi
+			[ "$now" -ge $(($(cat "$W/probed") + 30)) ] || exit 22
+		fi
+		;;
+	esac
 	if [ -f "$W/crash-at" ] && [ "$(cat "$W/clock")" -ge "$(cat "$W/crash-at")" ]; then exit 7; fi
 	printf '{"version":"%s"}' "$r"
 	;;
@@ -110,7 +123,11 @@ type release struct {
 	says       string   // the version it says it is, if not its tag
 	unsigned   bool
 	badSig     bool
-	behave     string // healthy (""), never (doesn't come up), crash (comes up, stops after 30 s)
+	// behave is how it runs: healthy (""), never (doesn't come up), crash (comes up, stops after 30 s), stall (one
+	// write stalls from `from` seconds after its start, and health answers 503 for 30 s), hang (from `from` on, health
+	// never answers).
+	behave string
+	from   int
 	// reads says how it takes the bank the game plays (`almanac bank check`): "" for a program too old to check one
 	// (it says nothing), "yes", "no" (it can't load it), "uneven" (it loads it, and fails on the categories' sizes).
 	reads    string
@@ -256,6 +273,7 @@ func (m *machine) publish(r release) {
 	}
 	if r.behave != "" {
 		m.write(filepath.Join(m.world, "behave-"+r.tag), r.behave, 0o644)
+		m.write(filepath.Join(m.world, "from-"+r.tag), fmt.Sprint(r.from), 0o644)
 	}
 	if r.migrates {
 		m.write(filepath.Join(m.world, "migrates-"+r.tag), "", 0o644)
@@ -492,6 +510,32 @@ func TestBackFromACrash(t *testing.T) {
 	}
 }
 
+// The watch after a good start: one write that stalls (a 503, held 30 s by /api/health) keeps the release, whenever
+// in the two minutes it comes, as on 23 Nov 2026 it didn't; a server that stops answering goes back.
+func TestWatch(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		behave string
+		from   int
+		live   bool
+	}{
+		{"stall", 5, true}, {"stall", 20, true}, {"stall", 60, true}, {"stall", 100, true},
+		{"hang", 20, false}, {"hang", 60, false},
+	} {
+		t.Run(fmt.Sprintf("%s from +%ds", c.behave, c.from), func(t *testing.T) {
+			t.Parallel()
+			m := newMachine(t)
+			m.publish(release{tag: "v1.0.1", migrations: healthy.migrations, behave: c.behave, from: c.from})
+			out, code := m.deploy("v1.0.1", "ci")
+			if c.live {
+				expect(t, out, code, 0, "live: v1.0.1")
+				return
+			}
+			expect(t, out, code, 1, "isn't healthy: it stopped answering", "back to almanac-v1.0.0")
+		})
+	}
+}
+
 // A version before that can't list its migrations: the release alone is marked.
 func TestBackToAnOldOne(t *testing.T) {
 	t.Parallel()
@@ -573,7 +617,7 @@ func TestNotBelowTheBank(t *testing.T) {
 }
 
 // A deploy and a bank reload never run at once: both take one lock, the same file on the server, and each waits for
-// the other, saying so. A reload's work during a deploy's health watch sent a healthy release back (23 Nov 2026).
+// the other, saying so: a new program reads the bank it will play, and a reload is checked by the program that plays it.
 func TestDeployAndBankShareALock(t *testing.T) {
 	t.Parallel()
 	lockOf := func(script string) string {
@@ -687,4 +731,39 @@ func (l *lockedBuffer) String() string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	return l.b.String()
+}
+
+// A command run as a unit of its own and waited for (`systemd-run … --wait`) is collected when it ends: without
+// --collect, one that fails stays in systemd as a failed unit until someone resets it (three did on the server, from
+// ad-hoc runs of the lines the docs and skills give). So every such line the scripts, docs and skills give collects.
+func TestTransientUnitsCollected(t *testing.T) {
+	t.Parallel()
+	var files []string
+	for _, pattern := range []string{"*.sh", "../*.md", "../.claude/skills/*/*.md"} {
+		found, err := filepath.Glob(pattern)
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, found...)
+	}
+	waits := regexp.MustCompile("systemd-run\\s[^'`]*--wait")
+	seen := 0
+	for _, file := range files {
+		src, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i, line := range strings.Split(string(src), "\n") {
+			if !waits.MatchString(line) {
+				continue
+			}
+			seen++
+			if !strings.Contains(line, "--collect") {
+				t.Errorf("%s:%d: systemd-run --wait without --collect: %s", file, i+1, strings.TrimSpace(line))
+			}
+		}
+	}
+	if seen < 4 {
+		t.Fatalf("found %d systemd-run lines: has the search lost them?", seen)
+	}
 }

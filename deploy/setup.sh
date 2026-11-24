@@ -35,30 +35,14 @@ if [ ! -d /srv/almanac-bank/.git ]; then
   git clone git@github.com:almanac-bg/almanac-questions.git /srv/almanac-bank
 fi
 
-# Logs: the game's are in the journal only (journald.conf). rsyslog leaves them out (rsyslog.conf), and those it copied
-# before are taken out of its files.
+# Logs: the game's are in the journal only (journald.conf); rsyslog leaves them out (rsyslog.conf).
 install -d /etc/systemd/journald.conf.d
 install -m 644 "$here/journald.conf" /etc/systemd/journald.conf.d/almanac.conf
 systemctl restart systemd-journald
 journalctl --vacuum-time=14d --vacuum-size=2G >/dev/null
 if [ -d /etc/rsyslog.d ]; then
   install -m 644 "$here/rsyslog.conf" /etc/rsyslog.d/10-almanac.conf
-  game=' almanac\[[0-9]*\]: '
-  for f in /var/log/syslog*; do
-    [ -f "$f" ] || continue
-    case "$f" in
-    *.gz)
-      if zgrep -q "$game" "$f"; then
-        zcat "$f" | grep -v "$game" | gzip > "$f.tmp"
-        chown --reference="$f" "$f.tmp"
-        chmod --reference="$f" "$f.tmp"
-        mv "$f.tmp" "$f"
-      fi
-      ;;
-    *) sed -i "/$game/d" "$f" ;;
-    esac
-  done
-  systemctl restart rsyslog # after the files changed under it: it writes to them anew
+  systemctl restart rsyslog
 fi
 
 # Security updates by themselves, and the restart some need, in the quiet hour.

@@ -52,7 +52,7 @@ and the lock removed. A lock left behind holds the next batch up for a day.
      old rules, and the server, which has the new ones, would refuse it at the end: update the checkout first).
 2. **Fetch the days' questions** from the server, so that the runway counts what the days have left, not the whole
    bank (only question ids and the last day drawn come back, nothing of a player's):
-   `ssh -i ~/.ssh/hetzner -o BatchMode=yes root@2.31.121.12 systemd-run --pipe --wait -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac bank used > <batch>/used.txt`.
+   `ssh -i ~/.ssh/hetzner -o BatchMode=yes root@2.31.121.12 systemd-run --pipe --wait --collect -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac bank used > <batch>/used.txt`.
    Its second line is `# through <the last day drawn>`; if the command fails, say so and plan without `-used` (the
    runway then counts the whole bank and overstates it).
 3. **Plan.** `bank plan -n <N> -json -used <batch>/used.txt <bank> > <batch>/plan.json` (N = the number given, else

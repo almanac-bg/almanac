@@ -203,7 +203,7 @@ the steps below, as the older version refuses the migrated database; a release i
 one from before signatures only while it's kept in `/usr/local/lib/almanac`, the five used latest), `almanac-bank` (check the new
 questions apart, then pull and reload them), `journalctl -u almanac` (logs). A bank reload and a deploy never run at
 once (they share a lock: `TestDeployAndBankShareALock`). The `almanac backup` commands need the service's settings:
-`systemd-run --pipe --wait -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac backup verify`
+`systemd-run --pipe --wait --collect -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac backup verify`
 brings the latest copy back and checks it (the server does this itself daily). Health: `https://almanac.bg/api/health`
 shows the live version and the bank played (its commit; one refused).
 
