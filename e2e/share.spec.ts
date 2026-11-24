@@ -37,7 +37,7 @@ test("the day shared: its score and shape and a link, which brings another to th
   await page.getByRole("button", { name: "Сподели", exact: true }).click();
   const sheet = page.getByRole("dialog", { name: "Сподели резултата" });
   const card = sheet.locator(".share-card");
-  await expect(card).toHaveAttribute("src", /^\/card\/\d+-[0-3]{10}\.png$/);
+  await expect(card).toHaveAttribute("src", /^\/card\/\d+-[0-3]{10}\.png\?v=[^&]+$/);
   await expect.poll(() => card.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth)).toBe(1200);
   await expect(sheet.locator(".share-text")).toContainText("/10");
   await sheet.getByRole("button", { name: "Сподели", exact: true }).click();
