@@ -7,7 +7,6 @@ import {
   found,
   hyphenate,
   issueOf,
-  issueWords,
   keepNumbers,
   keepShort,
   leftWords,
@@ -17,13 +16,12 @@ import {
   withWord,
 } from "./words.ts";
 
-test("a day as the game writes it: the date, the month in lower case; with its issue, a dateline", () => {
+test("a day as the game writes it: the date, the month in lower case, whole or short", () => {
   assert.equal(dateWords("2026-11-17"), "17 ноември");
   assert.equal(dateWords("2027-01-01"), "1 януари");
+  assert.equal(dateWords("2026-11-19", true), "19 ноем.");
+  assert.equal(dateWords("2027-05-01", true), "1 май");
   assert.equal(weekday("2026-11-17"), "Вторник");
-  assert.equal(issueWords(6, "2026-11-17"), "Брой 6 · 17 ноември");
-  assert.equal(issueWords(0, "2026-11-11"), "11 ноември");
-  assert.equal(issueWords(undefined, "2026-11-11"), "11 ноември");
 });
 
 test("a day's issue, as the server counts it (play.Issue)", () => {

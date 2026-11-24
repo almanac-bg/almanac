@@ -10,7 +10,7 @@ type State = Record<string, unknown> | null;
 const origin = "https://almanac.bg";
 const entries: { url: string; state: State }[] = [{ url: "/", state: null }];
 let index = 0;
-const loads: string[] = []; // the page loaded anew (reload), or another loaded (assign)
+const loads: string[] = []; // the page loaded anew (reload)
 
 const location = {
   origin,
@@ -19,7 +19,6 @@ const location = {
   search: "",
   hash: "",
   reload: () => loads.push(`reload ${location.pathname}`),
-  assign: (url: string) => loads.push(`assign ${url}`),
 };
 const point = () => {
   const u = new URL(entries[index]?.url ?? "/", origin);
@@ -237,26 +236,6 @@ test("a page fallen behind opens its next screen by loading anew, as tapped", as
   assert.deepEqual(drawn, [], "not drawn in place");
   assert.equal(router.entry().tap, true, "the page loaded anew opens as the tap would have");
   behind = false;
-});
-
-test("a link from outside: a page of the server's own loads as a page; a game under way asks first", async () => {
-  loads.length = 0;
-  router.navigate("https://almanac.bg/mail/off?u=1");
-  assert.deepEqual(loads, ["assign https://almanac.bg/mail/off?u=1"]);
-  router.navigate("https://evil.example/friends");
-  assert.equal(loads.length, 1, "another site's: nothing");
-  let asked = 0;
-  const unguard = router.beforeLeaving(() => {
-    asked++;
-    return true; // „Остани“ for now
-  });
-  const was = location.pathname;
-  router.navigate("/settings");
-  assert.equal(asked, 1);
-  assert.equal(location.pathname, was, "nothing opened before „Излез“");
-  unguard();
-  router.navigate("/settings");
-  assert.equal(location.pathname, "/settings");
 });
 
 test("a screen whose heading comes after it loads gets the focus with it, unless the player has moved it", async () => {

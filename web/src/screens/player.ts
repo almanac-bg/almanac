@@ -23,6 +23,7 @@ let {
   user,
   avatar,
   go,
+  lifetime,
   startDuel,
   withWord,
   profileHead,
@@ -57,6 +58,7 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
     user,
     avatar,
     go,
+    lifetime,
     startDuel,
     withWord,
     profileHead,
@@ -71,9 +73,12 @@ export function playerProfile(kit: Kit, [tag]: string[]): Child {
   title(`@${tag}`);
   const profile = signal<Profile | null>(null);
   const error = signal("");
+  // The page gone, a profile still on its way does nothing: never Профил in place of the page gone to meanwhile.
+  const life = lifetime();
   const load = () =>
     api<Profile>("GET", `/api/players/${tag}`).then(
       (p) => {
+        if (life.aborted) return;
         // One's own by another spelling of it (the server's word): Профил too.
         if (p.me) return go("/me", true);
         profile.set(p);

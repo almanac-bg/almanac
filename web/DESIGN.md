@@ -438,7 +438,7 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   a word needs more (never broken inside one); on a phone the well is the screen's width, its choices sharing it. A
   switch is a 52 × 30 track, its knob white by day (on: the action's colours). Never a native select, radio or
   checkbox.
-- **Sheets over the page** (`.sheet`, a `<dialog>`): a surface with round top corners over a scrim, from the foot on a
+- **Sheets over the page** (`sheet()`, `.sheet`, a `<dialog>`): a surface with round top corners over a scrim, from the foot on a
   phone, centred on a big screen (a name asked for, the share, a way out of a game, the avatars, an entry's picture,
   a game's questions gone over);
   its title's words whole,

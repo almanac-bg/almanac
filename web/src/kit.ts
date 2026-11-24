@@ -12,13 +12,14 @@ import { news } from "./game/news.ts";
 import { hands, reviewSheet } from "./game/results.ts";
 import { shareWordsOut } from "./game/share.ts";
 import { ApiError, api, errorText, lastOf, setIfNew } from "./lib/api.ts";
-import { type Child, computed, effect, h, onCleanup, signal, untracked, when } from "./lib/dom.ts";
+import { dayInBulgaria } from "./lib/day.ts";
+import { type Child, computed, effect, h, lifetime, onCleanup, signal, untracked, when } from "./lib/dom.ts";
 import { reportProblem } from "./lib/errors.ts";
 import { setTick, tickOn } from "./lib/prefs.ts";
 import { needsHomeScreen, pushable, pushOn, pushPrefs, setPushPref, turnOff, turnOn } from "./lib/push.ts";
 import { go, rename, title } from "./lib/router.ts";
 import { feelKit, loadFeel, play, quietWhenSilent, setSound, soundOn } from "./lib/sound.ts";
-import { leftWords, searchWords, withWord } from "./lib/words.ts";
+import { dateWords, leftWords, searchWords, withWord } from "./lib/words.ts";
 import { acceptedLine, startDuel } from "./screens/duel.ts";
 import { keepGame, mailAsk } from "./screens/keep.ts";
 import { missing } from "./screens/missing.ts";
@@ -47,6 +48,7 @@ import {
   seal,
   sealsSection,
   shapeNames,
+  sheet,
   standing,
   textWords,
   who,
@@ -65,6 +67,8 @@ export const kit = {
   chapterName,
   chapters,
   computed,
+  dateWords,
+  dayInBulgaria,
   effect,
   errorText,
   failure,
@@ -84,6 +88,7 @@ export const kit = {
   pictureCredit,
   searchWords,
   leftWords,
+  lifetime,
   loadFeel,
   loadStats,
   mailAsk,
@@ -117,6 +122,7 @@ export const kit = {
   setLook,
   look,
   shapeNames,
+  sheet,
   signal,
   signIn,
   noEmail,

@@ -39,6 +39,9 @@ export function formatValue(n: number): string {
     .replace("-", "−");
 }
 
+/** A count with its noun, one or many, in Bulgarian digits: „1 ден“, „12 дни“, „1 234 отговора“. */
+export const count = (n: number, one: string, many: string) => `${formatNumber(n)} ${n === 1 ? one : many}`;
+
 /** Several things in a sentence, as Bulgarian lists them: „Мария, Бо и Ци“. */
 export function listWords(list: string[]): string {
   return list.length > 1 ? `${list.slice(0, -1).join(", ")} и ${list.at(-1)}` : (list[0] ?? "");
@@ -71,10 +74,14 @@ const months = [
   "декември",
 ];
 
-/** A day (YYYY-MM-DD) as the game writes it: „17 ноември“, the month in lower case. */
-export function dateWords(day: string): string {
+/** The months as a short date writes them (an entry's in the Алманах: „19 ноем.“). */
+const shortMonths = ["ян.", "февр.", "март", "апр.", "май", "юни", "юли", "авг.", "септ.", "окт.", "ноем.", "дек."];
+
+/** A day (YYYY-MM-DD) as the game writes it: „17 ноември“, the month in lower case; `short`, „17 ноем.“, the two
+ * never parted at a line's end. */
+export function dateWords(day: string, short = false): string {
   const [, month = 1, date = 1] = day.split("-").map(Number);
-  return `${date} ${months[month - 1]}`;
+  return short ? `${date}\u00a0${shortMonths[month - 1]}` : `${date} ${months[month - 1]}`;
 }
 
 /** The day of Брой 1 (play.FirstIssue). */
@@ -85,12 +92,6 @@ export function issueOf(day: string): number {
   const [y = 0, m = 1, d = 1] = day.split("-").map(Number);
   const n = Math.round((Date.UTC(y, m - 1, d) - firstIssue) / 86_400_000);
   return n >= 0 ? n + 1 : 0;
-}
-
-/** A day's issue (play/issue.go) and its date, as the game's dateline: „Брой 6 · 17 ноември“; the date alone without
- * one. */
-export function issueWords(issue: number | undefined, day: string): string {
-  return issue ? `Брой ${issue} · ${dateWords(day)}` : dateWords(day);
 }
 
 const vowel = /[аъоуеиюяѝ]/;

@@ -1,5 +1,5 @@
 // The game's feel, in a file of its own: the sounds' voices, the result's moment (a game's end as a short sequence),
-// the streak growing in place. It loads after the player's first touch
+// a duel's. It loads after the player's first touch
 // (lib/sound.ts starts it), since nothing sounds or ends before one, and the first screen doesn't wait for it; until
 // it's in, the game is whole and only plainer: the screens always draw the end state, and this only moves them there.
 // Like a screen that loads on its own (kit.ts), it imports nothing of the app but types: what it needs comes as
@@ -18,9 +18,9 @@
 
 import type { SoundName } from "./lib/sound.ts";
 
-/** A note: its voice (bell, pluck, thud, beep, noise swell), its pitch in steps of the scale from D5 (−5 is D4,
+/** A note: its voice (bell, pluck, thud, beep), its pitch in steps of the scale from D5 (−5 is D4,
  * 5 is D6), when it starts (s), how long it rings (s), and how loud (0–1). */
-type Note = [voice: "b" | "p" | "t" | "s" | "w", step: number, at: number, ring: number, loud: number];
+type Note = [voice: "b" | "p" | "t" | "s", step: number, at: number, ring: number, loud: number];
 
 /** A sound: its notes, and whether it has the room (the reverb): only the big moments do. */
 type Cue = { notes: Note[]; room?: boolean };
@@ -93,14 +93,6 @@ const cues: Record<SoundName, Cue> = {
   // each that wasn't.
   pip: { notes: [["p", 0, 0, 0.05, 0.4]] },
   dud: { notes: [["t", 0, 0, 0.12, 0.3]] },
-  // The streak one day longer: a warm rising fifth over a swell of air.
-  streak: {
-    notes: [
-      ["w", 0, 0, 0.4, 0.12],
-      ["b", -5, 0, 0.35, 0.45],
-      ["b", -2, 0.12, 0.5, 0.5],
-    ],
-  },
 };
 
 /** A step of the scale from D5 as a pitch (Hz): D E F♯ A B in each octave. A fraction of a step detunes. */
@@ -144,7 +136,7 @@ function bus(c: BaseAudioContext) {
   const wet = c.createGain();
   wet.gain.value = 0.12;
   verb.connect(wet).connect(dry);
-  // White noise, for the pluck's click, the thud's knock and the swell.
+  // White noise, for the pluck's click and the thud's knock.
   const noise = c.createBuffer(1, Math.round(0.5 * rate), rate);
   const n = noise.getChannelData(0);
   for (let i = 0; i < n.length; i++) n[i] = Math.random() * 2 - 1;
@@ -244,20 +236,11 @@ export function sound(c: BaseAudioContext, name: SoundName, lift: number, t0: nu
       const knock = envelope(c, t, 0.002, 0.04, loud * 0.6);
       knock.connect(dry);
       noise(c, white, t, 0.04, "lowpass", 800, 0.7, knock);
-    } else if (voice === "s") {
+    } else {
       // The beep: a plain short sine, for the clock.
       const env = envelope(c, t, 0.005, ring, loud);
       env.connect(dry);
       osc(c, f, t, end, env);
-    } else {
-      // The swell: air rising and falling under a sound, through a filter that opens.
-      const env = c.createGain();
-      env.gain.setValueAtTime(0.0001, t);
-      env.gain.exponentialRampToValueAtTime(loud, t + ring * 0.6);
-      env.gain.exponentialRampToValueAtTime(0.0001, t + ring);
-      env.connect(dry);
-      const shape = noise(c, white, t, ring, "bandpass", 600, 0.8, env);
-      shape.frequency.exponentialRampToValueAtTime(2400, t + ring);
     }
   }
 }
@@ -488,75 +471,4 @@ export function duel(card: HTMLElement, plan: DuelPlan, hands: Hands): Promise<v
     addEventListener("keydown", done, true);
     at(1600, done);
   });
-}
-
-/** A number in place rolling from what it was to what it is: the old one slides up and out, the new one in from
- * below. */
-function roll(el: HTMLElement, from: string, to: string): Promise<void> {
-  const box = document.createElement("span");
-  box.style.cssText = "display:inline-grid;overflow:hidden;vertical-align:bottom";
-  const was = document.createElement("span");
-  const now = document.createElement("span");
-  was.textContent = from;
-  now.textContent = to;
-  for (const s of [was, now]) s.style.gridArea = "1/1";
-  box.append(was, now);
-  el.replaceChildren(box);
-  const options = { duration: 300, easing: settleIn, fill: "both" as const };
-  const out = was.animate([{ transform: "none" }, { transform: "translateY(-100%)", opacity: 0 }], options);
-  const into = now.animate(
-    [
-      { transform: "translateY(100%)", opacity: 0 },
-      { transform: "none", opacity: 1 },
-    ],
-    options,
-  );
-  // Filling, an animation stays on the document's timeline with what it moves: cancelled once the number is put.
-  const put = () => {
-    el.replaceChildren(to);
-    out.cancel();
-    into.cancel();
-  };
-  return into.finished.then(put, put);
-}
-
-/** The streak one day longer, in its chip (drawn with the new number): once `after` has come (the result has landed),
- * the number rolls up from the day before (a first streak's words come in with it: never „0 дни без прекъсване“), its words
- * (`label`, of a number) following the number shown: never a number its words don't fit. The flame swells once
- * with a gold glow, and the streak's sound. Resolves once it's over. */
-export async function streak(
-  chip: HTMLElement,
-  days: number,
-  label: (n: number) => string,
-  after: Promise<void>,
-  hands: Hands,
-): Promise<void> {
-  const n = chip.querySelector<HTMLElement>(".status-n");
-  const words = chip.querySelector<HTMLElement>(".status-text");
-  const said = chip.querySelector<HTMLElement>(".status-label");
-  const first = days === 1 && !!words;
-  const was = first ? "" : String(days - 1);
-  if (!hands.calm && n) {
-    n.textContent = was;
-    if (first) words.style.opacity = "0";
-    else if (said) said.textContent = label(days - 1);
-  }
-  await after;
-  hands.play("streak");
-  if (said) said.textContent = label(days);
-  if (hands.calm || !n) return;
-  if (first) {
-    words.style.opacity = "";
-    words.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 300, easing: settleIn });
-  }
-  const gold = token(chip, "--gold");
-  const swell = chip.querySelector(".status-flame")?.animate(
-    [
-      { transform: "none", filter: "none" },
-      { transform: "scale(1.25)", filter: `drop-shadow(0 0 10px ${gold})` },
-      { transform: "none", filter: "none" },
-    ],
-    { duration: 600, easing: "ease-in-out" },
-  );
-  await Promise.all([roll(n, was, String(days)), swell?.finished.catch(() => {})]);
 }

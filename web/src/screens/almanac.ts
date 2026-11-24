@@ -17,11 +17,14 @@ let {
   setIfNew,
   back,
   chapterName,
+  dateWords,
+  dayInBulgaria,
   failure,
   formatNumber,
   glyph,
   h,
   leaf,
+  lifetime,
   missing,
   nameWords,
   onCleanup,
@@ -31,6 +34,7 @@ let {
   rename,
   seal,
   searchWords,
+  sheet,
   signal,
   title,
   chapters,
@@ -96,11 +100,14 @@ function setKit(kit: Kit) {
     setIfNew,
     back,
     chapterName,
+    dateWords,
+    dayInBulgaria,
     failure,
     formatNumber,
     glyph,
     h,
     leaf,
+    lifetime,
     missing,
     nameWords,
     onCleanup,
@@ -110,6 +117,7 @@ function setKit(kit: Kit) {
     rename,
     seal,
     searchWords,
+    sheet,
     signal,
     title,
     chapters,
@@ -247,14 +255,6 @@ function card(id: string, ink: number, r: Rank | undefined): Child {
   );
 }
 
-const shortMonths = ["ян.", "февр.", "март", "апр.", "май", "юни", "юли", "авг.", "септ.", "окт.", "ноем.", "дек."];
-
-/** A day as an entry dates it: „19 ноем.“ */
-function shortDate(day: string): string {
-  const [, m = 1, d = 1] = day.split("-").map(Number);
-  return `${d} ${shortMonths[m - 1]}`;
-}
-
 /** A chapter of the book (/almanac/<chapter>): its head on its sheet, „Игра по тема“, and its facts as entries, the
  * latest first, a page at a time, found by their words. Its page and search are in the address (?page=2&q=…), so back
  * to it, or a reload, opens the same. Opened at facts (?fact=<id>, one for each: the day's result's, of the facts the
@@ -287,6 +287,9 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
   // The chapter's facts in all, unsearched: the search shows from `searchFrom` of them.
   const total = signal(first.peek()?.found ?? 0);
   let asked = "";
+  // The chapter gone, a page still on its way does nothing: renamed, the entry of the screen after would take its
+  // address.
+  const life = lifetime();
   // The words the page shown was found by, marked in its entries (none unsearched).
   let find: string[] = [];
   /** The chapter's first page, which has its rank: asked for apart when the chapter opens on another. */
@@ -317,7 +320,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
     failed.set(null);
     api<Page>("GET", `/api/almanac?${ask}`).then(
       (p) => {
-        if (asked !== ask) return; // an older answer, come late
+        if (asked !== ask || life.aborted) return; // an older answer, come late, or the chapter gone
         // A page past the last (an old link, a number typed in): the last page, in its place.
         const last = Math.max(0, Math.ceil(p.found / perPage) - 1);
         if (!p.facts.length && page.peek() > last) {
@@ -516,10 +519,10 @@ function stand(id: string, r: Rank | undefined, ink: number): Child {
 
 /** Where a fact was met, as its entry's dateline says it: „20 ноем. · Брой 9“. */
 function whence(f: Learned): string {
-  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Sofia" }).format(new Date(f.at));
+  const day = dateWords(dayInBulgaria(new Date(f.at)), true);
   const from =
     f.kind === "day" && f.issue ? `Брой ${f.issue}` : f.kind === "duel" ? "Дуел" : f.kind ? "Игра по тема" : "";
-  return from ? `${shortDate(day)} ·\u00a0${from}` : shortDate(day);
+  return from ? `${day} ·\u00a0${from}` : day;
 }
 
 /** How wide an entry's picture is drawn (app.css, .entry-pic): a thumbnail at its right on a phone, beside its
@@ -595,38 +598,18 @@ function entry(f: Learned, find: string[]): Child {
  * picture: no zoom, no gallery. Esc, „Затвори“ or a tap beside it puts it away. */
 function showPicture(f: Learned, im: Picture): void {
   const biggest = im.srcset.split(",").at(-1)?.trim().split(" ")[0] || im.src;
-  const close = () => box.close();
-  const box = h(
-    "dialog",
-    { class: "sheet picture-sheet", "aria-labelledby": "picture-title" },
-    h(
-      "div",
-      { class: "sheet-panel" },
-      h(
-        "div",
-        { class: "sheet-head" },
-        h("h2", { id: "picture-title" }, textWords(f.answer)),
-        h("button", { class: "link", type: "button", onclick: close }, "Затвори"),
-      ),
-      h("img", {
-        class: "picture-large",
-        src: biggest,
-        width: im.w,
-        height: im.h,
-        alt: im.alt,
-        decoding: "async",
-        style: { "--ratio": String(im.w / im.h) },
-      }),
-      f.credit ? pictureCredit(f.credit) : null,
-    ),
-  ) as HTMLDialogElement;
-  // A tap beside the sheet puts it away, as Esc does; put away, it goes (the router closes it with the screen).
-  box.addEventListener("click", (e) => {
-    if (e.target === box) close();
-  });
-  box.addEventListener("close", () => box.remove());
-  document.body.append(box);
-  box.showModal();
+  sheet({ class: "picture-sheet", title: textWords(f.answer) }, () => [
+    h("img", {
+      class: "picture-large",
+      src: biggest,
+      width: im.w,
+      height: im.h,
+      alt: im.alt,
+      decoding: "async",
+      style: { "--ratio": String(im.w / im.h) },
+    }),
+    f.credit ? pictureCredit(f.credit) : null,
+  ]);
 }
 
 /** Whether the chapter drawn next is come to by a turn of its pages (pager). */

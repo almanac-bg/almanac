@@ -58,8 +58,9 @@ export function player(): Promise<User> {
   return making;
 }
 
-/** The animals a new player is given one of, by their id (play.Starters): their avatar until they choose one. */
-const starters = ["fox", "bear", "cat", "hare", "hedgehog", "dog", "deer", "stork", "frog"];
+/** The animals a new player is given one of, by their id (play.Starters): their avatar until they choose one; and
+ * the one shown for someone without one of their own, by their name (ui.ts, avatar). */
+export const starters = ["fox", "bear", "cat", "hare", "hedgehog", "dog", "deer", "stork", "frog"];
 
 /** The player's avatar as the server last said it (the page's, a sign-in's, a choice made since: screens/avatar.ts),
  * or "", and whose it is: a sign-in, a sign-out, a game brought here make the player another, whose it isn't. */

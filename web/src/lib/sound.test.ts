@@ -152,8 +152,7 @@ test("the answers' sounds are short, the moments' longer but under a second and 
   const { length } = await loadFeel();
   for (const name of ["tap", "key", "tick", "hurry", "right", "exact", "partial", "wrong", "time", "pip"] as const)
     assert.ok(length(name) < 0.5, `${name}: ${length(name)} s`);
-  for (const name of ["end", "perfect", "win", "streak"] as const)
-    assert.ok(length(name) <= 1.4, `${name}: ${length(name)} s`);
+  for (const name of ["end", "perfect", "win"] as const) assert.ok(length(name) <= 1.4, `${name}: ${length(name)} s`);
 });
 
 test("nothing plays with sounds off, or before the page is touched", () => {

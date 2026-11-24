@@ -138,6 +138,7 @@ var shell = template.Must(template.New("shell").Parse(`<!doctype html>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
+<script src="/scheme.js"></script>
 {{with .Files}}{{range .Fonts}}<link rel="preload" href="/{{.}}" as="font" type="font/woff2" crossorigin>
 {{end}}{{if .CSS}}<link rel="stylesheet" href="/{{.CSS}}">{{end}}
 {{if .JS}}<script type="module" src="/{{.JS}}"></script>{{end}}

@@ -5,11 +5,11 @@ import { picture } from "./art/picture.ts";
 import type { Credit, Score } from "./game/types.ts";
 import { errorText, passing } from "./lib/api.ts";
 import { hourInBulgaria } from "./lib/day.ts";
-import { type Child, h, listen, onCleanup, signal } from "./lib/dom.ts";
+import { append, type Child, h, listen, onCleanup, scope, signal } from "./lib/dom.ts";
 import { calm, type Scheme, scheme, setScheme } from "./lib/prefs.ts";
-import { formatNumber, formatValue, found, hyphenate, keepNumbers, keepShort, stakeWords } from "./lib/words.ts";
+import { count, formatNumber, formatValue, found, hyphenate, keepNumbers, keepShort, stakeWords } from "./lib/words.ts";
 import { glyphBox, rankName, rankNames, sealParts } from "./seal.ts";
-import { chapters, chaptersAndMix, user } from "./state.ts";
+import { chapters, chaptersAndMix, starters, user } from "./state.ts";
 
 export { formatNumber, formatValue };
 
@@ -379,9 +379,7 @@ export function sealsSection(ranks: ChapterRank[], none: Child): HTMLElement {
       "div",
       { class: "sect-head" },
       h("h2", null, "Печати"),
-      ink > 0
-        ? h("span", { class: "sect-note seals-ink" }, `${formatNumber(ink)} ${ink === 1 ? "факт" : "факта"} с мастило`)
-        : null,
+      ink > 0 ? h("span", { class: "sect-note seals-ink" }, `${count(ink, "факт", "факта")} с мастило`) : null,
     ),
     sealList(had) ?? none,
   );
@@ -457,41 +455,6 @@ export function ladder(chapter: string, rank: number, size = 24): HTMLElement {
   );
 }
 
-const dayNames = ["понеделник", "вторник", "сряда", "четвъртък", "петък", "събота", "неделя"];
-const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Sofia", weekday: "short" });
-
-/** Today in Bulgaria, Monday first (0–6): the game's days are Bulgaria's. */
-function today(): number {
-  return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(weekday.format(new Date()));
-}
-
-const weekLetters = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
-
-/** This week, a square a day, Monday first: a day played filled, today ringed in gold, the day the week forgave
- * marked, the days to come open. */
-export function weekStrip(week?: boolean[], forgiven?: boolean[]): Child {
-  if (week?.length !== 7) return null;
-  const now = today();
-  return h(
-    "ol",
-    { class: "week", "aria-label": "Тази седмица" },
-    weekLetters.map((d, i) =>
-      h(
-        "li",
-        {
-          class:
-            [week[i] && "on", forgiven?.[i] && "forgiven", i === now && "today", i > now && "later"]
-              .filter(Boolean)
-              .join(" ") || undefined,
-          "aria-label": `${dayNames[i]}${week[i] ? ": изиграно" : forgiven?.[i] ? ": простен ден" : ""}`,
-        },
-        h("b", { class: "week-day" }, d),
-        h("i", { class: "week-dot" }),
-      ),
-    ),
-  );
-}
-
 /** A streak at stake while the day's ten wait (play/runs.go: it runs to yesterday until they're played), in a line
  * (stakeWords), read again each minute, so a screen left open turns to the evening's line: on the day's card and under
  * a chapter's result. */
@@ -503,19 +466,11 @@ export function stakeLine(days: number, spare: boolean): Child {
   return h("p", { class: "day-stake" }, () => stakeWords(days, spare, hour()));
 }
 
-/** A count of games, the way it's said: 1 игра, 2 игри. */
-export const games = (n: number) => `${n} ${n === 1 ? "игра" : "игри"}`;
-/** A count of questions: 1 въпрос, 2 въпроса. */
-export const questions = (n: number) => `${n} ${n === 1 ? "въпрос" : "въпроса"}`;
 /** Duels between two players, the way it's said to one of them: „печелиш 2, губиш 1, 1 равенство“, by verbs, so whose
  * wins they are is never in doubt (each part only when there are some; „2 победи“ under a friend's name read as
  * theirs as well as one's own). */
 export const record = (won: number, lost: number, drawn: number) =>
-  [
-    won ? `печелиш ${won}` : "",
-    lost ? `губиш ${lost}` : "",
-    drawn ? `${drawn} ${drawn === 1 ? "равенство" : "равенства"}` : "",
-  ]
+  [won ? `печелиш ${won}` : "", lost ? `губиш ${lost}` : "", drawn ? count(drawn, "равенство", "равенства") : ""]
     .filter(Boolean)
     .join(", ");
 
@@ -544,13 +499,11 @@ export const shapeNames: Record<string, string> = {
   lynx: "Рис",
 };
 
-const freeShapes = ["fox", "bear", "cat", "hare", "hedgehog", "dog", "deer", "stork", "frog"];
-
 /** An avatar for someone without one of their own: picked from their name, the same every time. */
 function fromName(name: string): string {
   let n = 0;
   for (const c of name) n = (n * 31 + (c.codePointAt(0) ?? 0)) >>> 0;
-  return freeShapes[n % freeShapes.length] ?? "fox";
+  return starters[n % starters.length] ?? "fox";
 }
 
 /** An avatar: the drawn animal in its own colours, on a rounded tile of its scene (DECISIONS.md: an avatar is a face,
@@ -784,6 +737,49 @@ export function failure(
 export function inSight(el: Element): void {
   el.classList.add("in-sight");
   requestAnimationFrame(() => el.scrollIntoView({ block: "nearest", behavior: calm.peek() ? "auto" : "smooth" }));
+}
+
+/** A sheet over the page (a <dialog> on the body: from the foot on a phone, centred on a big screen), built in a scope
+ * of its own: what it sets up (effects, timers) goes with it. With a `title`, its panel is made here, its head the
+ * title and „Затвори“, `build`'s under them; without one, `build` makes the panel, headed by an h2 `#sheet-title`.
+ * Esc, a tap beside it or `close` puts it away; put away (by the router too, with its screen), it goes, and `closed`
+ * is told. */
+export function sheet(
+  o: { class?: string; title?: Child; closed?: () => void },
+  build: (close: () => void) => Child,
+): HTMLDialogElement {
+  const box = h("dialog", {
+    class: o.class ? `sheet ${o.class}` : "sheet",
+    "aria-labelledby": "sheet-title",
+  }) as HTMLDialogElement;
+  const close = () => box.close();
+  const [inside, dispose] = scope(() =>
+    o.title === undefined
+      ? build(close)
+      : h(
+          "div",
+          { class: "sheet-panel" },
+          h(
+            "div",
+            { class: "sheet-head" },
+            h("h2", { id: "sheet-title" }, o.title),
+            h("button", { class: "link", type: "button", onclick: close }, "Затвори"),
+          ),
+          build(close),
+        ),
+  );
+  append(box, [inside]);
+  box.addEventListener("click", (e) => {
+    if (e.target === box) close();
+  });
+  box.addEventListener("close", () => {
+    box.remove();
+    dispose();
+    o.closed?.();
+  });
+  document.body.append(box);
+  box.showModal();
+  return box;
 }
 
 /** The way back to where a screen is reached from (a way to play, from Днес; Настройки, from Профил): back in the

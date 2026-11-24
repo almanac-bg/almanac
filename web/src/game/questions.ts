@@ -246,11 +246,6 @@ export function picture(view: View, fit = false): Child {
   return img;
 }
 
-/** Whether a question shows pictures (over it, or as its options). */
-export function hasPictures(view: View): boolean {
-  return !!view.image || (view.type === "choice" && !!view.pictures?.length);
-}
-
 /** Loads a question's pictures as its screen will show them, so that its time can start once they're in: done when
  * each is decoded (or has failed), or after `ms` at most. */
 export function picturesIn(view: View, ms: number): Promise<void> {

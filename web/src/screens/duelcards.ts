@@ -33,6 +33,7 @@ let {
   nameWords,
   play,
   reviewSheet,
+  sheet,
   signal,
   withWord,
 } = {} as Kit;
@@ -218,70 +219,40 @@ function allPlayed(): void {
     error.set("");
     try {
       page.set(await api<PlayedPage>("GET", `/api/duels/played?page=${n}`));
-      list?.scrollTo({ top: 0 });
+      box.querySelector(".sheet-panel")?.scrollTo({ top: 0 });
     } catch (err) {
       error.set(errorText(err));
     }
   };
-  let list: HTMLElement | undefined;
   const go = (step: number) => () => {
     const p = page.peek();
     if (p) void load(p.page + step);
   };
-  const box = h(
-    "dialog",
-    { class: "sheet duels-all", "aria-labelledby": "duels-all-title" },
-    h(
-      "div",
-      {
-        class: "sheet-panel",
-        ref: (el) => {
-          list = el as HTMLElement;
-        },
-      },
+  const box = sheet({ class: "duels-all", title: "Завършени дуели" }, () => () => {
+    const p = page();
+    if (!p) return error() ? h("p", { class: "bad", role: "alert" }, error()) : h("p", { class: "muted" }, "…");
+    return [
       h(
-        "div",
-        { class: "sheet-head" },
-        h("h2", { id: "duels-all-title" }, "Завършени дуели"),
-        h("button", { class: "link", type: "button", onclick: () => box.close() }, "Затвори"),
+        "ul",
+        { class: "duel-cards" },
+        p.duels.map((v) => duelCard(shown(v))),
       ),
-      () => {
-        const p = page();
-        if (!p) return error() ? h("p", { class: "bad", role: "alert" }, error()) : h("p", { class: "muted" }, "…");
-        return [
-          h(
-            "ul",
-            { class: "duel-cards" },
-            p.duels.map((v) => duelCard(shown(v))),
-          ),
-          error() ? h("p", { class: "bad", role: "alert" }, error()) : null,
-          p.pages > 1
-            ? h(
-                "nav",
-                { class: "pages", "aria-label": "Страници" },
-                h("button", { class: "btn inline", type: "button", disabled: p.page <= 1, onclick: go(-1) }, "По-нови"),
-                h(
-                  "span",
-                  { class: "pages-at" },
-                  `Страница ${formatNumber(p.page)}\u00a0от\u00a0${formatNumber(p.pages)}`,
-                ),
-                h(
-                  "button",
-                  { class: "btn inline", type: "button", disabled: p.page >= p.pages, onclick: go(1) },
-                  "По-стари",
-                ),
-              )
-            : null,
-        ];
-      },
-    ),
-  ) as HTMLDialogElement;
-  box.addEventListener("click", (e) => {
-    if (e.target === box) box.close();
+      error() ? h("p", { class: "bad", role: "alert" }, error()) : null,
+      p.pages > 1
+        ? h(
+            "nav",
+            { class: "pages", "aria-label": "Страници" },
+            h("button", { class: "btn inline", type: "button", disabled: p.page <= 1, onclick: go(-1) }, "По-нови"),
+            h("span", { class: "pages-at" }, `Страница ${formatNumber(p.page)}\u00a0от\u00a0${formatNumber(p.pages)}`),
+            h(
+              "button",
+              { class: "btn inline", type: "button", disabled: p.page >= p.pages, onclick: go(1) },
+              "По-стари",
+            ),
+          )
+        : null,
+    ];
   });
-  box.addEventListener("close", () => box.remove());
-  document.body.append(box);
-  box.showModal();
   void load(1);
 }
 
@@ -381,6 +352,7 @@ export function duelGroup(
     nameWords,
     play,
     reviewSheet,
+    sheet,
     signal,
     withWord,
   } = kit);

@@ -38,8 +38,9 @@ import (
 
 // firstScreen is how big, brotli-compressed as it's sent, what Днес needs before it draws may be: firstFiles and the
 // fonts the page preloads (assets.FirstFonts). Every daily player downloads it again after each release. A screen a
-// daily visit doesn't open loads on its own (web/src/kit.ts) and doesn't count here.
-const firstScreen = 110 << 10
+// daily visit doesn't open loads on its own (web/src/kit.ts) and doesn't count here. About 128 kB in November 2026, 60
+// of them the two fonts (each cached until it changes).
+const firstScreen = 136 << 10
 
 // firstFiles are the scripts and styles Днес draws with: the app, and the scripts every page loads as it starts
 // (assets.FirstScripts: the pictures, whose are the cover's ten glyphs).

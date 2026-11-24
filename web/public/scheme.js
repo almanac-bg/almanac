@@ -1,5 +1,6 @@
-// The pages the server draws alone (the privacy notice, a mail's settings) have no client: this puts the player's
-// Night or Day on them before they're drawn, as lib/prefs.ts does in the game (the same key, the same attribute).
+// The player's Night or Day on the page before it's first drawn, as lib/prefs.ts keeps it (the same key, the same
+// attribute): on the pages the server draws alone (the privacy notice, a mail's settings), which have no client, and on
+// the game's own, whose client comes after the first paint (a chosen Day would otherwise flash the device's Night).
 try {
   const chosen = localStorage.getItem("almanac.scheme");
   if (chosen === "night" || chosen === "day") document.documentElement.dataset.scheme = chosen;
