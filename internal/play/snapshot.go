@@ -23,9 +23,11 @@ import (
 // not missing: what it holds is by question id, and a count of the bank before is better than a wait (each user of it
 // says what stands for a question it lacks).
 //
-// A count is kept in the database too (counts, at most every keepEvery), and a server that starts again takes up the
-// last one kept as a stale count: shown at once, and counted again in the background. So a deploy makes nobody wait;
-// only a server that has never counted waits for its first count.
+// A count is kept in the database too (counts, at most every keepEvery), with the commit of the bank it was counted
+// for, and a server that starts again takes up the last one kept: shown at once, and counted again only once it's
+// stale, as if this server had counted it (of another bank, or of a bank whose commit isn't known, it's stale at once,
+// and counted again in the background). So a deploy makes nobody wait, and doesn't count everything again; only a
+// server that has never counted waits for its first count.
 type snapshot[T any] struct {
 	mu      sync.Mutex
 	last    *snapOf[T]
@@ -35,7 +37,8 @@ type snapshot[T any] struct {
 	taken   sync.Once     // the count kept, taken up (once, before anything else is asked of the snapshot)
 }
 
-// snapOf is a count: when, of which bank (nil: taken up from the database, of no bank this server knows), and what.
+// snapOf is a count: when, of which bank (nil: taken up from the database, of another bank or one of no known
+// commit), and what.
 type snapOf[T any] struct {
 	at   time.Time
 	bank *bank.Bank
@@ -95,6 +98,20 @@ func (s *snapshot[T]) peek(now time.Time, b *bank.Bank, c counter[T]) *snapOf[T]
 	return s.last
 }
 
+// current is the last count if it isn't stale; if it is (or there's none), it counts again and waits for it.
+func (s *snapshot[T]) current(ctx context.Context, now time.Time, b *bank.Bank, c counter[T]) (T, error) {
+	s.take(c, b)
+	s.mu.Lock()
+	if last := s.last; !last.stale(now, b, c.fresh) {
+		s.mu.Unlock()
+		return last.v, nil
+	}
+	s.start(now, b, c)
+	done := s.running
+	s.mu.Unlock()
+	return s.wait(ctx, done)
+}
+
 // refresh counts now, after the count under way if there's one, and waits for it.
 func (s *snapshot[T]) refresh(ctx context.Context, now time.Time, b *bank.Bank, c counter[T]) (T, error) {
 	for {
@@ -117,7 +134,8 @@ func (s *snapshot[T]) refresh(ctx context.Context, now time.Time, b *bank.Bank, 
 }
 
 // take takes up the count kept in the database, if there's one and nothing newer is here, the first time the
-// snapshot is asked for: a read of one row, where a count reads every answer.
+// snapshot is asked for: a read of one row, where a count reads every answer. One counted for the bank in play (its
+// commit) is of it, stale only by its age; any other is stale.
 func (s *snapshot[T]) take(c counter[T], b *bank.Bank) {
 	s.taken.Do(func() {
 		if c.db == nil || c.take == nil {
@@ -125,7 +143,8 @@ func (s *snapshot[T]) take(c counter[T], b *bank.Bank) {
 		}
 		var at int64
 		var raw []byte
-		err := c.db.Read.QueryRow(`SELECT at, value FROM counts WHERE name = ?`, c.name).Scan(&at, &raw)
+		var commit string
+		err := c.db.Read.QueryRow(`SELECT at, value, bank FROM counts WHERE name = ?`, c.name).Scan(&at, &raw, &commit)
 		if errors.Is(err, sql.ErrNoRows) {
 			return
 		}
@@ -142,6 +161,9 @@ func (s *snapshot[T]) take(c counter[T], b *bank.Bank) {
 		s.keptAt = time.UnixMilli(at)
 		if s.last == nil {
 			s.last = &snapOf[T]{at: s.keptAt, v: v}
+			if b != nil && b.Commit != "" && commit == b.Commit {
+				s.last.bank = b
+			}
 		}
 	})
 }
@@ -175,7 +197,7 @@ func (s *snapshot[T]) start(now time.Time, b *bank.Bank, c counter[T]) {
 		// that isn't kept is no reason to stop either: the next is.
 		if err == nil && keep {
 			var kerr error
-			if !safe.Do("keeping a count", func() { kerr = s.keep(c, now, v) }) || kerr != nil {
+			if !safe.Do("keeping a count", func() { kerr = s.keep(c, now, b, v) }) || kerr != nil {
 				slog.Warn("keeping a count", "count", c.name, "err", kerr)
 			}
 		}
@@ -186,16 +208,21 @@ func (s *snapshot[T]) start(now time.Time, b *bank.Bank, c counter[T]) {
 	}()
 }
 
-// keep writes a count to the database, in place of the one kept before.
-func (s *snapshot[T]) keep(c counter[T], at time.Time, v T) error {
+// keep writes a count to the database, in place of the one kept before: when, of which bank (its commit), and what.
+func (s *snapshot[T]) keep(c counter[T], at time.Time, b *bank.Bank, v T) error {
 	raw, err := c.keep(v)
 	if err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	if _, err := c.db.Write.ExecContext(ctx, `INSERT INTO counts (name, at, value) VALUES (?, ?, ?)
-		ON CONFLICT (name) DO UPDATE SET at = excluded.at, value = excluded.value`, c.name, store.Ms(at), raw); err != nil {
+	commit := ""
+	if b != nil {
+		commit = b.Commit
+	}
+	if _, err := c.db.Write.ExecContext(ctx, `INSERT INTO counts (name, at, value, bank) VALUES (?, ?, ?, ?)
+		ON CONFLICT (name) DO UPDATE SET at = excluded.at, value = excluded.value, bank = excluded.bank`,
+		c.name, store.Ms(at), raw, commit); err != nil {
 		return err
 	}
 	s.mu.Lock()

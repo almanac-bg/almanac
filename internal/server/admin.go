@@ -243,14 +243,15 @@ func (s *Server) adminQuestions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// How each question goes, once enough have answered it to tell: the answers tallied here as they lie, in one
-	// pass (a GROUP BY would have SQLite sort them all, twice, many times slower); those to it as it is now
-	// (play.Counted), if it's in the bank.
+	// pass (a GROUP BY would have SQLite sort them all, twice, many times slower), on the pool for long reads
+	// (store.DB.Scan), never a connection a player's request needs; those to it as it is now (play.Counted), if it's
+	// in the bank.
 	type tally struct {
 		n, right, ms int
 		counted      *play.Counted
 	}
 	tallies := map[string]*tally{}
-	if rows, err := db.QueryContext(ctx, `SELECT question_id, version, at, is_right, ms FROM answers WHERE `+play.FairAnswers); err == nil {
+	if rows, err := s.db.Scan.QueryContext(ctx, `SELECT question_id, version, at, is_right, ms FROM answers WHERE `+play.FairAnswers); err == nil {
 		var id []byte
 		var version sql.NullInt64
 		var at int64

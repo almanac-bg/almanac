@@ -22,10 +22,11 @@ type TimedOut struct {
 
 // TimedOutSince counts people's answers by kind since a day (YYYY-MM-DD), and those that ran out of time: no answer,
 // kept at the question's whole limit (settle keeps a time run out as its limit, in whole seconds; a give-up keeps when
-// it came), in games not a script's or a second play's (FairAnswers).
+// it came), in games not a script's or a second play's (FairAnswers). It reads every answer since: on the pool for long
+// reads (store.DB.Scan), never a connection a player's request needs.
 func (g *Game) TimedOutSince(ctx context.Context, day string) ([]TimedOut, error) {
 	start, _ := dayBounds(day)
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT question_id, given IS NULL AND ms % 1000 = 0 AND ms >= 15000
+	rows, err := g.DB.Scan.QueryContext(ctx, `SELECT question_id, given IS NULL AND ms % 1000 = 0 AND ms >= 15000
 		FROM answers WHERE at >= ? AND `+FairAnswers, start)
 	if err != nil {
 		return nil, err

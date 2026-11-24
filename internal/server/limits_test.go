@@ -218,7 +218,7 @@ func (g *game) from(addr, method, path, body string) (int, string) {
 }
 
 // Writes are limited by session, network and site, whatever they are: one client can't take the database's writer
-// (review 2026-11-18, S11). Reads aren't.
+// (review 2026-11-18, S11). Reads have a budget of their own.
 func TestWritesLimited(t *testing.T) {
 	g := start(t)
 	p := g.player()
@@ -236,6 +236,37 @@ func TestWritesLimited(t *testing.T) {
 	}
 	if status, _ := g.player().call("POST", "/api/guest", map[string]any{}); status != 200 {
 		t.Fatalf("another session of the network: %d", status)
+	}
+}
+
+// Reads are limited by session, network and site too, apart from the writes: one client asking in a loop can't hold
+// the read pool (audit 2026-11-24, С3).
+func TestReadsLimited(t *testing.T) {
+	g := start(t)
+	p := g.player()
+	p.call("POST", "/api/guest", map[string]any{})
+	for i := range readsSession {
+		if status, _ := p.call("GET", "/api/me", nil); status == 429 {
+			t.Fatalf("read %d refused", i+1)
+		}
+	}
+	if status, out := p.call("GET", "/api/me", nil); status != 429 {
+		t.Fatalf("past the session's reads: %d %v", status, out)
+	}
+	if status, _ := p.call("POST", "/api/told", map[string]string{"line": "none"}); status == 429 {
+		t.Fatal("a write past the reads refused")
+	}
+
+	for i := range readsNet {
+		if status, _ := g.from("198.51.100.7", "GET", "/api/health", ""); status == 429 {
+			t.Fatalf("the network's read %d refused", i+1)
+		}
+	}
+	if status, _ := g.from("198.51.100.7", "GET", "/api/health", ""); status != 429 {
+		t.Fatalf("past the network's reads: %d", status)
+	}
+	if status, _ := g.from("198.51.100.8", "GET", "/api/health", ""); status != 200 {
+		t.Fatalf("another network of the site: %d", status)
 	}
 }
 

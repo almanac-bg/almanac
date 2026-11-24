@@ -60,19 +60,20 @@ func (g *Game) Crowd(q bank.Question) *bank.Crowd {
 	return nil
 }
 
-// Count counts what's kept counted for everyone (the questions' crowds and hardness), the two at once, and waits for
-// them: the server's first counts, made as it starts. Until they're in, what was kept of
-// the last ones (snapshot.go) is shown, so no player waits on them unless none was ever kept.
+// Count brings what's kept counted for everyone (the questions' crowds and hardness) up to date, the two at once, and
+// waits for them: the server's first counts, as it starts. Each is counted again only if what was kept of it
+// (snapshot.go) is stale: a deploy doesn't read every answer twice. Until they're in, what was kept is shown, so no
+// player waits on them unless none was ever kept.
 func (g *Game) Count(ctx context.Context) error {
 	now, b := g.Now(), g.Bank()
 	errs := make([]error, 2)
 	var wg sync.WaitGroup
 	// A panic in a count is the count's (errCountBroke: snapshot.go); one around it is stopped here.
 	wg.Go(func() {
-		safe.Do("counting: crowds", func() { _, errs[0] = g.crowds.refresh(ctx, now, b, g.crowdCounter()) })
+		safe.Do("counting: crowds", func() { _, errs[0] = g.crowds.current(ctx, now, b, g.crowdCounter()) })
 	})
 	wg.Go(func() {
-		safe.Do("counting: hardness", func() { _, errs[1] = g.hard.refresh(ctx, now, b, g.hardCounter()) })
+		safe.Do("counting: hardness", func() { _, errs[1] = g.hard.current(ctx, now, b, g.hardCounter()) })
 	})
 	wg.Wait()
 	return errors.Join(errs...)

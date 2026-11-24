@@ -31,10 +31,12 @@ const SuspectOneSide = 0.6
 // SuspectTruth is the share right below which a true-or-not is a suspect: most players say the opposite.
 const SuspectTruth = 0.35
 
-// Suspects counts the crowds now and lists the suspects, the most answered first.
+// Suspects lists the suspects of the crowds as last counted (counted again in the background if stale; waited for
+// only if never counted), the most answered first: /admin asks with every look, and a count reads every answer. For
+// a count of now, CountCrowds first.
 func (g *Game) Suspects(ctx context.Context) ([]Suspect, error) {
 	b := g.Bank()
-	by, err := g.crowds.refresh(ctx, g.Now(), b, g.crowdCounter())
+	by, err := g.crowds.get(ctx, g.Now(), b, g.crowdCounter())
 	if err != nil {
 		return nil, err
 	}
