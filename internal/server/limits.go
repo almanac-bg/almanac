@@ -28,7 +28,7 @@ import (
 //
 // The server has two limiters (Server.limits, Server.guard): the limits that keep players safe (codes mailed and
 // tried, guests made, reports) are kept apart from the rest, so that no flood of the cheap keys
-// (pages visited, a player's writes) can push them out at all. Their keys are bounded too: a key for a network is
+// (pages visited, a player's reads and writes) can push them out at all. Their keys are bounded too: a key for a network is
 // made only while its site's budget isn't spent (from), so one site makes no more of them than its budget.
 //
 // The counts outlive a restart (save and restore, Config.LimitsFile): a deploy, several a day, would otherwise give

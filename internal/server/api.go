@@ -91,14 +91,14 @@ var playerErrors = map[error]*apiError{
 // loads itself anew at a moment that costs the player nothing (web/src/fresh.ts).
 const versionHeader = "X-Almanac-Version"
 
-// apiHandler runs an API handler: its error becomes a JSON answer, an unexpected one a 500 that's logged. A write
-// past its rate (mayWrite) isn't run.
+// apiHandler runs an API handler: its error becomes a JSON answer, an unexpected one a 500 that's logged. A request
+// past its rate (mayCall) isn't run.
 func (s *Server) apiHandler(h func(http.ResponseWriter, *http.Request) error) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set(versionHeader, s.cfg.Version)
 		var err error
-		if s.mayWrite(r) {
+		if s.mayCall(r) {
 			err = h(w, r)
 		} else {
 			err = errTooMany
@@ -128,32 +128,40 @@ func (s *Server) apiHandler(h func(http.ResponseWriter, *http.Request) error) ht
 	})
 }
 
-// How many writes (any API request but a GET) may come in writesPer: from a browser's session, from a network, and
+// How many writes (any API request but a GET) may come in callsPer: from a browser's session, from a network, and
 // from a site (address.go). Every write takes the database's one writer, so one client sending thousands a second
 // would make everyone's slow (review 2026-11-18, S11). A player answers, taps and moves on at a few a second at
 // most; a school's or an office's network has a few hundred at once; a site, a few such networks. The
 // rest of the limits are per action; this is the floor under all of them.
+//
+// Reads (a GET or a HEAD) have a budget of their own, as generous: the read pool is a few connections, and one client
+// asking for its book or its duels in a loop would hold them all (audit 2026-11-24, С3). A page asks for a few things
+// as it opens and Приятели once every 15 seconds; a network of a few hundred players opening pages fits many times.
 const (
-	writesPer     = 10 * time.Second
+	callsPer      = 10 * time.Second
 	writesSession = 100
 	writesNet     = 600
 	writesSite    = 2000
+	readsSession  = 300
+	readsNet      = 1500
+	readsSite     = 5000
 )
 
-// mayWrite counts a write (a request that isn't a GET or a HEAD) against its session's, network's and site's rate
-// (writesSession, writesNet, writesSite), and says whether it's within them. The session is kept by its token's hash,
-// never the token itself: the counts are saved to a file over a restart.
-func (s *Server) mayWrite(r *http.Request) bool {
+// mayCall counts a request against its session's, network's and site's rate, the writes' or the reads' (writesSession
+// …, readsSession …), and says whether it's within them. The session is kept by its token's hash, never the token
+// itself: the counts are saved to a file over a restart.
+func (s *Server) mayCall(r *http.Request) bool {
+	what, session, net, site := "write", writesSession, writesNet, writesSite
 	if r.Method == http.MethodGet || r.Method == http.MethodHead {
-		return true
+		what, session, net, site = "read", readsSession, readsNet, readsSite
 	}
 	if token := s.session(r); token != "" {
 		key := account.SessionKey(token)
-		if !s.limits.allow("write:session:"+base64.RawURLEncoding.EncodeToString(key[:12]), writesSession, writesPer) {
+		if !s.limits.allow(what+":session:"+base64.RawURLEncoding.EncodeToString(key[:12]), session, callsPer) {
 			return false
 		}
 	}
-	return s.allowFrom(r, "write", writesNet, writesSite, writesPer)
+	return s.allowFrom(r, what, net, site, callsPer)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

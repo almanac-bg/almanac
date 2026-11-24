@@ -21,7 +21,11 @@ func bankSuspects(dir string) error {
 		return err
 	}
 	defer db.Close()
-	list, err := play.New(db, func() *bank.Bank { return b }).Suspects(context.Background())
+	g := play.New(db, func() *bank.Bank { return b })
+	if err := g.CountCrowds(context.Background()); err != nil { // of now, not the count the server kept
+		return err
+	}
+	list, err := g.Suspects(context.Background())
 	if err != nil {
 		return err
 	}

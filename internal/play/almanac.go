@@ -104,10 +104,14 @@ func learnedAs(q bank.Question, at learnedAt, ink bool) Learned {
 	return l
 }
 
-// hasWords says whether a fact has every word of a search in it (its question, answer or fact), as the player wrote
-// them or not: Bulgarian needs no more than lower case.
-func hasWords(l Learned, words []string) bool {
-	text := strings.ToLower(l.Question + " " + l.Answer + " " + l.Fact)
+// hasWords says whether a fact has every word of a search in it (its question, answer or fact, as learnedAs shows
+// them), as the player wrote them or not: Bulgarian needs no more than lower case.
+func hasWords(q bank.Question, words []string) bool {
+	question, answer := q.Base().Text, bank.AnswerText(q)
+	if tf, ok := q.(*bank.TrueFalse); ok {
+		question, answer = "", tf.Text
+	}
+	text := strings.ToLower(question + " " + answer + " " + q.Extra().Fact)
 	for _, w := range words {
 		if !strings.Contains(text, w) {
 			return false
@@ -118,7 +122,8 @@ func hasWords(l Learned, words []string) bool {
 
 // AlmanacOf reads a page of a player's book (AlmanacQuery), the latest written first. Next is when and which fact the
 // page ends on, since facts are in that order, so a fact written meanwhile only comes at the top, and no page after
-// it shows one twice.
+// it shows one twice. Every fact of the book is gone through (the ink is counted from all of them), but only those on
+// the page are made into entries (learnedAs).
 func (g *Game) AlmanacOf(ctx context.Context, userID int64, aq AlmanacQuery) (Almanac, error) {
 	out := Almanac{Facts: []Learned{}, Ink: map[string]int{}}
 	fromAt, fromID, paged := strings.Cut(aq.From, ":")
@@ -126,7 +131,11 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, aq AlmanacQuery) (Al
 	paged = paged && err == nil
 	search := []rune(strings.ToLower(strings.TrimSpace(aq.Search)))
 	words := strings.Fields(string(search[:min(len(search), AlmanacSearch)]))
-	var found []Learned
+	type entry struct {
+		q bank.Question
+		w written
+	}
+	var found []entry
 	err = g.written(ctx, userID, func(q bank.Question, w written) {
 		if w.ink {
 			countIn(out.Ink, q)
@@ -135,8 +144,8 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, aq AlmanacQuery) (Al
 		if !inChapter(q, aq.Chapter) || paged && (at.at > before || at.at == before && q.Base().ID >= fromID) {
 			return
 		}
-		if l := learnedAs(q, at, w.ink); len(words) == 0 || hasWords(l, words) {
-			found = append(found, l)
+		if len(words) == 0 || hasWords(q, words) {
+			found = append(found, entry{q, w})
 		}
 	})
 	if err != nil {
@@ -146,7 +155,7 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, aq AlmanacQuery) (Al
 	slices.Reverse(found)
 	out.Found = len(found)
 	if aq.Fact != "" && !paged && aq.Limit > 0 {
-		aq.Page = max(0, slices.IndexFunc(found, func(l Learned) bool { return l.ID == aq.Fact })) / aq.Limit
+		aq.Page = max(0, slices.IndexFunc(found, func(e entry) bool { return e.q.Base().ID == aq.Fact })) / aq.Limit
 	}
 	out.Page = max(aq.Page, 0)
 	if !paged {
@@ -155,9 +164,11 @@ func (g *Game) AlmanacOf(ctx context.Context, userID int64, aq AlmanacQuery) (Al
 	if len(found) > aq.Limit {
 		found = found[:aq.Limit]
 		last := found[len(found)-1]
-		out.Next = strconv.FormatInt(last.At, 10) + ":" + last.ID
+		out.Next = strconv.FormatInt(last.w.at.at, 10) + ":" + last.q.Base().ID
 	}
-	out.Facts = append(out.Facts, found...)
+	for _, e := range found {
+		out.Facts = append(out.Facts, learnedAs(e.q, e.w.at, e.w.ink))
+	}
 	if aq.From == "" && aq.Page == 0 {
 		var since sql.NullInt64
 		if err := g.DB.Read.QueryRowContext(ctx, `SELECT min(started_at) FROM runs WHERE user_id = ?`, userID).

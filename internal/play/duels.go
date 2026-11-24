@@ -581,45 +581,64 @@ type Duels struct {
 // DuelsShown is how many duels played Приятели lists: the last ten.
 const DuelsShown = 10
 
-// DuelsOf are a player's duels, as Приятели lists them.
+// DuelsOf are a player's duels, as Приятели lists them: those open, and the last DuelsShown ended (listed). A few
+// queries, however many duels the player has had: Приятели asks again every 15 seconds while it's open.
 func (g *Game) DuelsOf(ctx context.Context, userID int64) (Duels, error) {
 	out := Duels{Yours: []DuelView{}, Theirs: []DuelView{}, Played: []DuelView{}}
-	list, err := g.duelsOf(ctx, userID, 0)
+	list, err := g.duelsOf(ctx, userID, listed, DuelsShown)
 	if err != nil {
 		return out, err
 	}
-	records, err := g.recordsOf(ctx, userID)
-	if err != nil {
+	if err := g.withRecords(ctx, userID, list); err != nil {
 		return out, err
 	}
 	for _, v := range list {
-		if r, ok := records[v.against]; ok && v.against != 0 {
-			v.Record = &r
-		}
 		switch v.State {
 		case DuelYours:
 			out.Yours = append(out.Yours, v)
 		case DuelTheirs:
-			if err := g.duelMore(ctx, &v); err != nil {
-				return out, err
-			}
 			out.Theirs = append(out.Theirs, v)
 		default:
-			if len(out.Played) < DuelsShown {
-				if err := g.duelMore(ctx, &v); err != nil {
-					return out, err
-				}
-				out.Played = append(out.Played, v)
-			}
+			out.Played = append(out.Played, v)
 		}
+	}
+	if err := g.duelMore(ctx, out.Theirs, out.Played); err != nil {
+		return out, err
 	}
 	out.PlayedAll, err = g.playedCount(ctx, userID)
 	return out, err
 }
 
+// withRecords gives each of a player's duels their record against its other side.
+func (g *Game) withRecords(ctx context.Context, userID int64, list []DuelView) error {
+	records, err := g.recordsOf(ctx, userID)
+	if err != nil {
+		return err
+	}
+	for i := range list {
+		if r, ok := records[list[i].against]; ok && list[i].against != 0 {
+			list[i].Record = &r
+		}
+	}
+	return nil
+}
+
 // playedWhere is, in a query whose ?1 is a player, the duels of theirs that have ended (played back, lapsed): those
 // Приятели lists as played.
 const playedWhere = `(a_id = ?1 OR (b_id = ?1 AND sent_at IS NOT NULL)) AND ended_at IS NOT NULL`
+
+// Which of a player's duels duelsOf reads: a condition on them (d), whose ?1 is the player, and ?3 and ?4 what's
+// passed with it.
+const (
+	// listed are those Приятели lists (DuelsOf): open, and the last ?3 ended.
+	listed = `(d.ended_at IS NULL OR d.id IN (SELECT id FROM duels WHERE ` + playedWhere + `
+		ORDER BY ended_at DESC, id DESC LIMIT ?3))`
+	// playedPage is a page of those ended (DuelsPlayed): ?3 of them, after the latest ?4.
+	playedPage = `d.id IN (SELECT id FROM duels WHERE ` + playedWhere + `
+		ORDER BY ended_at DESC, id DESC LIMIT ?3 OFFSET ?4)`
+	// oneDuel is the duel ?3 (DuelOf), if it's the player's.
+	oneDuel = `d.id = ?3`
+)
 
 // playedCount is how many duels of a player's have ended.
 func (g *Game) playedCount(ctx context.Context, userID int64) (int, error) {
@@ -646,120 +665,108 @@ func (g *Game) DuelsPlayed(ctx context.Context, userID int64, page int) (PlayedP
 	}
 	out.Pages = max(1, (n+DuelsShown-1)/DuelsShown)
 	out.Page = min(max(page, 1), out.Pages)
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT id FROM duels WHERE `+playedWhere+`
-		ORDER BY ended_at DESC, id DESC LIMIT ?2 OFFSET ?3`, userID, DuelsShown, (out.Page-1)*DuelsShown)
+	list, err := g.duelsOf(ctx, userID, playedPage, DuelsShown, (out.Page-1)*DuelsShown)
 	if err != nil {
 		return out, err
 	}
-	var ids []int64
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			rows.Close()
-			return out, err
-		}
-		ids = append(ids, id)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
+	if err := g.withRecords(ctx, userID, list); err != nil {
 		return out, err
 	}
-	for _, id := range ids {
-		v, err := g.DuelOf(ctx, userID, id)
-		if err != nil {
-			return out, err
-		}
-		out.Duels = append(out.Duels, v)
+	if err := g.duelMore(ctx, list); err != nil {
+		return out, err
 	}
+	out.Duels = append(out.Duels, list...)
 	return out, nil
 }
 
-// duelsOf are the player's duels (or only that one), as they see them: the open ones first (the oldest first: the
-// first to lapse), then those ended, the latest first. A friend's duel shows to the one it's sent to once it's sent.
-func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, d.mine, d.created_at, coalesce(d.ended_at, 0),
-			d.expires_at, d.sent_at IS NOT NULL, coalesce(d.expires_at >= d.sent_at + ?3, 0), coalesce(d.outcome, ''),
-			coalesce(CASE WHEN d.mine THEN d.a_run ELSE d.b_run END, 0),
-			coalesce(CASE WHEN d.mine THEN d.b_run ELSE d.a_run END, 0),
-			coalesce(CASE WHEN d.mine THEN d.b_id ELSE d.a_id END, 0)
-		FROM (SELECT *, coalesce(a_id = ?1, 0) AS mine FROM duels
-			WHERE (a_id = ?1 OR (b_id = ?1 AND sent_at IS NOT NULL)) AND (?2 = 0 OR id = ?2)) d
-		ORDER BY d.ended_at IS NOT NULL, CASE WHEN d.ended_at IS NULL THEN d.expires_at ELSE -d.ended_at END
-		LIMIT 200`, userID, only, DuelFor.Milliseconds())
+// duelsOf are the player's duels of which (listed, playedPage, oneDuel; args are its ?3 and ?4), as they see them:
+// the open ones first (the oldest first: the first to lapse), then those ended, the latest first. A friend's duel
+// shows to the one it's sent to once it's sent. One query, the sides and their runs joined, and one for the player.
+func (g *Game) duelsOf(ctx context.Context, userID int64, which string, args ...any) ([]DuelView, error) {
+	you, err := g.duelSide(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	type row struct {
-		v                       DuelView
-		outcome                 string
-		sent, fullWeek          bool
-		myRun, theirRun, theirs int64
-		expires                 int64
-	}
-	var list []row
-	for rows.Next() {
-		var r row
-		if err := rows.Scan(&r.v.ID, &r.v.First, &r.v.CreatedAt, &r.v.EndedAt, &r.expires, &r.sent,
-			&r.fullWeek, &r.outcome, &r.myRun, &r.theirRun, &r.theirs); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		list = append(list, r)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, d.mine, d.created_at, coalesce(d.ended_at, 0),
+			d.expires_at, d.sent_at IS NOT NULL, coalesce(d.expires_at >= d.sent_at + ?2, 0), coalesce(d.outcome, ''),
+			coalesce(CASE WHEN d.mine THEN d.a_run ELSE d.b_run END, 0),
+			coalesce(CASE WHEN d.mine THEN d.b_run ELSE d.a_run END, 0),
+			coalesce(CASE WHEN d.mine THEN d.b_id ELSE d.a_id END, 0),
+			`+runSide("m")+`, u.id IS NOT NULL, coalesce(u.name, ''), coalesce(u.tag, ''), `+lookColumns+`, `+runSide("t")+`
+		FROM (SELECT d.*, coalesce(d.a_id = ?1, 0) AS mine FROM duels d
+			WHERE (d.a_id = ?1 OR (d.b_id = ?1 AND d.sent_at IS NOT NULL)) AND `+which+`) d
+		LEFT JOIN runs m ON m.id = CASE WHEN d.mine THEN d.a_run ELSE d.b_run END
+		LEFT JOIN users u ON u.id = CASE WHEN d.mine THEN d.b_id ELSE d.a_id END
+		LEFT JOIN runs t ON t.id = CASE WHEN d.mine THEN d.b_run ELSE d.a_run END
+		ORDER BY d.ended_at IS NOT NULL, CASE WHEN d.ended_at IS NULL THEN d.expires_at ELSE -d.ended_at END,
+			CASE WHEN d.ended_at IS NULL THEN d.id ELSE -d.id END
+		LIMIT 200`, append([]any{userID, DuelFor.Milliseconds()}, args...)...)
+	if err != nil {
 		return nil, err
 	}
-	out := make([]DuelView, 0, len(list))
-	for _, r := range list {
-		v := r.v
-		v.RunID, v.against, v.theirRun = r.myRun, r.theirs, r.theirRun
-		var err error
-		if v.You, err = g.duelSide(ctx, userID, r.myRun); err != nil {
+	defer rows.Close()
+	var out []DuelView
+	for rows.Next() {
+		var v DuelView
+		var outcome, avatar string
+		var sent, fullWeek, there bool
+		var mine, theirs DuelSide
+		if err := rows.Scan(&v.ID, &v.First, &v.CreatedAt, &v.EndedAt, &v.Until, &sent, &fullWeek, &outcome,
+			&v.RunID, &v.theirRun, &v.against,
+			&mine.Done, &mine.Rights, &mine.score.tie.closeness, &mine.Started,
+			&there, &theirs.Name, &theirs.Tag, &avatar,
+			&theirs.Done, &theirs.Rights, &theirs.score.tie.closeness, &theirs.Started); err != nil {
 			return nil, err
 		}
-		if r.theirs != 0 {
-			if v.Opponent, err = g.duelSide(ctx, r.theirs, r.theirRun); err != nil {
-				return nil, err
-			}
+		if you != nil {
+			mine.ID, mine.Name, mine.Tag, mine.Look = you.ID, you.Name, you.Tag, you.Look
+			mine.score.rights = mine.Rights
+			v.You = &mine
 		}
-		if v.Opponent == nil {
+		if there {
+			look := g.lookOf(v.against, avatar)
+			theirs.ID, theirs.Look = v.against, &look
+			theirs.score.rights = theirs.Rights
+			v.Opponent = &theirs
+		} else {
 			// Every duel has another side: none is one who's gone.
 			v.Opponent = &DuelSide{Name: GoneName, Done: true, Gone: true}
 		}
-		mine := v.First
+		first := v.First
 		// The player's own, left before its first question showed: not a duel yet, in the lists (SettleDue drops it).
-		if only == 0 && v.EndedAt == 0 && mine && v.You != nil && !v.You.Started {
+		if which != oneDuel && v.EndedAt == 0 && first && v.You != nil && !v.You.Started {
 			continue
 		}
 		switch {
 		case v.EndedAt == 0:
-			v.Until = r.expires
 			v.State = DuelYours
-			if mine && v.You != nil && v.You.Done {
+			if first && v.You != nil && v.You.Done {
 				v.State = DuelTheirs
 			}
-		case r.outcome == "draw":
+		case outcome == "draw":
 			v.State = DuelDraw
-		case r.outcome == "a" && mine, r.outcome == "b" && !mine:
+		case outcome == "a" && first, outcome == "b" && !first:
 			v.State = DuelWon
-		case r.outcome == "a", r.outcome == "b":
+		case outcome == "a", outcome == "b":
 			v.State = DuelLost
 		default:
 			v.State = DuelExpired
-			if r.sent && r.fullWeek {
+			if sent && fullWeek {
 				// Lapsed: the friend never played it (or it's from before, cut off live: both had played some). One
 				// ended before its week was out ended with the friendship (Unfriend): no one let it lapse.
 				switch {
-				case mine && r.theirRun == 0:
+				case first && v.theirRun == 0:
 					v.Lapsed = "they"
-				case !mine && r.myRun == 0:
+				case !first && v.RunID == 0:
 					v.Lapsed = "you"
 				}
 			}
 		}
+		if v.EndedAt != 0 {
+			v.Until = 0 // only an open duel lapses
+		}
 		// The other's score shows once there's a result.
-		if result := v.State == DuelWon || v.State == DuelLost || v.State == DuelDraw; !result && v.Opponent != nil {
+		if !v.hasResult() {
 			v.Opponent.Rights = 0
 		}
 		// A result on even right answers says what broke the tie, in a list too (Приятели's rows).
@@ -768,11 +775,23 @@ func (g *Game) duelsOf(ctx context.Context, userID, only int64) ([]DuelView, err
 		}
 		out = append(out, v)
 	}
-	return out, nil
+	return out, rows.Err()
 }
 
-// duelSide is a player in a duel: who they are, and how their run went (none: not started).
-func (g *Game) duelSide(ctx context.Context, userID, runID int64) (*DuelSide, error) {
+// runSide are, of a duel's run r (joined: none if the side hasn't started), what its side shows: whether it's done, its
+// right answers and its closeness (what breaks a tie), and whether it has begun (DuelSide.Started).
+func runSide(r string) string {
+	return `coalesce(` + r + `.finished_at IS NOT NULL, 0), coalesce(` + r + `.rights, 0), coalesce(` + r + `.closeness, 0),
+		coalesce(` + r + `.at > 0 OR ` + r + `.shown_at IS NOT NULL OR EXISTS (SELECT 1 FROM answers WHERE run_id = ` + r + `.id), 0)`
+}
+
+// hasResult is whether a duel ended won, lost or drawn: not open, nor lapsed.
+func (v *DuelView) hasResult() bool {
+	return v.State == DuelWon || v.State == DuelLost || v.State == DuelDraw
+}
+
+// duelSide is a player in a duel, who they are (nil: gone); how their run went duelsOf reads with the duels.
+func (g *Game) duelSide(ctx context.Context, userID int64) (*DuelSide, error) {
 	s := DuelSide{ID: userID}
 	var avatar string
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT u.name, u.tag, `+lookColumns+` FROM users u WHERE u.id = ?`, userID).
@@ -785,15 +804,6 @@ func (g *Game) duelSide(ctx context.Context, userID, runID int64) (*DuelSide, er
 	}
 	look := g.lookOf(userID, avatar)
 	s.Look = &look
-	if runID != 0 {
-		err = g.DB.Read.QueryRowContext(ctx, `SELECT finished_at IS NOT NULL, rights, closeness,
-			at > 0 OR shown_at IS NOT NULL OR EXISTS (SELECT 1 FROM answers WHERE run_id = runs.id) FROM runs WHERE id = ?`, runID).
-			Scan(&s.Done, &s.Rights, &s.score.tie.closeness, &s.Started)
-		s.score.rights = s.Rights
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return nil, err
-		}
-	}
 	return &s, nil
 }
 
@@ -807,7 +817,7 @@ func (g *Game) DuelExists(ctx context.Context, id int64) (bool, error) {
 // DuelOf is one of a player's duels, as DuelsOf has it (duelMore), with their record against this person. ErrNoDuel
 // if it isn't theirs, ErrDuelGone if there's no such duel.
 func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, error) {
-	list, err := g.duelsOf(ctx, userID, duelID)
+	list, err := g.duelsOf(ctx, userID, oneDuel, duelID)
 	if err != nil {
 		return DuelView{}, err
 	}
@@ -819,10 +829,10 @@ func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, erro
 		}
 		return DuelView{}, ErrNoDuel
 	}
-	v := list[0]
-	if err := g.duelMore(ctx, &v); err != nil {
-		return v, err
+	if err := g.duelMore(ctx, list); err != nil {
+		return list[0], err
 	}
+	v := list[0]
 	if v.against != 0 {
 		r, err := g.recordAgainst(ctx, userID, v.against)
 		if err != nil {
@@ -833,42 +843,65 @@ func (g *Game) DuelOf(ctx context.Context, userID, duelID int64) (DuelView, erro
 	return v, nil
 }
 
-// duelMore adds to a duel (duelsOf) what its card shows of it: how each question went for each side (the player's
-// own; the other's once it has a result: DuelSide.Marks). The player's own game, once played, can be gone over from the
-// card on any day (Review).
-func (g *Game) duelMore(ctx context.Context, v *DuelView) error {
-	var err error
-	if v.You != nil && v.RunID != 0 {
-		if v.You.Marks, err = g.duelMarks(ctx, v.RunID); err != nil {
-			return err
+// duelMore adds to duels (duelsOf) what their cards show of them, in one query: how each question went for each side
+// (the player's own; the other's once it has a result: DuelSide.Marks). The player's own game, once played, can be
+// gone over from the card on any day (Review).
+func (g *Game) duelMore(ctx context.Context, lists ...[]DuelView) error {
+	var runs []int64
+	for _, list := range lists {
+		for i := range list {
+			v := &list[i]
+			if v.You != nil && v.RunID != 0 {
+				runs = append(runs, v.RunID)
+			}
+			if v.Opponent != nil && v.theirRun != 0 && v.hasResult() {
+				runs = append(runs, v.theirRun)
+			}
 		}
 	}
-	result := v.State == DuelWon || v.State == DuelLost || v.State == DuelDraw
-	if v.Opponent != nil && v.theirRun != 0 && result {
-		if v.Opponent.Marks, err = g.duelMarks(ctx, v.theirRun); err != nil {
-			return err
+	if len(runs) == 0 {
+		return nil
+	}
+	marks, err := g.duelMarks(ctx, runs)
+	if err != nil {
+		return err
+	}
+	for _, list := range lists {
+		for i := range list {
+			v := &list[i]
+			if v.You != nil && v.RunID != 0 {
+				v.You.Marks = marks[v.RunID]
+			}
+			if v.Opponent != nil && v.theirRun != 0 && v.hasResult() {
+				v.Opponent.Marks = marks[v.theirRun]
+			}
 		}
 	}
 	return nil
 }
 
-// duelMarks is how each question of a run went, in order.
-func (g *Game) duelMarks(ctx context.Context, runID int64) ([]DuelMark, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT score, is_right, given IS NULL FROM answers WHERE run_id = ?
-		ORDER BY n`, runID)
+// duelMarks is how each question of these runs went, in order, by run.
+func (g *Game) duelMarks(ctx context.Context, runs []int64) (map[int64][]DuelMark, error) {
+	ids, err := json.Marshal(runs)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := g.DB.Read.QueryContext(ctx, `SELECT run_id, score, is_right, given IS NULL FROM answers
+		WHERE run_id IN (SELECT value FROM json_each(?)) ORDER BY run_id, n`, string(ids))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []DuelMark
+	out := map[int64][]DuelMark{}
 	for rows.Next() {
+		var run int64
 		var m DuelMark
 		var score float64
-		if err := rows.Scan(&score, &m.Right, &m.Missed); err != nil {
+		if err := rows.Scan(&run, &score, &m.Right, &m.Missed); err != nil {
 			return nil, err
 		}
 		m.Close = closeAnswer(score, m.Right)
-		out = append(out, m)
+		out[run] = append(out[run], m)
 	}
 	return out, rows.Err()
 }
@@ -1003,7 +1036,7 @@ func (g *Game) DuelsWaiting(ctx context.Context, userID int64) (*Waiting, error)
 	}
 	w.More = all - 1
 	if from.Valid {
-		if w.From, err = g.duelSide(ctx, from.Int64, 0); err != nil {
+		if w.From, err = g.duelSide(ctx, from.Int64); err != nil {
 			return nil, err
 		}
 	}
