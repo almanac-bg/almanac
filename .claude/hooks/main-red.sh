@@ -4,13 +4,16 @@
 # server refused, deploy files not installed), so a failure there is seen only if someone looks: this looks for every
 # session; and the Dependabot pull requests ready to merge. Says nothing when there's none of it, or when GitHub can't
 # be reached.
+#
+# What it prints goes into the session as it starts, so it lists only what is ours: the runs of pushes to main
+# (-e push) and our own pull requests (--author @me).
 set -u
 cd "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}" 2>/dev/null || exit 0
 command -v gh >/dev/null && command -v jq >/dev/null || exit 0
 
 fixes=
 for workflow in CI Deploy; do
-	runs=$(timeout 8 gh run list -w "$workflow" -b main -L 10 --json conclusion,status,databaseId,displayTitle,url 2>/dev/null) || continue
+	runs=$(timeout 8 gh run list -w "$workflow" -b main -e push -L 10 --json conclusion,status,databaseId,displayTitle,url 2>/dev/null) || continue
 	last=$(jq -c '[.[] | select(.status == "completed" and .conclusion != "cancelled")][0] // empty' <<<"$runs")
 	[ -n "$last" ] || continue
 	[ "$(jq -r .conclusion <<<"$last")" = failure ] || continue
@@ -31,7 +34,7 @@ deps=$(timeout 8 gh pr list --state open --author app/dependabot --json number,t
 	-q '.[] | select((.statusCheckRollup | length) > 0 and ([.statusCheckRollup[] | .conclusion // .state] | all(. == "SUCCESS" or . == "SKIPPED" or . == "NEUTRAL"))) | "#\(.number) \(.title)"' 2>/dev/null)
 [ -n "$deps" ] && printf 'Dependabot pull requests with their checks green, to merge (gh pr merge <n> --auto --squash):\n%s\n' "$deps"
 if [ -n "$fixes" ]; then
-	open=$(timeout 8 gh pr list --state open --search "fix in:title" --json number,title -q '.[] | "#\(.number) \(.title)"' 2>/dev/null | head -5)
+	open=$(timeout 8 gh pr list --state open --author @me --search "fix in:title" --json number,title -q '.[] | "#\(.number) \(.title)"' 2>/dev/null | head -5)
 	[ -n "$open" ] && printf 'Open fixes that may already be on it:\n%s\n' "$open"
 fi
 exit 0
