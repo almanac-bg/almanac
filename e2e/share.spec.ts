@@ -63,9 +63,24 @@ test("the day shared: its score and shape and a link, which brings another to th
   // Played: the score shared stays on the result, beside the visitor's own.
   await playRun(visitor);
   await expect(visitor.locator(".score-leaf")).toContainText(`По връзката: ${rights} от 10`);
+  // With no friends yet, the board's Приятели asks whoever sent the link, and names nobody.
+  const board = visitor.locator(".day-board");
+  await board.getByRole("tab", { name: "Приятели" }).click();
+  await expect(board).toContainText("Още нямаш приятели.");
+  await board.getByRole("button", { name: "Покани човека, който ти прати връзката" }).click();
+  await expect(board.getByRole("status")).toHaveText(
+    "Поканата е изпратена. Ако я приеме, ще се появи в приятелите ти.",
+  );
   await other.close();
-  // Opened by one who had played already: their result, with the score shared on it.
+  // The one who shared it sees the request, with the link's issue.
+  const issue = link.match(/\/d\/(\d+)-/)?.[1] ?? "";
+  await page.goto("/friends");
+  await expect(page.locator(".invitation")).toContainText(`Иска да сте приятели. По връзката ти от Брой ${issue}.`);
+  // Opened by one who had played already: their result, with the score shared on it; their own link asks nobody.
   await page.goto(link);
+  await page.locator(".day-board").getByRole("tab", { name: "Приятели" }).click();
+  await expect(page.locator(".day-board")).toContainText("Още нямаш приятели.");
+  await expect(page.getByRole("button", { name: "Покани човека, който ти прати връзката" })).toHaveCount(0);
   await expect(page.locator(".score-leaf")).toContainText(`По връзката: ${rights} от 10`);
   // Not on a later visit by Днес's own address: nothing of it is kept.
   await page.goto("/");

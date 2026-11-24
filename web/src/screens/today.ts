@@ -106,11 +106,14 @@ export interface Today {
 let inPage = boot.day as Today | undefined;
 
 /** A day shared (server/share.go): its day, its issue, and its shape (play.Share: each of the ten, '1' right, '2'
- * близо, '0' wrong, '3' one that counts for nobody). */
+ * близо, '0' wrong, '3' one that counts for nobody); its link as the answers and a request send it („13-k4f2m7qa“),
+ * and whether it's the player's own: never whose it is. */
 interface Shared {
   day: string;
   issue: number;
   shape: string;
+  link: string;
+  mine?: boolean;
 }
 
 /** A shared day's score in words, from its shape: „2 от 10“, never parted at a line's end. */
@@ -149,6 +152,8 @@ export function today() {
   // ти?“; once it's over, a line that it is, over today's.
   const shared = sharedIn;
   sharedIn = null;
+  // Its games played here say the link they came by (playRun): a new player's first counts as one who came by a link.
+  const via = shared?.link ?? "";
   // A profile just deleted, or a game just brought here, is said once, over the day.
   let bye = notice.peek();
   notice.set("");
@@ -206,7 +211,7 @@ export function today() {
       // A question this tab was showing has its time running (a reload): straight back into it. Otherwise (another
       // device, or tab) the day left half-way waits on Днес for „Продължи“: no question's time starts without a tap.
       if (run && !run.done && run.question && shownHere(run.id))
-        screen.show(() => playRun(run, (s) => home(view, s, true)));
+        screen.show(() => playRun(run, (s) => home(view, s, true), "", "", undefined, via));
       else screen.show(() => home(view, view.run, false));
     } catch (err) {
       // Drawn from what it showed last, it stays so: the line's trouble is said only over nothing.
@@ -274,7 +279,7 @@ export function today() {
       try {
         const now = await api<State>("GET", `/api/runs/${left.id}`);
         if (!now.done && now.question) {
-          screen.show(() => playRun(now, (s) => home(t, s, true)));
+          screen.show(() => playRun(now, (s) => home(t, s, true), "", "", undefined, via));
           scrollTo(0, 0);
           return;
         }
@@ -298,7 +303,7 @@ export function today() {
                 ? await api<State>("GET", `/api/runs/${left.id}`)
                 : await api<State>("POST", "/api/day", {});
             counting = false;
-            screen.show(() => playRun(s, (end) => home(t, end, true)));
+            screen.show(() => playRun(s, (end) => home(t, end, true), "", "", undefined, via));
           } catch (err) {
             failed = errorText(err);
             back(t);
@@ -631,6 +636,9 @@ function result(
   // None right: the questions missed, under the score, once they're here (none, while the review hasn't come: the
   // button „Прегледай въпросите“ stays, to ask for them again).
   const missedList = signal<Reviewed[] | null>(null);
+  // Come by that day's link, someone else's: on the board's Приятели while the player has no friends, the one way to
+  // whoever sent it (askSharer).
+  const sharer = shared && !shared.mine ? askSharer(shared.link) : null;
   if (zero) review.then(missedList.set, () => {});
   // The day's board's tab, as the player chose it (none yet: dayBoard opens it).
   const among = signal<Among | null>(null);
@@ -753,7 +761,7 @@ function result(
       "div",
       { class: "result-side page-2" },
       // 5. The day's board (none for yesterday's issue finished late: Днес hasn't its board).
-      t.late ? null : () => dayBoard(fresh(), run, among),
+      t.late ? null : () => dayBoard(fresh(), run, among, sharer),
     ),
   );
   return page;
@@ -933,7 +941,7 @@ type Among = "friends" | "all";
  * Приятели. It opens among friends all the same, or on all България for a player with none yet (`among` keeps the
  * tab chosen while the result is open). Nothing until the day as it stands with the game played is here: before,
  * the board doesn't name its players to the player, nor show anyone's squares (play.FriendsBoard). */
-function dayBoard(t: Today, run: State, among: Signal<Among | null>): Child {
+function dayBoard(t: Today, run: State, among: Signal<Among | null>, sharer: (() => Child) | null): Child {
   if (!t.run?.done) return null;
   const opens: Among = t.friends?.length || t.befriended ? "friends" : "all";
   const now = () => among() ?? opens;
@@ -950,15 +958,16 @@ function dayBoard(t: Today, run: State, among: Signal<Among | null>): Child {
       now,
       (v) => among.set(v),
     ),
-    () => (now() === "all" ? everyone(t, run) : ofFriends(t)),
+    () => (now() === "all" ? everyone(t, run) : ofFriends(t, sharer)),
   );
 }
 
 /** The day among the player's friends: each who played, best first, the player among them. A row says what places
  * it: the right answers („8 от 10“; a tie between them broken as play/board.go says, never by time: those still equal
  * share a place, the server's); the player's own row washed, „ти“ after the name. No friend has played yet: the
- * player's own row all the same, and why it's alone (no friends at all: the way to Приятели to add some). */
-function ofFriends(t: Today): Child {
+ * player's own row all the same, and why it's alone (no friends at all: the way to Приятели to add some, or, come by
+ * someone's link to the day, the way to ask them: `sharer`). */
+function ofFriends(t: Today, sharer: (() => Child) | null): Child {
   const rows = t.friends ?? [];
   if (!rows.length) {
     const mine = t.board.mine ?? t.board.top.find((s) => s.me);
@@ -967,15 +976,17 @@ function ofFriends(t: Today): Child {
       "ol",
       { class: "rows ranks" },
       mine ? scoreRow({ ...mine, me: true }, 1) : null,
-      t.befriended === false
-        ? h(
-            "li",
-            { class: "board-empty" },
-            "Още нямаш приятели. ",
-            h("a", { href: "/friends" }, "Добави приятели"),
-            " и сравнявайте резултатите си всеки ден.",
-          )
-        : h("li", { class: "board-empty" }, "Още никой от приятелите ти не е играл днес."),
+      t.befriended === false && sharer
+        ? h("li", { class: "board-empty board-ask" }, h("p", null, "Още нямаш приятели."), sharer)
+        : t.befriended === false
+          ? h(
+              "li",
+              { class: "board-empty" },
+              "Още нямаш приятели. ",
+              h("a", { href: "/friends" }, "Добави приятели"),
+              " и сравнявайте резултатите си всеки ден.",
+            )
+          : h("li", { class: "board-empty" }, "Още никой от приятелите ти не е играл днес."),
     );
   }
   return h(
@@ -983,6 +994,39 @@ function ofFriends(t: Today): Child {
     { class: "rows ranks" },
     rows.map((s, i) => scoreRow(s, s.place ?? i + 1)),
   );
+}
+
+/** The way to ask whoever shared the day, by its link (`link`), to be friends (play.AskSharer: DECISIONS.md, Friends):
+ * an ordinary request, which they see in Приятели with the link's issue; who they are, the player learns only if they
+ * say yes, as what comes back names nobody. Kept for the result's life: the board draws it again on each tab. */
+function askSharer(link: string): () => Child {
+  const busy = signal(false);
+  const asked = signal(false);
+  const error = signal("");
+  const ask = async () => {
+    busy.set(true);
+    error.set("");
+    try {
+      await api("POST", "/api/friends/requests", { link });
+      asked.set(true);
+    } catch (err) {
+      error.set(errorText(err));
+    } finally {
+      busy.set(false);
+    }
+  };
+  return () =>
+    asked()
+      ? h("p", { role: "status" }, "Поканата е изпратена. Ако я приеме, ще се появи в приятелите ти.")
+      : [
+          h(
+            "button",
+            { class: "btn inline", type: "button", disabled: busy, onclick: ask },
+            "Покани човека, който ти прати връзката",
+          ),
+          h("p", { class: "board-ask-note" }, "Ще види поканата в Приятели. Кой е, ще разбереш, ако я приеме."),
+          error() ? h("p", { class: "bad", role: "alert" }, error()) : null,
+        ];
 }
 
 /** The day among everyone who played it: how they spread (spreadChart), where the player stands, then the best twenty

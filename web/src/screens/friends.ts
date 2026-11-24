@@ -66,6 +66,9 @@ interface Request {
   /** Who asks, as they show to others (play.Look). */
   look?: Look;
   email?: string;
+  /** The issue whose shared link it came by (play.AskSharer): to the one asked, said under who asks; to its sender, in
+   * place of whom it went to, who stays unnamed unless they say yes. */
+  via?: number;
 }
 
 interface Friends {
@@ -261,7 +264,11 @@ function page(kit: Kit): Child {
             "div",
             { class: "invitation-who" },
             who(r.name ?? "", r.look ?? {}, null, r.name ?? "", r.tag ?? ""),
-            h("p", { class: "invitation-line" }, "Иска да сте приятели."),
+            h(
+              "p",
+              { class: "invitation-line" },
+              r.via ? `Иска да сте приятели. По връзката ти от Брой\u00a0${r.via}.` : "Иска да сте приятели.",
+            ),
           ),
           h(
             "div",
@@ -380,7 +387,9 @@ function page(kit: Kit): Child {
                     null,
                     r.email
                       ? h("span", null, emailWords(r.email))
-                      : h("a", { href: profileHref(r.tag ?? "") }, nameWords(r.name ?? "")),
+                      : r.via
+                        ? h("span", null, `Който ти прати връзката към Брой\u00a0${r.via}`)
+                        : h("a", { href: profileHref(r.tag ?? "") }, nameWords(r.name ?? "")),
                     h("button", { class: "link muted tap", type: "button", onclick: () => drop(r, "sent") }, "Отмени"),
                   ),
                 ),

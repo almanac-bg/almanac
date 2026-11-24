@@ -90,7 +90,7 @@ func TestSharingTheDay(t *testing.T) {
 	status, _, body := other.get(path, browserUA)
 	if status != 200 || !strings.Contains(body, fmt.Sprintf(`property="og:image" content="%s/card/%d-%s.png"`, g.url, issue, shape)) ||
 		!strings.Contains(body, fmt.Sprintf(`content="%d от 10 · АЛМАНАХ, Брой %d"`, rights, issue)) ||
-		!strings.Contains(body, fmt.Sprintf(`"shared":{"day":"%s","issue":%d,"shape":"%s"}`, day, issue, shape)) {
+		!strings.Contains(body, fmt.Sprintf(`"shared":{"day":"%s","issue":%d,"shape":"%s","link":"%d-%s"}`, day, issue, shape, issue, path[len(path)-8:])) {
 		t.Fatalf("the shared day's page: %d\n%s", status, body)
 	}
 	// What the page says of the link (its preview, the day shared) names nobody; the day's board under it is

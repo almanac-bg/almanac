@@ -110,13 +110,21 @@ packages' doc comments; this file holds only what must not drift.
     A friend's duel waiting for the player is on Днес too (2026-11-23, the owner): under the streak on the cover,
     „Играй“ beside it; once the day is played, it is the result's action, „Сподели“ then a quiet link. It's the one
     piece of others' news on Днес: a duel waits on the player, and asks for the same few minutes the day does.
-  - **Friends** are added by username or email, a request the other says yes to. The personal invite link was removed
-    (21 Nov): little use, much machinery; friends come by username or email.
+  - **Friends** are added by username or email, a request the other says yes to, or from a day someone shared with
+    you (owner, 2026-11-24): having played that day by its link, a player with no friends yet has on the board's
+    Приятели one action, „Покани човека, който ти прати връзката“, an ordinary request to whoever shared it, within
+    the request's limits and at most 20 by one link; they see it with the link's issue, and its sender learns who it
+    was only if they say yes. The share was the one way a new person came, and it left them with no friends, so the
+    friends' board, duels and the push naming a friend never began for them; this rides on the link already shared,
+    with no new link, page or noun. The personal invite link was removed (21 Nov): little use, much machinery, a
+    separate link to make and send.
   - **Приятели's dot is news since the player last looked there** (2026-11-21), on any device: a friend request, a
     duel sent to them, a result of one of their duels (played back or run out). Opening Приятели clears it. It isn't
     a to-do count: as „a duel waits for you“ it stayed lit up to a week after its news was read (the owner hit it), and
     a result never lit it. A duel to play stays first in Приятели until it's played; the ping is for news arriving.
-  - **Sharing:** the score and its tiles, never the answers, unsigned, with a way into the same ten.
+  - **Sharing:** the score and its tiles, never the answers, unsigned, with a way into the same ten. Unsigned means
+    nothing the link shows, nor anything the game answers about it, says whose it is: a request by it (Friends) names
+    nobody to its sender until it's accepted (2026-11-24).
   - **A result has a budget:** the score and tiles, what the day wrote in the book (its ink by chapter, a rank risen:
     2026-11-22, no single question picked out of the ten), the streak with today's in it (2026-11-23, the owner: it
     grew out of sight once the „Утре“ card went), one action (a friend's duel waiting, else „Сподели“: 2026-11-23, the
@@ -147,8 +155,12 @@ packages' doc comments; this file holds only what must not drift.
     issue better" means it changes only the questions, the clock or the play screen and adds nothing outside it. A
     fix restores stated behaviour; polish adds no data, count, block or notification.
   - **The bets,** each read from what the game keeps anyway (runs, facts, duels, shares), by a query when it's asked,
-    never by new tracking: that ink from the issue alone is enough progress (D30 of the players whose games are only
-    the day's); that the share brings players (new players beside the days shared, day by day).
+    never by new tracking, but for one count: that ink from the issue alone is enough progress (D30 of the players
+    whose games are only the day's); that the share brings players (new players beside the days shared, and of them
+    „Нови по връзка“, day by day). That one count (owner, 2026-11-24) is a number a day, of new players whose first
+    game, the day's issue played as a person plays, began on a page opened by a shared link, kept with nothing of who
+    (privacy.go says so): without it, a day the share brought players can't be told from a day a mention or a search
+    did, and the bet that justifies sharing can't be read.
   The decisions below that this replaces are gone from this file.
 - **The day's ten questions are the heart;** everything else serves them or stays out of the way. A new system replaces
   one or proves it's needed (CLAUDE.md, Direction).
@@ -172,7 +184,7 @@ packages' doc comments; this file holds only what must not drift.
   still be declined, a friend removed); and on 22 Nov the duel against a recording of another's game (a duel is with
   a friend, challenged directly) and „Нов дуел“. The
   Алманах's facts are a chapter's entries, the latest first, each dated with where it was learned (the edition's
-  mockups, chosen 20 Nov), never one list of them all. Friends are added by username or email.
+  mockups, chosen 20 Nov), never one list of them all. Friends are added by username, email or a shared day (Friends).
   Don't bring any of them back, or something in their place, without the owner's call.
 - **Gamification only from what the game really counts:** no invented currencies, no random boxes, never real money.
 

@@ -272,11 +272,19 @@ func (s *Server) answer(w http.ResponseWriter, r *http.Request) error {
 		N      int             `json:"n"`
 		Answer json.RawMessage `json:"answer"`
 		InTime bool            `json:"inTime"`
+		// Via is the shared day's link the page playing it was opened at („13-k4f2m7qa“), if any: a new player's first
+		// game, ended, is counted as one who came by a link (play.ByLink), and nothing else is kept of it.
+		Via string `json:"via"`
 	}
 	if err := readJSON(r, &in); err != nil {
 		return err
 	}
-	res, err := s.game.AnswerTimed(r.Context(), user, id, in.N, in.Answer, in.InTime)
+	ctx := r.Context()
+	if m := linkOf.FindStringSubmatch(in.Via); m != nil {
+		issue, _ := strconv.Atoi(m[1])
+		ctx = play.ByLink(ctx, issue, m[2])
+	}
+	res, err := s.game.AnswerTimed(ctx, user, id, in.N, in.Answer, in.InTime)
 	if err != nil {
 		return err
 	}

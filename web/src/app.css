@@ -7005,6 +7005,23 @@
     padding: var(--space-3) 0 var(--space-2);
   }
 
+  /* Come by someone's link to the day, with no friends yet: the way to ask them, its line under it. */
+  .board-ask {
+    display: grid;
+    gap: var(--space-2);
+    justify-items: start;
+  }
+
+  .board-ask p {
+    margin: 0;
+  }
+
+  .board-ask .board-ask-note {
+    color: var(--ink-3);
+    font-weight: 500;
+    font-size: 0.875rem;
+  }
+
   /* A friend's way to a duel, a button (or „Премахни“), at the row's end: 44px to tap, the row no taller for it. */
   .friend-act {
     grid-area: act;
