@@ -9,9 +9,13 @@
 # deploy goes to its end, going back included, even if the session that started it is cut (CI cancelled, the network
 # gone; Ctrl-C stops only the following: `systemctl stop almanac-deploy-v2.0.0` stops the deploy). One deploy at a
 # time: a second waits for the first. Nor beside a bank reload (almanac-bank, bank.sh, takes the same lock): each
-# waits for the other, as a reload's work (the days ahead drawn again) during the health watch below could pass for
-# the new version's fault, and send it back (23 Nov 2026). A version that is live already is left as it is, so CI asks
-# for the latest release after every merge, and a deploy that didn't happen is tried again.
+# waits for the other, so the bank a new program reads before the restart (below) is the one it then plays, and the
+# program a reload checks its bank with is the one that plays it. The lock doesn't cover a reload's own work in the
+# game (today's questions voided, the days ahead drawn again): the server does that within its next minute
+# (play.KeepDays), after bank.sh has let the lock go, a write at a time, so it holds the game's one writer only briefly
+# (#700; on 23 Nov 2026 a redraw held it for the whole drawing, a write probe timed out, and the watch below sent a
+# healthy release back). A version that is live already is left as it is, so CI asks for the latest release after
+# every merge, and a deploy that didn't happen is tried again.
 #
 # A release that went back for not being healthy is marked (/var/lib/almanac-deploy/unhealthy-vX.Y.Z, its first line
 # says why), and CI doesn't ask for it again: every merge would cut play twice for a release that fails the same way.
@@ -50,7 +54,11 @@
 # Whatever stops this midway while the game is stopped, the game is started again as it ends.
 #
 # Healthy: the server answers as the new version within three minutes, and then keeps answering, the same process,
-# for two more (a crash after a good start goes back too).
+# for two more (a crash after a good start goes back too). Keeps answering: it's asked every 15 seconds, and three
+# misses in a row send it back. /api/health holds a failed write probe's answer for 30 s (probeEvery,
+# internal/server/api.go), so polls 15 s apart read one slow write at most twice: only a failure that lasts sends a
+# release back, not one stalled write read three times (as polls 5 s apart did, 23 Nov 2026). A hang that begins in
+# the watch's last half minute passes it; the monitors that poll the game (README: Наблюдение) see it then.
 set -eu
 usage="usage: almanac-deploy vX.Y.Z [ci]"
 tag=${1:-}
@@ -219,7 +227,7 @@ if [ -n "$healthy" ]; then
 	missed=0
 	until=$(($(date +%s) + 120))
 	while [ "$(date +%s)" -lt "$until" ]; do
-		sleep 5
+		sleep 15 # not less than half of the health probe's probeEvery (above)
 		if [ "$(systemctl show -p MainPID --value almanac)" != "$pid" ]; then
 			healthy= why="it stopped after it started"
 			break

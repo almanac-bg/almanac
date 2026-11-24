@@ -38,7 +38,7 @@ any rule:
 Every few weeks (the owner's call, or when the server mails about reports), what says a live question may have gone
 wrong is fixed the same way:
 
-1. From the server, as `bank used` in `/new-questions` (`systemd-run --pipe --wait -p User=almanac -p
+1. From the server, as `bank used` in `/new-questions` (`systemd-run --pipe --wait --collect -p User=almanac -p
    EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac …` over ssh): `bank reports > <work>/reports.jsonl` and
    `bank suspects > <work>/suspects.txt`.
 2. `python3 -I <skill>/upkeep.py <bank> <work> --reports <work>/reports.jsonl --suspects <work>/suspects.txt` (adds

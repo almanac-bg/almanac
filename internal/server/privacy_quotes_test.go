@@ -28,6 +28,12 @@ func TestPrivacyQuotesTheCode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	journald := func(key string) string {
+		if m := regexp.MustCompile(`(?m)^` + key + `=(.*)$`).FindStringSubmatch(string(journal)); m != nil {
+			return m[1]
+		}
+		return "(not set)"
+	}
 	day := 24 * time.Hour
 	for _, q := range []struct {
 		what      string
@@ -50,8 +56,10 @@ func TestPrivacyQuotesTheCode(t *testing.T) {
 		{"play.SharerAsks", play.SharerAsks, 20, "по една връзка най-много 20 души"},
 		{"backup.DaysKept", backup.DaysKept, 30 * day, "Резервните копия на базата данни се пазят до месец"},
 		{"store.CopiesKept", store.CopiesKept, 30 * day, "от резервните копия — до месец"},
-		{"deploy/journald.conf's MaxRetentionSec", regexp.MustCompile(`(?m)^MaxRetentionSec=(.*)$`).FindStringSubmatch(string(journal))[1],
-			"14day", "Пазим ги до 14 дни"},
+		{"deploy/journald.conf's MaxRetentionSec", journald("MaxRetentionSec"), "14day", "Пазим ги до 14 дни"},
+		// journald deletes whole archived files only, and archives the one it writes to by MaxFileSec (a month unless
+		// set): without it, a line outlives MaxRetentionSec by up to a month.
+		{"deploy/journald.conf's MaxFileSec", journald("MaxFileSec"), "1day", "Пазим ги до 14 дни"},
 	} {
 		if q.got != q.want {
 			t.Errorf("%s is %v, and the privacy page says it's %v: „%s“ (privacy.go)", q.what, q.got, q.want, q.phrase)

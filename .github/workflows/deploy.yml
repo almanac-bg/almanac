@@ -241,8 +241,8 @@ jobs:
           DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
         run: |
           if [ -z "$DEPLOY_KEY" ]; then
-            echo "No DEPLOY_KEY: nothing deployed." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+            echo "::error::No DEPLOY_KEY (a secret of the production environment): nothing deployed, so the latest release isn't live."
+            exit 1
           fi
           install -d -m 700 ~/.ssh
           (umask 077 && printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/deploy)

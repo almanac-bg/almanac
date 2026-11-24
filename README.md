@@ -123,7 +123,7 @@ go run ./cmd/almanac bank check -sample bank/sample   # извадката
 **Проверка и възстановяване.** Командите на сървъра искат неговите настройки:
 
 ```bash
-alias almanac-backup='systemd-run --pipe --wait --quiet -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac backup'
+alias almanac-backup='systemd-run --pipe --wait --quiet --collect -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac backup'
 almanac-backup list                       # копията, най-новото отгоре
 almanac-backup verify                     # последното копие на деня: цяло ли е, както е пратено, и от този сървър ли е
 systemctl stop almanac.socket almanac
