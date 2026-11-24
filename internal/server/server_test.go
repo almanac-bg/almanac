@@ -1205,6 +1205,42 @@ func TestFriendsOverHTTP(t *testing.T) {
 	}
 }
 
+// A yes to a request when the list is already full is refused, and the request waits still: befriend deletes it
+// first, so the refusal must undo that (play.MaxFriends: what one player can make of another's list is bounded).
+func TestAcceptWhenFriendsFull(t *testing.T) {
+	g := start(t)
+	ana, bo := g.player(), g.player()
+	_, a := ana.call("POST", "/api/guest", map[string]any{})
+	bo.call("POST", "/api/guest", map[string]any{})
+	played(bo)
+	bo.call("POST", "/api/friends/requests", map[string]string{"to": "@" + tagOf(ana)})
+	if _, err := g.db.Write.Exec(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?)
+		INSERT INTO users (name, tag, created_at, seen_at) SELECT 'Играч', 'full' || i, 0, 0 FROM n`, play.MaxFriends); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := g.db.Write.Exec(`INSERT INTO friends (user_id, friend_id, since, asked)
+		SELECT ?, id, 0, 0 FROM users WHERE tag LIKE 'full%'`, a["user"].(map[string]any)["id"]); err != nil {
+		t.Fatal(err)
+	}
+	_, mine := ana.call("GET", "/api/friends", nil)
+	in := mine["requests"].(map[string]any)["in"].([]any)
+	if len(in) != 1 {
+		t.Fatalf("Bo's request: %v", mine["requests"])
+	}
+	id := int64(in[0].(map[string]any)["id"].(float64))
+	if status, out := ana.call("POST", fmt.Sprintf("/api/friends/requests/%d/accept", id), map[string]any{}); status != http.StatusConflict ||
+		out["error"] != "many_friends" {
+		t.Fatalf("a yes with %d friends: %d %v", play.MaxFriends, status, out)
+	}
+	_, mine = ana.call("GET", "/api/friends", nil)
+	if friends := mine["friends"].([]any); len(friends) != play.MaxFriends {
+		t.Fatalf("%d friends after the refused yes, want %d", len(friends), play.MaxFriends)
+	}
+	if in := mine["requests"].(map[string]any)["in"].([]any); len(in) != 1 {
+		t.Fatalf("Bo's request after the refused yes: %v", mine["requests"])
+	}
+}
+
 // Pushes that others cause are capped for whoever gets them: strangers asking to be friends, once a day each (asking
 // again after a no tells nobody again), at most peoplePushes a day in all.
 func TestPeoplePushesCapped(t *testing.T) {
