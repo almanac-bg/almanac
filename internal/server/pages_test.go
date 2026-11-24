@@ -4,11 +4,99 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
 )
+
+// Днес's title is the server's and the client's both (the page's head, then the router's title() as it draws Днес):
+// one changed alone, the client would set the tab and what a search shows back to the other as the page draws.
+func TestHomeTitleMatchesTheClient(t *testing.T) {
+	src, err := os.ReadFile("../../web/src/lib/router.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := regexp.MustCompile(`export const homeTitle = "([^"]+)";`).FindSubmatch(src)
+	if m == nil {
+		t.Fatal("router.ts has no homeTitle: has it changed shape? Change this test with it")
+	}
+	if string(m[1]) != homeTitle {
+		t.Fatalf("the client's Днес is titled %q, the server's page %q: make them one", m[1], homeTitle)
+	}
+}
+
+// The front page says what the game is to whoever reads it without running it (a search's crawler, an AI's reader):
+// its title and description, the site's name as structured data, a paragraph in its <noscript> with the ten topics,
+// and its picture's words. Other pages keep the one line.
+func TestFrontPageSaysWhatTheGameIs(t *testing.T) {
+	g := start(t)
+	get := func(path string) string {
+		res, err := http.Get(g.url + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		return string(body)
+	}
+	const ld = `<script type="application/ld+json">`
+	home := get("/")
+	for _, want := range []string{
+		"<title>" + homeTitle + "</title>",
+		`<meta property="og:title" content="` + homeTitle + `">`,
+		`<meta name="description" content="` + siteDescription + `">`,
+		`<meta property="og:image:alt" content="АЛМАНАХ: десет въпроса на ден`,
+		ld,
+		"обща култура, наука, история", // the sample bank's chapters, in its order
+		`<a href="/privacy">`,
+	} {
+		if !strings.Contains(home, want) {
+			t.Errorf("/ has no %s", want)
+		}
+	}
+	var site map[string]any
+	if i := strings.Index(home, ld); i >= 0 {
+		data, _, _ := strings.Cut(home[i+len(ld):], "</script>")
+		if err := json.Unmarshal([]byte(data), &site); err != nil {
+			t.Fatalf("the site's structured data isn't JSON: %v %.300s", err, data)
+		}
+	}
+	if site["@type"] != "WebSite" || site["name"] != "АЛМАНАХ" || site["url"] != g.url+"/" || site["inLanguage"] != "bg" {
+		t.Errorf("the site's structured data: %v", site)
+	}
+	friends := get("/friends")
+	if strings.Contains(friends, "ld+json") || strings.Contains(friends, "обща култура") ||
+		!strings.Contains(friends, "<title>"+homeTitle+"</title>") {
+		t.Errorf("/friends has the front page's words, or not its title")
+	}
+}
+
+// Every file of web/public is served from the site's root (publicFiles): one added there and not here is a 404.
+func TestPublicFilesServed(t *testing.T) {
+	entries, err := os.ReadDir("../../web/public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if !slices.Contains(publicFiles, e.Name()) {
+			t.Errorf("web/public/%s isn't served: add it to publicFiles in pages.go", e.Name())
+		}
+	}
+	g := start(t)
+	g.srv.client = fstest.MapFS{"favicon.ico": {Data: []byte("\x00\x00\x01\x00icon")}}
+	res, err := http.Get(g.url + "/favicon.ico")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != 200 || res.Header.Get("Content-Type") != "image/x-icon" {
+		t.Fatalf("/favicon.ico: %d %q", res.StatusCode, res.Header.Get("Content-Type"))
+	}
+}
 
 // bootOf is the boot data of the page at path, as p's browser gets it.
 func bootOf(t *testing.T, p *player, path string) map[string]any {

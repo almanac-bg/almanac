@@ -454,7 +454,11 @@ function restore(y = 0): void {
   stopRestoring = stop;
 }
 
-/** Sets the tab's title for the screen. */
+/** Днес's title, the front page's: the game's name and what it is, as a search shows it and a bookmark keeps it. The
+ * server's page starts with the same (server/pages.go, homeTitle: TestHomeTitleMatchesTheClient holds them equal). */
+export const homeTitle = "АЛМАНАХ · Десет въпроса на ден за цяла България";
+
+/** Sets the tab's title for the screen: its name and the game's („Алманах · АЛМАНАХ“); none, Днес's (homeTitle). */
 export function title(text?: string): void {
-  document.title = text ? `${text} · АЛМАНАХ` : "АЛМАНАХ";
+  document.title = text ? `${text} · АЛМАНАХ` : homeTitle;
 }

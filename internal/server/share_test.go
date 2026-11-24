@@ -65,6 +65,11 @@ func TestSharingTheDay(t *testing.T) {
 	if status, _ := other.call("POST", "/api/runs/"+id+"/share", nil); status != 404 {
 		t.Fatalf("someone else's day shared: %d", status)
 	}
+	// /admin's table counts it, once, on the day it was played.
+	rows, err := g.srv.dayRows(t.Context())
+	if err != nil || len(rows) == 0 || rows[0].Day != short(day) || rows[0].Shared != 1 {
+		t.Fatalf("/admin's days: %v %+v", err, rows[:min(len(rows), 1)])
+	}
 
 	// Opened: the day's page, with the day shared in its boot and the card in its preview, and no name.
 	_, me := p.call("GET", "/api/me", nil)
@@ -157,7 +162,7 @@ func TestSharingTheDay(t *testing.T) {
 	res.Body.Close()
 	img, err = png.Decode(bytes.NewReader(b))
 	if res.StatusCode != 200 || err != nil || img.Bounds().Dx() != 1200 || img.Bounds().Dy() != 630 ||
-		res.Header.Get("Cache-Control") != "public, max-age=3600" {
+		res.Header.Get("Cache-Control") != "public, max-age=86400" {
 		t.Fatalf("the site's picture: %d %v %v", res.StatusCode, err, res.Header)
 	}
 

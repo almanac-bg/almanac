@@ -10,6 +10,7 @@
 import { recover } from "./fresh.ts";
 import { news } from "./game/news.ts";
 import { hands, reviewSheet } from "./game/results.ts";
+import { shareWordsOut } from "./game/share.ts";
 import { ApiError, api, errorText, lastOf, setIfNew } from "./lib/api.ts";
 import { type Child, computed, effect, h, onCleanup, signal, untracked, when } from "./lib/dom.ts";
 import { reportProblem } from "./lib/errors.ts";
@@ -52,6 +53,7 @@ import {
 } from "./ui.ts";
 
 export const kit = {
+  shareWordsOut,
   acceptedLine,
   inSight,
   isOwnTag,

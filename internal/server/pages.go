@@ -119,7 +119,7 @@ var shell = template.Must(template.New("shell").Parse(`<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>АЛМАНАХ</title>
+<title>{{.HomeTitle}}</title>
 <meta name="description" content="{{.Description}}">
 {{if .Canonical}}<link rel="canonical" href="{{.Canonical}}">{{end}}
 <meta property="og:site_name" content="АЛМАНАХ">
@@ -130,6 +130,7 @@ var shell = template.Must(template.New("shell").Parse(`<!doctype html>
 <meta property="og:image" content="{{.Image}}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="{{.ImageAlt}}">
 <meta property="og:locale" content="bg_BG">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#f3f4fa" media="(prefers-color-scheme: light)">
@@ -143,10 +144,15 @@ var shell = template.Must(template.New("shell").Parse(`<!doctype html>
 {{range .Scripts}}<link rel="modulepreload" href="/{{.}}">
 {{end}}{{if .Screen}}<link rel="modulepreload" href="/{{.Screen}}">{{end}}{{end}}
 <script type="application/json" id="boot">{{.Boot}}</script>
-</head>
+{{with .Site}}<script type="application/ld+json">{{.}}</script>
+{{end}}</head>
 <body>
 <div id="app">{{if not .Files.JS}}<p style="padding:2rem;font-family:system-ui">The client isn't built: go run ./cmd/build</p>{{end}}</div>
-<noscript><p>За да играеш АЛМАНАХ, включи JavaScript в браузъра си.</p></noscript>
+<noscript>{{if .Topics}}<p>АЛМАНАХ е безплатна игра с въпроси на български. Всеки ден излизат нови десет въпроса, едни
+и същи за цяла България: по един от всяка от десетте теми ({{.Topics}}), от лесен към труден. Всеки верен отговор в броя
+на деня вписва факта си с мастило в твоя Алманах. Играеш без регистрация, сравняваш резултата си с приятелите си и
+ги предизвикваш на дуел.</p>
+<p>За да играеш, включи JavaScript в браузъра си. <a href="/privacy">Какво пазим и защо</a></p>{{else}}<p>За да играеш АЛМАНАХ, включи JavaScript в браузъра си.</p>{{end}}</noscript>
 </body>
 </html>
 `))
@@ -220,17 +226,26 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	}
 	boot, _ := json.Marshal(start) // escapes <, > and &: safe inside the script element
 	files := filesOf(m, r.URL.Path)
-	title, description, image := s.preview(r, shared)
-	canonical := ""
+	pv := s.preview(r, shared)
+	page := map[string]any{
+		"Files": files, "Boot": template.JS(boot), "HomeTitle": homeTitle,
+		"Title": pv.title, "Description": pv.description, "Canonical": "",
+		"URL": s.cfg.PublicURL + r.URL.Path, "Image": s.cfg.PublicURL + pv.image, "ImageAlt": pv.alt,
+	}
+	// The front page, the one search engines are given (indexed): its address, the site's name for them, and for a
+	// reader that doesn't run the page (an AI's, a crawler's), what the game is in words.
 	if r.URL.Path == "/" {
-		canonical = s.cfg.PublicURL + "/"
+		page["Canonical"] = s.cfg.PublicURL + "/"
+		site, _ := json.Marshal(map[string]any{
+			"@context": "https://schema.org", "@type": "WebSite", "name": "АЛМАНАХ",
+			"alternateName": []string{"Алманах", "almanac.bg"}, "url": s.cfg.PublicURL + "/", "inLanguage": "bg",
+			"description": siteDescription,
+		})
+		page["Site"] = template.JS(site) // a data block, never run: the CSP's script-src doesn't apply to it
+		page["Topics"] = topicWords(b.Categories)
 	}
 	var out bytes.Buffer
-	if err := shell.Execute(&out, map[string]any{
-		"Files": files, "Boot": template.JS(boot),
-		"Title": title, "Description": description, "Canonical": canonical,
-		"URL": s.cfg.PublicURL + r.URL.Path, "Image": s.cfg.PublicURL + image,
-	}); err != nil {
+	if err := shell.Execute(&out, page); err != nil {
 		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return
 	}
@@ -279,24 +294,48 @@ func (s *Server) there(r *http.Request) bool {
 // preview is what a link to this page shows when it's sent (Viber, Messenger, WhatsApp), and its picture: a player's
 // page, whose it is, and nothing it would have to claim of them (never a rank's word beside a name: DECISIONS.md, the
 // seal); a shared day, its score and its card (share.go), never whose it was.
-func (s *Server) preview(r *http.Request, shared play.Share) (title, description, image string) {
-	title, description = "АЛМАНАХ", "Десет въпроса на ден, едни и същи за цяла България. Всеки верен отговор вписва факт в твоя Алманах."
-	image = "/og.png"
+func (s *Server) preview(r *http.Request, shared play.Share) linkPreview {
+	p := linkPreview{title: homeTitle, description: siteDescription, image: "/og.png",
+		alt: "АЛМАНАХ: десет въпроса на ден, едни и същи за цяла България"}
 	switch path := r.URL.Path; {
 	case shared.Code != "":
-		title = fmt.Sprintf("%d от %d · АЛМАНАХ, Брой %d", shared.Rights(), shared.Counted(), shared.Issue)
-		description = "Десет въпроса на ден, едни и същи за цяла България. Колко ще познаеш ти?"
-		image = cardOf(shared)
+		p.title = fmt.Sprintf("%d от %d · АЛМАНАХ, Брой %d", shared.Rights(), shared.Counted(), shared.Issue)
+		p.description = "Десет въпроса на ден, едни и същи за цяла България. Колко ще познаеш ти?"
+		p.image = cardOf(shared)
+		p.alt = fmt.Sprintf("АЛМАНАХ, Брой %d: %d от %d", shared.Issue, shared.Rights(), shared.Counted())
 	case strings.HasPrefix(path, "/players/"):
 		if tag, err := account.NormalTag(strings.TrimPrefix(path, "/players/")); err == nil {
-			if p, err := s.profileOf(r, tag, 0); err == nil {
-				title = p.Name + " (@" + p.Tag + ") в АЛМАНАХ"
-				description = "Профил в АЛМАНАХ. Десет въпроса на ден, едни и същи за цяла България."
+			if pr, err := s.profileOf(r, tag, 0); err == nil {
+				p.title = pr.Name + " (@" + pr.Tag + ") в АЛМАНАХ"
+				p.description = "Профил в АЛМАНАХ. Десет въпроса на ден, едни и същи за цяла България."
 			}
 		}
 	}
-	return title, description, image
+	return p
 }
+
+// homeTitle is the front page's title, the words a search shows and a tab or a bookmark keeps: the game's name and
+// what it is, since „алманах“ alone is a common word (and a book's title). Every page starts with it, and a link to
+// any page but a shared day's or a player's shows it; the client's router sets each screen's own as it draws it
+// (web/src/lib/router.ts, title: TestHomeTitleMatchesTheClient holds the two equal).
+const homeTitle = "АЛМАНАХ · Десет въпроса на ден за цяла България"
+
+// siteDescription is the front page's description, the line under its title in a search and under a link to it in a
+// chat: what the game is in plain words, for someone who has never heard of it.
+const siteDescription = "Игра с въпроси: десет на ден, едни и същи за цяла България. История, география, наука, кино, " +
+	"музика, спорт и още. Безплатно, без регистрация."
+
+// topicWords are the bank's chapters as a sentence names them: „обща култура, наука, …“.
+func topicWords(chapters []bank.Category) string {
+	names := make([]string, len(chapters))
+	for i, c := range chapters {
+		names[i] = strings.ToLower(c.Name)
+	}
+	return strings.Join(names, ", ")
+}
+
+// linkPreview is what a link to a page shows when it's sent: its title, its line, its picture and the picture's words.
+type linkPreview struct{ title, description, image, alt string }
 
 // Search engines get the front page and the privacy notice, and nothing else: every other page is the game itself,
 // the same empty page until it starts, or something of one player's or one game's (a duel, a profile), so those say "noindex". The API is closed to them. Both files carry the site's own address, so they're
@@ -321,9 +360,12 @@ func (s *Server) sitemap(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte(b.String()))
 }
 
-// The client's fonts are its own files: say what they are, wherever the server runs (not every system's MIME table
-// knows woff2).
-func init() { _ = mime.AddExtensionType(".woff2", "font/woff2") }
+// The client's fonts and its icon are its own files: say what they are, wherever the server runs (not every system's
+// MIME table knows woff2 or ico).
+func init() {
+	_ = mime.AddExtensionType(".woff2", "font/woff2")
+	_ = mime.AddExtensionType(".ico", "image/x-icon")
+}
 
 // asset serves the client's built files. Their names change with their content, so they're cached for good. A script
 // or a stylesheet goes out as the build compressed it (cmd/build: brotli at its best, else gzip), in the encoding the
@@ -386,7 +428,7 @@ func accepts(r *http.Request, encoding string) bool {
 
 // publicFiles are served from the site's root as they are (web/public).
 var publicFiles = []string{
-	"favicon.svg", "bimi.svg", "manifest.webmanifest", "sw.js", "scheme.js",
+	"favicon.svg", "favicon.ico", "bimi.svg", "manifest.webmanifest", "sw.js", "scheme.js",
 	"icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "badge-96.png",
 }
 

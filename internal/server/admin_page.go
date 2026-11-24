@@ -64,9 +64,9 @@ var adminBody = template.Must(template.New("admin").Funcs(template.FuncMap{"n": 
 <h2>По дни</h2>
 <p class="muted">Играч тук е човек: отговорил на въпрос с човешка скорост, без тези, които водят играта. Нови: играли
 за първи път този ден. Играли: отговорили на поне един въпрос в коя да е игра, не само в броя. След 1, 7 и 30 дни:
-колко от новите са играли пак точно тогава.</p>
-<div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th><th class="num">Играли</th><th class="num">Нови</th><th class="num">След 1 ден</th><th class="num">След 7 дни</th><th class="num">След 30 дни</th></tr></thead><tbody>
-{{range .Days}}<tr><td>{{.Day}}</td><td class="num">{{n .Played}}</td><td class="num">{{n .New}}</td>{{range .Back}}<td class="num">{{.}}</td>{{end}}</tr>{{end}}
+колко от новите са играли пак точно тогава. Споделени: колко резултата от броя на този ден са споделени с връзка.</p>
+<div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th><th class="num">Играли</th><th class="num">Нови</th><th class="num">Споделени</th><th class="num">След 1 ден</th><th class="num">След 7 дни</th><th class="num">След 30 дни</th></tr></thead><tbody>
+{{range .Days}}<tr><td>{{.Day}}</td><td class="num">{{n .Played}}</td><td class="num">{{n .New}}</td><td class="num">{{n .Shared}}</td>{{range .Back}}<td class="num">{{.}}</td>{{end}}</tr>{{end}}
 </tbody></table></div>
 </section>
 `))

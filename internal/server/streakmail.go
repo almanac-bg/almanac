@@ -258,7 +258,7 @@ func (s *Server) mailOff(w http.ResponseWriter, r *http.Request) {
 	}
 	var body bytes.Buffer
 	_ = mailOffPage.Execute(&body, data)
-	s.plain(w, "Писма от АЛМАНАХ", nil, template.HTML(body.String()))
+	s.plain(w, "Писма от АЛМАНАХ", nil, template.HTML(body.String()), plainMeta{})
 }
 
 // mailPrefs is the player's mail by kind (the streak's, the day's reminder): whether they get it, and whether they

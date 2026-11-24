@@ -49,7 +49,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   steps aside in a game (`html.playing`); on a new visitor's cover and on the sign-in page it is bare (`html.bare`):
   the mark where it always is and no places, „Вход“ at the right on the cover, nothing at the right on the sign-in page.
 - **Вход** (`/signin`, `signInPage` in `screens/signin.ts`): under the bare frame, „Назад“ (to the page it was come
-  from, else Днес), „Влез в профила си“, and the form, nothing else: the email and „Прати ми код“, then the code
+  from, else Днес), „Влез в профила си“, and the form, nothing else but „Какво пазим и защо“ under it, a quiet link (the email is asked for here; its way back is to Вход): the email and „Прати ми код“, then the code
   (`signIn`, the same steps and words as everywhere a code is asked for). Signed in, back to that page (Днес or Профил
   says what came of it). Every way in by name points here: the bar's and the cover's „Вход“, Профил's „Имаш профил?
   Влез“, a player's page's „Влез“. A player signed in already who opens it lands on Профил; Профил with nobody on the
@@ -80,7 +80,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
     the first sent (`/duel/<id>`): never the cover's action, which is the day's ten.
   - On a big screen, under them, „В броя“: the ten chapters in their order, as a book's table of contents on the
     page (no card, no lines between: nothing in it opens).
-  - A new visitor: the cover, „Започни“, and under it „Едни и същи за цяла България.“ (on a big screen „В броя“ under
+  - A new visitor: the cover, „Започни“, and under it „Нови десет всеки ден, едни и същи за цяла България.“ (on a big screen „В броя“ under
     it, as a player's, and the line under the words only „Без регистрация.“). In an app's own browser, one
     line under „Започни“: on Android „Имаш игра в браузъра? Отвори я там“, a tap that opens it; on an iPhone, where no
     link can, „Имаш игра в браузъра? Отвори я там: ··· → Отвори в Safari“, no button (`coverExit`).
@@ -91,7 +91,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   the day's board (6) the right one, the room to itself:
   1. The score on a sheet of the issue's first chapter: „Брой 9 · 20 ноември“, the score as the hero numeral „7 от
      10“, the tiles, „На десетия въпрос вярно отговарят 14 %“ (nothing before a crowd: the tenth is
-     always the hardest), and with a crowd „България днес: средно 6,2“ (the average always to one decimal: „6,0“). Ten of ten:
+     always the hardest), and with a crowd „България днес: средно 6,2“ (the average always to one decimal: „6,0“); come by that day's shared link (or opened it having played), „По връзката: 2 от 10“ under it, for the page's life, nothing kept. Ten of ten:
      the game's mark drawn large beside the score (64–128px, as much as the score leaves room for), „Всички
      верни“ under it at the date's size. The card opens the day's questions (below): a tap anywhere on it,
      and each tile at its own question. None right: right under the score, „Въпросите“ open
@@ -240,7 +240,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   A duel named in the address (`?duel=<id>`: its game just ended, or an old link to its page) is first in its group,
   brought into sight, and its result lands there once (`feel.duel`: the marks fill pair by pair, the score counts
   up, the chip lands with the end's sound), never again. The record between two is the friend's row's, never a duel's. Friends are added in one field under „Добави приятел“, „име или
-  имейл“; requests sent wait under „Изпратени покани (2)“, each section headed alike (`.sect-head`). A request to the
+  имейл“; a request by email says no letter goes („Писмо не пращаме.“) and offers „Сподели“: today's issue and the player's username, for one who doesn't play yet; requests sent wait under „Изпратени покани (2)“, each section headed alike (`.sect-head`). A request to the
   player is a card as every card is, no frame of its own, „Приеми“ and „Откажи“ under the name, on its edge. Only two friends of one name show their @username. The
   questions' dialog (above) says under its head whose duel it is and its score, each question with how it went for
   the two.
@@ -606,8 +606,8 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
 
 ## The share
 
-- **The text:** „Брой 42 · 8/10 · серия 23 дни“ (the streak from three days; on a national day its date and name after
-  the issue, „Брой 112 · 3 март · Освобождението · 8/10“), the squares ■ right, ◩ близо (U+25E9, the upper left half, as the tiles), □ not, and the
+- **The text:** „АЛМАНАХ · Брой 42 · 8/10 · серия 23 дни“, the name first (seen without its preview, it says what it is; the streak from three days; on a national day its date and name after
+  the issue, „АЛМАНАХ · Брой 112 · 3 март · Освобождението · 8/10“), the squares ■ right, ◩ близо (U+25E9, the upper left half, as the tiles), □ not, and the
   link whole, „https://almanac.bg/d/…“, so that every messenger links it (`game/share.ts`). Unsigned.
 - **The card** (`internal/card`, `/card/<issue>-<shape>.png`), drawn once, by the server, one look in every theme: the
   picture a shared link's preview shows, and the one the sheet shows and shares. The mark and the name, „Брой N“ big

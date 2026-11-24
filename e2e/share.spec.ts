@@ -19,7 +19,7 @@ async function standIn(page: Page, sheet: boolean): Promise<void> {
   }, sheet);
 }
 
-const shape = /^Брой \d+ · (\d+)\/10( · \d+ дни)?\n[■◩□]{10}\nhttps?:\/\/\S+(\/d\/\d+-[a-z2-9]{8})$/;
+const shape = /^АЛМАНАХ · Брой \d+ · (\d+)\/10( · \d+ дни)?\n[■◩□]{10}\nhttps?:\/\/\S+(\/d\/\d+-[a-z2-9]{8})$/;
 
 test("the day shared: its score and shape and a link, which brings another to the same ten", async ({
   page,
@@ -60,7 +60,17 @@ test("the day shared: its score and shape and a link, which brings another to th
   await expect(visitor.locator(".shared-score .tile.right")).toHaveCount(Number(rights));
   await startDay(visitor);
   await expect(visitor.locator(".question-head")).toContainText("1 от 10");
+  // Played: the score shared stays on the result, beside the visitor's own.
+  await playRun(visitor);
+  await expect(visitor.locator(".score-leaf")).toContainText(`По връзката: ${rights} от 10`);
   await other.close();
+  // Opened by one who had played already: their result, with the score shared on it.
+  await page.goto(link);
+  await expect(page.locator(".score-leaf")).toContainText(`По връзката: ${rights} от 10`);
+  // Not on a later visit by Днес's own address: nothing of it is kept.
+  await page.goto("/");
+  await expect(page.locator(".score-n")).toHaveText(rights);
+  await expect(page.locator(".score-leaf")).not.toContainText("По връзката");
 
   // A link that isn't is a page that isn't.
   const missing = await page.goto("/d/1-abcdefgh");
@@ -137,5 +147,5 @@ test("a national day: the cover names it under the date, and the share says it a
   await sheet.getByRole("button", { name: "Копирай текста" }).click();
   await expect(sheet.getByRole("status")).toHaveText("Копирано.");
   const [copied = ""] = await page.evaluate(() => (window as unknown as { copied: string[] }).copied);
-  expect(copied).toMatch(/^Брой \d+ · \d{1,2} [а-я]+ · Освобождението · \d+\/10\n[■◩□]{10}\n/);
+  expect(copied).toMatch(/^АЛМАНАХ · Брой \d+ · \d{1,2} [а-я]+ · Освобождението · \d+\/10\n[■◩□]{10}\n/);
 });

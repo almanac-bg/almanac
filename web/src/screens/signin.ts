@@ -60,6 +60,8 @@ export function signInPage(): Child {
         queueMicrotask(() => leave(from));
       },
     }),
+    // Where an email is asked for, what's kept and why is a tap away, a guest's too (Настройки has it for a player).
+    h("p", null, h("a", { class: "link tap", href: "/privacy?from=signin" }, "Какво пазим и защо")),
   );
 }
 

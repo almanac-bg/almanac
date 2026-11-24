@@ -17,7 +17,9 @@ var plainPage = template.Must(template.New("page").Parse(`<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Title}} · АЛМАНАХ</title>
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+{{with .Description}}<meta name="description" content="{{.}}">
+{{end}}{{with .Canonical}}<link rel="canonical" href="{{.}}">
+{{end}}<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 {{if .CSS}}<link rel="stylesheet" href="/{{.CSS}}">{{end}}
 <script src="/scheme.js"></script>
 </head>
@@ -65,25 +67,23 @@ var privacyBody = template.Must(template.New("privacy").Parse(`
 или името ти: по нея не се вижда чий е резултатът. Докато денят трае, може да изиграе същите въпроси. Връзката
 изчезва с играта, например когато изтриеш профила си.</li>
 <li><strong>Приятелите ти</strong> — с кого сте приятели в играта, за списъка „Приятели“, класацията на приятелите и
-дуелите помежду ви. Приятелите ти виждат името и потребителското ти име, аватара и печата, който носиш,
-резултата ти за деня и дуелите ви: дуел, който им пратиш, и отговорите ти в него, когато го играят след теб.
+дуелите помежду ви. Приятелите ти виждат името и потребителското ти име, аватара, резултата ти за деня и дуелите ви: дуел, който им пратиш, и отговорите ти в него, когато го играят след теб.
 Дуел, който приятелят ти не изиграе до седем дни, изтича. Пазим и кога за последно отвори „Приятели“, на което и да е
 устройство: точката на „Приятели“ е само за новото оттогава (покана, дуел или резултат от дуел).</li>
 <li><strong>Поканите за приятелство</strong> — всяка покана, която пращаш (по потребителско име или имейл), докато
 някой я приеме или откаже. Покана по имейл чака до 60 дни този, който има адреса или
 влезе с него по-късно. На теб не казваме дали има такъв играч, дори когато откаже: при теб поканата чака, докато
-изтече. На него показваме само името, потребителското име, аватара и печата, който носиш. Не пращаме писма на никого.</li>
+изтече. На него показваме само името, потребителското име и аватара ти. Писмо за поканата не пращаме на никого.</li>
 <li><strong>Алманахът ти</strong> — фактите на въпросите от игрите ти: с мастило при верен отговор в броя
-на деня, щом го срещаш там за първи път, иначе в сиво; печатът ти във всяка тема според мастилото в нея (и на коя тема
-носиш печата). Фактите виждаш само ти. Печатът, който носиш, се вижда на аватара ти навсякъде, където другите виждат името ти:
-в класациите, в дуелите, при приятелите ти и в поканите ти за приятелство; всичките ти печати са и в профила ти.</li>
+на деня, щом го срещаш там за първи път, иначе в сиво; печатът ти във всяка тема според мастилото в нея. Фактите
+виждаш само ти. Печатите ти са в профила ти и никъде другаде: до името ти, в класациите, в дуелите и при приятелите ти,
+печат няма.</li>
 <li><strong>Колко добре знаеш всяка тема</strong> — изчисляваме го от отговорите ти всеки път, когато трябва, и не го
 пазим: по него подбираме въпросите в игрите ти по теми и в дуелите. Не го показваме никъде, дори на теб.</li>
 <li><strong>Аватарът ти</strong> — животното по твой избор. Вижда се до името ти в
 класациите, в дуелите, при приятелите ти и в поканите ти за приятелство.</li>
 <li><strong>Профилът ти</strong> — страница, която всеки може да отвори по потребителското ти име, и без да влезе в
-играта. На нея са името и аватарът ти, серията ти в момента (колко дни е), печатът, който
-носиш, и печатите ти по теми (с броя на фактите с мастило във всяка). Прекъсната серия и колко дълга е била не
+играта. На нея са името и аватарът ти, серията ти в момента (колко дни е) и печатите ти по теми (с броя на фактите с мастило във всяка). Прекъсната серия и колко дълга е била не
 показваме никъде. Печатите се отчитат, щом завършиш броя на деня (недовършен брой — след края на деня му):
 игра, която още играеш, не се вижда.</li>
 <li><strong>Съобщенията ти за грешки във въпросите</strong> — каквото напишеш, когато съобщиш, че въпрос е сгрешен,
@@ -143,7 +143,7 @@ var privacyBody = template.Must(template.New("privacy").Parse(`
 За всичко ни пиши. Ако смяташ, че нещо не е наред, можеш да подадеш жалба до Комисията за защита на
 личните данни (<a href="https://www.cpdp.bg">cpdp.bg</a>).</p>
 
-<p class="muted">Последна промяна: 22 ноември 2026 г.</p>
+<p class="muted">Последна промяна: 24 ноември 2026 г.</p>
 `))
 
 // emailParts is an email address cut where a narrow line may break it, after its @ and before a dot, never inside a
@@ -159,21 +159,35 @@ func emailParts(email string) []string {
 	return append(parts, email[from:])
 }
 
-// privacy is the privacy notice. It says what the code does (a test holds parts of it to the code).
+// privacy is the privacy notice. It says what the code does (a test holds parts of it to the code). It's opened from
+// Настройки, and from the sign-in page (?from=signin), where an email is asked for: its way back is to where it came
+// from.
 func (s *Server) privacy(w http.ResponseWriter, r *http.Request) {
 	var body bytes.Buffer
 	_ = privacyBody.Execute(&body, map[string]any{
 		"Operator": s.cfg.Operator, "Contact": s.cfg.Contact, "ContactParts": emailParts(s.cfg.Contact),
 	})
-	s.plain(w, "Какво пазим и защо", &back{"/settings", "Настройки"}, template.HTML(body.String()))
+	way := &back{"/settings", "Настройки"}
+	if r.URL.Query().Get("from") == "signin" {
+		way = &back{"/signin", "Вход"}
+	}
+	s.plain(w, "Какво пазим и защо", way, template.HTML(body.String()), plainMeta{
+		description: "Какво пази АЛМАНАХ за играчите си, защо и докога, кой стои зад играта и как да изтриеш профила си.",
+		canonical:   s.cfg.PublicURL + "/privacy",
+	})
 }
+
+// plainMeta is what a page of the server's own says of itself to a search: its description and its one address (none
+// for a page that isn't for a search, as a mail's „no more of these“).
+type plainMeta struct{ description, canonical string }
 
 // plain draws a page of the server's own in the game's frame: the mark, the three places (in the bar on a big screen,
 // at the foot on a phone) and the way back, if it has one.
-func (s *Server) plain(w http.ResponseWriter, title string, way *back, body template.HTML) {
+func (s *Server) plain(w http.ResponseWriter, title string, way *back, body template.HTML, m plainMeta) {
 	var out bytes.Buffer
 	if err := plainPage.Execute(&out, map[string]any{
 		"Title": title, "Back": way, "Body": body, "CSS": assets.Manifest(s.client)["app.css"],
+		"Description": m.description, "Canonical": m.canonical,
 	}); err != nil {
 		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return

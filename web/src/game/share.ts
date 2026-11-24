@@ -1,5 +1,5 @@
 // Sharing the day's result (server/share.go, play/share.go): its issue, the score and its tiles, never an answer, and
-// the link that brings whoever opens it to the same ten: „Брой 42 · 8/10 · серия 23 дни“, the tiles as squares (■ right,
+// the link that brings whoever opens it to the same ten: „АЛМАНАХ · Брой 42 · 8/10 · серия 23 дни“, the tiles as squares (■ right,
 // ◩ близо, □ not), the link. The link is made as the day is first shared (the server's), and kept for the page's life,
 // so a second tap shares at once; where there's no sheet, the text is copied. The card is the server's, the picture
 // the link's preview shows (internal/card, /card/<issue>-<shape>.png), fetched as the sheet opens; it goes on its own,
@@ -32,14 +32,15 @@ export function squares(marks: Mark[]): string {
     .join("");
 }
 
-/** The text a day is shared with: „Брой 42 · 8/10 · серия 23 дни“ (the streak from three days; on a national day its
- * date and name after the issue, „Брой 112 · 3 март · Освобождението · 8/10“), its squares, and the link (`url`) whole,
- * its scheme too: a messenger links „https://almanac.bg/d/…“, and not every one links it without. Unsigned: nothing in
- * it says whose it is. */
+/** The text a day is shared with: „АЛМАНАХ · Брой 42 · 8/10 · серия 23 дни“ (the game's name first, so that the text
+ * says what it is where no preview shows; the streak from three days; on a national day its date and name after the
+ * issue, „АЛМАНАХ · Брой 112 · 3 март · Освобождението · 8/10“), its squares, and the link (`url`) whole, its scheme
+ * too: a messenger links „https://almanac.bg/d/…“, and not every one links it without. Unsigned: nothing in it says
+ * whose it is. */
 export function shareWords(d: SharedDay, url: string): string {
   const national = d.national ? ` · ${d.national}` : "";
   const streak = d.streak >= 3 ? ` · серия ${d.streak} дни` : "";
-  return `Брой ${d.issue}${national} · ${d.rights}/${d.of}${streak}\n${squares(d.marks)}\n${url}`;
+  return `АЛМАНАХ · Брой ${d.issue}${national} · ${d.rights}/${d.of}${streak}\n${squares(d.marks)}\n${url}`;
 }
 
 const links = new Map<number, Promise<string>>();
@@ -65,7 +66,12 @@ export async function shareText(run: number, d: SharedDay): Promise<string> {
  * iPhone); the card goes on its own (shareCard). The link is asked for first, so the sheet opens a moment after the
  * tap, which every browser allows (its five seconds). */
 export async function shareDay(run: number, d: SharedDay): Promise<Shared> {
-  const text = await shareText(run, d);
+  return shareWordsOut(await shareText(run, d));
+}
+
+/** Shares a text (the day's, or Приятели's word to a friend who doesn't play yet): with the device's share sheet where
+ * there is one, else by copying it; neither possible, the text, for the player to copy by hand. */
+export async function shareWordsOut(text: string): Promise<Shared> {
   if (typeof navigator.share === "function") {
     try {
       await navigator.share({ text });
