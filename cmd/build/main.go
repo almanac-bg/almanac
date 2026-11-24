@@ -74,14 +74,14 @@ func build(watch, sourceMaps bool) error {
 		return err
 	}
 	opts := api.BuildOptions{
-		EntryPoints:   []string{"web/src/app.ts", "web/src/app.css", "web/src/admin.css"},
-		Outdir:        filepath.Join(out, "assets"),
-		Bundle:        true,
-		Write:         true,
-		Metafile:      true,
-		Format:        api.FormatESModule,
-		Splitting:     true, // each import() a file of its own
-		Target:        api.ES2022,
+		EntryPoints: []string{"web/src/app.ts", "web/src/app.css", "web/src/admin.css"},
+		Outdir:      filepath.Join(out, "assets"),
+		Bundle:      true,
+		Write:       true,
+		Metafile:    true,
+		Format:      api.FormatESModule,
+		Splitting:   true, // each import() a file of its own
+		Target:      api.ES2022,
 		// The oldest browsers the game is for: what it uses (CSS, JS, the DOM) must be in all three, held by
 		// web/src/engines.test.ts for what tsc can't see.
 		Engines:       []api.Engine{{Name: api.EngineChrome, Version: "111"}, {Name: api.EngineFirefox, Version: "121"}, {Name: api.EngineSafari, Version: "16.4"}},
