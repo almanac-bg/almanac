@@ -63,6 +63,65 @@ func TestProblemsForgottenDaily(t *testing.T) {
 	}
 }
 
+// What was told today is kept over a restart (a deploy, many a day): a problem that goes on isn't mailed again, and
+// the browsers' budget isn't whole again; the next day, both are.
+func TestProblemsToldOverARestart(t *testing.T) {
+	g := start(t)
+	alerts := Alerts{Email: "owner@example.com"}
+	g.srv.problems.note("backup: upload failed", background)
+	for i := range browserKinds {
+		g.srv.problems.note(fmt.Sprint("browser: ", i), fromBrowser)
+	}
+	g.srv.tellProblems(t.Context(), alerts)
+	mails := func() int {
+		t.Helper()
+		var n int
+		if err := g.db.Read.QueryRow(`SELECT count(*) FROM outbox WHERE message ->> 'to' = ?`, alerts.Email).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	if mails() != 1 {
+		t.Fatalf("%d mails, want 1", mails())
+	}
+	restart := func() *Server {
+		t.Helper()
+		s, err := New(Config{PublicURL: g.url, Version: "next"}, Deps{DB: g.db, Accounts: g.srv.accounts, Outbox: g.outbox,
+			Bank: g.srv.bank.Load()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { s.game.Settled(context.Background()) })
+		return s
+	}
+	next := restart()
+	next.problems.note("backup: upload failed", background)
+	next.problems.note("browser: one more", fromBrowser)
+	next.tellProblems(t.Context(), alerts)
+	if mails() != 2 {
+		t.Fatalf("%d mails after a restart, want 2: one saying the browsers' were past their budget", mails())
+	}
+	var text string
+	if err := g.db.Read.QueryRow(`SELECT message ->> 'text' FROM outbox ORDER BY id DESC LIMIT 1`).Scan(&text); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(text, "backup: upload failed") || strings.Contains(text, "one more") ||
+		!strings.Contains(text, fmt.Sprintf("Още 1 от браузърите, над %d вида", browserKinds)) {
+		t.Fatalf("the mail after a restart:\n%s", text)
+	}
+
+	// What was told a day ago, a restart doesn't take back: what goes on is told again.
+	if _, err := g.db.Write.Exec(`UPDATE kv SET value = json_set(value, '$.since', ?) WHERE key = ?`,
+		time.Now().Add(-25*time.Hour).UnixMilli(), toldKey); err != nil {
+		t.Fatal(err)
+	}
+	later := restart()
+	later.problems.note("backup: upload failed", background)
+	if news, _ := later.problems.take(); news["backup: upload failed"] == nil {
+		t.Fatal("a day on, a problem that goes on wasn't told")
+	}
+}
+
 // A browser's text in the mail is one line, with no address but the game's own, numbers left out, and short.
 func TestPlainKind(t *testing.T) {
 	for in, want := range map[string]string{
