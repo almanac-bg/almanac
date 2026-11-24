@@ -303,7 +303,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
     const shown = new URLSearchParams();
     if (page.peek()) shown.set("page", String(page.peek() + 1));
     if (query.peek().trim()) shown.set("q", query.peek().trim());
-    rename(`/almanac/${id}${shown.size ? `?${shown}` : ""}`);
+    rename(`/almanac/${id}${shown.toString() ? `?${shown}` : ""}`);
   };
   const load = () => {
     const q = new URLSearchParams({ chapter: id, page: String(page.peek()) });
@@ -381,7 +381,7 @@ export function chapter(kit: Kit, [id = ""]: string[]): Child {
     const shown = new URLSearchParams();
     if (to) shown.set("page", String(to + 1));
     if (query.peek().trim()) shown.set("q", query.peek().trim());
-    return `/almanac/${id}${shown.size ? `?${shown}` : ""}`;
+    return `/almanac/${id}${shown.toString() ? `?${shown}` : ""}`;
   };
   const index = chapterIds().indexOf(id);
   const finder = user.peek()
