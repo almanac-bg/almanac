@@ -10,6 +10,11 @@ updates:
     commit-message: { prefix: "fix(deps)" }
     cooldown:
       default-days: 5
+    ignore:
+      # The SQLite driver runs on exactly the libc (and its helpers) its go.mod names: they move only with it.
+      - dependency-name: "modernc.org/libc"
+      - dependency-name: "modernc.org/memory"
+      - dependency-name: "modernc.org/mathutil"
     groups:
       modules:
         patterns: ["*"]
