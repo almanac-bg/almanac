@@ -87,14 +87,19 @@ func TestPublicFilesServed(t *testing.T) {
 		}
 	}
 	g := start(t)
-	g.srv.client = fstest.MapFS{"favicon.ico": {Data: []byte("\x00\x00\x01\x00icon")}}
-	res, err := http.Get(g.url + "/favicon.ico")
-	if err != nil {
-		t.Fatal(err)
+	g.srv.client = fstest.MapFS{
+		"favicon.ico":          {Data: []byte("\x00\x00\x01\x00icon")},
+		"manifest.webmanifest": {Data: []byte(`{"name":"АЛМАНАХ"}`)},
 	}
-	res.Body.Close()
-	if res.StatusCode != 200 || res.Header.Get("Content-Type") != "image/x-icon" {
-		t.Fatalf("/favicon.ico: %d %q", res.StatusCode, res.Header.Get("Content-Type"))
+	for file, kind := range map[string]string{"favicon.ico": "image/x-icon", "manifest.webmanifest": "application/manifest+json"} {
+		res, err := http.Get(g.url + "/" + file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		if res.StatusCode != 200 || res.Header.Get("Content-Type") != kind {
+			t.Errorf("/%s: %d %q", file, res.StatusCode, res.Header.Get("Content-Type"))
+		}
 	}
 }
 

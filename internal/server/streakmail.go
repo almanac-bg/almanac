@@ -206,8 +206,10 @@ func (s *Server) wantsMail(ctx context.Context, userID int64, kind mailKind) (bo
 }
 
 func (s *Server) setMailPref(ctx context.Context, userID int64, kind mailKind, on bool) error {
-	_, err := s.db.Write.ExecContext(ctx, `INSERT INTO mail_prefs (user_id, kind, wanted) VALUES (?, ?, ?)
-		ON CONFLICT (user_id, kind) DO UPDATE SET wanted = excluded.wanted`, userID, kind, on)
+	// A player deleted since the mail went has nothing to stop: their link changes nothing, and isn't an error.
+	_, err := s.db.Write.ExecContext(ctx, `INSERT INTO mail_prefs (user_id, kind, wanted)
+		SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ?)
+		ON CONFLICT (user_id, kind) DO UPDATE SET wanted = excluded.wanted`, userID, kind, on, userID)
 	return err
 }
 

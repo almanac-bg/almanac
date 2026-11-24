@@ -36,7 +36,7 @@ interface ChapterInk {
  * (screens/almanac.ts). */
 function factsHref(c: ChapterInk): string {
   const q = new URLSearchParams((c.facts ?? []).map((id) => ["fact", id]));
-  return `/almanac/${c.chapter}${q.size ? `?${q}` : ""}`;
+  return `/almanac/${c.chapter}${q.toString() ? `?${q}` : ""}`;
 }
 
 /** What a game brought, asked for once the game (run) is kept (after `delay`: a duel is kept a moment after it ends).

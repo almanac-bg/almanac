@@ -6,8 +6,6 @@ import (
 	"html/template"
 	"net/http"
 	"time"
-
-	"github.com/almanac-bg/almanac/internal/assets"
 )
 
 // The server's own pages: plain HTML in the app's style, no script.
@@ -190,7 +188,7 @@ type plainMeta struct{ description, canonical string }
 func (s *Server) plain(w http.ResponseWriter, title string, way *back, body template.HTML, m plainMeta) {
 	var out bytes.Buffer
 	if err := plainPage.Execute(&out, map[string]any{
-		"Title": title, "Back": way, "Body": body, "CSS": assets.Manifest(s.client)["app.css"],
+		"Title": title, "Back": way, "Body": body, "CSS": s.files()["app.css"],
 		"Description": m.description, "Canonical": m.canonical,
 	}); err != nil {
 		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
