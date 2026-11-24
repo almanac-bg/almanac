@@ -29,8 +29,9 @@ self.addEventListener("notificationclick", (event) => {
       const w = windows.find((w) => w.url === url) ?? windows[0];
       if (!w) return self.clients.openWindow(url);
       await w.focus();
-      // A window this worker doesn't control (opened before it was) can't be taken elsewhere: a new one then.
-      if (w.url !== url) await w.navigate(url).catch(() => self.clients.openWindow(url));
+      // The page goes there itself (lib/push.ts → router's navigate), as a tapped link would: a game under way asks
+      // first, never left in the middle of a question by a load from here.
+      if (w.url !== url) w.postMessage({ open: url });
     }),
   );
 });

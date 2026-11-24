@@ -28,7 +28,7 @@ done
 # Dependabot's pull requests: nobody else merges them (one waited green for a day, the audit of 2026-11-24). Its
 # five days of cooldown are the wait for a bad release; once its checks pass, a session merges it.
 deps=$(timeout 8 gh pr list --state open --author app/dependabot --json number,title,statusCheckRollup \
-	-q '.[] | select([.statusCheckRollup[]? | .conclusion // .state] | all(. == "SUCCESS" or . == "SKIPPED" or . == "NEUTRAL")) | "#\(.number) \(.title)"' 2>/dev/null)
+	-q '.[] | select((.statusCheckRollup | length) > 0 and ([.statusCheckRollup[] | .conclusion // .state] | all(. == "SUCCESS" or . == "SKIPPED" or . == "NEUTRAL"))) | "#\(.number) \(.title)"' 2>/dev/null)
 [ -n "$deps" ] && printf 'Dependabot pull requests with their checks green, to merge (gh pr merge <n> --auto --squash):\n%s\n' "$deps"
 if [ -n "$fixes" ]; then
 	open=$(timeout 8 gh pr list --state open --search "fix in:title" --json number,title -q '.[] | "#\(.number) \(.title)"' 2>/dev/null | head -5)

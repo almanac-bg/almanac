@@ -451,8 +451,11 @@ var publicFiles = []string{
 
 func (s *Server) publicFile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=3600")
-	if r.URL.Path == "/sw.js" { // a new service worker reaches every browser at once
+	switch r.URL.Path {
+	case "/sw.js": // a new service worker reaches every browser at once
 		w.Header().Set("Cache-Control", "no-cache")
+	case "/scheme.js": // in every page's head, before its first paint: a day's player never waits on asking for it again
+		w.Header().Set("Cache-Control", "public, max-age=3600, stale-while-revalidate=2592000")
 	}
 	serveFile(w, r, s.client, strings.TrimPrefix(r.URL.Path, "/"))
 }

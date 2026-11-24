@@ -65,6 +65,14 @@ commit)
 		to=${BASH_REMATCH[1]//\"/}
 		cd "${to/#\~/$HOME}" 2>/dev/null || exit 0
 	fi
+	# The git command itself, up to its message (a message's words are no options: „go test -race“ isn't -a), and
+	# its -C, the checkout it commits in.
+	commit=$(grep -oE 'git(\s+-C\s+\S+)?\s+commit\b.*' <<<"$cmd" | head -1)
+	commit=$(sed -E 's/[[:space:]](-m|-F|--message|--file|-C[[:space:]]|-c[[:space:]]|<<).*//' <<<"${commit#*commit}")
+	if [[ "$cmd" =~ git[[:space:]]+-C[[:space:]]+([^[:space:]\;\&]+)[[:space:]]+commit ]]; then
+		to=${BASH_REMATCH[1]//\"/}
+		cd "${to/#\~/$HOME}" 2>/dev/null || exit 0
+	fi
 	top
 	# What the commit takes: what's staged, the files the command names (`git add a b && git commit`), and with -a
 	# every tracked file changed.
@@ -74,7 +82,7 @@ commit)
 			w=${w//\"/}
 			[ -f "$w" ] && echo "${w#./}"
 		done
-		grep -qE 'commit\b.*\s-[a-zA-Z]*a' <<<"$cmd" && git diff --name-only
+		grep -qE '(^|\s)(-[a-zA-Z]*a[a-zA-Z]*|--all)(\s|$)' <<<"$commit" && git diff --name-only
 	) | sort -u)
 	[ -n "$files" ] || exit 0
 	# shellcheck disable=SC2086 # the repo's paths have no spaces
