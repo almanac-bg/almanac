@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -164,16 +165,19 @@ func defaultBankDir() string {
 	return "bank/sample"
 }
 
-// bankCheck checks everything the server checks before it plays a bank, the owner's rule that the categories are
-// about the same size (bank.SizeSlack), and that every national day (bank.NationalDays) has a question about Bulgaria
-// a day can still deal for „На този ден“; -sample lets the small public sample pass the last two. With -live (the bank
-// this one replaces: almanac-bank passes the checkout the game plays), a national day with none fails only if the live
-// bank has one for it, so an urgent fix isn't held up by a day already empty; that one is warned of; and it fails on a
-// question the live bank has that this one dropped, or has as another kind (bank.Dropped, bank.Rekinded). It prints every
-// error, and counts the warnings by rule (bank lint lists them); it reports the mix and the sources; the day's runway:
-// how long each place of a day has questions for, where the next batch writes first (with -used, the questions the
-// days have had are taken off: `almanac bank used`), and the dates' („На този ден“); each chapter's themes against their
-// targets; and the subjects that come back. Its last line counts the problems.
+// bankCheck checks everything the server checks before it plays a bank (bank.Load: a bank it fails, it says „the
+// server would not play“ of, and deploy.sh holds a release for), the bank's rules (bank.Lint: the server never runs
+// them, so this is their one gate, and almanac-bank's), the owner's rule that the categories are about the same size
+// (bank.SizeSlack), and that every national day (bank.NationalDays) has a question about Bulgaria a day can still deal
+// for „На този ден“; -sample lets the small public sample pass the last two. With -live (the bank this one replaces:
+// almanac-bank passes the checkout the game plays), a national day with none fails only if the live bank has one for
+// it, so an urgent fix isn't held up by a day already empty; that one is warned of; and it fails on a question the
+// live bank has that this one dropped, or has as another kind (bank.Dropped, bank.Rekinded). It prints every error,
+// and counts the warnings by rule (bank lint lists them); it reports the mix and the sources; the day's runway: how
+// long each place of a day has questions for, where the next batch writes first (with -used, the questions the days
+// have had are taken off: `almanac bank used`), and the dates' („На този ден“); with -used, it warns of a question
+// dated for a day drawn already without it (drawnWithout); each chapter's themes against their targets; and the
+// subjects that come back. Its last line counts the problems.
 func bankCheck(args []string) error {
 	fs := flag.NewFlagSet("bank check", flag.ContinueOnError)
 	sample := fs.Bool("sample", false, "the public sample: pass it though its categories aren't the same size and it lacks the national days")
@@ -190,7 +194,12 @@ func bankCheck(args []string) error {
 	if err != nil {
 		return err
 	}
+	// What the server loads (bank.Load), then the rules only this holds a bank to (bank.Lint): a bank the server would
+	// refuse is told apart from one only the rules refuse, which deploy.sh doesn't hold a release for.
 	b, problems := bank.Load(dir)
+	if b != nil {
+		problems = append(problems, b.Lint()...)
+	}
 	count := bank.CountOf(problems)
 	tally := fmt.Sprintf("%s: %s", dir, count)
 	if count.Warnings > 0 {
@@ -204,6 +213,10 @@ func bankCheck(args []string) error {
 	if b == nil {
 		fmt.Println(tally)
 		return fmt.Errorf("%s: %d errors: the server would not play this bank", dir, count.Errors)
+	}
+	if count.Errors > 0 {
+		fmt.Println(tally)
+		return fmt.Errorf("%s: %d errors against the bank's rules (bank lint): fix the bank or the rule", dir, count.Errors)
 	}
 	// Against the bank the game plays: no question gone from it, none of another kind (the server refuses the first,
 	// and a day drawn already holds each in a place of its kind): told here, before the bank in play moves.
@@ -237,6 +250,10 @@ func bankCheck(args []string) error {
 	if len(empty) > 0 {
 		fmt.Printf("warning: national days with no question about Bulgaria left, as in the live bank: %s (write for them)\n",
 			strings.Join(empty, ", "))
+	}
+	if late := drawnWithout(b, used, today()); len(late) > 0 {
+		fmt.Printf("warning: dated for a day drawn already without them, so no day deals them on their date this year: %s\n",
+			strings.Join(late, ", "))
 	}
 	if t := themes(b); t != "" {
 		fmt.Println(t)
@@ -294,6 +311,33 @@ func nationalDays(b, live *bank.Bank, against bool, used play.Used, today string
 	return s.String(), missing, empty
 }
 
+// drawnWithout names the live questions dated (bank.Tail.On) for today or tomorrow, a day drawn already (used.Through)
+// without them (no day has had them: used.IDs), that changed since the day before that date: dated after their day
+// was drawn, so it never deals them. A bank's change has the days after tomorrow drawn again, never today or
+// tomorrow (play.KeepDays), so such a question waits for its date next year, or for good if it's a year's own. One
+// that changed earlier and still isn't in its day lost to the others dated for it, and isn't named. Without used
+// (-used), nothing: the days drawn aren't known.
+func drawnWithout(b *bank.Bank, used play.Used, today string) []string {
+	day, err := time.Parse(time.DateOnly, today)
+	if err != nil || used.Through == "" {
+		return nil
+	}
+	var out []string
+	for _, q := range b.Live("", "") {
+		t, id := q.Extra(), q.Base().ID
+		if len(t.On) == 0 || used.IDs[id] {
+			continue
+		}
+		for i := range 2 {
+			d := day.AddDate(0, 0, i).Format(time.DateOnly)
+			if d <= used.Through && t.OnDay(d) && cmp.Or(t.Updated, t.Added) >= day.AddDate(0, 0, i-1).Format(time.DateOnly) {
+				out = append(out, fmt.Sprintf("%s (%s)", id, d))
+			}
+		}
+	}
+	return out
+}
+
 func countList(cs []bank.CategoryCount) string {
 	var parts []string
 	for _, c := range cs {
@@ -305,7 +349,7 @@ func countList(cs []bank.CategoryCount) string {
 // bankLint lists every problem of a bank by rule (bank.Rules, the format's first), each with its question's id: what
 // a content pass works through. rules ("giveaway,stale") keeps only those; short prints only each rule's count.
 func bankLint(dir, rules string, short bool) error {
-	_, problems := bank.Load(dir)
+	_, problems := bank.Check(dir)
 	want := map[string]bool{}
 	for _, r := range strings.Split(rules, ",") {
 		if r = strings.TrimSpace(r); r != "" {

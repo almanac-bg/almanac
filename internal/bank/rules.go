@@ -13,10 +13,13 @@ import (
 // The bank's rules that code checks: every rule of the questions skill that a program can judge is one of Rules, so
 // that a question breaking it is found by `almanac bank check` (and listed by `almanac bank lint`), not by whoever
 // remembers the rule. A rule judges one question (its form, its wording, its numbers) or the bank as a whole (one
-// question giving another away, the same answer asked twice).
+// question giving another away, the same answer asked twice). They are the bank's keepers', run by Lint (`bank check`,
+// `bank lint`, `bank add`), never by a server's Load: no game depends on one (what a game does depend on, the format,
+// the pictures, the ids, is Load's), so a stricter rule never holds a release, only the next bank update until the
+// bank or the rule is fixed.
 //
-// How strict: a question added since StrictFrom must pass every rule (a finding is an error, and the bank isn't
-// played); an older one is warned of, so that the bank keeps loading while a content pass fixes it. A finding about
+// How strict: a question added since StrictFrom must pass every rule (a finding is an error, and `bank check` refuses
+// the bank); an older one is warned of, so that the bank keeps passing while a content pass fixes it. A finding about
 // two questions is an error if either is new: the new one should have been written around the old. A rule marked
 // hint only ever warns: it points at what a person should look at, and is right often enough to be worth a look, not
 // always. A true exception is waived by the bank's WaiversFile, with its reason.
@@ -137,12 +140,25 @@ func readWaivers(dir string) ([]Waiver, error) {
 	return ws, nil
 }
 
+// waivedBy is what waivers lift: [id, rule], each as listed, whether it holds or not (lint says).
+func waivedBy(waivers []Waiver) map[[2]string]bool {
+	waived := map[[2]string]bool{}
+	for _, w := range waivers {
+		waived[[2]string{w.ID, w.Rule}] = true
+	}
+	return waived
+}
+
+// Lint holds a loaded bank to its rules (Rules) and its waivers to theirs: what `almanac bank check` fails on beside
+// what Load does, and `bank lint` lists. A server never runs it (Load).
+func (b *Bank) Lint() []Problem { return b.lint(b.waivers, b.where) }
+
 // lint runs every rule over a loaded bank's questions not retired (those of a kind Off too: newLintBank) and says what it found: errors for what a question added
 // since StrictFrom breaks, warnings for the rest, nothing for what a waiver covers. where says each question's file
 // and line. The bank keeps what the waivers lift (Bank.Estimate reads it).
 func (b *Bank) lint(waivers []Waiver, where map[string]Problem) []Problem {
 	var out []Problem
-	waived := map[[2]string]bool{}
+	waived := waivedBy(waivers)
 	b.waived = waived
 	for _, w := range waivers {
 		at := Problem{File: WaiversFile, ID: w.ID}
@@ -164,7 +180,6 @@ func (b *Bank) lint(waivers []Waiver, where map[string]Problem) []Problem {
 		if at.Msg != "" {
 			out = append(out, at)
 		}
-		waived[[2]string{w.ID, w.Rule}] = true
 	}
 	used := map[[2]string]bool{}
 	l := newLintBank(b)

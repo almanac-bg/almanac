@@ -129,7 +129,8 @@ type release struct {
 	behave string
 	from   int
 	// reads says how it takes the bank the game plays (`almanac bank check`): "" for a program too old to check one
-	// (it says nothing), "yes", "no" (it can't load it), "uneven" (it loads it, and fails on the categories' sizes).
+	// (it says nothing), "yes", "no" (it can't load it), "uneven" (it loads it, and fails on the categories' sizes),
+	// "rules" (it loads it, and fails on the bank's rules: bank lint's, which the server never runs).
 	reads    string
 	migrates bool // its start copies the database and migrates it
 }
@@ -152,6 +153,9 @@ func (r release) program() string {
 			`echo "almanac: $3: 1 errors: the server would not play this bank" >&2; exit 1`
 	case "uneven":
 		check = `echo "$3: 0 errors, 0 warnings"; echo "almanac: $3: categories more than 2% off the mean" >&2; exit 1`
+	case "rules":
+		check = `echo "questions/general.json:7: gen-2: [fact] a fact ends in a period"; echo "$3: 1 errors, 0 warnings"; ` +
+			`echo "almanac: $3: 1 errors against the bank's rules (bank lint): fix the bank or the rule" >&2; exit 1`
 	}
 	return fmt.Sprintf("#!/bin/sh\ncase $1 in\nversion) echo %s ;;\nmigrations) %s ;;\nbank) %s ;;\n*) exit 1 ;;\nesac\n",
 		says, list, check)
@@ -641,9 +645,10 @@ func TestBackBelowAMigrationByHand(t *testing.T) {
 }
 
 // The floor under going back: a program that can't read the bank the game plays is never made live, by CI or by hand,
-// and nothing restarts for it: an older one than the bank (a field it doesn't know), a newer one with a check the bank
-// doesn't pass yet. One that reads it is deployed, as is one that only fails `bank check` on what isn't the server's to
-// refuse (the categories' sizes), one too old to check a bank at all, and any on a server with no bank's checkout yet.
+// and nothing restarts for it: an older one than the bank (a field it doesn't know), a newer one whose load (its format,
+// bank.Load) the bank doesn't pass yet. One that reads it is deployed, as is one that only fails `bank check` on what
+// isn't the server's to refuse (the categories' sizes; the bank's rules, bank lint's: a stricter rule holds the next
+// bank update, never a release), one too old to check a bank at all, and any on a server with no bank's checkout yet.
 func TestNotBelowTheBank(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
@@ -656,6 +661,7 @@ func TestNotBelowTheBank(t *testing.T) {
 		{"it refuses the bank, by hand", "no", false, nil, false},
 		{"it refuses the bank, from CI", "no", false, []string{"ci"}, false},
 		{"only the sizes fail", "uneven", false, nil, true},
+		{"only the bank's rules fail", "rules", false, []string{"ci"}, true},
 		{"too old to check a bank", "", false, nil, true},
 		{"no bank on the server yet", "no", true, nil, true},
 	} {

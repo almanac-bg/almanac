@@ -13,8 +13,9 @@
 // retirements, checked against the bank as it would be first. A server plays a copy of a bank (keep.go), and knows
 // which commit of the bank's repository it is.
 //
-// Besides its format (check.go), a loaded bank is held to every rule of the questions skill a program can judge
-// (rules.go): how lines end and are typed (wording.go), the options (options.go), numbers as estimates with one
+// A server loads a bank (Load) checking only what a game depends on: its format (check.go), its themes, pictures and
+// ids. `almanac bank check` (Check: Load, then Lint) also holds it to every rule of the questions skill a program can
+// judge (rules.go), before it reaches a server: how lines end and are typed (wording.go), the options (options.go), numbers as estimates with one
 // tolerance formula (number.go) that count no list, judge an offset scale and show no number near the answer
 // (estimate.go; an easy number never a year but a date everyone knows), orders' gaps (order.go), and give-aways and twins from one question to another (giveaway.go, on the
 // word stems of text.go), near-duplicates that ask one fact in other words (near.go), a fact told twice or telling

@@ -198,6 +198,69 @@ func TestCheckAgainstTheLiveBank(t *testing.T) {
 	}
 }
 
+// bank check fails on a question that breaks one of the bank's rules (bank.Lint) as on one the server would refuse
+// (bank.Load), but says „the server would not play this bank“ only of the second: deploy.sh holds a release for that
+// alone.
+func TestCheckTellsTheRulesFromTheServer(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.CopyFS(dir, os.DirFS("../../bank/sample")); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, bank.QuestionsDir, "technology.json")
+	data, _ := os.ReadFile(file)
+	for _, c := range []struct{ name, from, to, says string }{
+		{"a rule", "с въгленов микрофон.", "с въгленов микрофон", "errors against the bank's rules (bank lint)"},
+		{"the format", `"checkedBy": "twins fable-5.2",`, `"checkedBy": "twins fable-5.2", "typo": 1,`, "the server would not play this bank"},
+	} {
+		broken := strings.Replace(string(data), c.from, c.to, 1)
+		if broken == string(data) {
+			t.Fatalf("%s: no %q in the sample", c.name, c.from)
+		}
+		if err := os.WriteFile(file, []byte(broken), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		err := bankCheck([]string{"-sample", dir})
+		if err == nil || !strings.Contains(err.Error(), c.says) {
+			t.Errorf("%s: %v, want %q", c.name, err, c.says)
+		}
+		if c.name == "a rule" && strings.Contains(err.Error(), "the server would not play") {
+			t.Errorf("a rule's error says the server would refuse the bank: %v", err)
+		}
+	}
+}
+
+// bank check warns of a question dated for today or tomorrow, drawn already without it, that changed since the day
+// before its date (a batch dated it late): neither day is drawn again, so its date passes without it. Not of one a
+// day has had, one that changed before (it lost to the others for its date), or without the days drawn (-used).
+func TestDrawnWithout(t *testing.T) {
+	b, problems := bank.Load("../../bank/sample")
+	if b == nil {
+		t.Fatal(problems)
+	}
+	q := b.Live("history", "choice")[0]
+	id, tail := q.Base().ID, q.Extra()
+	drawn := play.Used{IDs: map[string]bool{}, Through: "2027-02-22"}
+	for _, c := range []struct {
+		name, on, updated string
+		used              play.Used
+		want              []string
+	}{
+		{"dated for tomorrow today", "11-26", "2026-11-25", drawn, []string{id + " (2026-11-26)"}},
+		{"dated for today yesterday", "11-25", "2026-11-24", drawn, []string{id + " (2026-11-25)"}},
+		{"a year's own date", "2026-11-26", "2026-11-25", drawn, []string{id + " (2026-11-26)"}},
+		{"dated before tomorrow was drawn", "11-26", "2026-11-24", drawn, nil},
+		{"a day after tomorrow: drawn again", "11-27", "2026-11-25", drawn, nil},
+		{"a day has had it", "11-26", "2026-11-25", play.Used{IDs: map[string]bool{id: true}, Through: "2027-02-22"}, nil},
+		{"tomorrow not drawn yet", "11-26", "2026-11-25", play.Used{IDs: map[string]bool{}, Through: "2026-11-25"}, nil},
+		{"no days known", "11-26", "2026-11-25", play.Used{}, nil},
+	} {
+		tail.On, tail.Updated = []string{c.on}, c.updated
+		if got := drawnWithout(b, c.used, "2026-11-25"); !slices.Equal(got, c.want) {
+			t.Errorf("%s: %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 // bank check names the national days with too few questions about Bulgaria, and those with none: they fail it, but
 // against the live bank (-live) only those it has some for.
 func TestNationalDaysReport(t *testing.T) {

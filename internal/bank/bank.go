@@ -49,8 +49,12 @@ type Bank struct {
 	// Themes are each category's themes (ThemesFile; nil for a bank without them). themesBroken: the file has errors.
 	Themes       map[string][]Theme
 	themesBroken bool
-	// waived are the rules the bank's waivers lift, by question: [id, rule].
-	waived map[[2]string]bool
+	// waivers are the bank's waivers as its WaiversFile has them (Lint judges them), and waived the rules they lift,
+	// by question: [id, rule] (Estimate reads it, so a game does).
+	waivers []Waiver
+	waived  map[[2]string]bool
+	// where is each question's file and line, for the problems Lint finds.
+	where map[string]Problem
 }
 
 // Of is a bank of these questions as they are (read with Decode), unchecked: a fixture a test builds in code, where
@@ -127,8 +131,13 @@ func Types() []string {
 	return names
 }
 
-// Load reads and checks the bank in dir. Errors (any Problem that isn't a warning) mean the bank must not be played:
-// Load then returns a nil Bank with the problems. A server keeps playing the bank it has while a new one is broken.
+// Load reads the bank in dir and checks what a game depends on: each question's format and its type's own rules
+// (check.go), its theme and its pictures on disk, the ids and the questions unique, the waivers readable (Estimate
+// reads them). Errors (any Problem that isn't a warning) mean the bank must not be played: Load then returns a nil Bank
+// with the problems. A server keeps playing the bank it has while a new one is broken.
+//
+// The bank's editorial rules (rules.go) are Lint's, not Load's: a server never runs them (they took most of every
+// start). `almanac bank check` is their one gate, before a bank reaches the server (Check).
 func Load(dir string) (*Bank, []Problem) {
 	b := &Bank{Dir: dir, byID: map[string]Question{}}
 	var problems []Problem
@@ -242,13 +251,29 @@ func Load(dir string) (*Bank, []Problem) {
 		}
 	}
 
-	// The rules over the questions (rules.go), now that the bank is all in: one question can give another away.
+	// The waivers, for what they lift (Estimate); whether each holds is Lint's.
 	waivers, err := readWaivers(dir)
 	if err != nil {
 		fail(WaiversFile, 0, "", err.Error())
 	}
-	problems = append(problems, b.lint(waivers, where)...)
+	b.waivers, b.waived, b.where = waivers, waivedBy(waivers), where
 
+	for _, p := range problems {
+		if !p.Warning {
+			return nil, problems
+		}
+	}
+	return b, problems
+}
+
+// Check is Load and then Lint: what a bank's keepers hold a bank to (`almanac bank check`, `bank lint`, `bank add`),
+// a nil Bank if either finds an error.
+func Check(dir string) (*Bank, []Problem) {
+	b, problems := Load(dir)
+	if b == nil {
+		return nil, problems
+	}
+	problems = append(problems, b.Lint()...)
 	for _, p := range problems {
 		if !p.Warning {
 			return nil, problems

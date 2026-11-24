@@ -43,12 +43,12 @@ type Added struct {
 // Off); a new one takes the next numbers of its own category's ids and is added today or in the few days before
 // (newFaults); a changed one is a live question of that category and of the same kind (never another: a day drawn
 // already holds it in a place of its kind), keeps its added, is updated today, and is changed today if and only if
-// what it asks changed (askedChanges); and the bank with the batch in it loads with no errors. The files are written in the bank's
+// what it asks changed (askedChanges); and the bank with the batch in it passes Check (its rules too) with no errors. The files are written in the bank's
 // format. checkedBy, if set, marks every new or changed question checked today by it (Tail.Checked, CheckedBy) where the batch doesn't say (a changed one: says no other than the bank).
 // dry checks only: the bank stays as it is.
 func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 	today := time.Now().Format(time.DateOnly)
-	b, problems := Load(dir)
+	b, problems := Check(dir)
 	if b == nil {
 		return Added{Warnings: problems}, errors.New(dir + ": the bank has errors already: fix them first")
 	}
@@ -211,7 +211,7 @@ func Add(dir, from, checkedBy string, dry bool) (Added, error) {
 			}
 		}
 	}
-	after, problems := Load(tmp)
+	after, problems := Check(tmp)
 	if after == nil {
 		var lines []string
 		for _, p := range problems {
