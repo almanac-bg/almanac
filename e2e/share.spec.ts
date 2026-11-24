@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { daysPlayed, playRun, startDay } from "./play.ts";
+import { daysPlayed, mailedCode, playRun, startDay } from "./play.ts";
 
 /** What the page sent to the share sheet and to the clipboard, each stood in for (`sheet`: whether there is a share
  * sheet at all). */
@@ -71,6 +71,27 @@ test("the day shared: its score and shape and a link, which brings another to th
   await expect(board.getByRole("status")).toHaveText(
     "Поканата е изпратена. Ако я приеме, ще се появи в приятелите ти.",
   );
+  // Signed in right after to a profile of their own from elsewhere, Днес drawn again as theirs: the request stays sent,
+  // not offered again.
+  const email = `by-link-${test.info().project.name}-${Date.now()}@example.com`;
+  const elsewhere = await browser.newContext({ ...test.info().project.use, baseURL: test.info().project.use.baseURL });
+  await elsewhere.request.post("/api/auth/code", { data: { email } });
+  await expect.poll(() => mailedCode(email)).not.toBe("");
+  await elsewhere.request.post("/api/auth/verify", { data: { email, code: mailedCode(email) } });
+  await elsewhere.close();
+  const first = mailedCode(email);
+  const asks = visitor.locator(".result-share");
+  await asks.getByLabel("Имейл").fill(email);
+  await asks.getByRole("button", { name: "Напомняй ми по имейл" }).click();
+  await expect.poll(() => mailedCode(email)).not.toBe(first);
+  await asks.getByLabel("Код").fill(mailedCode(email));
+  await asks.getByRole("button", { name: "Потвърди" }).click();
+  await expect(visitor.locator(".notice")).toContainText("Влезе като");
+  await board.getByRole("tab", { name: "Приятели" }).click();
+  await expect(board.getByRole("status")).toHaveText(
+    "Поканата е изпратена. Ако я приеме, ще се появи в приятелите ти.",
+  );
+  await expect(board.getByRole("button", { name: "Покани човека, който ти прати връзката" })).toHaveCount(0);
   await other.close();
   // The one who shared it sees the request, with the link's issue.
   const issue = link.match(/\/d\/(\d+)-/)?.[1] ?? "";

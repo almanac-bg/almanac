@@ -154,6 +154,8 @@ export function today() {
   sharedIn = null;
   // Its games played here say the link they came by (playRun): a new player's first counts as one who came by a link.
   const via = shared?.link ?? "";
+  // Whoever shared it asked to be friends from here (askSharer): for the page's life, over every redraw of the result.
+  const sharerAsked = signal(false);
   // A profile just deleted, or a game just brought here, is said once, over the day.
   let bye = notice.peek();
   notice.set("");
@@ -366,7 +368,7 @@ export function today() {
     const streakSaid = !run?.done && t.streak >= streakFrom && endsTonight(t) ? null : streakNotice(t);
     // Come by that day's shared link, the score shared stays on the result, beside the player's own (played just now,
     // or before the link was opened), for the page's life: nothing is kept of it.
-    if (run?.done) return result(t, run, just, notices, load, shared?.day === t.day ? shared : null);
+    if (run?.done) return result(t, run, just, notices, load, shared?.day === t.day ? shared : null, sharerAsked);
     // The player's numbers (Профил's): the streak's week, the facts in the book.
     const stats = signal<Stats | null>(lastOf<Stats>("/api/me/stats") ?? null);
     if (user.peek())
@@ -621,6 +623,7 @@ function result(
   notices: Child[],
   reload: () => void,
   shared: Shared | null = null,
+  sharerAsked = signal(false),
 ): Child {
   const fresh = signal<Today>(t);
   // The day as it stands with the game just played (its streak, its friends): until it's here, the streak with today's
@@ -638,7 +641,7 @@ function result(
   const missedList = signal<Reviewed[] | null>(null);
   // Come by that day's link, someone else's: on the board's Приятели while the player has no friends, the one way to
   // whoever sent it (askSharer).
-  const sharer = shared && !shared.mine ? askSharer(shared.link) : null;
+  const sharer = shared && !shared.mine ? askSharer(shared.link, sharerAsked) : null;
   if (zero) review.then(missedList.set, () => {});
   // The day's board's tab, as the player chose it (none yet: dayBoard opens it).
   const among = signal<Among | null>(null);
@@ -997,11 +1000,11 @@ function ofFriends(t: Today, sharer: (() => Child) | null): Child {
 }
 
 /** The way to ask whoever shared the day, by its link (`link`), to be friends (play.AskSharer: DECISIONS.md, Friends):
- * an ordinary request, which they see in Приятели with the link's issue; who they are, the player learns only if they
- * say yes, as what comes back names nobody. Kept for the result's life: the board draws it again on each tab. */
-function askSharer(link: string): () => Child {
+ * a request, which they see in Приятели with the link's issue; who they are, the player learns only if they say yes,
+ * as what comes back names nobody. Drawn again on each of the board's tabs, and with each result; that it was sent
+ * (`asked`) is Днес's, so it stays sent over them. */
+function askSharer(link: string, asked: Signal<boolean>): () => Child {
   const busy = signal(false);
-  const asked = signal(false);
   const error = signal("");
   const ask = async () => {
     busy.set(true);

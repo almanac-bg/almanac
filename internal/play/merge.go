@@ -83,6 +83,9 @@ var mergeSteps = []mergeStep{
 		sql: `UPDATE OR IGNORE friend_requests SET from_id = ?1 WHERE from_id = ?2 AND (to_id IS NULL OR to_id <> ?1)`},
 	{sql: `UPDATE OR IGNORE friend_requests SET to_id = ?1 WHERE to_id = ?2 AND from_id <> ?1`},
 	{sql: `DELETE FROM friend_requests WHERE from_id = ?2 OR to_id = ?2`},
+	// The links the guest has asked by (AskSharer), still asked by: asking again by one takes no more of it.
+	{carries: []string{"share_asks.from_id"}, sql: `UPDATE OR IGNORE share_asks SET from_id = ?1 WHERE from_id = ?2`},
+	{sql: `DELETE FROM share_asks WHERE from_id = ?2`},
 	// The questions the guest reported, still theirs.
 	{carries: []string{"reports.user_id"}, sql: `UPDATE reports SET user_id = ?1 WHERE user_id = ?2`},
 	// What the guest has been told, so that nothing is told twice: of Днес's lines, of their streak.

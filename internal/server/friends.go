@@ -68,11 +68,14 @@ func (s *Server) friends(w http.ResponseWriter, r *http.Request) error {
 // errPlayFirst is a friend request from a guest who has yet to finish a game.
 var errPlayFirst = &apiError{http.StatusForbidden, "play_first", "Първо изиграй една игра, после добавяй приятели."}
 
-// errNoLink is a request by a shared link (askSharer) that isn't one, or not of a day the player has finished while
-// it's today's.
-var errNoLink = &apiError{http.StatusNotFound, "no_link", "Тази връзка вече не води до днешния брой."}
+// errNoLink is a request by a shared link (askSharer) that isn't one, or is of a day that isn't today's (nor
+// yesterday's, in the grace after midnight).
+var errNoLink = &apiError{http.StatusNotFound, "no_link", "Тази връзка не води до днешния брой."}
 
-// errLinkAsked is a request by a shared link that has brought its owner play.SharerAsks requests already.
+// errPlayShared is a request by a shared link of a day the player hasn't finished yet.
+var errPlayShared = &apiError{http.StatusForbidden, "play_shared", "Първо изиграй докрай броя, до който води връзката."}
+
+// errLinkAsked is a request by a shared link that play.SharerAsks people have asked its owner by already.
 var errLinkAsked = &apiError{http.StatusConflict, "link_asked",
 	"По тази връзка вече поискаха приятелство твърде много хора. Поискай потребителското име на човека, който ти я прати."}
 
@@ -130,7 +133,8 @@ func (s *Server) requestFriend(w http.ResponseWriter, r *http.Request) error {
 
 // askSharer asks whoever shared the day by the link the player played it by (play.AskSharer), within the limits of
 // any request (requestFriend's) and the link's own (play.SharerAsks). Its answer is the same whoever it went to, and
-// whether a request was made or one stood already: it names nobody (DECISIONS.md, Sharing: unsigned).
+// whether a request was made or one stood already; and none of its failures depends on whose the link is: it names
+// nobody (DECISIONS.md, Sharing: unsigned).
 func (s *Server) askSharer(w http.ResponseWriter, r *http.Request, u *account.User, link string) error {
 	m := linkOf.FindStringSubmatch(link)
 	if m == nil {
@@ -141,6 +145,8 @@ func (s *Server) askSharer(w http.ResponseWriter, r *http.Request, u *account.Us
 	switch {
 	case errors.Is(err, play.ErrNoRun):
 		return errNoLink
+	case errors.Is(err, play.ErrPlayShared):
+		return errPlayShared
 	case errors.Is(err, play.ErrSharerAsked):
 		return errLinkAsked
 	case err != nil:
