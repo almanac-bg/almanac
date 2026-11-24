@@ -207,9 +207,9 @@ once (they share a lock: `TestDeployAndBankShareALock`). The `almanac backup` co
 brings the latest copy back and checks it (the server does this itself daily). Health: `https://almanac.bg/api/health`
 shows the live version and the bank played (its commit; one refused).
 
-Going back to an older minor (vOLD) puts the database back as it was before the migration: by hand, as root, in this
-order and no other. A copy put in beside the database's `-wal` comes out corrupt while health says `ok`, and the newer
-program, started on the copy, migrates it again.
+Going back to an older minor (vOLD) from the version live now (vNEW) puts the database back as it was before the
+migration: by hand, as root, in this order and no other. A copy put in beside the database's `-wal` comes out corrupt
+while health says `ok`, and the newer program, started on the copy, migrates it again.
 
 0. It loses every game played since that release: fix forward instead, unless the migration destroyed data.
 1. Before stopping anything, the older program reads the live bank, or there is no going back below the bank (it
@@ -218,13 +218,31 @@ program, started on the copy, migrates it again.
    ```bash
    setpriv --reuid=almanac --regid=almanac --clear-groups /usr/local/lib/almanac/almanac-vOLD bank check /srv/almanac-bank
    ```
-2. `systemctl stop almanac.socket almanac`.
-3. The database aside with its log, then the copy in its place, `before-vX.Y.Z.db` of the first release after vOLD
-   that brought a migration (the two latest are kept; older ones are in the backups):
+2. Mark vNEW as deploy.sh marks a release that failed migrating: CI then deploys neither it nor any release that
+   brings its migrations unchanged (else the next merge puts it back, and it migrates the copy again). It prints the
+   mark: a line why, and a `migration <sha>  <name>` line for each migration vNEW has and vOLD hasn't (none: stop):
+
+   ```bash
+   v() { setpriv --reuid=almanac --regid=almanac --clear-groups /usr/local/lib/almanac/almanac-$1 migrations; }
+   mark=/var/lib/almanac-deploy/unhealthy-vNEW && v vOLD >/run/had && [ -s /run/had ] && mkdir -p "${mark%/*}" &&
+     { echo "vNEW went back by hand at $(date -u '+%Y-%m-%d %H:%M UTC'): WHY"
+       v vNEW | grep -vxFf /run/had | sed 's/^/migration /'; } >"$mark" && rm /run/had && cat "$mark"
+   ```
+3. `systemctl stop almanac.socket almanac`.
+4. The database aside with its log, the copy in its place (`before-vX.Y.Z.db` of the first release after vOLD that
+   brought a migration; the two latest are kept, older ones are in the backups), and vOLD linked: a failed step 5 then
+   has nothing to go back to (deploy.sh goes back to the version linked, and vNEW would migrate the copy again):
 
    ```bash
    cd /var/lib/almanac && f=failed-by-hand-$(date -u +%Y%m%dT%H%M%SZ).db &&
      mv almanac.db "$f" && { [ ! -e almanac.db-wal ] || mv almanac.db-wal "$f-wal"; } && rm -f almanac.db-shm &&
-     mv before-vX.Y.Z.db almanac.db
+     mv before-vX.Y.Z.db almanac.db && ln -sfn /usr/local/lib/almanac/almanac-vOLD /usr/local/bin/almanac
    ```
-4. `almanac-deploy vOLD`: it starts the older program on the copy. Never start the socket or the service before it.
+5. `almanac-deploy vOLD`: it starts the older program on the copy. Never start the socket or the service before it,
+   nor ever while vNEW is linked over the copy. If it fails before the restart („not taken“, „not deployed“), nothing
+   started: fix that, run it again. If vOLD started and isn't healthy („nothing to go back to“), `systemctl stop
+   almanac.socket almanac`; then fix it and `systemctl start almanac.socket almanac`, or go back up: step 4 the other
+   way (the copy aside with its `-wal`, `failed-by-hand-….db` and its `-wal` back as `almanac.db`), then
+   `almanac-deploy vNEW` (by hand it goes out marked, and its mark goes once it's healthy).
+6. The fix goes forward, in a new release that changes vNEW's migration: the mark holds back every one that brings it
+   unchanged (`TestBackBelowAMigrationByHand`), and goes once a release that has run them all is live and healthy.

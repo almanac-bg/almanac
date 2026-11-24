@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"strings"
-
-	"github.com/almanac-bg/almanac/internal/store"
 )
 
 // adminCommand makes a player an admin (or, with -remove, no longer one), by the email they sign in with.
@@ -16,7 +14,7 @@ func adminCommand(args []string) error {
 	if len(args) != 1 {
 		return fmt.Errorf("usage: almanac admin [-remove] <email>")
 	}
-	db, err := store.Open(dbPath())
+	db, err := openDB()
 	if err != nil {
 		return err
 	}

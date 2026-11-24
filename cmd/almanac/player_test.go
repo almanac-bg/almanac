@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -148,5 +150,27 @@ func residue(t *testing.T, db *store.DB, id int64, email, tag string) {
 	}
 	if open > 0 {
 		t.Errorf("%d duels left open against nobody", open)
+	}
+}
+
+// A command on the game's database, run without the service's settings, finds none where it looks: it says so, and
+// makes no new one to answer from (nobody has that email, no question has reports), as if the game held nothing.
+func TestCommandsRefuseNoDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "almanac.db")
+	t.Setenv("DB_PATH", path)
+	sample := filepath.Join("..", "..", "bank", "sample")
+	for name, run := range map[string]func() error{
+		"player":         func() error { return playerCommand([]string{"delete", "ivan@example.bg"}) },
+		"admin":          func() error { return adminCommand([]string{"ivan@example.bg"}) },
+		"bank reports":   func() error { return bankReports(nil) },
+		"bank suspects":  func() error { return bankSuspects(sample) },
+		"bank calibrate": func() error { return bankCalibrate(sample) },
+	} {
+		if err := run(); err == nil || !strings.Contains(err.Error(), "no database at "+path) {
+			t.Errorf("%s: %v", name, err)
+		}
+		if _, err := os.Stat(path); err == nil {
+			t.Fatalf("%s made a database", name)
+		}
 	}
 }

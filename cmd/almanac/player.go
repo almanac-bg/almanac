@@ -19,8 +19,8 @@ import (
 // playerCommand deletes a player at their request, made by mail (the privacy page: theirs, or a parent's for a
 // child's profile): `almanac player delete <email|@tag>` lists who it is and what of theirs the database holds, and
 // changes nothing; with -yes, it deletes them as their own deletion does (DELETE /api/me: account.Accounts.Delete, on
-// server.NewAccounts, so every part of the game forgets them). It never migrates the database (store.Open). On the
-// server, run it as the service, like the backup commands (README).
+// server.NewAccounts, so every part of the game forgets them). It never migrates the database (store.Open), nor makes
+// one (openDB). On the server, run it as the service, like the backup commands (README).
 func playerCommand(args []string) error {
 	const usage = "usage: almanac player delete [-yes] <email|@tag>"
 	if len(args) < 2 || args[0] != "delete" {
@@ -34,7 +34,7 @@ func playerCommand(args []string) error {
 	if len(args) != 1 {
 		return errors.New(usage)
 	}
-	db, err := store.Open(dbPath())
+	db, err := openDB()
 	if err != nil {
 		return err
 	}

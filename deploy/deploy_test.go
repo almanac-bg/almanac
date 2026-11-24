@@ -564,6 +564,82 @@ func TestBackCutOff(t *testing.T) {
 	}
 }
 
+// Going back below a migration by hand, as CLAUDE.md's steps (Production) do it, their commands run here: the mark
+// holds the newer release back from CI, and every release that brings its migration unchanged; and with the older one
+// linked first, an older one that fails has nothing to go back to, so the newer one never starts on the copy.
+func TestBackBelowAMigrationByHand(t *testing.T) {
+	t.Parallel()
+	src, err := os.ReadFile("../CLAUDE.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := string(src)
+	doc = doc[strings.Index(doc, "Going back to an older minor"):]
+	step := func(t *testing.T, m *machine, has string) {
+		t.Helper()
+		for _, block := range strings.Split(doc, "```bash\n")[1:] {
+			block = block[:strings.Index(block, "```")]
+			if !strings.Contains(block, has) {
+				continue
+			}
+			for _, r := range [][2]string{{"/var/lib/almanac-deploy", m.marks}, {"/var/lib/almanac", m.data},
+				{"/usr/local/lib/almanac", m.lib}, {"/usr/local/bin/almanac", m.link}, {"/run/", m.world + "/"},
+				{"vNEW", "v1.1.0"}, {"vOLD", "v1.0.0"}, {"vX.Y.Z", "v1.1.0"}} {
+				block = strings.ReplaceAll(block, r[0], r[1])
+			}
+			m.write(filepath.Join(m.root, "step.sh"), block, 0o755)
+			if out, err := m.command(filepath.Join(m.root, "step.sh")).CombinedOutput(); err != nil {
+				t.Fatalf("the step with %s: %v\n%s", has, err, out)
+			}
+			return
+		}
+		t.Fatalf("CLAUDE.md has no step with %s", has)
+	}
+	bad := mig('3', "0003_c.sql")
+	for _, fails := range []bool{false, true} {
+		t.Run(fmt.Sprintf("the older one fails: %v", fails), func(t *testing.T) {
+			t.Parallel()
+			m := newMachine(t)
+			m.install(release{tag: "v1.1.0", migrations: append(healthy.migrations, bad)})
+			m.write(filepath.Join(m.data, "before-v1.1.0.db"), "the game\n", 0o600)
+			m.write(filepath.Join(m.data, "almanac.db"), "migrated by v1.1.0\n", 0o600)
+			m.write(filepath.Join(m.data, "almanac.db-wal"), "log of v1.1.0\n", 0o600)
+			step(t, m, "unhealthy-vNEW")
+			if mark := m.read(filepath.Join(m.marks, "unhealthy-v1.1.0")); !strings.HasSuffix(mark, "\nmigration "+bad+"\n") ||
+				strings.Count(mark, "\n") != 2 {
+				t.Fatalf("the mark: %q", mark)
+			}
+			m.write(filepath.Join(m.world, "running"), "", 0o644) // systemctl stop almanac.socket almanac
+			step(t, m, "failed-by-hand")
+			if db := m.read(filepath.Join(m.data, "almanac.db")); db != "the game\n" || m.live() != "v1.0.0" {
+				t.Fatalf("the database %q, linked %s", db, m.live())
+			}
+			if kept, _ := filepath.Glob(filepath.Join(m.data, "failed-by-hand-*.db-wal")); len(kept) != 1 {
+				t.Fatalf("the migrated database's log isn't kept: %v", kept)
+			}
+			if fails {
+				m.write(filepath.Join(m.world, "behave-v1.0.0"), "never", 0o644)
+				out, code := m.deploy("v1.0.0")
+				expect(t, out, code, 1, "nothing to go back to")
+				if r := strings.TrimSpace(m.read(filepath.Join(m.world, "running"))); r != "v1.0.0" || m.live() != "v1.0.0" {
+					t.Fatalf("running %s, linked %s", r, m.live())
+				}
+				return
+			}
+			out, code := m.deploy("v1.0.0")
+			expect(t, out, code, 0, "live: v1.0.0")
+			out, code = m.deploy("v1.1.0", "ci")
+			expect(t, out, code, 1, "not tried again from CI")
+			m.publish(release{tag: "v1.1.1", migrations: append(healthy.migrations, bad), migrates: true})
+			out, code = m.deploy("v1.1.1", "ci")
+			expect(t, out, code, 1, "brings that release's migration, unchanged")
+			if m.live() != "v1.0.0" {
+				t.Fatalf("live: %s", m.live())
+			}
+		})
+	}
+}
+
 // The floor under going back: a program that can't read the bank the game plays is never made live, by CI or by hand,
 // and nothing restarts for it: an older one than the bank (a field it doesn't know), a newer one with a check the bank
 // doesn't pass yet. One that reads it is deployed, as is one that only fails `bank check` on what isn't the server's to

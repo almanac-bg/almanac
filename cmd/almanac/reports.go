@@ -35,7 +35,7 @@ func bankReports(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	db, err := store.Open(dbPath())
+	db, err := openDB()
 	if err != nil {
 		return err
 	}

@@ -6,7 +6,6 @@ import (
 
 	"github.com/almanac-bg/almanac/internal/bank"
 	"github.com/almanac-bg/almanac/internal/play"
-	"github.com/almanac-bg/almanac/internal/store"
 )
 
 // bankSuspects prints the questions whose players' answers speak against the key (play.Suspects), one a line: the
@@ -16,7 +15,7 @@ func bankSuspects(dir string) error {
 	if b == nil {
 		return fmt.Errorf("%s: %d problems: fix the bank first", dir, len(problems))
 	}
-	db, err := store.Open(dbPath())
+	db, err := openDB()
 	if err != nil {
 		return err
 	}
