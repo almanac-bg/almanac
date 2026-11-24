@@ -839,6 +839,67 @@ func pushWorld(t *testing.T) (*Server, *game, *fakePushService, func(p *player, 
 	return s, g, fake, subscribe
 }
 
+// A page of another release (one from before a deploy, or after one gone back) may send a field this one doesn't
+// know: passed over, never a refused step, which would fail the game at every step until the player left. An answer
+// itself is the bank's to read, strictly: a field it doesn't know there is still refused.
+func TestUnknownFieldsPassedOver(t *testing.T) {
+	g := start(t)
+	p, _ := g.guest()
+	status, run := p.call("POST", "/api/day", map[string]any{"later": true})
+	if status != 200 {
+		t.Fatalf("the day with a field unknown: %d %v", status, run)
+	}
+	id := strconv.Itoa(int(run["id"].(float64)))
+	status, st := p.call("POST", "/api/runs/"+id+"/show", map[string]any{"later": 1})
+	if status != 200 {
+		t.Fatalf("show with a field unknown: %d %v", status, st)
+	}
+	answer := map[string]any{"pick": 0}
+	switch st["question"].(map[string]any)["view"].(map[string]any)["type"] {
+	case "number":
+		answer = map[string]any{"value": 1}
+	case "order":
+		answer = map[string]any{"order": []int{0, 1, 2, 3}}
+	case "truefalse":
+		answer = map[string]any{"truth": true}
+	case "match":
+		answer = map[string]any{"pairs": []int{0, 1, 2, 3}}
+	case "split":
+		answer = map[string]any{"sides": []int{0, 1, 0, 1, 0, 1}}
+	}
+	inner := map[string]any{"later": 1}
+	for k, v := range answer {
+		inner[k] = v
+	}
+	if status, out := p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": 0, "answer": inner}); out["error"] != "bad_answer" {
+		t.Fatalf("an answer with a field unknown inside it: %d %v", status, out)
+	}
+	if status, out := p.call("POST", "/api/runs/"+id+"/answer", map[string]any{"n": 0, "answer": answer, "later": 1}); status != 200 {
+		t.Fatalf("an answer with a field unknown beside it: %d %v", status, out)
+	}
+}
+
+// Днес never takes a failure to read the player's day for a day not started: it says it failed.
+func TestTodayTellsAFailedRead(t *testing.T) {
+	g := start(t)
+	ana, id := g.guest()
+	bo, _ := g.guest()
+	befriend(ana, bo)
+	_, run := bo.call("POST", "/api/day", map[string]any{})
+	playRun(bo, run) // a friend has played: no other read of the server's own follows
+	u := &account.User{ID: id}
+	if day, err := g.srv.todayOf(t.Context(), u); err != nil || day["friends"] == nil {
+		t.Fatalf("%v, friends %v", err, day["friends"])
+	}
+	// The server's own reads fail; the game's (its own handle on the database) don't.
+	closed := storetest.Open(t)
+	_ = closed.Read.Close()
+	g.srv.db = &store.DB{Write: g.db.Write, Read: closed.Read, Scan: g.db.Scan}
+	if day, err := g.srv.todayOf(t.Context(), u); err == nil {
+		t.Fatalf("a failed read taken for no run: %v", day["run"])
+	}
+}
+
 // playRun answers each question of a run (any answer will do).
 func playRun(p *player, run map[string]any) { playRunBy(p, run, "", 3*time.Second) }
 
