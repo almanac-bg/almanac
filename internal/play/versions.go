@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"math"
 	"sync"
-	"time"
 
 	"github.com/almanac-bg/almanac/internal/bank"
 )
@@ -150,8 +149,9 @@ func (g *Game) loadVersions(ctx context.Context) error {
 
 // question is a pick's question, as the run has it: the version it holds (Pick.V: the one it showed, or the day's from
 // the day's start), or, none yet, the bank's now. False if there's none: gone from the bank, or a version the game
-// never kept.
-func (g *Game) question(p Pick) (bank.Question, bool) {
+// never kept. A past version is read through db: the transaction the caller holds, or the read pool where it holds
+// none (pastVersion).
+func (g *Game) question(db querier, p Pick) (bank.Question, bool) {
 	q, ok := g.Bank().Get(p.ID)
 	if ok && (p.V == "" || bank.Version(q) == p.V) {
 		return q, true
@@ -159,12 +159,12 @@ func (g *Game) question(p Pick) (bank.Question, bool) {
 	if p.V == "" {
 		return nil, false
 	}
-	return g.pastVersion(p.ID, p.V)
+	return g.pastVersion(db, p.ID, p.V)
 }
 
-// deal deals a pick's question, the version it showed (question).
-func (g *Game) deal(p Pick) (bank.Dealt, bool) {
-	q, ok := g.question(p)
+// deal deals a pick's question, the version it showed (question), read through db.
+func (g *Game) deal(db querier, p Pick) (bank.Dealt, bool) {
+	q, ok := g.question(db, p)
 	if !ok {
 		return nil, false
 	}
@@ -173,10 +173,13 @@ func (g *Game) deal(p Pick) (bank.Dealt, bool) {
 
 // Deal deals a pick as a run has it: the version it showed, if it did (a duel's, played second), else as the
 // bank has it now. False if it can't be.
-func (g *Game) Deal(p Pick) (bank.Dealt, bool) { return g.deal(p) }
+func (g *Game) Deal(p Pick) (bank.Dealt, bool) { return g.deal(g.DB.Read, p) }
 
-// pastVersion is a version of a question no longer in the bank, as the game kept it.
-func (g *Game) pastVersion(id, version string) (bank.Question, bool) {
+// pastVersion is a version of a question no longer in the bank, as the game kept it, read through db: a caller that
+// holds a transaction reads in it, never asking the read pool for a second connection. A few at once, each holding one
+// and waiting for another, would wait on each other (the writer with them, in Show or Answer); and the version a run
+// holds was kept (Keep) before it was ever shown, so any transaction that sees the run sees its versions.
+func (g *Game) pastVersion(db querier, id, version string) (bank.Question, bool) {
 	key := versionKey{id, version}
 	v := &g.versions
 	v.mu.Lock()
@@ -185,10 +188,8 @@ func (g *Game) pastVersion(id, version string) (bank.Question, bool) {
 	if ok {
 		return q, true
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 	var category, body string
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT category, body FROM question_versions WHERE question_id = ? AND version = ?`,
+	err := db.QueryRowContext(context.Background(), `SELECT category, body FROM question_versions WHERE question_id = ? AND version = ?`,
 		id, version).Scan(&category, &body)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {

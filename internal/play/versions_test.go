@@ -281,3 +281,60 @@ func TestCountsStandOverAReload(t *testing.T) {
 		t.Fatalf("the count its waiter left: %v", err)
 	}
 }
+
+// A question's past version is read through the transaction its reader holds, never by asking the read pool for a
+// second connection (audit 2026-11-24, C-39). After a restart, with none read back yet, a few looks at once, each
+// holding a connection and waiting for another, waited on each other until a timeout: the writer held meanwhile, and
+// the question counted as gone, skipped for good while still in its time. Here the pool is taken by others: the writer
+// shows a question shown before a reload with no read connection free, and a look with only its own.
+func TestPastVersionReadInTheTransaction(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	w.reload(w.b)
+	fixed := editedSample(t, func(id string, q map[string]any) {
+		if id == "geo-960" {
+			q["answer"], q["changed"], q["updated"] = false, "2026-11-14", "2026-11-14"
+		}
+	})
+	ana, bo := w.user(), w.user()
+	runs := []int64{w.runOf(ana, "chapter", "geo-960", "geo-001"), w.runOf(bo, "chapter", "geo-960", "geo-001")}
+	w.show(ana, runs[0])
+	w.show(bo, runs[1])
+	w.reload(fixed)
+	taken := func(n int) (free func()) {
+		var conns []*sql.Conn
+		for range n {
+			c, err := w.db.Read.Conn(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			conns = append(conns, c)
+		}
+		return func() {
+			for _, c := range conns {
+				c.Close()
+			}
+		}
+	}
+	pool := w.db.Read.Stats().MaxOpenConnections
+	for i, look := range []struct {
+		taken int
+		fn    func(context.Context, int64, int64) (State, error)
+	}{{pool, w.g.Show}, {pool - 1, w.g.State}} {
+		user := []int64{ana, bo}[i]
+		w.g.versions.mu.Lock()
+		w.g.versions.past = nil // none read back yet, for this look too
+		w.g.versions.mu.Unlock()
+		free := taken(look.taken)
+		in, cancel := context.WithTimeout(ctx, 3*time.Second)
+		s, err := look.fn(in, user, runs[i])
+		cancel()
+		free()
+		if err != nil || s.Question == nil || s.Question.N != 0 {
+			t.Fatalf("look %d, %d of %d read connections taken: %+v %v", i, look.taken, pool, s.Question, err)
+		}
+	}
+	if n := w.count(`SELECT count(*) FROM answers WHERE run_id IN (?, ?)`, runs[0], runs[1]); n != 0 {
+		t.Fatalf("%d questions counted as gone", n)
+	}
+}

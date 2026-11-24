@@ -185,6 +185,7 @@ func hardnessFor(b *bank.Bank, byID map[string]float64) *hardnesses {
 
 type querier interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
 // abilities goes over a player's answers, oldest first, up to a time (ms; 0 for all of them): their ability in each
