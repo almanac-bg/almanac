@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -29,6 +31,9 @@ import (
 //
 // Past a budget, a new kind is only counted, and the mail says how many there were. The kinds told are forgotten
 // daily, so one that goes on is heard of again the next day, and a budget is whole again.
+//
+// What was told today is kept over a restart (kv 'problems_told', written with the mail that tells it, read by New):
+// a deploy, many a day, mails again no problem that goes on, nor makes a budget whole.
 type problems struct {
 	mu    sync.Mutex
 	now   func() time.Time // the clock (tests); nil: time.Now
@@ -112,6 +117,62 @@ func (p *problems) take() (map[string]*problem, [sources]int) {
 	return news, over
 }
 
+// toldKey is the kv row that keeps what was told today (problemsTold) over a restart.
+const toldKey = "problems_told"
+
+// problemsTold is what was told today, as the database keeps it.
+type problemsTold struct {
+	Since int64        `json:"since"` // ms
+	Told  []string     `json:"told"`
+	Kinds [sources]int `json:"kinds"`
+}
+
+// toldToday is what has been told today as the database keeps it: every kind told but those still waiting to be.
+func (p *problems) toldToday() ([]byte, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	t := problemsTold{Since: p.since.UnixMilli(), Told: []string{}, Kinds: p.kinds}
+	for k := range p.told {
+		if p.news[k] == nil {
+			t.Told = append(t.Told, k)
+		}
+	}
+	slices.Sort(t.Told)
+	return json.Marshal(t)
+}
+
+// restore takes back what was told today as the database kept it (toldToday), unless it's a day old.
+func (p *problems) restore(kept []byte) {
+	var t problemsTold
+	if json.Unmarshal(kept, &t) != nil {
+		return
+	}
+	since := time.UnixMilli(t.Since)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.clock().Sub(since) >= 24*time.Hour {
+		return
+	}
+	p.since, p.kinds = since, t.Kinds
+	for _, k := range t.Told {
+		p.told[k] = true
+	}
+}
+
+// restoreProblems takes back what was told today, before this start (tellProblems).
+func (s *Server) restoreProblems(ctx context.Context) error {
+	var kept string
+	err := s.db.Read.QueryRowContext(ctx, `SELECT value FROM kv WHERE key = ?`, toldKey).Scan(&kept)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	s.problems.restore([]byte(kept))
+	return nil
+}
+
 // Problem records a problem from outside a request (a failed backup), to be mailed like the rest.
 func (s *Server) Problem(kind string) { s.problems.note(kind, background) }
 
@@ -148,7 +209,7 @@ func (s *Server) TellProblems(ctx context.Context, period time.Duration) {
 	}
 }
 
-// tellProblems mails the new problems, if there are any.
+// tellProblems mails the new problems, if there are any, and keeps what has been told today with the mail.
 func (s *Server) tellProblems(ctx context.Context, to Alerts) {
 	news, over := s.problems.take()
 	text := problemsMail(news, over, s.cfg.PublicURL, s.cfg.Version)
@@ -159,7 +220,16 @@ func (s *Server) tellProblems(ctx context.Context, to Alerts) {
 	if to.Email == "" {
 		return
 	}
-	err := s.db.Tx(ctx, func(tx *sql.Tx) error {
+	told, err := s.problems.toldToday()
+	if err != nil {
+		slog.Error("mailing problems", "err", err)
+		return
+	}
+	err = s.db.Tx(ctx, func(tx *sql.Tx) error {
+		if _, err := tx.Exec(`INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value`,
+			toldKey, string(told)); err != nil {
+			return err
+		}
 		return s.outbox.Enqueue(tx, mail.Message{To: to.Email, Subject: subject, Text: text})
 	})
 	if err != nil {

@@ -134,6 +134,10 @@ func New(cfg Config, d Deps) (*Server, error) {
 	if s.secure {
 		s.cookie, s.askCookie, s.playedCookie = "__Host-sid", "__Host-ask", "__Host-played"
 	}
+	// What was told today before this start isn't told again (problems.go).
+	if err := s.restoreProblems(context.Background()); err != nil {
+		return nil, err
+	}
 	s.limits.off, s.guard.off = cfg.Dev, cfg.Dev
 	// A key pushed out of a full limiter means a flood of keys: the counts pushed out start again (limits.go).
 	s.limits.onFull = func() { s.problems.add("limits: a flood of keys filled the limiter; counts were pushed out") }
