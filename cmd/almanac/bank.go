@@ -10,6 +10,7 @@ import (
 	"maps"
 	"math"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -92,6 +93,9 @@ func bankCommand(args []string) error {
 // nothing. dry (-check) only checks it and says what it would do: a writer checks one category's part this way, before
 // the batch is whole.
 func bankAdd(from, dir, checkedBy string, dry bool) error {
+	if err := batchPublic(from, dir); err != nil {
+		return err
+	}
 	res, err := bank.Add(dir, from, checkedBy, dry)
 	if err != nil {
 		return err
@@ -109,6 +113,44 @@ func bankAdd(from, dir, checkedBy string, dry bool) error {
 	}
 	fmt.Printf("%s: %s; live after: %s\n", dir, did, strings.Join(sizes, ", "))
 	return nil
+}
+
+// batchPublic refuses a batch whose own questions the public sample asks too (bank.Public): their answers are public.
+func batchPublic(from, dir string) error {
+	b, _ := bank.Load(dir)
+	if b == nil {
+		return nil // bank.Add says why
+	}
+	with, ids, err := b.WithBatch(from)
+	if err != nil {
+		return nil // bank.Add says why
+	}
+	var bad []string
+	for _, p := range publicProblems(dir, with) {
+		if slices.Contains(ids, p.ID) {
+			bad = append(bad, p.String())
+		}
+	}
+	if len(bad) > 0 {
+		return fmt.Errorf("%s: the public sample asks %d of its questions too, so their answers are public: write others\n%s",
+			from, len(bad), strings.Join(bad, "\n"))
+	}
+	return nil
+}
+
+// publicProblems holds a bank against the public sample (bank.Public, from the repository's root): nothing when the
+// sample isn't here (the server has none beside its bank) or the bank is the sample itself.
+func publicProblems(dir string, b *bank.Bank) []bank.Problem {
+	here, err1 := filepath.Abs(dir)
+	public, err2 := filepath.Abs(bank.PublicDir)
+	if _, err := os.Stat(filepath.Join(bank.PublicDir, bank.CategoriesFile)); err != nil || err1 != nil || err2 != nil || here == public {
+		return nil
+	}
+	sample, _ := bank.Load(bank.PublicDir)
+	if sample == nil {
+		return nil
+	}
+	return b.Public(sample)
 }
 
 // defaultBankDir is the private bank when there is one (a clone in private/), else the public sample.
@@ -174,6 +216,14 @@ func bankCheck(args []string) error {
 				dir, len(against), *liveDir)
 		}
 	}
+	// Against the public sample: a question it asks too has its answer on GitHub (not for the sample itself).
+	var public []bank.Problem
+	if !*sample {
+		public = publicProblems(dir, b)
+	}
+	for _, p := range public {
+		fmt.Println(p)
+	}
 	fmt.Println(summary(b))
 	fmt.Println(runway(b, used, today()))
 	var live *bank.Bank
@@ -195,6 +245,10 @@ func bankCheck(args []string) error {
 	fmt.Println(tally)
 	if *sample {
 		return nil
+	}
+	if len(public) > 0 {
+		return fmt.Errorf("%s: %d live questions the public sample (%s) asks too: retire them (retiredWhy %s)",
+			dir, len(public), bank.PublicDir, bank.RulePublic)
 	}
 	if off, mean := b.Uneven(); len(off) > 0 {
 		return fmt.Errorf("%s: categories more than %.0f%% off the mean of %.0f: %s (a batch adds to every category alike)",

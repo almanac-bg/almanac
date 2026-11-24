@@ -13,7 +13,12 @@ from it. Nothing goes into the bank unchecked, and every rule below holds for ev
 - `private/` is a clone of the private repo `almanac-bg/almanac-questions`, ignored by this repo. It holds
   `categories.json` and `questions/<category>.json`: the real bank, kept private so answers can't be searched. Never
   paste many of its questions anywhere public.
-- `bank/sample/` is the public sample that CI and the browser tests play. Its answers are public.
+- `bank/sample/` is the public sample that CI and the browser tests play. Its answers are public, so the bank
+  never asks what it asks: from the repo's root, `bank check` fails and `bank add` refuses a batch while a live
+  question of the bank is one of the sample's (`bank.Public`, the `public` rule: the same answer, with one text's words
+  all in the other's; a "who or what is this" with the same picture or a clue of it; an order, match or split with all but one of
+  its items); such a question is retired (`retiredWhy` `public`). Write a sample question new, never copy one from
+  the bank.
 - The format and the checks are the code: `internal/bank` (one file per type, `check.go` for the format,
   `rules.go` and the files it names for the rules below, `balance.go`). `internal/bank/names.json` is the spelling of
   names written more than one way; `internal/bank/language.json` the Russian words and loanwords the game never uses
@@ -238,7 +243,7 @@ Every question is one JSON object in its category's file:
 | `checked`, `checkedBy` | When it was last checked against its sources, and by what: a process and its model (`"new-questions fable-5.2"`), or for older questions the bank commit that added or last changed it (`"bank 7bb2938"`: its message and report say how). Required with `sources` |
 | `reviewBy`           | For an answer that may stop being true (an office holder, a record): when to check it. From that day no game deals it (`bank check` warns, the server logs it) until it is checked and the date moved |
 | `image`              | A picture (see below)                                                                    |
-| `retired`            | `true`: never dealt again, kept for history and stats; with `retiredWhy` (`wrong`, `stale`, `weak`, `twin`, `giveaway`, `rule`) and `replacedBy` (the id that took its place). A question retired as `wrong` or `stale` also leaves the players' Алманах |
+| `retired`            | `true`: never dealt again, kept for history and stats; with `retiredWhy` (`wrong`, `stale`, `weak`, `twin`, `giveaway`, `rule`, `public`) and `replacedBy` (the id that took its place). A question retired as `wrong` or `stale` also leaves the players' Алманах |
 | `on`                 | The days it belongs to: `"03-03"` every year, `"2027-05-02"` that year only (Великден). On such a day it goes into the day's ten as „На този ден“ |
 | `day`                | With `on`, required (unless the text itself names the date it asks about): one short line (at most 100 characters, ending in a period) saying what happened on that day and naming the date: „На 16 декември 1982 г. умира Колин Чапман.“ The player reads it with the answer, only when the question is dealt on its date (never before answering: it could give the answer away; never in a chapter's game). See „A question for a day“ below |
 | `bg`                 | `true` for a question about Bulgaria (people, places, history, culture, language, sport): every day has at least three |
