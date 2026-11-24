@@ -104,8 +104,9 @@ jobs:
       - run: npm test
 
   # Each engine in shards, side by side, each a part of the tests with a server of its own: one job per engine took
-  # 15 minutes (WebKit 25, against its 30), all three in one job was cut off before it said anything. Some 8 minutes
-  # each: WebKit, the slowest, in three, the others in two.
+  # 15 minutes (WebKit 25, against its 30), all three in one job was cut off before it said anything. Some 8 to 10
+  # minutes each: WebKit, the slowest, in four, the others in two. Playwright shards by the number of tests, not their
+  # time: layout.spec's slow ones fall in WebKit's middle shards (in three, 5, 11 and 11 minutes).
   browsers:
     name: Browsers (${{ matrix.engine }} ${{ matrix.shard }}/${{ matrix.shards }})
     if: github.event_name != 'pull_request'
@@ -117,9 +118,10 @@ jobs:
         include:
           - { engine: chromium, shard: 1, shards: 2 }
           - { engine: chromium, shard: 2, shards: 2 }
-          - { engine: webkit, shard: 1, shards: 3 }
-          - { engine: webkit, shard: 2, shards: 3 }
-          - { engine: webkit, shard: 3, shards: 3 }
+          - { engine: webkit, shard: 1, shards: 4 }
+          - { engine: webkit, shard: 2, shards: 4 }
+          - { engine: webkit, shard: 3, shards: 4 }
+          - { engine: webkit, shard: 4, shards: 4 }
           - { engine: firefox, shard: 1, shards: 2 }
           - { engine: firefox, shard: 2, shards: 2 }
     permissions:
