@@ -3,11 +3,13 @@
 // whoever opens it:
 //
 //   - a shared day's card (Draw), the picture a shared day's link shows and the browser shares as the day is shared
-//     (web/src/game/share.ts, cardFile): the mark and the name, „Брой“ and the issue's number big with its date (and
-//     on a national day its name: „3 март · Освобождението“), almanac.bg, and the ten tiles two rows of five, each its chapter's colour with its glyph, filled right (the glyph
-//     on a white tile), the upper left half filled близо (◩), dashed and hollow wrong (so that they part in grey too),
-//     dashed and empty one that counts for
-//     nobody. Never an answer, never a name, never the score in figures (the link's title says it: server/pages.go);
+//     (web/src/game/share.ts, cardFile): the mark and the name, „Брой 9 · 20 ноември“ small (on a national day its
+//     name after it: „3 март · Освобождението“), the score big („6 от 9“: DECISIONS.md, sharing is the score and its
+//     tiles), the game in a line (Line) for whoever sees the card alone (a picture shared on its own, a preview
+//     without its title, a thumbnail), almanac.bg, and the ten tiles two rows of five, each its chapter's colour with
+//     its glyph, filled right (the glyph on a white tile), the upper left half filled близо (◩), dashed and hollow
+//     wrong (so that they part in grey too), dashed and empty one that counts for nobody. Never an answer, never a
+//     name. The score follows from the shape, so it adds no card to draw;
 //   - the site's own picture (Site, /og.png): the mark and the name, „Десет въпроса на ден, едни и същи за цяла
 //     България.“, a day's ten tiles and almanac.bg.
 //
@@ -109,30 +111,44 @@ const (
 	Line    = "Десет въпроса на ден, едни и същи за цяла България."
 )
 
+// column is how wide the card's words are at its left, beside the tiles.
+const column = 372.0
+
 // Draw draws a shared day's card as a PNG.
 func Draw(c Card) ([]byte, error) {
 	p, err := newPicture()
 	if err != nil {
 		return nil, err
 	}
-	// The issue: „Брой“, its number set big (smaller, should it ever run into the tiles), and the date.
-	p.write(p.face("sofia-sans-900", 56), ink, 64, 238, "Брой", 0)
-	n := fmt.Sprint(c.Issue)
-	size := 250.0
-	if w := p.measure(p.face("sofia-sans-extra-condensed-900", size), n, 0); w > 370 {
-		size *= 370 / w
-	}
-	p.write(p.face("sofia-sans-extra-condensed-900", size), ink, 56, 456, n, 0)
-	// The date, with a national day's name after it, on one line under the tiles: smaller should it ever be wider.
-	date := c.Date
+	// The issue and its date, small, over the tiles' top (a national day's name after it: smaller should it ever be
+	// wider than the card).
+	head := fmt.Sprintf("Брой %d · %s", c.Issue, c.Date)
 	if c.National != "" {
-		date += " · " + c.National
+		head += " · " + c.National
 	}
-	size = 44
-	if w := p.measure(p.face("sofia-sans-800", size), date, 0); w > Width-2*64 {
+	size := 36.0
+	if w := p.measure(p.face("sofia-sans-800", size), head, 0); w > Width-2*64 {
 		size *= (Width - 2*64) / w
 	}
-	p.write(p.face("sofia-sans-800", size), ink, 64, 530, date, 0)
+	p.write(p.face("sofia-sans-800", size), ink, 64, 158, head, 0)
+	// The score, the card's hero as it's the result's: its number of right set big, „от 10“ after it on its baseline,
+	// both smaller should they ever be wider than the column. A thumbnail of the card says it at a glance.
+	rights, of := strings.Count(c.Shape, "1"), len(c.Shape)-strings.Count(c.Shape, "3")
+	n, rest := fmt.Sprint(rights), fmt.Sprintf("от %d", of)
+	big, small := 270.0, 66.0
+	if w := p.measure(p.face("sofia-sans-extra-condensed-900", big), n, 0) + 18 +
+		p.measure(p.face("sofia-sans-900", small), rest, 0); w > column {
+		big, small = big*column/w, small*column/w
+	}
+	end := p.write(p.face("sofia-sans-extra-condensed-900", big), ink, 58, 400, n, 0)
+	p.write(p.face("sofia-sans-900", small), ink, end+18, 400, rest, 0)
+	// What the game is, for whoever sees the card alone (a picture shared on its own, a preview with no title).
+	line := p.face("sofia-sans-900", 30)
+	y := 462.0
+	for _, l := range wrap(p, line, Line, column) {
+		p.write(line, ink, 64, y, l, 0)
+		y += 36
+	}
 	if err := p.tiles(c.Chapters, c.Shape); err != nil {
 		return nil, err
 	}
