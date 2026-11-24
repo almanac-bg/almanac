@@ -102,6 +102,13 @@ What the rules ask (the questions skill has the details):
 - **easy-year** (an easy number asks a year): judge it by the rubric. A date three adults in four know within ±2
   years (one taught in school or lived through: 1878, 1944, 1989, the euro in 2026) is waived, the `why` saying why
   everyone knows it; any other is relabelled medium or hard (a label: `changed` stays).
+- **judge: sourcing** (an old question with no `sources`, its turn in the sourcing pass): confirm from pages you
+  read the answer, that no wrong option is also right, every value, and **every claim of the fact one by one** (side
+  details too: a place, a count, a date, a superlative's scope; a Bulgarian name or term on a Bulgarian page). The
+  audit of 24 Nov 2026 found about one fact in eight of the old questions claiming more than its source. What holds:
+  set `sources` to the pages that hold it (a sources-only change: `changed` stays). What doesn't: the smallest fix
+  (a hedge the source has, a side detail dropped, another fact), sourced. Read its `bank related` list too: a fact
+  that tells another's answer or another's fact is fixed here as well.
 - **judge: audit** (what an independent audit found, with its evidence and sources): a lead, not a verdict. Confirm
   it from pages you read yourself; fix what holds by the rule it breaks (a give-away, a fact that overclaims, a label),
   keep what doesn't, and say which.
@@ -110,7 +117,10 @@ What the rules ask (the questions skill has the details):
 **Other chunks run beside yours.** Change a question outside your chunk only if `<work>/owners.json` doesn't list it
 (it maps every listed id to its chunk); if it lists it, fix your side, or leave the item and say why. And before you
 write any new question, claim its subject: `grep -i '<answer>' <work>/claims.txt` — if another chunk has it, pick
-another subject — then `echo '<chunk> <answer> | <subject>' >> <work>/claims.txt`.
+another subject — then `echo '<chunk> <answer> | <subject>' >> <work>/claims.txt`. Before you change a question
+outside your chunk, claim its id the same way: `grep -w '<id>' <work>/claims.txt` — if another chunk has it, leave it
+and say so — then `echo '<chunk> <id>' >> <work>/claims.txt` (two chunks that changed one question: one of the two
+is lost at the merge).
 
 **Every word you write can give another question away**, and `bank add -check` sees only a few kinds of it: in round
 1 most of what the checkers caught was a new fact, `day` line, item or option that named another question's answer
@@ -129,7 +139,10 @@ Britannica, official sites; WebFetch the page itself; WebSearch is rate-limited)
 In `<work>/fix/<chunk>/` (nothing else in it):
 
 - `<category>.json`: one JSON array: every changed question whole (its id), then every new question (ids from your
-  range). Leave kept and waived ones out.
+  range). Leave kept and waived ones out. A fact you write, on an old question too, is at most 140 characters (`bank
+  add` refuses a longer one). Leave `checked` and `checkedBy` as the bank has them on a changed question (the final
+  `bank add -checked-by` sets them); a new question carries today and `fix-questions opus-5.5` (a new one is refused
+  without them).
 - `retire.json` if you replace any: `[{"id": "<old>", "why": "<why>", "by": "<new id>"}]`.
 - `images/` only if you made pictures.
 

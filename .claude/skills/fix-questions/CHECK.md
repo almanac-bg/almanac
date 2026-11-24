@@ -24,7 +24,10 @@ chunk's name.
    the same cell (or a choice for `estimate`), and the retirement's `why` is honest; a waiver is a true exception; a
    `keep` really passes its rule; the problem the item had is gone, and no new one came in.
 3. **The dates**: `updated` today; `changed` today exactly when what it asks changed; `added` kept.
-4. `sources` lists pages that hold what the question claims.
+4. `sources` lists pages that hold what the question claims: open them. A fixer's note that a page says something is
+   a claim to check, not a source (the audit's second round found three notes citing pages that didn't hold the
+   claim). A **sourcing** item passed as "sources only" is checked like a fix: every claim of its fact on a page.
+5. A fact written anew is at most 140 characters; `checked`/`checkedBy` of a changed question as the bank has them.
 
 Anything you can't confirm: take the fix out (the question stays as the bank has it) and say why; if the bank's own
 version is wrong, say so loudly in your notes. Never send personal data anywhere.
