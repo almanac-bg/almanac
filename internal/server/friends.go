@@ -97,7 +97,7 @@ func (s *Server) requestFriend(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	// Tags are public, but a stream of guesses isn't asking a friend.
-	if !s.allowFrom(r, "request", 30, 0, time.Hour) {
+	if !s.allowFrom(r, "request", 30, 150, time.Hour) {
 		return errTooMany
 	}
 	// A guest who hasn't finished a game is nobody yet: one made for the asking, then another, would let a stranger
@@ -123,12 +123,48 @@ func (s *Server) requestFriend(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+	if full, err := s.waitingFull(r.Context(), u.ID, to, byEmail); err != nil {
+		return err
+	} else if full {
+		return errManyWaiting
+	}
 	sent, err := s.game.Request(r.Context(), u.ID, to, byEmail)
 	if err != nil {
 		return err
 	}
 	s.toldOfRequest(r.Context(), u, sent)
 	return ok(w, sent)
+}
+
+// maxWaiting is how many friend requests may wait for one player's answer, or one address's: far more than the people
+// anyone knows, and a bound on what strangers can pile on someone, who has no way to block them (DECISIONS.md). One by
+// a shared link is bounded by the link already (play.SharerAsks).
+const maxWaiting = 100
+
+// errManyWaiting is a request to someone maxWaiting requests wait for already.
+var errManyWaiting = &apiError{http.StatusConflict, "many_waiting",
+	"Твърде много покани вече чакат отговор от този човек. Опитай пак по-късно."}
+
+// waitingFull says whether a request to a tag, or an address (byEmail), would go past maxWaiting: requests waiting for
+// the one asked as play.Requests lists them (to their id or their email, not declined). Never when one of the asker's
+// waits there already, nor to a friend, nor when the one asked has asked the asker (play.Request makes them friends):
+// a flood keeps no one from the people they know.
+func (s *Server) waitingFull(ctx context.Context, from int64, to string, byEmail bool) (bool, error) {
+	tag, email := any(to), any(nil)
+	if byEmail {
+		tag, email = nil, to
+	}
+	var n int
+	var mine, known bool
+	err := s.db.Read.QueryRowContext(ctx, `WITH them AS (SELECT id, email FROM users WHERE tag = ?2 OR email = ?3)
+		SELECT count(*), coalesce(sum(r.from_id = ?1), 0) > 0,
+			EXISTS (SELECT 1 FROM friends WHERE user_id = ?1 AND friend_id = (SELECT id FROM them))
+			OR EXISTS (SELECT 1 FROM friend_requests c WHERE c.from_id = (SELECT id FROM them)
+				AND (c.to_id = ?1 OR c.to_email = (SELECT email FROM users WHERE id = ?1)))
+		FROM friend_requests r
+		WHERE (r.to_id = (SELECT id FROM them) OR r.to_email = coalesce((SELECT email FROM them), ?3)) AND NOT r.declined`,
+		from, tag, email).Scan(&n, &mine, &known)
+	return n >= maxWaiting && !mine && !known, err
 }
 
 // askSharer asks whoever shared the day by the link the player played it by (play.AskSharer), within the limits of

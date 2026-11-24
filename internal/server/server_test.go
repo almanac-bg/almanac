@@ -358,8 +358,9 @@ func TestPages(t *testing.T) {
 		"/play/mix": 404, "/play/bulgaria": 404, "/play/nosuch": 404, "/players/nobody": 404, "/nowhere": 404, "/api/nowhere": 404,
 		"/qimg/edf5f1c42d5e21e8.webp": 200, "/qimg/../../go.mod": 404, "/qimg/0000000000000000.webp": 404,
 		"/privacy": 200, "/.well-known/security.txt": 200,
-		// An app's page with a slash after it is that page; the slash after anything else isn't.
-		"/almanac/": 200, "/almanac/history/": 200, "/almanac/nosuch/": 404, "/nowhere/": 404,
+		// An app's page with a slash after it is that page; the slash after anything else isn't, but for the privacy
+		// notice, the one page apart from the app's a link may well end in a slash (its canonical stays /privacy).
+		"/almanac/": 200, "/almanac/history/": 200, "/almanac/nosuch/": 404, "/nowhere/": 404, "/privacy/": 200,
 		// Every chapter at once and Bulgaria's are no game and no chapter of the book.
 		"/almanac/mix": 404, "/almanac/bulgaria": 404,
 	} {
@@ -1238,6 +1239,56 @@ func TestAcceptWhenFriendsFull(t *testing.T) {
 	}
 	if in := mine["requests"].(map[string]any)["in"].([]any); len(in) != 1 {
 		t.Fatalf("Bo's request after the refused yes: %v", mine["requests"])
+	}
+}
+
+// Strangers can pile only so many requests on one player (maxWaiting, by tag or by their address), who has no way to
+// block them; and a full list keeps nobody from the people they know: one the player asked first, or a friend.
+func TestRequestsWaitingCapped(t *testing.T) {
+	g := start(t)
+	ana, anaID := g.guest()
+	bo, _ := g.guest()
+	cy, _ := g.guest()
+	played(ana)
+	played(bo)
+	played(cy)
+	if _, err := g.db.Write.Exec(`UPDATE users SET email = 'ana@example.com' WHERE id = ?`, anaID); err != nil {
+		t.Fatal(err)
+	}
+	if status, out := ana.call("POST", "/api/friends/requests", map[string]string{"to": "@" + tagOf(cy)}); status != 200 {
+		t.Fatalf("Ana asks Cy: %d %v", status, out)
+	}
+	// maxWaiting from strangers: all but one to her tag, one to her address.
+	if _, err := g.db.Write.Exec(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?)
+		INSERT INTO users (name, tag, created_at, seen_at) SELECT 'Играч', 'flood' || i, 0, 0 FROM n`, maxWaiting); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := g.db.Write.Exec(`INSERT INTO friend_requests (from_id, to_id, to_email, at)
+		SELECT id, iif(tag = 'flood1', NULL, ?1), iif(tag = 'flood1', 'ana@example.com', NULL), 0
+		FROM users WHERE tag LIKE 'flood%'`, anaID); err != nil {
+		t.Fatal(err)
+	}
+	for _, to := range []string{"@" + tagOf(ana), "ana@example.com"} {
+		if status, out := bo.call("POST", "/api/friends/requests", map[string]string{"to": to}); status != http.StatusConflict ||
+			out["error"] != "many_waiting" {
+			t.Fatalf("Bo asks %s past %d waiting: %d %v", to, maxWaiting, status, out)
+		}
+	}
+	if status, out := cy.call("POST", "/api/friends/requests", map[string]string{"to": "@" + tagOf(ana)}); status != 200 ||
+		out["friends"] != true {
+		t.Fatalf("Cy, whom Ana asked, asks her: %d %v", status, out)
+	}
+	// A friend's request (as when they ask again) isn't refused either.
+	if status, out := cy.call("POST", "/api/friends/requests", map[string]string{"to": "@" + tagOf(ana)}); status != 200 {
+		t.Fatalf("a friend asks: %d %v", status, out)
+	}
+	// One declined makes room.
+	if _, err := g.db.Write.Exec(`UPDATE friend_requests SET declined = 1 WHERE to_id = ? AND from_id =
+		(SELECT id FROM users WHERE tag = 'flood2')`, anaID); err != nil {
+		t.Fatal(err)
+	}
+	if status, out := bo.call("POST", "/api/friends/requests", map[string]string{"to": "@" + tagOf(ana)}); status != 200 {
+		t.Fatalf("Bo asks with room: %d %v", status, out)
 	}
 }
 

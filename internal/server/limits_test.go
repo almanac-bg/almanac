@@ -17,6 +17,39 @@ import (
 	"time"
 )
 
+// A player's page is within the read budget, and says whether a tag is someone's only by the counted lookup (profileOf):
+// past a network's misses, it no longer tells a tag that is someone's from one that isn't (review 2026-11-18, S12).
+func TestPlayerPagesTellNoMoreThanTheAPI(t *testing.T) {
+	g := start(t)
+	p, _ := g.guest()
+	tag := tagOf(p)
+	get := func(path string) int {
+		t.Helper()
+		res, err := http.Get(g.url + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	if real, absent := get("/players/"+tag), get("/players/nobody0"); real != 200 || absent != 404 {
+		t.Fatalf("within the budget: real %d, absent %d", real, absent)
+	}
+	for n := range profileMissesNet {
+		get(fmt.Sprintf("/players/nobody%d", n+1))
+	}
+	if real, absent := get("/players/"+tag), get("/players/nobody999"); real != absent {
+		t.Errorf("past the misses: real %d, absent %d: the page still tells them apart", real, absent)
+	}
+	// Pages share the API's read budget: past it, a page is refused as a call is.
+	for range readsNet {
+		get("/me")
+	}
+	if status := get("/"); status != http.StatusTooManyRequests {
+		t.Errorf("a page past the network's reads: %d", status)
+	}
+}
+
 // clock is a time the test moves.
 type clock struct {
 	mu sync.Mutex

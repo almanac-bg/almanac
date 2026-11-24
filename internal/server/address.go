@@ -123,8 +123,9 @@ func site(a netip.Addr) string {
 	return p.String()
 }
 
-// allowFrom counts one of what from the request's network, and says whether that's within n a period; and, with
-// site above 0, within site a period from its site too (clientSite). For the limits that keep players safe, guardFrom.
+// allowFrom counts one of what from the request's network, and says whether that's within n a period, and within site
+// a period from its site too (clientSite): every limit counts the site, so no limit can be farmed across a site's
+// networks (a site of 0 lets nothing through). For the limits that keep players safe, guardFrom.
 func (s *Server) allowFrom(r *http.Request, what string, n, site int, per time.Duration) bool {
 	return s.from(s.limits, r, what, n, site, per)
 }
@@ -139,11 +140,11 @@ func (s *Server) guardFrom(r *http.Request, what string, n, site int, per time.D
 // networks it sends from.
 func (s *Server) from(l *limiter, r *http.Request, what string, n, site int, per time.Duration) bool {
 	wide := what + ":site:" + s.clientSite(r)
-	if site > 0 && l.spent(wide, site) {
+	if l.spent(wide, site) {
 		return false
 	}
 	if !l.allow(what+":"+s.clientNet(r), n, per) {
 		return false
 	}
-	return site <= 0 || l.allow(wide, site, per)
+	return l.allow(wide, site, per)
 }

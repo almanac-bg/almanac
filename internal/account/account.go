@@ -121,9 +121,11 @@ const (
 	// CodesPerAddressHour and CodesPerAddressDay are the most codes mailed to one address, whoever asks and from
 	// wherever, counted in the database: a player needs one, a second when the first is slow or lost among the spam,
 	// one for each device they sign in on. Nobody can flood an inbox with codes from many networks, nor spend the
-	// domain's good name on it; the price is that someone who knows a player's address can make them wait (an hour,
-	// at worst until the day's codes are a day old) to sign in on a new device, while the codes in their inbox say
-	// so (S5).
+	// domain's good name on it. The price, chosen (S5): anyone who knows a player's address can spend its codes, and
+	// keep it from signing in on a new device for as long as they keep asking (the windows roll, and a few codes an
+	// hour keep them full), while the codes in its inbox, each good only in the browser that asked, say so. A device
+	// signed in already stays signed in. Should a player ever be kept out so, the remedy is to let a site's first
+	// code through (a site counted with each mail), not a higher cap.
 	CodesPerAddressHour = 4
 	CodesPerAddressDay  = 12
 )

@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -27,7 +28,7 @@ import (
 // The app is one page: the server sends it for every path the app knows (and a 404 with it for the rest, which the
 // app shows as such), with what it needs to start in it, so it draws at once without asking for anything: Днес's
 // page has the day in it too (GET /api/day's answer), and every page asks for its style, its script and the font its
-// first paint is in at once, in its head and in a Link header (which Cloudflare also sends ahead as Early Hints).
+// first paint is in at once, in its head and in a Link header (files.link).
 var appPaths = []*regexp.Regexp{
 	regexp.MustCompile(`^/$`),
 	regexp.MustCompile(`^/play/[a-z]+$`),
@@ -96,8 +97,9 @@ func filesOf(m map[string]string, path string) files {
 	return f
 }
 
-// link is the Link header that asks for a page's files as its head does: a browser may start on them before the page
-// has come, and Cloudflare sends it ahead of the page (103 Early Hints) to the next who asks for one.
+// link is the Link header that asks for a page's files as its head does: a browser may start on them before the page's
+// body has come. It isn't sent ahead of the page (103 Early Hints): none came from production (November 2026), and
+// Cloudflare would hint only its preload and preconnect links, never a modulepreload.
 func (f files) link() string {
 	var links []string
 	if f.CSS != "" {
@@ -169,6 +171,11 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	// A page reads what the API does (the day, a player, a duel): within the same budget (mayCall).
+	if !s.mayCall(r) {
+		http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+		return
+	}
 	// A page of the app's with a slash after it (/almanac/) is that page (the client's router drops the slash, and the
 	// page's canonical link is without it): served in place, never sent elsewhere by a redirect.
 	if p := strings.TrimSuffix(r.URL.Path, "/"); p != r.URL.Path && p != "" && isAppPath(p) {
@@ -234,6 +241,9 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 	boot, _ := json.Marshal(start) // escapes <, > and &: safe inside the script element
 	files := filesOf(m, r.URL.Path)
 	pv := s.preview(r, shared)
+	if pv.missing {
+		status = http.StatusNotFound
+	}
 	page := map[string]any{
 		"Files": files, "Boot": template.JS(boot), "HomeTitle": homeTitle,
 		"Title": pv.title, "Description": pv.description, "Canonical": "",
@@ -271,7 +281,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 }
 
 // there is whether what a page of the app is of is there, where the server can tell: a chapter's games, a duel, a
-// player. One that isn't is a 404 (as for a path the app doesn't know), which its screen says in words. A failure to
+// player's well-formed tag (whether it's someone's, preview says). One that isn't is a 404 (as for a path the app doesn't know), which its screen says in words. A failure to
 // tell is taken as there: the screen finds out.
 func (s *Server) there(r *http.Request) bool {
 	p, ctx := r.URL.Path, r.Context()
@@ -287,11 +297,10 @@ func (s *Server) there(r *http.Request) bool {
 		id, _ := strconv.ParseInt(strings.TrimPrefix(p, "/duel/"), 10, 64)
 		yes, err = s.game.DuelExists(ctx, id)
 	case strings.HasPrefix(p, "/players/"):
-		tag, e := account.NormalTag(strings.TrimPrefix(p, "/players/"))
-		if e != nil {
-			return false
-		}
-		err = s.db.Read.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM users WHERE tag = ?)`, tag).Scan(&yes)
+		// Whether the tag is someone's is for the page's one counted lookup to say (preview: profileOf, whose misses
+		// a network may make only so many of), never an uncounted one here.
+		_, e := account.NormalTag(strings.TrimPrefix(p, "/players/"))
+		return e == nil
 	default:
 		return true
 	}
@@ -312,10 +321,12 @@ func (s *Server) preview(r *http.Request, shared play.Share) linkPreview {
 		p.alt = fmt.Sprintf("АЛМАНАХ, Брой %d: %d от %d", shared.Issue, shared.Rights(), shared.Counted())
 	case strings.HasPrefix(path, "/players/"):
 		if tag, err := account.NormalTag(strings.TrimPrefix(path, "/players/")); err == nil {
-			if pr, err := s.profileOf(r, tag, 0); err == nil {
+			pr, err := s.profileOf(r, tag, 0)
+			if err == nil {
 				p.title = pr.Name + " (@" + pr.Tag + ") в АЛМАНАХ"
 				p.description = "Профил в АЛМАНАХ. Десет въпроса на ден, едни и същи за цяла България."
 			}
+			p.missing = errors.Is(err, play.ErrNoPlayer)
 		}
 	}
 	return p
@@ -341,8 +352,12 @@ func topicWords(chapters []bank.Category) string {
 	return strings.Join(names, ", ")
 }
 
-// linkPreview is what a link to a page shows when it's sent: its title, its line, its picture and the picture's words.
-type linkPreview struct{ title, description, image, alt string }
+// linkPreview is what a link to a page shows when it's sent: its title, its line, its picture and the picture's words;
+// and whether the player a page is of is nobody (a 404).
+type linkPreview struct {
+	title, description, image, alt string
+	missing                        bool
+}
 
 // Search engines get the front page and the privacy notice, and nothing else: every other page is the game itself,
 // the same empty page until it starts, or something of one player's or one game's (a duel, a profile), so those say "noindex". The API is closed to them. Both files carry the site's own address, so they're
@@ -478,8 +493,10 @@ func serveFile(w http.ResponseWriter, r *http.Request, fsys fs.FS, name string) 
 		http.NotFound(w, r)
 		return
 	}
-	if _, err := fs.Stat(fsys, name); err != nil {
-		w.Header().Del("Cache-Control")
+	// A folder is no file (/assets/ lists nothing), and a miss is never kept by a cache between: a file missing now (a
+	// release's script asked of the one before it, around a rollback) may be there in a moment.
+	if info, err := fs.Stat(fsys, name); err != nil || info.IsDir() {
+		w.Header().Set("Cache-Control", "no-store")
 		http.NotFound(w, r)
 		return
 	}
