@@ -45,9 +45,6 @@ test("a streak at stake: unlit till the day lights it, pointed to from a chapter
   // A chapter's result points to the day while it waits: the gold button, the streak under it, „Още десет“ plain.
   await openGame(page, "/play/history");
   await playRun(page);
-  // A new level may come with the game, in its sheet once the result has landed: put away.
-  await page.waitForTimeout(2500);
-  await page.keyboard.press("Escape");
   const day = page.getByRole("link", { name: "Към днешния брой" });
   await expect(day).toHaveClass(/primary/);
   await expect(page.locator(".actions .day-stake")).toHaveText("С днешния брой серията ти става 4.");
@@ -68,6 +65,7 @@ test("a streak at stake: unlit till the day lights it, pointed to from a chapter
 
 test("a week's streak on Днес, and the day played: no sheet over the result, no note of it", async ({ page }) => {
   test.setTimeout(120_000);
+  await page.clock.install(); // the page's timers, run on at once instead of waited for
   await page.goto("/");
   // Six days: the seventh makes it seven; nothing is noted (DECISIONS.md, „The direction“: no notes as rewards).
   await daysPlayed(page, 6, 5, 4, 3, 2, 1);
@@ -80,7 +78,7 @@ test("a week's streak on Днес, and the day played: no sheet over the result,
   await expect(page.locator(".summary .streak-chip:not(.unlit)")).toContainText("7дни без прекъсване");
   await expect(page.locator(".summary")).not.toContainText("Отбелязано");
   // Never a sheet over the result, whatever the game was.
-  await page.waitForTimeout(1500);
+  await page.clock.runFor(1500);
   await expect(page.locator("dialog[open]")).toHaveCount(0);
 });
 

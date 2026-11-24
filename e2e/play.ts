@@ -346,9 +346,14 @@ export async function meetAs(page: Page, name?: string): Promise<void> {
 export async function befriend(a: Page, b: Page): Promise<void> {
   for (const p of [a, b]) {
     await p.goto("/friends");
+    // Not yet a player: „Добави приятел“ makes them one first. Either shows once the page has loaded, not at once
+    // (looked for at once, a slow engine had neither yet, and the field never came): looked for till one does.
     const make = p.locator(".friends").getByRole("button", { name: "Добави приятел" });
-    if (await make.count()) await make.click();
-    await expect(p.getByLabel("Потребителско име или имейл на приятел")).toBeVisible();
+    const field = p.getByLabel("Потребителско име или имейл на приятел");
+    await expect(async () => {
+      if (await make.isVisible()) await make.click({ timeout: 1000 });
+      await expect(field).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 10_000 });
   }
   await playedBefore(b, 1);
   const tag = await a.evaluate(async () => (await (await fetch("/api/me")).json()).user.tag as string);

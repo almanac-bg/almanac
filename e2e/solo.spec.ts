@@ -171,13 +171,14 @@ test("a chapter, ten questions, a question reported, and ten more", async ({ pag
   await expect(page.locator(".question-head")).toContainText("1 от 10");
 });
 test("a chapter's count can be backed out of, or cut short", async ({ page }) => {
+  await page.clock.install(); // the page's timers, run on at once instead of waited for
   await page.goto("/almanac/history");
   await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await page.getByRole("button", { name: "Отказ", exact: true }).click();
   await expect(page).toHaveURL(/\/almanac\/history$/);
-  // Nothing started behind it.
-  await page.waitForTimeout(3500);
+  // Nothing started behind it, past the count's three seconds.
+  await page.clock.runFor(3500);
   await expect(page).toHaveURL(/\/almanac\/history$/);
 
   await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
@@ -191,14 +192,15 @@ test("a chapter's count can be backed out of, or cut short", async ({ page }) =>
 });
 
 test("the day's count can be backed out of, and nothing starts; let run, it starts by itself", async ({ page }) => {
+  await page.clock.install(); // the page's timers, run on at once instead of waited for
   await page.goto("/");
   const day = page.locator(".issue");
   await page.getByRole("button", { name: "Започни", exact: true }).click();
   await expect(page.locator(".get-ready .kicker")).toHaveText("Днешният брой");
   await page.getByRole("button", { name: "Отказ", exact: true }).click();
   await expect(day).toContainText("Десет въпроса за днес");
-  // Nothing started behind it: the day is still unplayed, after a reload too.
-  await page.waitForTimeout(3500);
+  // Nothing started behind it, past the count's three seconds: the day is still unplayed, after a reload too.
+  await page.clock.runFor(3500);
   await expect(page.locator(".question-head")).toHaveCount(0);
   await page.reload();
   const go = page.locator(".today").getByRole("button", { name: "Започни", exact: true });
@@ -216,6 +218,7 @@ test("the day's count can be backed out of, and nothing starts; let run, it star
 
 test("the day left after its third question waits on Днес, and goes on from the fourth", async ({ page }) => {
   test.setTimeout(120_000);
+  await page.clock.install(); // the page's timers, run on at once instead of waited for
   await page.goto("/");
   await startDay(page);
   for (let n = 0; n < 3; n++) {
@@ -231,7 +234,7 @@ test("the day left after its third question waits on Днес, and goes on from 
   await expect(day.locator(".tiles .tile:is(.right, .near, .wrong)")).toHaveCount(3);
   await expect(page.locator(".places-foot")).toBeVisible();
   // The card waits: no question's time starts behind it, a reload included.
-  await page.waitForTimeout(4000);
+  await page.clock.runFor(4000);
   await page.reload();
   await expect(page.locator(".issue")).toContainText("Следва въпрос 4 от 10.");
   await startDay(page, "Продължи");

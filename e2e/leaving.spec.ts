@@ -72,13 +72,14 @@ test("a chapter counts in only after a tap; a reload goes back to its question, 
   page,
 }) => {
   test.setTimeout(120_000);
+  await page.clock.install(); // the page's timers, run on at once instead of waited for
   await page.goto("/almanac/history");
   await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
-  // A reload in the count starts nothing: the chapter waits for „Започни“.
+  // A reload in the count starts nothing: the chapter waits for „Започни“, past the count's three seconds too.
   await page.reload();
   await expect(page.getByRole("button", { name: "Започни", exact: true })).toBeVisible();
-  await page.waitForTimeout(3500);
+  await page.clock.runFor(3500);
   await expect(page.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
   await page.getByRole("button", { name: "Започни", exact: true }).click();
   await page.getByRole("button", { name: "Веднага" }).click();
@@ -92,7 +93,9 @@ test("a chapter counts in only after a tap; a reload goes back to its question, 
         .textContent()
         .then((t) => (t ?? "").replace(/\D/g, "")),
     );
-  await page.waitForTimeout(2000);
+  // Some of its time gone first (a second less shown), so that a reload that gave it all back would show more.
+  const full = await secsLeft();
+  await expect.poll(secsLeft).toBeLessThan(full);
   const before = await secsLeft();
   await page.reload();
   await expect(page.locator(".question-head")).toContainText("1 от 10");
@@ -182,9 +185,10 @@ test("the ways back pop the history; back comes to a page and its board where th
   // in view), and be kept where it moved to.
   await expect(page.locator(".me-seals")).toBeVisible();
   await page.evaluate(() => scrollTo(0, 200));
-  await page.waitForTimeout(400); // kept once it stops
   const y = await page.evaluate(() => scrollY);
   expect(y).toBeGreaterThan(0);
+  // Kept in its entry once it stops (router.ts).
+  await expect.poll(() => page.evaluate(() => history.state?.y)).toBe(y);
   await page.goBack();
   await expect(page).toHaveURL(/\/friends$/);
   await page.goForward();
@@ -231,8 +235,11 @@ test("a game's page left before it's ready holds nothing over the page come to",
   await expect(page).toHaveURL(/\/play\/history$/);
   await page.goBack();
   await expect(page).toHaveURL(/\/almanac\/history$/);
+  const answered = page.waitForResponse("**/api/runs/left");
   free();
-  await page.waitForTimeout(1000);
+  // Its answer read, and what it would have started drawn: a frame or two after.
+  await (await answered).finished();
+  await page.evaluate(() => new Promise((on) => requestAnimationFrame(() => requestAnimationFrame(on))));
   // The chapter's count never came: no game's entry over Днес, and the header and the places are there.
   expect(await page.evaluate(() => history.state?.game)).toBeUndefined();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
