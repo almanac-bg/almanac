@@ -222,7 +222,15 @@ func (g *Game) dayCrowd(ctx context.Context, db querier, day string, q bank.Ques
 	key := day + " " + id
 	k, lead, recount := g.dayCrowds.look(key, version, now)
 	if lead {
-		c, n, err := g.countDayCrowd(context.WithoutCancel(ctx), g.DB.Read, day, q, 0)
+		// A count that panics is a count that failed: those waiting for it go on, and the next answer counts it again.
+		var c *bank.Crowd
+		var n int
+		var err error
+		if !safe.Do("counting a day's crowd", func() {
+			c, n, err = g.countDayCrowd(context.WithoutCancel(ctx), g.DB.Read, day, q, 0)
+		}) {
+			err = errCountBroke
+		}
 		if err != nil {
 			slog.Warn("counting a day's crowd", "question", id, "err", err)
 		}
