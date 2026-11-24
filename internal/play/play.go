@@ -638,7 +638,7 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 		if res.Ink, err = g.record(tx, r, gr, number, min(took, limit).Milliseconds()); err != nil {
 			return err
 		}
-		if err := g.countByLink(ctx, tx, r); err != nil {
+		if err := g.markByLink(ctx, tx, r); err != nil {
 			return err
 		}
 		res.Score, res.Right, res.Exact, res.Given = gr.Score, gr.Right, gr.Exact, gr.Shown

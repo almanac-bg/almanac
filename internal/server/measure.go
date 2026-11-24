@@ -11,8 +11,8 @@ import (
 // What /admin tells of the players: one plain table, a row a day, of how many played (people only: play.People), how
 // many of them for the first time, how many of that day's issues were shared (a link made for them: share.go), and of
 // the new, how many played again a day, a week and a month after (play.DayCounts). It's read from the days played,
-// the games and the links shared, nothing kept for it but one count a day, of the new who came by a shared link
-// (play.ByLinkDays: no more than the number): a change is judged by whether players come back (DECISIONS.md,
+// the games and the links shared, nothing kept for it but a mark on a player's first game that it was played by a
+// shared link (not whose: play.Activity counts the new whose first game it is): a change is judged by whether players come back (DECISIONS.md,
 // „The rule for later“), and the bet that the share brings players is read as the new beside the days shared.
 
 // AdminDays is how many days /admin's table shows, today with them.
@@ -38,13 +38,9 @@ func (s *Server) dayRows(ctx context.Context) ([]dayRow, error) {
 	if err != nil {
 		return nil, err
 	}
-	byLink, err := s.game.ByLinkDays(ctx, from)
-	if err != nil {
-		return nil, err
-	}
 	var rows []dayRow
 	for _, c := range act.DayCounts() {
-		r := dayRow{Day: short(c.Day), Played: c.Played, New: c.New, Shared: shared[c.Day], ByLink: byLink[c.Day]}
+		r := dayRow{Day: short(c.Day), Played: c.Played, New: c.New, Shared: shared[c.Day], ByLink: c.ByLink}
 		for k := range play.Backs {
 			r.Back[k] = "—"
 			if c.Due[k] && c.New > 0 {

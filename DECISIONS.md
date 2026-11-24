@@ -112,9 +112,10 @@ packages' doc comments; this file holds only what must not drift.
     piece of others' news on Днес: a duel waits on the player, and asks for the same few minutes the day does.
   - **Friends** are added by username or email, a request the other says yes to, or from a day someone shared with
     you (owner, 2026-11-24): having played that day by its link, a player with no friends yet has on the board's
-    Приятели one action, „Покани човека, който ти прати връзката“, an ordinary request to whoever shared it, within
-    the request's limits and at most 20 by one link; they see it with the link's issue, and its sender learns who it
-    was only if they say yes. The share was the one way a new person came, and it left them with no friends, so the
+    Приятели one action, „Покани човека, който ти прати връзката“, a request to whoever shared it, within the
+    request's limits and from at most 20 people by one link; they see it with the link's issue, and its sender learns
+    who it was only if they say yes: nothing they can see or do tells them before, whatever username they guess (a
+    request by a link stands apart from one by username, and a no to it leaves it waiting on the sender's side). The share was the one way a new person came, and it left them with no friends, so the
     friends' board, duels and the push naming a friend never began for them; this rides on the link already shared,
     with no new link, page or noun. The personal invite link was removed (21 Nov): little use, much machinery, a
     separate link to make and send.
@@ -157,9 +158,10 @@ packages' doc comments; this file holds only what must not drift.
   - **The bets,** each read from what the game keeps anyway (runs, facts, duels, shares), by a query when it's asked,
     never by new tracking, but for one count: that ink from the issue alone is enough progress (D30 of the players
     whose games are only the day's); that the share brings players (new players beside the days shared, and of them
-    „Нови по връзка“, day by day). That one count (owner, 2026-11-24) is a number a day, of new players whose first
-    game, the day's issue played as a person plays, began on a page opened by a shared link, kept with nothing of who
-    (privacy.go says so): without it, a day the share brought players can't be told from a day a mention or a search
+    „Нови по връзка“, day by day). That one count (owner, 2026-11-24) is of the new players whose first game, the day's
+    issue played as a person plays, began on a page opened by a shared link: a mark on that game alone, that it came by
+    a link and not whose (privacy.go says so), counted as /admin draws, so a guest who signs in to an older account,
+    not new after all, drops out of it as out of „Нови“ (a count a day kept apart couldn't). Without it, a day the share brought players can't be told from a day a mention or a search
     did, and the bet that justifies sharing can't be read.
   The decisions below that this replaces are gone from this file.
 - **The day's ten questions are the heart;** everything else serves them or stays out of the way. A new system replaces

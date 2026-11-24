@@ -49,18 +49,19 @@ func dayBoundsJSON(from, to string) string {
 const boundsCTE = `b(day, s, e) AS (SELECT json_extract(value, '$[0]'), json_extract(value, '$[1]'),
 	json_extract(value, '$[2]') FROM json_each(?1))`
 
-// Activity is who played on which days from From to Today (both in), people only (personDay), and who had played
-// before From.
+// Activity is who played on which days from From to Today (both in), people only (personDay), who had played
+// before From, and whose first game was played by a shared link (markByLink).
 type Activity struct {
 	From, Today string
 	played      map[int64][]bool // by player, a day each from From
 	before      map[int64]bool
+	byLink      map[int64]bool
 }
 
 // Activity reads the days people played from `from` to today.
 func (g *Game) Activity(ctx context.Context, from string) (*Activity, error) {
 	today := g.Today()
-	a := &Activity{From: from, Today: today, played: map[int64][]bool{}, before: map[int64]bool{}}
+	a := &Activity{From: from, Today: today, played: map[int64][]bool{}, before: map[int64]bool{}, byLink: map[int64]bool{}}
 	n := daysBetween(from, today) + 1
 	if n <= 0 {
 		return a, nil
@@ -101,13 +102,39 @@ func (g *Game) Activity(ctx context.Context, from string) (*Activity, error) {
 	if err != nil {
 		return nil, err
 	}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		a.before[id] = true
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// Of the new (who hadn't played before From), whose first game, as it stands (a guest's games brought to an older
+	// account come after the account's), was played by a shared link.
+	ids = ids[:0]
+	for id := range a.played {
+		if !a.before[id] {
+			ids = append(ids, id)
+		}
+	}
+	who, _ = json.Marshal(ids)
+	rows, err = g.DB.Read.QueryContext(ctx, `SELECT value FROM json_each(?) j WHERE EXISTS (SELECT 1 FROM runs_by_link
+		WHERE run_id = (SELECT id FROM runs WHERE user_id = j.value ORDER BY started_at, id LIMIT 1))`, string(who))
+	if err != nil {
+		return nil, err
+	}
 	defer rows.Close()
 	for rows.Next() {
 		var id int64
 		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
-		a.before[id] = true
+		a.byLink[id] = true
 	}
 	return a, rows.Err()
 }
@@ -128,13 +155,14 @@ func (a *Activity) first(id int64) string {
 // Backs are the days after a player's first that /admin tells whether they played on again: D1, D7, D30.
 var Backs = [3]int{1, 7, 30}
 
-// DayCount is a day of /admin's table: how many played on it, how many of them for the first time, and of those new,
-// how many played again on each of the days Backs after it (Due: whether that day is over yet).
+// DayCount is a day of /admin's table: how many played on it, how many of them for the first time, of those new how
+// many came by a shared link (their first game played by one: markByLink), and how many played again on each of the
+// days Backs after it (Due: whether that day is over yet).
 type DayCount struct {
-	Day         string
-	Played, New int
-	Back        [3]int
-	Due         [3]bool
+	Day                 string
+	Played, New, ByLink int
+	Back                [3]int
+	Due                 [3]bool
 }
 
 // DayCounts are the counts of the days the Activity read, newest first: today, under way, with them. A player is new on
@@ -160,6 +188,9 @@ func (a *Activity) DayCounts() []DayCount {
 				continue
 			}
 			c.New++
+			if a.byLink[id] {
+				c.ByLink++
+			}
 			for k, after := range Backs {
 				if d+after < len(days) && days[d+after] {
 					c.Back[k]++

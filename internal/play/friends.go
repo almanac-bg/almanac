@@ -82,14 +82,9 @@ type Sent struct {
 
 // Request asks a player to be friends: by their tag, or by an email address. An email request waits for whoever has
 // the address, or signs in with it later, and the sender learns nothing about whether anyone does. to is already a
-// normal tag or email (account.NormalTag, account.NormalEmail); byEmail says which.
+// normal tag or email (account.NormalTag, account.NormalEmail); byEmail says which. A request by a shared link
+// (AskSharer) stands apart: asked by tag too, the same player has two.
 func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool) (Sent, error) {
-	return g.request(ctx, from, to, byEmail, 0)
-}
-
-// request is Request, made by the shared link of the issue via (AskSharer), or (0) by the tag or the email given.
-// Asked by tag after, a request made by a link is one by tag; asked by the link after, one by tag stays so.
-func (g *Game) request(ctx context.Context, from int64, to string, byEmail bool, via int) (Sent, error) {
 	var mine sql.NullString // the sender's email: requests to it are to them
 	if err := g.DB.Read.QueryRowContext(ctx, `SELECT email FROM users WHERE id = ?`, from).Scan(&mine); err != nil {
 		return Sent{}, err
@@ -134,9 +129,10 @@ func (g *Game) request(ctx context.Context, from int64, to string, byEmail bool,
 				return err
 			}
 		}
+		// Waiting is one by tag: one by a link to the same player is a request apart, which says nothing of whom.
 		var n int
-		if err := tx.QueryRow(`SELECT count(*), coalesce(sum(to_id = ?2), 0) > 0 FROM friend_requests WHERE from_id = ?1`,
-			from, other).Scan(&n, &waiting); err != nil {
+		if err := tx.QueryRow(`SELECT count(*), coalesce(sum(to_id = ?2 AND via_issue IS NULL), 0) > 0
+			FROM friend_requests WHERE from_id = ?1`, from, other).Scan(&n, &waiting); err != nil {
 			return err
 		}
 		if n >= MaxRequests && !waiting {
@@ -148,9 +144,9 @@ func (g *Game) request(ctx context.Context, from int64, to string, byEmail bool,
 				ON CONFLICT (from_id, to_email) WHERE to_email IS NOT NULL DO UPDATE SET at = excluded.at`, from, to, now)
 			return err
 		}
-		_, err := tx.Exec(`INSERT INTO friend_requests (from_id, to_id, at, via_issue) VALUES (?, ?, ?, nullif(?, 0))
-			ON CONFLICT (from_id, to_id) WHERE to_id IS NOT NULL DO UPDATE SET at = excluded.at,
-				via_issue = iif(excluded.via_issue IS NULL, NULL, friend_requests.via_issue)`, from, other, now, via)
+		_, err := tx.Exec(`INSERT INTO friend_requests (from_id, to_id, at) VALUES (?, ?, ?)
+			ON CONFLICT (from_id, to_id) WHERE to_id IS NOT NULL AND via_issue IS NULL DO UPDATE SET at = excluded.at`,
+			from, other, now)
 		return err
 	})
 	if err == nil && crossed {
@@ -176,7 +172,8 @@ type FriendRequest struct {
 	Email string `json:"email,omitempty"`
 	Look  *Look  `json:"look,omitempty"`
 	// Via is the issue whose shared link the request came by (AskSharer): to the one asked, „по връзката ти от Брой
-	// 13“; to its sender, it stands in for whom it went to, who stays unnamed unless they say yes.
+	// 13“; to its sender, it stands in for whom it went to, who stays unnamed unless they say yes (a request apart from
+	// one by tag to the same player, which names them).
 	Via int `json:"via,omitempty"`
 }
 
@@ -248,12 +245,14 @@ func (g *Game) Accept(ctx context.Context, userID, requestID int64) (name string
 // Withdraw drops a friend request: its sender calls it off, or the one asked says no (the sender isn't told). A no to
 // a request by email leaves it waiting in its sender's list until it runs out (account.EmailRequestDays), as one to an
 // address without a player does: had it gone at once, the sender would know the address has one (review 2026-11-18,
-// S29). The one asked sees it no more.
+// S29). So does a no to one by a shared link, until its sender calls it off: had it gone, with one by tag to the same
+// player gone at the same time, the sender would know whose the link was (AskSharer). The one asked sees it no more.
 func (g *Game) Withdraw(ctx context.Context, userID, requestID int64) error {
 	var n int64
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		res, err := tx.Exec(`UPDATE friend_requests SET declined = 1 WHERE id = ?1 AND from_id <> ?2 AND NOT declined
-			AND to_email = (SELECT email FROM users WHERE id = ?2)`, requestID, userID)
+			AND (to_email = (SELECT email FROM users WHERE id = ?2) OR (to_id = ?2 AND via_issue IS NOT NULL))`,
+			requestID, userID)
 		if err != nil {
 			return err
 		}

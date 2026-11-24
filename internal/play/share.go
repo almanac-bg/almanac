@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/almanac-bg/almanac/internal/store"
 )
 
 // Sharing the day's result (DECISIONS.md, „The direction“): the score and its shape, never the answers, with a way
@@ -17,7 +19,7 @@ import (
 // their links with them, and a guest's day that a sign-in drops (merge.go) its link. Opened (Shared), a link tells
 // the day, its issue and the shape (how each of the ten went), never an answer, nor whose it was. Whoever played the day
 // by it may ask its owner to be friends, still without learning who it is unless they say yes (AskSharer); and a new
-// player whose first game was played by one is counted, a number a day and nothing of who (countByLink).
+// player whose first game was played by one is marked so, and nothing of whose (markByLink), for /admin's count.
 //
 // The text shared is Share.Text; the picture a link shows where it's sent, internal/card.
 
@@ -152,28 +154,37 @@ func (g *Game) Shared(ctx context.Context, issue int, code string) (Share, error
 	return Share{Code: code, Owner: userID, Day: st.Day, Issue: issue, Shape: shapeOf(st.Trail)}, nil
 }
 
-// SharerAsks is how many friend requests one shared link may bring its owner (AskSharer): enough for the people a
-// day is shared with in a chat, few for a link posted where thousands see it.
+// SharerAsks is how many people one shared link may bring its owner friend requests from (AskSharer): enough for the
+// people a day is shared with in a chat, few for a link posted where thousands see it.
 const SharerAsks = 20
 
-// ErrSharerAsked is a shared link that has brought its owner SharerAsks requests already.
+// ErrSharerAsked is a shared link that SharerAsks people have asked its owner by already.
 var ErrSharerAsked = errors.New("the link has asked its owner enough")
 
+// ErrPlayShared is a player asking by a shared link before they've finished the day it shares.
+var ErrPlayShared = errors.New("the day shared isn't played yet")
+
 // AskSharer asks the owner of a shared day (its link: issue and code) to be friends, for a player who played that day
-// by it (DECISIONS.md, Friends): an ordinary request (Request), which the one asked sees with the link's issue, and
-// which names nobody to its sender (Requests, relation) unless they say yes. Only for whoever has finished that day's
-// issue, while it's today's or yesterday's (one finished in the grace after midnight): a link opened after its day
-// opens today's issue, another ten. A link brings its owner SharerAsks requests at most, counted as they're made
-// (shares.asked), not as they wait: a no doesn't make room for another. What it says to its sender says nothing of
-// the owner: asked of oneself, or of a friend already, or asked again, it's as if sent (Sent{}; nothing is sent to
-// oneself); a link that isn't, or isn't of a day the sender finished, ErrNoRun.
+// by it (DECISIONS.md, Friends): a friend request, which the one asked sees with the link's issue, and which names
+// nobody to its sender (Requests, relation) unless they say yes. Only while the link's day is today's, or yesterday's
+// within DayGrace (one finished in the grace after midnight): a link opened after its day opens today's issue,
+// another ten. A link that isn't, or of another day, is ErrNoRun; one whose day the sender hasn't finished,
+// ErrPlayShared. A link brings its owner requests from SharerAsks people at most, each counted once (share_asks), so a
+// no doesn't make room for another, nor does a request called off and made again take more.
+//
+// Nothing it says or does tells its sender whose the link is, whoever they guess: it's a request apart from one by
+// tag to the same player (both stand, and both show in the sender's list), held to MaxRequests as any other, made the
+// same to a friend already (who never sees it: it's made as declined), to a player who has asked the sender first (no
+// friends at once: the sender has their request to say yes to), and to anyone; asked of oneself, nothing is made, and
+// it answers as if it were.
 func (g *Game) AskSharer(ctx context.Context, from int64, issue int, code string) (Sent, error) {
 	sh, err := g.Shared(ctx, issue, code)
 	if err != nil {
 		return Sent{}, err
 	}
 	today := g.Today()
-	if sh.Day != today && sh.Day != DayShift(today, -1) {
+	if _, end := dayBounds(sh.Day); sh.Day != today &&
+		(sh.Day != DayShift(today, -1) || g.Now().After(time.UnixMilli(end).Add(DayGrace))) {
 		return Sent{}, ErrNoRun
 	}
 	var played bool
@@ -182,36 +193,50 @@ func (g *Game) AskSharer(ctx context.Context, from int64, issue int, code string
 		return Sent{}, err
 	}
 	if !played {
-		return Sent{}, ErrNoRun
+		return Sent{}, ErrPlayShared
 	}
 	if sh.Owner == from {
 		return Sent{}, nil
 	}
-	var tag string
-	if err := g.DB.Read.QueryRowContext(ctx, `SELECT tag FROM users WHERE id = ?`, sh.Owner).Scan(&tag); err != nil {
-		return Sent{}, err
-	}
-	// The link's count first, one of its SharerAsks taken, and given back should no request be made by it.
-	res, err := g.DB.Write.ExecContext(ctx, `UPDATE shares SET asked = asked + 1 WHERE code = ? AND asked < ?`,
-		code, SharerAsks)
-	if err != nil {
-		return Sent{}, err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		return Sent{}, ErrSharerAsked
-	}
-	sent, err := g.request(ctx, from, tag, false, issue)
-	if err != nil || !sent.New {
-		if _, err := g.DB.Write.ExecContext(ctx, `UPDATE shares SET asked = asked - 1 WHERE code = ? AND asked > 0`,
-			code); err != nil {
-			return Sent{}, err
+	var sent Sent
+	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		// One of the link's SharerAsks, the first time this sender asks by it.
+		if _, err := tx.Exec(`INSERT INTO share_asks (code, from_id) SELECT ?1, ?2
+			WHERE (SELECT count(*) FROM share_asks WHERE code = ?1) < ?3 ON CONFLICT DO NOTHING`,
+			code, from, SharerAsks); err != nil {
+			return err
 		}
-	}
-	if err != nil {
-		return Sent{}, err
-	}
-	// Friends already, or now (the owner had asked first): they know each other; still, nothing said of whom.
-	return Sent{New: sent.New, To: sent.To}, nil
+		var counted bool
+		if err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM share_asks WHERE code = ? AND from_id = ?)`, code, from).
+			Scan(&counted); err != nil {
+			return err
+		}
+		if !counted {
+			return ErrSharerAsked
+		}
+		var n int
+		var waiting, friends bool
+		if err := tx.QueryRow(`SELECT count(*), coalesce(sum(to_id = ?2 AND via_issue = ?3), 0) > 0,
+				EXISTS (SELECT 1 FROM friends WHERE user_id = ?1 AND friend_id = ?2)
+			FROM friend_requests WHERE from_id = ?1`, from, sh.Owner, issue).Scan(&n, &waiting, &friends); err != nil {
+			return err
+		}
+		if n >= MaxRequests && !waiting {
+			return ErrManyRequests
+		}
+		declined := 0 // to a friend already: theirs never to see
+		if friends {
+			declined = 1
+		}
+		if _, err := tx.Exec(`INSERT INTO friend_requests (from_id, to_id, at, via_issue, declined) VALUES (?, ?, ?, ?, ?)
+			ON CONFLICT (from_id, to_id, via_issue) WHERE via_issue IS NOT NULL DO UPDATE SET at = excluded.at`,
+			from, sh.Owner, store.Ms(g.Now()), issue, declined); err != nil {
+			return err
+		}
+		sent = Sent{New: !waiting && !friends, To: sh.Owner}
+		return nil
+	})
+	return sent, err
 }
 
 // linkKey keeps in a context the shared link a page was opened at (ByLink).
@@ -223,45 +248,24 @@ type link struct {
 }
 
 // ByLink is ctx with the shared day's link (its issue and code) the page that plays a game was opened at: a new
-// player's first game, finished, counts its day once in new_by_link (countByLink).
+// player's first game, finished, is marked as one played by a link (markByLink).
 func ByLink(ctx context.Context, issue int, code string) context.Context {
 	return context.WithValue(ctx, linkKey{}, link{issue, code})
 }
 
-// countByLink counts a new player who came by a shared link (/admin's „Нови по връзка“), as their first game ends: a
-// day's issue, played at a person's pace (as /admin counts people: People), by someone who isn't an admin and had no
-// game before it, on a page opened at a link (ByLink) to anyone's shared day but their own (of any day: one gone by
-// opens today's). A count a day (the game's day), nothing of who: what it keeps is the number alone. The run ends
-// once, so it's counted once.
-func (g *Game) countByLink(ctx context.Context, tx *sql.Tx, r *run) error {
+// markByLink marks a player's first game as played by a shared link (runs_by_link), as it ends: a day's issue,
+// played at a person's pace (as /admin counts people: People), by someone who had no game before it, on a page opened
+// at a link (ByLink) to anyone's shared day but their own (of any day: one gone by opens today's). That it came by a
+// link is all that's kept, not whose. /admin's „Нови по връзка“ counts the new whose first game it still is
+// (Activity): a guest who signs in to an account that played before isn't new, and isn't counted.
+func (g *Game) markByLink(ctx context.Context, tx *sql.Tx, r *run) error {
 	l, ok := ctx.Value(linkKey{}).(link)
 	if !ok || !r.finished || r.kind != "day" || r.shadow == ShadowScript || len(l.code) != CodeLength {
 		return nil
 	}
-	_, err := tx.Exec(`INSERT INTO new_by_link (day, players) SELECT ?1, 1
-		WHERE NOT EXISTS (SELECT 1 FROM runs WHERE user_id = ?2 AND id <> ?3)
-		AND NOT EXISTS (SELECT 1 FROM users WHERE id = ?2 AND admin)
-		AND EXISTS (SELECT 1 FROM shares s JOIN runs o ON o.id = s.run_id WHERE s.code = ?4 AND o.day = ?5
-			AND o.user_id <> ?2)
-		ON CONFLICT (day) DO UPDATE SET players = players + 1`, r.day, r.userID, r.id, l.code, IssueDay(l.issue))
+	_, err := tx.Exec(`INSERT OR IGNORE INTO runs_by_link (run_id) SELECT ?1
+		WHERE NOT EXISTS (SELECT 1 FROM runs WHERE user_id = ?2 AND id <> ?1)
+		AND EXISTS (SELECT 1 FROM shares s JOIN runs o ON o.id = s.run_id WHERE s.code = ?3 AND o.day = ?4
+			AND o.user_id <> ?2)`, r.id, r.userID, l.code, IssueDay(l.issue))
 	return err
-}
-
-// ByLinkDays are how many new players came by a shared link (countByLink) on each day from `from` on, by day.
-func (g *Game) ByLinkDays(ctx context.Context, from string) (map[string]int, error) {
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT day, players FROM new_by_link WHERE day >= ?`, from)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := map[string]int{}
-	for rows.Next() {
-		var day string
-		var n int
-		if err := rows.Scan(&day, &n); err != nil {
-			return nil, err
-		}
-		out[day] = n
-	}
-	return out, rows.Err()
 }
