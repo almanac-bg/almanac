@@ -198,12 +198,33 @@ This runs on the owner's own Mac, with other sessions beside you. When your work
 
 One Hetzner server (ARM) behind Cloudflare; the program runs under systemd as `almanac`, serves HTTPS itself, keeps
 SQLite in `/var/lib/almanac`, and backs it up to R2 every 15 minutes. Deploys come from CI (above). By hand, as root:
-`almanac-deploy vX.Y.Z` (also how to go back: an older version, within the same minor (`vX.Y.*`: the same migrations); to an older minor, the older version refuses the database and the deploy goes back
-to where it was, so put the copy from before that release back by hand, `/var/lib/almanac/before-vX.Y.Z.db`, with
-`systemctl stop almanac.socket almanac` first, and lose what was played since; a release is taken only signed, so
+`almanac-deploy vX.Y.Z` (also how to go back: an older version, within the same minor (`vX.Y.*`: the same migrations); to an older minor only by
+the steps below, as the older version refuses the migrated database; a release is taken only signed, so
 one from before signatures only while it's kept in `/usr/local/lib/almanac`, the five used latest), `almanac-bank` (check the new
 questions apart, then pull and reload them), `journalctl -u almanac` (logs). A bank reload and a deploy never run at
 once (they share a lock: `TestDeployAndBankShareALock`). The `almanac backup` commands need the service's settings:
 `systemd-run --pipe --wait -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac backup verify`
 brings the latest copy back and checks it (the server does this itself daily). Health: `https://almanac.bg/api/health`
 shows the live version and the bank played (its commit; one refused).
+
+Going back to an older minor (vOLD) puts the database back as it was before the migration: by hand, as root, in this
+order and no other. A copy put in beside the database's `-wal` comes out corrupt while health says `ok`, and the newer
+program, started on the copy, migrates it again.
+
+0. It loses every game played since that release: fix forward instead, unless the migration destroyed data.
+1. Before stopping anything, the older program reads the live bank, or there is no going back below the bank (it
+   says „the server would not play this bank“: fix forward):
+
+   ```bash
+   setpriv --reuid=almanac --regid=almanac --clear-groups /usr/local/lib/almanac/almanac-vOLD bank check /srv/almanac-bank
+   ```
+2. `systemctl stop almanac.socket almanac`.
+3. The database aside with its log, then the copy in its place, `before-vX.Y.Z.db` of the first release after vOLD
+   that brought a migration (the two latest are kept; older ones are in the backups):
+
+   ```bash
+   cd /var/lib/almanac && f=failed-by-hand-$(date -u +%Y%m%dT%H%M%SZ).db &&
+     mv almanac.db "$f" && { [ ! -e almanac.db-wal ] || mv almanac.db-wal "$f-wal"; } && rm -f almanac.db-shm &&
+     mv before-vX.Y.Z.db almanac.db
+   ```
+4. `almanac-deploy vOLD`: it starts the older program on the copy. Never start the socket or the service before it.

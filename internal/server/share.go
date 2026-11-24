@@ -136,8 +136,10 @@ func (c *cards) draw(ctx context.Context, name string, of card.Card) ([]byte, er
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
-	b, err := card.Draw(of)
-	<-c.turns
+	b, err := func() ([]byte, error) {
+		defer func() { <-c.turns }() // the turn given back however the drawing ends, a panic in it included
+		return card.Draw(of)
+	}()
 	if err != nil {
 		return nil, err
 	}

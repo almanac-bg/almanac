@@ -142,11 +142,24 @@ func TestBackupsAside(t *testing.T) {
 	}
 	t.Setenv("DB_PATH", path)
 
-	// Back in place: the newest copy, opened with the key; the database it replaces is kept aside.
+	// Back in place: the newest copy, opened with the key; the database it replaces is kept aside with its log, which
+	// holds its last write (the files as a server killed rather than stopped leaves them), and no log is replayed onto
+	// the copy.
 	if _, err := db.Write.Exec(`INSERT INTO users (name, tag, created_at, seen_at) VALUES ('Ти', 'ti', 1, 1)`); err != nil {
 		t.Fatal(err)
 	}
+	beside := map[string][]byte{}
+	for _, f := range []string{path, path + "-wal", path + "-shm"} {
+		if beside[f], err = os.ReadFile(f); err != nil {
+			t.Fatal(err)
+		}
+	}
 	db.Close()
+	for f, b := range beside {
+		if err := os.WriteFile(f, b, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
 	ids, err := age.ParseIdentities(strings.NewReader(secret))
 	if err != nil {
 		t.Fatal(err)
@@ -165,8 +178,24 @@ func TestBackupsAside(t *testing.T) {
 	if _, err := os.Stat(path + ".restoring"); err == nil {
 		t.Fatal("left the copy beside it")
 	}
-	if err := restoreInPlace(t.Context(), s, key, path, backup.Opening{IDs: ids}, key); err != nil {
+	// As README's line runs it: the secret key on the input, and the copy's name typed back with -confirm, before the
+	// name (the flags stop at it), as `systemd-run --pipe` gives no terminal to ask on.
+	keyFile := filepath.Join(t.TempDir(), "key.txt")
+	if err := os.WriteFile(keyFile, []byte(secret+"\n"), 0o600); err != nil {
 		t.Fatal(err)
+	}
+	stdin := os.Stdin
+	t.Cleanup(func() { os.Stdin = stdin })
+	if os.Stdin, err = os.Open(keyFile); err != nil {
+		t.Fatal(err)
+	}
+	if err := run([]string{"backup", "restore", "-identity", "-", "-into-place", "-confirm", key, key}); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{path + "-wal", path + "-shm"} {
+		if _, err := os.Stat(f); err == nil {
+			t.Fatalf("%s left beside the copy put in place", f)
+		}
 	}
 	back, err := store.Open(path)
 	if err != nil {
@@ -177,8 +206,20 @@ func TestBackupsAside(t *testing.T) {
 	if err := back.Read.QueryRow(`SELECT count(*) FROM users`).Scan(&n); err != nil || n != 1 {
 		t.Fatalf("players %d %v", n, err)
 	}
-	if kept, _ := filepath.Glob(filepath.Join(dir, "replaced-*.db")); len(kept) != 1 {
+	kept, _ := filepath.Glob(filepath.Join(dir, "replaced-*.db"))
+	if len(kept) != 1 {
 		t.Fatalf("kept %v", kept)
+	}
+	if _, err := os.Stat(kept[0] + "-wal"); err != nil {
+		t.Fatalf("the replaced database's log: %v", err)
+	}
+	replaced, err := store.OpenReadOnly(kept[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer replaced.Close()
+	if err := replaced.Read.QueryRow(`SELECT count(*) FROM users`).Scan(&n); err != nil || n != 2 {
+		t.Fatalf("the replaced database holds %d players, %v", n, err)
 	}
 	if left, _ := filepath.Glob(filepath.Join(dir, "almanac.db.*")); len(left) > 0 {
 		t.Fatalf("left %v", left)

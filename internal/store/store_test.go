@@ -14,6 +14,8 @@ import (
 	"testing"
 	"testing/fstest"
 	"time"
+
+	"github.com/almanac-bg/almanac/internal/safe"
 )
 
 func TestOpenMigratesAndReopens(t *testing.T) {
@@ -313,6 +315,82 @@ func TestTxWithAnEndedContext(t *testing.T) {
 	_ = db.Read.QueryRow(`SELECT count(*) FROM users`).Scan(&n)
 	if !errors.Is(err, context.Canceled) || strings.Contains(err.Error(), "already been committed") || n != 0 {
 		t.Fatalf("err %v, %d users", err, n)
+	}
+}
+
+// A panic inside a transaction, stopped further up (safe, a request's recovery), lets go of the one write
+// connection: the next write goes through at once, though the panicked transaction's context never ends.
+func TestTxLetsGoOnAPanic(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "game.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	stopped := !safe.Do("a test's panic in a transaction", func() {
+		_ = db.Tx(context.Background(), func(tx *sql.Tx) error {
+			if _, err := tx.Exec(`INSERT INTO users (name, tag, created_at, seen_at) VALUES ('А', 'abc', 1, 1)`); err != nil {
+				return err
+			}
+			var m map[string]int
+			m["a bug"]++ // a runtime panic, as a real bug makes
+			return nil
+		})
+	})
+	if !stopped {
+		t.Fatal("the panic wasn't stopped")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	err = db.Tx(ctx, func(tx *sql.Tx) error {
+		_, err := tx.Exec(`INSERT INTO users (name, tag, created_at, seen_at) VALUES ('Б', 'abd', 1, 1)`)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("a write after the panic: %v", err)
+	}
+	var names string
+	_ = db.Read.QueryRow(`SELECT group_concat(name) FROM users`).Scan(&names)
+	if names != "Б" {
+		t.Fatalf("users %q: the panicked transaction's write was kept, or the next one lost", names)
+	}
+}
+
+// A database closed cleanly is one whole file: the write-ahead log checkpointed into it and gone, though the read
+// pools had connections open, so that a copy put in its place later is never read with this one's log.
+func TestCloseLeavesNoLog(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "game.db")
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Write.Exec(`INSERT INTO users (name, tag, created_at, seen_at) VALUES ('А', 'abc', 1, 1)`); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	for _, pool := range []*sql.DB{db.Read, db.Scan} {
+		if err := pool.QueryRow(`SELECT count(*) FROM users`).Scan(&n); err != nil || n != 1 {
+			t.Fatalf("read %d users, %v", n, err)
+		}
+	}
+	if _, err := os.Stat(path + "-wal"); err != nil {
+		t.Fatalf("no log while open (%v): the test shows nothing", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, companion := range []string{"-wal", "-shm"} {
+		if _, err := os.Stat(path + companion); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("%s left beside the database after Close (%v)", companion, err)
+		}
+	}
+	// The file alone holds the write.
+	alone, err := OpenReadOnly(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer alone.Close()
+	if err := alone.Read.QueryRow(`SELECT count(*) FROM users`).Scan(&n); err != nil || n != 1 {
+		t.Fatalf("the file alone holds %d users, %v", n, err)
 	}
 }
 
