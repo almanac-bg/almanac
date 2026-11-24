@@ -1,5 +1,6 @@
-# Every pull request and push to main: the server's tests (with the race detector), the client's types, lint and
-# tests, and both builds (the client under its size ceiling) — a couple of minutes, all a pull request waits for.
+# Every pull request and push to main: the server's tests, the client's types, lint and tests, and both builds (the
+# client under its size ceiling) — a couple of minutes, all a pull request waits for. The race detector runs beside
+# them over the same tests (about eight minutes): not required, as its failure is rare and goes to main's red.
 # After a merge, on main, the game is also played in Chromium, WebKit and Firefox (about 15 minutes): it doesn't
 # hold anything up, and a failure there is fixed with the next change. Run it on a branch by hand (Actions → CI →
 # Run workflow) when a change is risky for the browsers.
@@ -21,9 +22,7 @@ jobs:
   go:
     name: Server
     runs-on: ubuntu-24.04
-    # The race detector over every package takes most of it (the SQLite driver is Go: every query is instrumented);
-    # past 10 minutes runs were cut off with every test passed.
-    timeout-minutes: 20
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -40,11 +39,32 @@ jobs:
       - run: go vet ./...
       - name: The client, under its size ceiling
         run: go run ./cmd/build
-      - run: go test -race ./...
+      - run: go test ./...
       - name: The program
         run: CGO_ENABLED=0 go build -trimpath -o almanac ./cmd/almanac
       - name: The sample bank passes its checks
         run: ./almanac bank check -sample bank/sample
+
+  # The same tests under the race detector: most of a pull request's wait when it was in Server (7 of its 8–11
+  # minutes, the audit of 2026-11-24; the SQLite driver is Go, so every query is instrumented), so a job of its own
+  # that no merge waits for. A failure here is fixed at once, like a browser test's.
+  race:
+    name: Race detector
+    runs-on: ubuntu-24.04
+    # Past 10 minutes runs were cut off with every test passed.
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: The client, which the server embeds
+        run: go run ./cmd/build
+      - run: go test -race ./...
 
   # Known vulnerabilities in what the program calls, Go's own library included: a fix is a newer Go in go.mod
   # (setup-go installs exactly that one) or a newer module. A job of its own, beside the tests, not after them.
@@ -79,10 +99,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts
-      - name: Types
-        run: npx tsc -p web && npx tsc -p e2e
-      - name: Lint and format
-        run: npx biome ci .
+      # Types, lint and format, a warning failing as an error: the same check the release's gate runs.
+      - run: npm run check
       - run: npm test
 
   # One job per engine, side by side: all three in one job outgrew its time, so every run was cut off before it said

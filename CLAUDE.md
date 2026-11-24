@@ -62,8 +62,8 @@ A review or a look at a screen is of a game played for a while, not only of a ne
 database (then `serve` it with the same `DB_PATH`) and be its personas, a new guest to a long-time player (each one's `sid`
 cookie, or `-state`'s Playwright storage state per persona).
 
-CI runs the race detector on everything (`go test -race ./...`, a minute or two); locally run it where goroutines
-meet (`server`, or `play` when you touch its locks), not on everything: the SQLite driver is
+CI runs the race detector on everything (`go test -race ./...`, about eight minutes, in a job no merge waits for);
+locally run it where goroutines meet (`server`, or `play` when you touch its locks), not on everything: the SQLite driver is
 Go, so under the detector every query is instrumented, and the whole tree takes minutes instead of seconds. A test gets
 its database from `storetest.Open(t)` (migrated once per test program, copied) and the sample bank from
 `banktest.Sample(t)` (shared: a test that changes questions loads its own with `bank.Load`).
