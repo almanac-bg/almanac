@@ -100,7 +100,7 @@ func TestLateRebuildRefused(t *testing.T) {
 	}
 	migrations = set
 	path := filepath.Join(t.TempDir(), "game.db")
-	db, err := Open(path)
+	db, err := OpenMigrating(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestLateRebuildRefused(t *testing.T) {
 	db.Close()
 	set["migrations/0002_check.sql"] = &fstest.MapFile{Data: []byte(rebuildT)}
 	set["migrations/0004_u.sql"] = &fstest.MapFile{Data: []byte(`CREATE TABLE u (x INTEGER);`)}
-	_, err = Open(path)
+	_, err = OpenMigrating(path)
 	if err == nil || !strings.Contains(err.Error(), "0002_check.sql arrive after 0003_add.sql") ||
 		!strings.Contains(err.Error(), "column t.y") || !strings.Contains(err.Error(), "Nothing is applied") {
 		t.Fatalf("opened with a late rebuild that loses a column: %v", err)
@@ -129,7 +129,7 @@ func TestLateRebuildRefused(t *testing.T) {
 	// Kept as it is but given a number after 0003's, it would lose y in a new database too: refused there, at once.
 	delete(set, "migrations/0002_check.sql")
 	set["migrations/0005_check.sql"] = &fstest.MapFile{Data: []byte(rebuildT)}
-	if _, err := Open(filepath.Join(t.TempDir(), "new.db")); err == nil || !strings.Contains(err.Error(), "column t.y") {
+	if _, err := OpenMigrating(filepath.Join(t.TempDir(), "new.db")); err == nil || !strings.Contains(err.Error(), "column t.y") {
 		t.Fatalf("a new database lost a column: %v", err)
 	}
 	// A rebuild can't hold both before and after a column is added: it's moved after 0003, and keeps y.
@@ -139,7 +139,7 @@ INSERT INTO t_new (x, y) SELECT x, y FROM t;
 DROP TABLE t;
 ALTER TABLE t_new RENAME TO t;
 `)}
-	db, err = Open(path)
+	db, err = OpenMigrating(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,13 +162,13 @@ func TestLateMigrationThatDiffers(t *testing.T) {
 	}
 	migrations = set
 	path := filepath.Join(t.TempDir(), "game.db")
-	db, err := Open(path)
+	db, err := OpenMigrating(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	db.Close()
 	set["migrations/0002_t_x.sql"] = &fstest.MapFile{Data: []byte(`CREATE INDEX t_x ON t (x);`)}
-	if _, err := Open(path); err == nil || !strings.Contains(err.Error(), "index t_x extra") {
+	if _, err := OpenMigrating(path); err == nil || !strings.Contains(err.Error(), "index t_x extra") {
 		t.Fatalf("opened with a late index a new database doesn't have: %v", err)
 	}
 }

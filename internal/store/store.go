@@ -1,5 +1,6 @@
-// Package store keeps the game's data in one SQLite file: opening it, bringing its schema up to date (a version that
-// brings migrations keeps a copy from before them, KeepCopy), and the few helpers every query uses. The migrations
+// Package store keeps the game's data in one SQLite file: opening it, bringing its schema up to date (the server
+// alone, OpenMigrating: a version that brings migrations keeps a copy from before them, KeepCopy; any other command
+// is refused a database with migrations still to apply, Open), and the few helpers every query uses. The migrations
 // apply in the order of their names, and are checked so that the schema comes out the same wherever they ran, whatever
 // order they landed in (migrate).
 //
@@ -64,9 +65,18 @@ const scanners = 2
 // plans by them).
 const optimizeEvery = time.Hour
 
-// Open opens (or creates) the database at path and brings its schema up to date. It refuses a database newer than
-// this program (one a later version has migrated): running old code on it could lose data.
-func Open(path string) (*DB, error) {
+// Open opens (or creates) the database at path, for anything but the server: a new database gets the whole schema,
+// but an existing one with a migration still to apply is refused, and nothing in it changed. Only the server migrates
+// one (OpenMigrating), after keeping the copy to go back to (KeepCopy): a command run while a deploy has linked the new
+// program, and the server it replaces is still up, would otherwise migrate the live database with no copy, and the
+// deploy's way back would find the old program refusing it. It refuses a database newer than this program too (one a
+// later version has migrated): running old code on it could lose data.
+func Open(path string) (*DB, error) { return open(path, false) }
+
+// OpenMigrating is Open that brings an existing database's schema up to date: the server's, after KeepCopy.
+func OpenMigrating(path string) (*DB, error) { return open(path, true) }
+
+func open(path string, migrating bool) (*DB, error) {
 	pragmas := url.Values{}
 	for _, p := range []string{
 		"journal_mode(WAL)",
@@ -112,6 +122,12 @@ func Open(path string) (*DB, error) {
 		pool.SetConnMaxLifetime(optimizeEvery)
 	}
 	db := &DB{Write: w, Read: r, Scan: scan}
+	if !migrating {
+		if err := db.noneToApply(); err != nil {
+			db.Close()
+			return nil, err
+		}
+	}
 	if err := db.migrate(); err != nil {
 		db.Close()
 		return nil, err
@@ -126,6 +142,26 @@ func Open(path string) (*DB, error) {
 	db.stop = stop
 	go safe.Loop(ctx, "store: the statistics", db.keepOptimized)
 	return db, nil
+}
+
+// noneToApply refuses a database that has had migrations and has one of this program's still to apply (Open),
+// reading it only.
+func (db *DB) noneToApply() error {
+	names, err := migrationNames()
+	if err != nil {
+		return err
+	}
+	had, err := migrationsIn(db.Write, names)
+	if err != nil || len(had) == 0 { // a new database: made whole
+		return err
+	}
+	for _, name := range names {
+		if _, ok := had[name]; !ok {
+			return fmt.Errorf("the database has migration %s still to apply: only the server applies migrations, "+
+				"after it keeps a copy to go back to (almanac serve); run this again once it has started", name)
+		}
+	}
+	return nil
 }
 
 // keepOptimized brings the statistics up to date every optimizeEvery, until Close.

@@ -20,7 +20,7 @@ import (
 
 func TestOpenMigratesAndReopens(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "game.db")
-	db, err := Open(path)
+	db, err := OpenMigrating(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestOpenMigratesAndReopens(t *testing.T) {
 	db.Close()
 
 	// Opening again applies nothing twice.
-	db, err = Open(path)
+	db, err = OpenMigrating(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestOpenReadOnly(t *testing.T) {
 	if _, err := os.Stat(path); err == nil {
 		t.Fatal("made a database to read")
 	}
-	live, err := Open(path)
+	live, err := OpenMigrating(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,15 +89,61 @@ func TestOpenReadOnly(t *testing.T) {
 
 func TestRefusesNewerDatabase(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "game.db")
-	db, err := Open(path)
+	db, err := OpenMigrating(path)
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, _ = db.Write.Exec(`INSERT INTO schema_migrations (name, applied_at) VALUES ('9999_from_the_future.sql', 1)`)
 	db.Close()
-	if _, err := Open(path); err == nil || !strings.Contains(err.Error(), "newer than this program") {
+	if _, err := OpenMigrating(path); err == nil || !strings.Contains(err.Error(), "newer than this program") {
 		t.Fatalf("opened a newer database: %v", err)
 	}
+}
+
+// Only the server migrates a database (OpenMigrating, after its copy): Open makes a new one whole, but refuses one
+// with a migration still to apply, and changes nothing in it.
+func TestOnlyTheServerMigrates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "game.db")
+	files, _ := fs.Glob(migrations, "migrations/*.sql")
+	db := openAt(t, path, len(files)-1)
+	db.Close()
+	count := func() int {
+		t.Helper()
+		ro, err := OpenReadOnly(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer ro.Close()
+		var n int
+		if err := ro.Read.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	if _, err := Open(path); err == nil || !strings.Contains(err.Error(), "still to apply") {
+		t.Fatalf("a tool opened a database with a migration to apply: %v", err)
+	}
+	if n := count(); n != len(files)-1 {
+		t.Fatalf("%d migrations after a refused open, want %d", n, len(files)-1)
+	}
+	db, err := OpenMigrating(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	if n := count(); n != len(files) {
+		t.Fatalf("%d migrations after the server's open, want %d", n, len(files))
+	}
+	db, err = Open(path)
+	if err != nil {
+		t.Fatalf("a tool on a database up to date: %v", err)
+	}
+	db.Close()
+	db, err = Open(filepath.Join(t.TempDir(), "new.db"))
+	if err != nil {
+		t.Fatalf("a new database: %v", err)
+	}
+	db.Close()
 }
 
 // A database migrated before names were kept (only user_version counts it) takes the names of the migrations it has,
@@ -125,7 +171,7 @@ func TestNamesForACountedDatabase(t *testing.T) {
 	_, _ = db.Write.Exec(`DROP TABLE schema_migrations`)
 	_, _ = db.Write.Exec(`PRAGMA user_version = 9999`)
 	db.Close()
-	if _, err := Open(path); err == nil || !strings.Contains(err.Error(), "newer than this program") {
+	if _, err := OpenMigrating(path); err == nil || !strings.Contains(err.Error(), "newer than this program") {
 		t.Fatalf("opened a newer counted database: %v", err)
 	}
 }
@@ -139,7 +185,7 @@ func TestMigrationsWithTheSameNumber(t *testing.T) {
 		"migrations/0002_b.sql": {Data: []byte(`CREATE TABLE b (x INTEGER);`)},
 	}
 	migrations = set
-	db, err := Open(filepath.Join(t.TempDir(), "game.db"))
+	db, err := OpenMigrating(filepath.Join(t.TempDir(), "game.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +213,7 @@ func TestMigrationsWithTheSameNumber(t *testing.T) {
 // A burst of reads keeps its connections for the next one: none closed for want of room among the idle, none opened
 // anew (opening one reads the whole schema).
 func TestReadsKeepTheirConnections(t *testing.T) {
-	db, err := Open(filepath.Join(t.TempDir(), "game.db"))
+	db, err := OpenMigrating(filepath.Join(t.TempDir(), "game.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +252,7 @@ func TestReadsKeepTheirConnections(t *testing.T) {
 // The read pool is about as big as the cores, not a multiple of them (the driver's allocator is one lock); the long
 // reads over a whole table have a pool of their own, read-only too.
 func TestPools(t *testing.T) {
-	db, err := Open(filepath.Join(t.TempDir(), "game.db"))
+	db, err := OpenMigrating(filepath.Join(t.TempDir(), "game.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,7 +277,7 @@ func TestOpenAnalyses(t *testing.T) {
 		t.Fatal(err)
 	}
 	db.Close()
-	db, err := Open(path)
+	db, err := OpenMigrating(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +293,7 @@ func TestOpenAnalyses(t *testing.T) {
 // set will do): deleting a row there, or a guest's merge, looks for what points to it, and without one reads the
 // whole table, in the one write transaction.
 func TestForeignKeysIndexed(t *testing.T) {
-	db, err := Open(filepath.Join(t.TempDir(), "game.db"))
+	db, err := OpenMigrating(filepath.Join(t.TempDir(), "game.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -277,7 +323,7 @@ func TestForeignKeysIndexed(t *testing.T) {
 }
 
 func TestTxRollsBack(t *testing.T) {
-	db, err := Open(filepath.Join(t.TempDir(), "game.db"))
+	db, err := OpenMigrating(filepath.Join(t.TempDir(), "game.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,7 +342,7 @@ func TestTxRollsBack(t *testing.T) {
 
 // A transaction whose context ends midway (the player went away) says so, not that it's been rolled back twice.
 func TestTxWithAnEndedContext(t *testing.T) {
-	db, err := Open(filepath.Join(t.TempDir(), "game.db"))
+	db, err := OpenMigrating(filepath.Join(t.TempDir(), "game.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,7 +367,7 @@ func TestTxWithAnEndedContext(t *testing.T) {
 // A panic inside a transaction, stopped further up (safe, a request's recovery), lets go of the one write
 // connection: the next write goes through at once, though the panicked transaction's context never ends.
 func TestTxLetsGoOnAPanic(t *testing.T) {
-	db, err := Open(filepath.Join(t.TempDir(), "game.db"))
+	db, err := OpenMigrating(filepath.Join(t.TempDir(), "game.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,7 +405,7 @@ func TestTxLetsGoOnAPanic(t *testing.T) {
 // pools had connections open, so that a copy put in its place later is never read with this one's log.
 func TestCloseLeavesNoLog(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "game.db")
-	db, err := Open(path)
+	db, err := OpenMigrating(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -397,7 +443,7 @@ func TestCloseLeavesNoLog(t *testing.T) {
 // A migration that rebuilds a table keeps the rows that point to it.
 func TestRebuildKeepsWhatPointsToIt(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "game.db")
-	db, err := Open(path)
+	db, err := OpenMigrating(path)
 	if err != nil {
 		t.Fatal(err)
 	}
