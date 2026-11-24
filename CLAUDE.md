@@ -164,8 +164,9 @@ Fast is the rule: several sessions work at once, and every wait multiplies acros
   changed firewall or sshd file goes back by itself in ten minutes unless `almanac-harden confirm` comes from a new
   ssh login: `deploy/harden.sh`); until then the Deploy run is red. Nothing a player does may live in the server's memory
   alone: anything new kept there must survive a restart (the limits' counts do: `limits.go`).
-- **The browser tests run after the merge, on `main`** (about 15 minutes, all three engines). They hold nothing up;
-  if one fails, whoever sees it fixes it, at once (a session is told as it starts: `.claude/hooks/main-red.sh`).
+- **The browser tests run after the merge, on `main`** (about 10 minutes, all three engines, each in shards side by
+  side). They hold nothing up; if one fails, whoever sees it fixes it, at once (a session is told as it starts:
+  `.claude/hooks/main-red.sh`).
   Before opening a PR, run only the specs your change touches, in Chromium:
   `npx playwright test -c e2e --project=chromium e2e/<spec>`. Each checkout gets its own port, so sessions
   don't stop each other's test servers.

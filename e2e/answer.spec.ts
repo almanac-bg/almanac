@@ -336,6 +336,7 @@ test("a touch of the answer's panel holds the game there, its line saying so: it
   page,
 }) => {
   test.setTimeout(60_000);
+  await page.clock.install(); // the page's timers, run on at once instead of waited for
   await page.goto("/");
   await startDay(page);
   await expect(page.locator(".question-head")).toContainText("1 от 10");
@@ -348,8 +349,10 @@ test("a touch of the answer's panel holds the game there, its line saying so: it
   await expect(label).toContainText("след малко");
   await page.locator(".after .verdict").dispatchEvent("pointerdown");
   await expect(label).toHaveText("Продължаваш с „Напред“.");
-  // Past the longest it would wait on its own (a choice's: 3 s and a fact's 9 s at most, from its beat).
-  await page.waitForTimeout(13_000);
+  // Past the longest it would wait on its own (a choice's: 3 s and a fact's 9 s at most, from its beat): it hasn't
+  // set off for the next (moving on marks the panel going at once, before the next question comes).
+  await page.clock.runFor(13_000);
+  await expect(page.locator(".after")).not.toHaveClass(/\bgoing\b/);
   await expect(page.locator(".question-head")).toContainText("1 от 10");
   await go.click();
   await expect(page.locator(".question-head")).toContainText("2 от 10", { timeout: 10_000 });

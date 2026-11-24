@@ -1,7 +1,7 @@
 # Every pull request and push to main: the server's tests, the client's types, lint and tests, and both builds (the
 # client under its size ceiling) — a couple of minutes, all a pull request waits for. The race detector runs beside
 # them over the same tests (about eight minutes): not required, as its failure is rare and goes to main's red.
-# After a merge, on main, the game is also played in Chromium, WebKit and Firefox (about 15 minutes): it doesn't
+# After a merge, on main, the game is also played in Chromium, WebKit and Firefox (about 10 minutes): it doesn't
 # hold anything up, and a failure there is fixed with the next change. Run it on a branch by hand (Actions → CI →
 # Run workflow) when a change is risky for the browsers.
 name: CI
@@ -103,17 +103,25 @@ jobs:
       - run: npm run check
       - run: npm test
 
-  # One job per engine, side by side: all three in one job outgrew its time, so every run was cut off before it said
-  # anything.
+  # Each engine in shards, side by side, each a part of the tests with a server of its own: one job per engine took
+  # 15 minutes (WebKit 25, against its 30), all three in one job was cut off before it said anything. Some 8 minutes
+  # each: WebKit, the slowest, in three, the others in two.
   browsers:
-    name: Browsers (${{ matrix.engine }})
+    name: Browsers (${{ matrix.engine }} ${{ matrix.shard }}/${{ matrix.shards }})
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        engine: [chromium, webkit, firefox]
+        include:
+          - { engine: chromium, shard: 1, shards: 2 }
+          - { engine: chromium, shard: 2, shards: 2 }
+          - { engine: webkit, shard: 1, shards: 3 }
+          - { engine: webkit, shard: 2, shards: 3 }
+          - { engine: webkit, shard: 3, shards: 3 }
+          - { engine: firefox, shard: 1, shards: 2 }
+          - { engine: firefox, shard: 2, shards: 2 }
     permissions:
       contents: read
     steps:
@@ -143,11 +151,12 @@ jobs:
       - name: The game, played in it
         env:
           ENGINE: ${{ matrix.engine }}
-        run: npx playwright test -c e2e --project="$ENGINE"
+          SHARD: ${{ matrix.shard }}/${{ matrix.shards }}
+        run: npx playwright test -c e2e --project="$ENGINE" --shard="$SHARD"
       - name: Traces of what failed
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: browser-traces-${{ matrix.engine }}
+          name: browser-traces-${{ matrix.engine }}-${{ matrix.shard }}
           path: test-results/e2e
           retention-days: 7
