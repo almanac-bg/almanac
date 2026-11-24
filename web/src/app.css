@@ -7125,6 +7125,11 @@
     flex: 1 0 auto;
   }
 
+  /* Sharing today's issue with someone who doesn't play yet, under what a request by email does: its own width. */
+  .add-friend-invite {
+    justify-self: start;
+  }
+
   .waiting li {
     display: flex;
     align-items: center;

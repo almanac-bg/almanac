@@ -205,6 +205,12 @@ test("„Вход“ is a page of its own: the form alone, back where it was com
     await expect(page.locator(".places-foot")).toBeHidden();
     await expect(page.locator(".bar-in, .bar-me")).toHaveCount(0);
   };
+  // Where the email is asked for, what's kept and why is a tap away, and back from it.
+  await page.goto("/signin");
+  await page.getByRole("link", { name: "Какво пазим и защо" }).click();
+  await expect(page).toHaveURL(/\/privacy\?from=signin$/);
+  await page.locator("a.back").click();
+  await expect(page).toHaveURL(/\/signin$/);
   // Opened by its address: back is Днес.
   await page.goto("/signin");
   await bare();

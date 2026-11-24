@@ -179,6 +179,25 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await b.getByRole("button", { name: "Добави", exact: true }).click();
   await expect(b.getByText("Поканата до Ана Петрова е изпратена.")).toBeVisible();
   await expect(b.locator(".waiting")).toContainText("Ана Петрова");
+  // By email: no letter goes, and it says so; what brings someone who doesn't play yet is today's issue and Bo's
+  // username, shared.
+  await b.getByLabel("Потребителско име или имейл на приятел").fill("not-a-player@example.com");
+  await b.getByRole("button", { name: "Добави", exact: true }).click();
+  await expect(b.getByRole("status").filter({ hasText: "Писмо не пращаме." })).toBeVisible();
+  await b.evaluate(() => {
+    const w = window as unknown as { sent: string[] };
+    w.sent = [];
+    navigator.share = async (d?: ShareData) => void w.sent.push(d?.text ?? "");
+  });
+  await b.getByRole("button", { name: "Сподели", exact: true }).click();
+  await expect
+    .poll(() => b.evaluate(() => (window as unknown as { sent: string[] }).sent))
+    .toEqual([expect.stringMatching(/^Играй днешния брой на АЛМАНАХ и ме добави: @\S+\nhttps?:\/\/\S+\/$/)]);
+  await b
+    .locator(".waiting li", { hasText: "not-a-player@example.com" })
+    .getByRole("button", { name: "Отмени" })
+    .click();
+  await expect(b.locator(".waiting")).not.toContainText("not-a-player@example.com");
   // Adding and the requests sent each a section, headed as every section of the page is.
   await expect(b.locator(".sect-head h2")).toContainText(["Добави приятел", "Изпратени покани (1)"]);
   // Its name a link as every player's name is: one rule for all of them, never underlined only in part.

@@ -22,6 +22,10 @@ import { noEmail, noEmailLine, signIn } from "./signin.ts";
 /** This page's app browser, if it's in one. */
 export const app = embedded;
 
+/** What the first results' ask to be reminded says first (by mail, mailAsk; by notification, Днес's): a newcomer from a
+ * link or a search doesn't know yet that the ten are new every day. */
+export const daily = "Всеки ден излизат нови десет.";
+
 /** What keeping the game is for, under the email's field. */
 const keepNote = "Ще ти пратим код, за да потвърдиш имейла. Така серията и Алманахът ти са с теб на всяко устройство.";
 
@@ -85,7 +89,8 @@ export interface MailPrefs {
  * profile, by the notice as `signedIn` draws the page again as theirs (none: in place). `no`: a „Не сега“ under it
  * (Днес's ask); `folded`: the guest's form a tap away (Настройки, where the profile's own is further down);
  * `turning`: told as it's being turned on (before a guest's email is set as theirs); `yes`: told once it's on, with
- * the mail as it is now; `primary`: it's the page's one action (the first results'). */
+ * the mail as it is now; `primary`: it's the page's one action (the first results'), and says first that the ten are
+ * new every day (daily). */
 export function mailAsk({
   stake,
   no,
@@ -129,6 +134,8 @@ export function mailAsk({
     h(
       "p",
       { class: "muted" },
+      // On the first results, first what a newcomer may not know yet: the ten are new every day.
+      primary ? `${daily} ` : null,
       // The address broken after its @ or before a dot, never at any letter (twice the text on a narrow phone).
       to ? ["Да ти пишем на ", emailWords(to), ", ако"] : "Да ти пишем, ако",
       " броят още те чака? Веднъж на ден, около часа, в който играеш.",

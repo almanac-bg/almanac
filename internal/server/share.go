@@ -61,8 +61,10 @@ func (s *Server) sitePicture(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Нещо се обърка при нас. Опитай пак след малко.", http.StatusInternalServerError)
 		return
 	}
+	// Its address names no version, but it changes only with a release that redraws it, and a day late is harmless:
+	// previewers ask for it with every link to the site.
 	if w.Header().Get("Cache-Control") == "" {
-		w.Header().Set("Cache-Control", "public, max-age=3600")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
 	}
 	w.Header().Set("Content-Type", "image/png")
 	http.ServeContent(w, r, "", time.Time{}, bytes.NewReader(b))

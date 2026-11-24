@@ -43,6 +43,7 @@ let {
   who,
   inSight,
   playerRow,
+  shareWordsOut,
 } = {} as Kit;
 
 interface Friend {
@@ -103,6 +104,7 @@ export function friends(kit: Kit): Child {
     who,
     inSight,
     playerRow,
+    shareWordsOut,
   } = kit);
   title("Приятели");
   // Opened: what has come here is seen, on every device, and the dot on Приятели goes.
@@ -392,11 +394,22 @@ function page(kit: Kit): Child {
 }
 
 /** Asking someone to be friends: by their tag (@tag) or their email, on a line, „Добави“ beside it; under it, the
- * player's own tag, for a friend to add them by. */
+ * player's own tag, for a friend to add them by. A request by email is seen only by a player with that address, in
+ * the game: no letter goes to it (privacy: one player can't have the game mail a stranger). So it says so, and offers
+ * what does bring someone who doesn't play yet: today's issue and the player's username, shared (invite). */
 function addFriend(reload: () => Promise<void>): Child {
   const to = signal("");
   const busy = signal(false);
-  const note = signal<{ text: string; bad?: boolean } | null>(null);
+  const note = signal<{ text: string; bad?: boolean; invite?: boolean } | null>(null);
+  // What came of sharing the invitation, said under it.
+  const sent = signal("");
+  const invite = async () => {
+    const tag = user.peek()?.tag;
+    const r = await shareWordsOut(
+      `${tag ? `Играй днешния брой на АЛМАНАХ и ме добави: @${tag}` : "Играй днешния брой на АЛМАНАХ"}\n${location.origin}/`,
+    );
+    sent.set(r === "copied" ? "Копирано." : typeof r === "object" ? r.text : "");
+  };
   let field: HTMLInputElement | undefined;
   return h(
     "form",
@@ -416,13 +429,17 @@ function addFriend(reload: () => Promise<void>): Child {
         try {
           const r = await api<{ friends?: boolean; name?: string }>("POST", "/api/friends/requests", { to: who });
           const byEmail = who.includes("@") && !who.startsWith("@");
-          note.set({
-            text: r.friends
-              ? `Вече сте приятели ${withWord(r.name ?? "")}.`
+          sent.set("");
+          note.set(
+            r.friends
+              ? { text: `Вече сте приятели ${withWord(r.name ?? "")}.` }
               : byEmail
-                ? "Поканата е изпратена. Ако има играч с този имейл, ще я види в играта."
-                : `Поканата до ${r.name} е изпратена.`,
-          });
+                ? {
+                    text: "Ако има играч с този имейл, ще види поканата в играта. Писмо не пращаме. Ако още не играе, сподели днешния брой и потребителското си име.",
+                    invite: true,
+                  }
+                : { text: `Поканата до ${r.name} е изпратена.` },
+          );
           to.set("");
           await reload();
         } catch (err) {
@@ -464,7 +481,14 @@ function addFriend(reload: () => Promise<void>): Child {
     },
     () => {
       const n = note();
-      return n && h("p", { class: n.bad ? "bad" : "muted", role: n.bad ? "alert" : "status", ref: inSight }, n.text);
+      if (!n) return null;
+      const said = h("p", { class: n.bad ? "bad" : "muted", role: n.bad ? "alert" : "status", ref: inSight }, n.text);
+      if (!n.invite) return said;
+      return [
+        said,
+        h("button", { class: "btn inline add-friend-invite", type: "button", onclick: invite }, "Сподели"),
+        () => sent() && h("p", { class: "muted", role: "status" }, sent()),
+      ];
     },
   );
 }

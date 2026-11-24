@@ -102,12 +102,15 @@ func TestPagesPrivate(t *testing.T) {
 }
 
 // A page of the server's own is in the game's frame: the places at a phone's foot, and on the privacy notice the way
-// back to Настройки, where it's opened from. A game put on a phone's screen has no browser's back to leave it by.
+// back to where it's opened from (Настройки, or the sign-in page), and its description for a search. A game put on a
+// phone's screen has no browser's back to leave it by.
 func TestPlainPagesFramed(t *testing.T) {
 	g := start(t)
 	for path, want := range map[string][]string{
-		"/privacy":     {`class="places-foot"`, `href="/friends"`, `<a class="back" href="/settings">`},
-		"/mail/off?t=": {`class="places-foot"`, `href="/friends"`, `<script src="/scheme.js">`},
+		"/privacy": {`class="places-foot"`, `href="/friends"`, `<a class="back" href="/settings">`,
+			`<meta name="description" content="Какво пази АЛМАНАХ`, `<link rel="canonical" href="` + g.url + `/privacy">`},
+		"/privacy?from=signin": {`<a class="back" href="/signin">`, `<link rel="canonical" href="` + g.url + `/privacy">`},
+		"/mail/off?t=":         {`class="places-foot"`, `href="/friends"`, `<script src="/scheme.js">`},
 	} {
 		res, err := http.Get(g.url + path)
 		if err != nil {

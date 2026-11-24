@@ -48,7 +48,18 @@ import {
   textWords,
   tiles,
 } from "../ui.ts";
-import { app, coverExit, exitWay, handedIn, haveProfile, keepLine, keepStake, mailAsk, takeHand } from "./keep.ts";
+import {
+  app,
+  coverExit,
+  daily,
+  exitWay,
+  handedIn,
+  haveProfile,
+  keepLine,
+  keepStake,
+  mailAsk,
+  takeHand,
+} from "./keep.ts";
 import { loadStats, type Stats } from "./stats.ts";
 
 export interface Today {
@@ -101,6 +112,10 @@ interface Shared {
   issue: number;
   shape: string;
 }
+
+/** A shared day's score in words, from its shape: „2 от 10“, never parted at a line's end. */
+const sharedWords = (shape: string) =>
+  `${[...shape].filter((c) => c === "1").length} от ${[...shape].filter((c) => c !== "3").length}`;
 
 /** The day shared by the link the page was opened at, until Днес has taken it (sharedDay). */
 let sharedIn = (boot.shared as Shared | undefined) ?? null;
@@ -344,7 +359,9 @@ export function today() {
     // lit, with today's, and nothing of the days missed, so there it's only kept as told. On an evening the streak ends at midnight without the day, the
     // streak's line says that, and what came of the days missed waits, untold, for another visit.
     const streakSaid = !run?.done && t.streak >= streakFrom && endsTonight(t) ? null : streakNotice(t);
-    if (run?.done) return result(t, run, just, notices, load);
+    // Come by that day's shared link, the score shared stays on the result, beside the player's own (played just now,
+    // or before the link was opened), for the page's life: nothing is kept of it.
+    if (run?.done) return result(t, run, just, notices, load, shared?.day === t.day ? shared : null);
     // The player's numbers (Профил's): the streak's week, the facts in the book.
     const stats = signal<Stats | null>(lastOf<Stats>("/api/me/stats") ?? null);
     if (user.peek())
@@ -433,7 +450,7 @@ function issue(t: Today, marks: Mark[], shared: Shared | null, first: boolean): 
             t.late
               ? "Десет въпроса от вчера"
               : lead
-                ? `Някой позна ${sharedMarks.filter((m) => m.right).length}\u00a0от\u00a0${sharedMarks.filter((m) => !m.void).length}. А ти?`
+                ? `Някой позна ${sharedWords(lead.shape)}. А ти?`
                 : "Десет въпроса за днес",
           ),
           at
@@ -487,7 +504,7 @@ function issueGo(start: () => void, at: number, error: string, first: boolean): 
       ? h(
           "div",
           { class: "issue-words" },
-          h("h2", null, "Едни и същи за цяла България."),
+          h("h2", null, "Нови десет всеки ден, едни и същи за цяла България."),
           h(
             "p",
             { class: "deck" },
@@ -580,7 +597,8 @@ const outOf = (s: State) => s.total - (s.void ?? 0);
 
 /** The day played, as a page, in its budget's order (DESIGN.md, The result), the HTML's order too:
  *
- *   1. the score on its sheet, the tiles, how many knew the tenth, and how all of България did on average;
+ *   1. the score on its sheet, the tiles, how many knew the tenth, how all of България did on average, and come by
+ *      the day's shared link (`shared`), the score shared („По връзката: 2 от 10“);
  *   2. what the day wrote in the book („Днес в Алманаха“: its ink, by chapter; a rank risen);
  *   3. the action: sharing it (on the first results, keeping the game and being reminded, or the way out of an app's
  *      browser, which come right under what the day wrote instead);
@@ -591,7 +609,14 @@ const outOf = (s: State) => s.total - (s.void ?? 0);
  * „Прегледай въпросите“, by a tap on the score's card, and by a tile, at its question. As it's
  * played (`just`), it lands (feel.ts) and what it brought is told; on a later visit it is as it is. A wrong game is
  * never celebrated; ten of ten is a big moment. */
-function result(t: Today, run: State, just: boolean, notices: Child[], reload: () => void): Child {
+function result(
+  t: Today,
+  run: State,
+  just: boolean,
+  notices: Child[],
+  reload: () => void,
+  shared: Shared | null = null,
+): Child {
   const fresh = signal<Today>(t);
   // The day as it stands with the game just played (its streak, its friends): until it's here, the streak with today's
   // isn't known, and the share (which says it) waits for it.
@@ -669,6 +694,7 @@ function result(t: Today, run: State, just: boolean, notices: Child[], reload: (
         const avg = fresh().board.average;
         return avg ? h("p", { class: "score-bg" }, `България днес: средно ${averageWords(avg)}`) : null;
       },
+      shared ? h("p", { class: "score-bg" }, `По връзката: ${sharedWords(shared.shape)}`) : null,
     ],
     "result-score score-leaf",
   );
@@ -1343,7 +1369,13 @@ function remindAsk(
         }),
       ];
     return [
-      h("p", { class: "muted" }, "Да ти напомняме, ако броят още те чака? Веднъж на ден, около часа, в който играеш."),
+      h(
+        "p",
+        { class: "muted" },
+        // On the first results, first that the ten are new every day (daily).
+        primary ? `${daily} ` : null,
+        "Да ти напомняме, ако броят още те чака? Веднъж на ден, около часа, в който играеш.",
+      ),
       h(
         "div",
         { class: "remind-actions" },

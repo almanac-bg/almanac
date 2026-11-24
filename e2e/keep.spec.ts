@@ -18,6 +18,7 @@ test("from the second day, where no notification comes, the reminder by mail ask
   const asks = page.locator(".asks");
   await expect(asks).toContainText("Серията ти от 2 дни е само на това устройство.");
   await expect(asks).toContainText("Да ти пишем, ако броят още те чака?");
+  await expect(asks).not.toContainText("Всеки ден излизат");
   // One ask for the email, not two.
   await expect(asks.getByRole("button", { name: "Запази я с имейл" })).toHaveCount(0);
   await asks.getByLabel("Имейл").fill(email);
@@ -120,7 +121,8 @@ test("a first day asks for the reminder only, not yet to keep the game; „Не 
   await playRun(page);
   // The first result's action, under what the day wrote in the book.
   const ask = page.locator(".result-share.result-first");
-  await expect(ask).toContainText("Да ти пишем, ако броят още те чака?");
+  // A newcomer may not know yet that the ten are new every day: said first.
+  await expect(ask).toContainText("Всеки ден излизат нови десет. Да ти пишем, ако броят още те чака?");
   await expect(ask).not.toContainText("само на това устройство");
   // Sharing stays, a quiet link beside the tiles.
   await expect(page.locator(".score-leaf .result-share-link")).toBeVisible();
