@@ -132,8 +132,8 @@ var shell = template.Must(template.New("shell").Parse(`<!doctype html>
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="bg_BG">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#f6f1e7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#121620" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f3f4fa" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e0c1d" media="(prefers-color-scheme: dark)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">

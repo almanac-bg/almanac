@@ -24,6 +24,7 @@ this file passes the rule for later (DECISIONS.md).
 - **Only what the game counts:** the score is the number right out of ten; ink per chapter, its seal; the streak.
   Nothing else adds up. A wrong game is never celebrated; a best rank rising and ten of ten are the big moments.
 - **The seal is the only ornament.** It is never the logo (the rosette's four petals).
+- **The mark has one version:** the rosette light on an ink tile, its upper left petal gold (the icons, the browser's tab, the bar by night); by day on the page its petals are ink. One gold, the game's. The icons are drawn by `internal/card/icon.go`, never by hand.
 - **Few taps; leaving asks.** Every game starts one tap from where it's offered, and only a tap starts one
   (`startScreen()`). While leaving costs something (a question's time running), every way out asks first
   (`guardLeaving()`).

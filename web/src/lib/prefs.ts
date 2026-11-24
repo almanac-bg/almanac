@@ -50,8 +50,8 @@ function readScheme(): Scheme {
 
 export const scheme = signal<Scheme>(readScheme());
 
-/** The browser's own bar (a phone's, over the page), in the page's colour: --paper's, by Day and by Night. */
-const barColour = { night: "#121620", day: "#f6f1e7" };
+/** The browser's own bar (a phone's, over the page), in the page's colour: app.css's --bg by Day and by Night (server: TestBrowserBarIsThePage). */
+const barColour = { night: "#0e0c1d", day: "#f3f4fa" };
 
 function apply(): void {
   const root = document.documentElement;
