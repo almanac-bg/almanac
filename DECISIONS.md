@@ -13,7 +13,8 @@ packages' doc comments; this file holds only what must not drift.
   short, concrete step. A session never hands a product decision back to the owner, and every decision carries its
   own reason, never "the owner said so" or "it was approved". The owner's wishes and complaints are an opinion worth
   hearing, not an order: the session weighs them, argues back when they're wrong, and adopts them only on their
-  merits. The calls below marked „owner“ stand until the session changes them, with its reason, here.
+  merits. The calls written below stand until the owner changes them (owner, 2026-11-24): a session that thinks one
+  wrong says so, and why, as the top of this file says.
 - **The owner gives a purpose; the session decides the rest** and says why in a line. A question back is only for what
   is truly the owner's: money, legal, credentials, something that can't be undone, a change to a decision below.
 - **The right shape, not a pleasing one.** Asked „ok?“, give the trade-off first: what it duplicates, what it should
