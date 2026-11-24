@@ -4,6 +4,10 @@
 # After a merge, on main, the game is also played in Chromium, WebKit and Firefox (about 10 minutes): it doesn't
 # hold anything up, and a failure there is fixed with the next change. Run it on a branch by hand (Actions → CI →
 # Run workflow) when a change is risky for the browsers.
+# Once a week, on main, the checks run by themselves (not the race detector nor the browsers, whose rare failures a
+# session meets at the next merge): in a quiet spell with no merge, a newly known vulnerability (Go's own library
+# included) or a test the calendar broke still fails, and GitHub mails a failed scheduled run to whoever last changed
+# its cron line, the owner. A pass mails nothing. GitHub stops the schedule after 60 days without a commit.
 name: CI
 
 on:
@@ -11,11 +15,13 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * 1" # Mondays, 07:17 in Bulgaria in winter
 
 permissions: {}
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name == 'schedule' && 'schedule' || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
@@ -50,6 +56,7 @@ jobs:
   # that no merge waits for. A failure here is fixed at once, like a browser test's.
   race:
     name: Race detector
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     # Past 10 minutes runs were cut off with every test passed.
     timeout-minutes: 20
@@ -109,7 +116,7 @@ jobs:
   # time: layout.spec's slow ones fall in WebKit's middle shards (in three, 5, 11 and 11 minutes).
   browsers:
     name: Browsers (${{ matrix.engine }} ${{ matrix.shard }}/${{ matrix.shards }})
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
