@@ -3,7 +3,8 @@ judge, by question, in chunks of a category, each with free ids for its replacem
 
   python3 -I worklist.py <repo> <bank> <work> [--rules R,…] [--judge J,…] [--categories C,…] [--size N]
 
---rules: only these lint rules (default: all); --judge: false-fact, easy-picture, blind (what blind.py compare
+--rules: only these lint rules (default: all); --judge: false-fact, easy-picture, sourcing (every live question dealt today without sources: the sourcing pass,
+the questions --used lists first), blind (what blind.py compare
 found), signals (what upkeep.py gathered, or an audit put in <work>/signals.json: {id: {"signals": [...]}}); default: none; --size: items a chunk (default 40). Writes
 <work>/chunks/<category>-<n>.json, and <work>/owners.json (each listed id: its chunk, so a fixer leaves another chunk's
 questions alone), and prints the chunk names, one a line. A question judged earlier in this pass (<work>/judged.json,
@@ -26,6 +27,8 @@ p.add_argument("--rules", default="")
 p.add_argument("--judge", default="")
 p.add_argument("--categories", default="")
 p.add_argument("--size", type=int, default=40)
+p.add_argument("--used", default="", help="a file of `almanac bank used`: their questions first in the sourcing pass")
+p.add_argument("--limit", type=int, default=0, help="at most this many sourcing items")
 a = p.parse_args()
 
 cats = [c["id"] for c in json.load(open(f"{a.bank}/categories.json"))]
@@ -67,6 +70,19 @@ for i, (c, q) in qs.items():
         item(i)["judge"].append("false-fact: the fact starts with what is true")
     if "easy-picture" in judge and "easy-picture" not in judged.get(i, []) and q["type"] == "choice" and q["difficulty"] == "easy" and (q.get("image") or q.get("pictures")):
         item(i)["judge"].append("easy-picture: the picture is the question, and a quarter of adults miss it")
+
+if "sourcing" in judge:
+    used = [l.strip() for l in open(a.used) if l.strip() and not l.startswith("#")] if a.used else []
+    order = [i for i in used if i in qs] + sorted(i for i in qs if i not in set(used))
+    picked = 0
+    for i in order:
+        c, q = qs[i]
+        if q.get("sources") or q["type"] == "clues" or "sourcing" in judged.get(i, []):
+            continue  # clues are off: never dealt, sourced if they come back
+        if a.limit and picked >= a.limit:
+            break
+        item(i)["judge"].append("sourcing: confirm the answer and every claim of the fact from pages you read, fix what doesn't hold, set sources")
+        picked += 1
 
 if "signals" in judge:
     for i, said in json.load(open(f"{a.work}/signals.json")).items():
