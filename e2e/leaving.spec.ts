@@ -1,7 +1,8 @@
 // Leaving a game and coming back to it: back asks while a question's time runs (the browser's back too), a game
 // starts only after a tap, a reload goes back to the question it left, and back comes to a page where it was left.
 import { expect, test } from "@playwright/test";
-import { answer, moveOn, openGame, startDay } from "./play.ts";
+import { kinds } from "./kinds.ts";
+import { answer, dealt, moveOn, openGame, startDay } from "./play.ts";
 
 const asked = "Ако излезеш сега, въпросът остава без отговор.";
 
@@ -46,6 +47,73 @@ test("Esc mid-question asks as the arrow out does, „Остани“ first; Esc
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Излез" }).click();
   await expect(page).toHaveURL(/\/almanac$/);
+});
+
+test("while it asks, keys are the ask's: none answers the question behind it, of any kind", async ({ page }) => {
+  test.setTimeout(60_000);
+  const of = (name: string) => kinds().find((k) => k.name === name)?.q.id ?? "";
+  await page.goto("/");
+  await dealt(page, "history", [of("number"), of("choice"), of("truefalse")]);
+  const sent: string[] = [];
+  page.on("request", (r) => {
+    if (r.method() === "POST" && r.url().endsWith("/answer")) sent.push(r.url());
+  });
+  await page.goto("/play/history");
+  await page.getByRole("button", { name: "Продължи", exact: true }).click();
+  await page.getByRole("button", { name: "Веднага" }).click();
+  const stay = page.getByRole("button", { name: "Остани" });
+  // Nothing went to the server, and the question still waits, its verdict unshown.
+  const unanswered = async (n: number) => {
+    await page.evaluate(() => new Promise((on) => setTimeout(on, 300)));
+    expect(sent).toEqual([]);
+    await expect(page.locator(".verdict")).toHaveCount(0);
+    await expect(page.locator(".question-head")).toContainText(`${n} от 3`);
+  };
+
+  // A number half typed, then Esc, then Enter on „Остани“: it stays, and the number is still there to send.
+  await expect(page.locator(".question-head")).toContainText("1 от 3");
+  await page.keyboard.type("42");
+  await page.keyboard.press("Escape");
+  await expect(page.getByText(asked)).toBeVisible();
+  await expect(stay).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText(asked)).toBeHidden();
+  await unanswered(1);
+  // Tab past „Излез“, out of the ask, then Enter: nothing behind it is pressed, and the focus is back on „Остани“.
+  await page.keyboard.press("Escape");
+  await expect(stay).toBeFocused();
+  const inAsk = () => page.evaluate(() => !!document.activeElement?.closest(".leave-ask"));
+  for (let i = 0; i < 3 && (await inAsk()); i++) await page.keyboard.press("Tab"); // WebKit's Tab skips buttons
+  expect(await inAsk()).toBe(false);
+  await page.keyboard.press("Enter");
+  await expect(page.getByText(asked)).toBeVisible();
+  await expect(stay).toBeFocused();
+  await unanswered(1);
+  await page.keyboard.press("Escape");
+  await expect(page.getByText(asked)).toBeHidden();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".verdict")).toBeVisible();
+  expect(sent).toHaveLength(1);
+  sent.length = 0;
+  await moveOn(page);
+
+  // A choice, and „Вярно или невярно“: „1“ with the ask up answers neither; once it's gone, „1“ answers.
+  for (const n of [2, 3]) {
+    await expect(page.locator(".question-head")).toContainText(`${n} от 3`, { timeout: 10_000 });
+    await expect(page.locator("article.question .answering")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(stay).toBeFocused();
+    await page.keyboard.press("1");
+    await expect(page.getByText(asked)).toBeVisible();
+    await unanswered(n);
+    await page.keyboard.press("Escape");
+    await expect(page.getByText(asked)).toBeHidden();
+    await page.keyboard.press("1");
+    await expect(page.locator(".verdict")).toBeVisible();
+    expect(sent).toHaveLength(1);
+    sent.length = 0;
+    if (n === 2) await moveOn(page);
+  }
 });
 
 test("the browser's back in a chapter asks, its address kept while it does; „Излез“ comes to its chapter", async ({

@@ -423,11 +423,10 @@ export function guardLeaving(
     going.set(true);
     await leave(on);
   };
-  // Esc asks too, as the game's arrow out does (a way out a keyboard has), and closes the asking again; not while a
-  // sheet of its own is open over the game (a picture shown large), which Esc closes.
+  const shown = () => asking() && (now() || going());
   const layer = h(
     "div",
-    { class: "leave-layer", hidden: () => !asking() || !(now() || going()) },
+    { class: "leave-layer", hidden: () => !shown() },
     h(
       "div",
       { class: "card leave-ask", role: "alertdialog", "aria-modal": "true", "aria-label": "Излизане от играта" },
@@ -440,11 +439,26 @@ export function guardLeaving(
       ),
     ),
   );
+  // While it asks, keys are the ask's alone: the question's own (1–4, a number's digits and Enter: questions.ts, on the
+  // document) never hear them, so Enter on „Остани“ stays and answers nothing behind it. A key from outside the ask
+  // (Tab took the focus past „Излез“) only brings the focus back to „Остани“. Esc goes on, to close it.
+  listen(
+    document,
+    "keydown",
+    (e: KeyboardEvent) => {
+      if (!shown() || e.key === "Escape") return;
+      e.stopImmediatePropagation();
+      if (layer.contains(e.target as Node) || e.metaKey || e.ctrlKey || e.altKey) return; // the browser's own keys pass
+      e.preventDefault();
+      stay.focus({ preventScroll: true });
+    },
+    { capture: true },
+  );
+  // Esc asks too, as the game's arrow out does (a way out a keyboard has), and closes the asking again.
   listen(document, "keydown", (e: KeyboardEvent) => {
     if (e.key !== "Escape" || e.repeat || e.defaultPrevented) return; // held down: once, not open-shut-open
     if (asking()) keep();
-    else if (now() && !document.querySelector("dialog[open]"))
-      layer.parentElement?.querySelector<HTMLElement>(".game-leave")?.click();
+    else if (now()) layer.parentElement?.querySelector<HTMLElement>(".game-leave")?.click();
   });
   return layer;
 }
