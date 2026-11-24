@@ -88,7 +88,7 @@ func TestSharingTheDay(t *testing.T) {
 		}
 	}
 	status, _, body := other.get(path, browserUA)
-	if status != 200 || !strings.Contains(body, fmt.Sprintf(`property="og:image" content="%s/card/%d-%s.png"`, g.url, issue, shape)) ||
+	if status != 200 || !strings.Contains(body, fmt.Sprintf(`property="og:image" content="%s/card/%d-%s.png`, g.url, issue, shape)) ||
 		!strings.Contains(body, fmt.Sprintf(`content="%d от 10 · АЛМАНАХ, Брой %d"`, rights, issue)) ||
 		!strings.Contains(body, fmt.Sprintf(`"shared":{"day":"%s","issue":%d,"shape":"%s","link":"%d-%s"}`, day, issue, shape, issue, path[len(path)-8:])) {
 		t.Fatalf("the shared day's page: %d\n%s", status, body)
@@ -128,8 +128,16 @@ func TestSharingTheDay(t *testing.T) {
 			t.Errorf("card %s: %d", name, status)
 		}
 	}
-	if m := cardName.FindStringSubmatch(cardOf(play.Share{Issue: issue, Shape: shape})[len("/card/"):]); m == nil {
-		t.Errorf("the card's own name isn't one it's served by: %s", cardOf(play.Share{Issue: issue, Shape: shape}))
+	// The card's own address, its release's (?v=) or none, is one it's served by.
+	for _, version := range []string{"", "v3.64.1"} {
+		at := cardOf(play.Share{Issue: issue, Shape: shape}, version)
+		if before, after, _ := strings.Cut(at, "?"); cardName.FindStringSubmatch(before[len("/card/"):]) == nil ||
+			(version != "" && after != "v="+version) {
+			t.Errorf("the card's own address isn't one it's served by: %s", at)
+		}
+		if status, _, _ := other.get(at, browserUA); status != 200 {
+			t.Errorf("card %s: %d", at, status)
+		}
 	}
 
 	// Past a network's budget, a card not drawn yet is the site's picture, for a preview, marked a stand-in, which the

@@ -307,7 +307,7 @@ func (s *Server) preview(r *http.Request, shared play.Share) linkPreview {
 	case shared.Code != "":
 		p.title = fmt.Sprintf("%d от %d · АЛМАНАХ, Брой %d", shared.Rights(), shared.Counted(), shared.Issue)
 		p.description = "Десет въпроса на ден, едни и същи за цяла България. Колко ще познаеш ти?"
-		p.image = cardOf(shared)
+		p.image = cardOf(shared, s.cfg.Version)
 		p.alt = fmt.Sprintf("АЛМАНАХ, Брой %d: %d от %d", shared.Issue, shared.Rights(), shared.Counted())
 	case strings.HasPrefix(path, "/players/"):
 		if tag, err := account.NormalTag(strings.TrimPrefix(path, "/players/")); err == nil {

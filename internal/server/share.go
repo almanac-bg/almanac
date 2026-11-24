@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"sync"
@@ -99,8 +100,16 @@ func (s *Server) sharedOf(r *http.Request) (play.Share, bool) {
 	return sh, err == nil
 }
 
-// cardOf is where a shared day's card is.
-func cardOf(sh play.Share) string { return fmt.Sprintf("/card/%d-%s.png", sh.Issue, sh.Shape) }
+// cardOf is where a shared day's card is, as the release that draws it names it: a card is kept a week wherever it's
+// cached (the browser, Cloudflare, the apps' previews), so a release that draws cards anew asks for them under a new
+// address (?v=, which the card's handler ignores: game/share.ts, cardPath, the same) and no old drawing is shared.
+func cardOf(sh play.Share, version string) string {
+	p := fmt.Sprintf("/card/%d-%s.png", sh.Issue, sh.Shape)
+	if version != "" {
+		p += "?v=" + url.QueryEscape(version)
+	}
+	return p
+}
 
 // cards are the cards drawn, kept by their file's name, and the turns to draw one.
 type cards struct {

@@ -7,6 +7,7 @@
 // What it looks like is the screen's: this is only what it does, for any screen to use.
 
 import { api } from "../lib/api.ts";
+import { version } from "../lib/boot.ts";
 import type { Mark } from "./types.ts";
 
 /** How sharing went: sent on (or at least the share sheet closed with a choice), copied, given up (the sheet closed
@@ -89,11 +90,12 @@ export async function shareWordsOut(text: string): Promise<Shared> {
   }
 }
 
-/** Where the day's card is (server/share.go): its issue, and how each of its ten went as play.Share.Shape spells it,
- * in the issue's order: 1 right, 2 близо, 3 one that counts for nobody, 0 not. */
-export function cardPath(issue: number, marks: Mark[]): string {
+/** Where the day's card is (server/share.go, cardOf): its issue, and how each of its ten went as play.Share.Shape
+ * spells it, in the issue's order: 1 right, 2 близо, 3 one that counts for nobody, 0 not; and the release, since a
+ * card is cached a week and a release may draw it anew. */
+export function cardPath(issue: number, marks: Mark[], release = version): string {
   const shape = marks.map((m) => (m.void ? "3" : m.right ? "1" : m.close ? "2" : "0")).join("");
-  return `/card/${issue}-${shape}.png`;
+  return `/card/${issue}-${shape}.png${release ? `?v=${encodeURIComponent(release)}` : ""}`;
 }
 
 /** The day's card (cardPath) as a file to share; null where the server didn't give it, or gave the site's picture in
