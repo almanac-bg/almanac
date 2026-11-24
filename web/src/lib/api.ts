@@ -42,6 +42,15 @@ export function lastOf<T>(path: string): T | undefined {
   return kept.get(path) as T | undefined;
 }
 
+/** Keeps `data` as the last answer to a GET of `path` (lastOf): one that came some other way (Днес's day, in its page),
+ * kept as an asked one is, and forgotten with them. The latest kept last; a few dozen at most (a book's pages and
+ * searches are many). */
+export function keepAnswer(path: string, data: unknown): void {
+  kept.delete(path);
+  kept.set(path, data);
+  if (kept.size > 40) kept.delete(kept.keys().next().value ?? "");
+}
+
 /** Forgets every answer kept (lastOf). */
 export function forget(): void {
   kept.clear();
@@ -94,12 +103,7 @@ export async function api<T>(method: "GET" | "POST" | "PATCH" | "DELETE", path: 
     reportProblem(`${method} ${path}: ${res.status} without JSON (${type}, ${text.length} characters)`);
     throw new ApiError("server", ours);
   }
-  if (method === "GET" && sentIn === era) {
-    // The latest kept last; a few dozen at most (a book's pages and searches are many).
-    kept.delete(path);
-    kept.set(path, data);
-    if (kept.size > 40) kept.delete(kept.keys().next().value ?? "");
-  }
+  if (method === "GET" && sentIn === era) keepAnswer(path, data);
   return data as T;
 }
 

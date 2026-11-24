@@ -22,7 +22,7 @@ import { land, opensReview, perfectHead, reviewSheet } from "../game/results.ts"
 import { getReady, leftLine, playRun, shownHere, starting } from "../game/run.ts";
 import { cardFile, cardPath, type SharedDay, shareCard, shareDay, shareText } from "../game/share.ts";
 import type { Board, Mark, Reviewed, Score, State } from "../game/types.ts";
-import { api, errorText, lastOf, serverNow, setIfNew } from "../lib/api.ts";
+import { api, errorText, keepAnswer, lastOf, serverNow, setIfNew } from "../lib/api.ts";
 import { boot } from "../lib/boot.ts";
 import { dayInBulgaria, hourInBulgaria } from "../lib/day.ts";
 import { type Child, h, lifetime, onCleanup, type Signal, signal, slot } from "../lib/dom.ts";
@@ -199,6 +199,8 @@ export function today() {
     }
     try {
       const t = inPage ?? (await api<Today>("GET", "/api/day"));
+      // The page's day kept as an asked one: Днес come back to is drawn from it at once, the first time too.
+      if (inPage) keepAnswer("/api/day", inPage);
       inPage = undefined;
       if (life.aborted) return;
       const was = before;
