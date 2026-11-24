@@ -51,7 +51,7 @@ func TestKeepCopy(t *testing.T) {
 	}
 
 	keep(false) // no database yet
-	db, err := Open(path)
+	db, err := OpenMigrating(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestKeepCopy(t *testing.T) {
 
 	// It migrated part of the way (0003), and stopped before 0004: the copy from before 0003 is still the way back.
 	db.Close()
-	if db, err = Open(path); err != nil {
+	if db, err = OpenMigrating(path); err != nil {
 		t.Fatal(err)
 	}
 	write(db, 3)
@@ -98,7 +98,7 @@ func TestKeepCopy(t *testing.T) {
 
 	// The release live, deployed again: nothing to migrate, and its way back stays as it is.
 	db.Close()
-	if db, err = Open(path); err != nil {
+	if db, err = OpenMigrating(path); err != nil {
 		t.Fatal(err)
 	}
 	before, _ := os.Stat(copied)

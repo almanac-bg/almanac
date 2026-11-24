@@ -153,7 +153,7 @@ func serve([]string) error {
 			slog.Info("database copied before its migrations", "before", version)
 		}
 	}
-	db, err := store.Open(dbPath())
+	db, err := store.OpenMigrating(dbPath()) // the one program that migrates: after the copy above
 	if err != nil {
 		return err
 	}
