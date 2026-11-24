@@ -257,6 +257,10 @@ func TestAddChangesOnlyByTheRules(t *testing.T) {
 			dated(m)
 			m["fact"], m["added"] = "Факт.", today
 		})}, "added stays as the bank has it"},
+		"a fact written anew, too long": {map[string]string{"general.json": edited(t, b, "gen-001", func(m map[string]any) {
+			dated(m)
+			m["fact"] = strings.Repeat("Дълъг факт за празника. ", 6) + "Край."
+		})}, "a fact written anew is at most 140 characters"},
 		"the same as the bank's": {map[string]string{"general.json": edited(t, b, "gen-001", dated)}, "the same as the bank's"},
 		"another category's question": {map[string]string{"general.json": edited(t, b, "his-001", func(m map[string]any) {
 			dated(m)

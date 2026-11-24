@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Batch files: a batch is a directory with <category>.json for each category it adds to or changes (a JSON array, as
@@ -316,6 +317,11 @@ func changeFaults(old, q Question, category, today string) []string {
 	}
 	if t.Updated != today {
 		out = append(out, fmt.Sprintf("a change sets updated to today (%s)", today))
+	}
+	// A fact written anew is held to the short fact's length, whatever the question's age: the old ones were let keep
+	// up to factMax only so as not to cut what was there.
+	if t.Fact != o.Fact && utf8.RuneCountInString(t.Fact) > shortFactMax {
+		out = append(out, fmt.Sprintf("a fact written anew is at most %d characters (this one: %d), on an old question too", shortFactMax, utf8.RuneCountInString(t.Fact)))
 	}
 	if asked := askedChanges(old, q); len(asked) > 0 {
 		if t.Changed != today {
