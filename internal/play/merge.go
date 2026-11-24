@@ -28,6 +28,10 @@ var mergeSteps = []mergeStep{
 	// that the day played as several guests, and signed in from the best of them, races nobody.
 	{sql: `UPDATE runs SET shadow = ` + strconv.Itoa(ShadowGuest) + ` WHERE user_id = ?2 AND kind = 'day'
 		AND shadow = 0 AND started_at >= (SELECT created_at FROM users WHERE id = ?1)`},
+	// A day the account began and left, that the guest played through, the account hasn't played: the finished game
+	// is the day's, as everywhere else, so the begun one goes (and the guest's comes, by the next step).
+	{sql: `DELETE FROM runs WHERE user_id = ?1 AND kind = 'day' AND finished_at IS NULL
+		AND day IN (SELECT day FROM runs WHERE user_id = ?2 AND kind = 'day' AND finished_at IS NOT NULL)`},
 	{carries: []string{"runs.user_id"}, sql: `UPDATE runs SET user_id = ?1 WHERE user_id = ?2
 		AND NOT (kind = 'day' AND day IN (SELECT day FROM runs WHERE user_id = ?1 AND kind = 'day'))`},
 	// The guest's friends become the account's (the two aren't friends with themselves), as many as the account has

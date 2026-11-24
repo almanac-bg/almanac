@@ -354,6 +354,47 @@ func TestMergeShadowsAGuestsDay(t *testing.T) {
 	}
 }
 
+// A day the account began and left, that the guest played through, is the guest's game: the finished one is the day's,
+// as everywhere else (audit 2026-11-24, A25b-1). Kept the other way, the merge deleted a day the person played, and
+// with it their streak.
+func TestMergeKeepsTheFinishedDay(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	owner, guest := w.user(), w.user()
+	w.since(owner, 30*24*time.Hour)
+	w.daysPlayed(owner, 4, 3, 1)
+	twoBack := DayShift(w.g.Today(), -2)
+	left := func(day string) {
+		if _, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, day, questions, at, started_at)
+			VALUES (?, 'day', ?, '[{"id":""}]', 1, ?)`, owner, day, w.now.UnixMilli()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	left(twoBack)
+	st, err := w.g.StartDay(ctx, owner)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.play(owner, st.ID, w.right, w.right)
+	w.dayPlayed(guest, twoBack, 7)
+	today := w.dayGame(guest, nil)
+	brought, _ := w.g.DayRuns(ctx, guest)
+	w.fold(guest, owner)
+	if n, err := w.g.DaysLeft(ctx, owner, brought); err != nil || n != 0 {
+		t.Fatalf("the guest's finished days: %d left behind, %v", n, err)
+	}
+	if s, err := w.g.StartDay(ctx, owner); err != nil || s.ID != today || !s.Done {
+		t.Fatalf("the account's day after: %+v %v", s, err)
+	}
+	if n := w.count(`SELECT count(*) FROM runs WHERE user_id = ? AND kind = 'day' AND day = ? AND finished_at IS NOT NULL`,
+		owner, twoBack); n != 1 {
+		t.Fatalf("the day two back: %d finished games", n)
+	}
+	if s, err := w.g.Streak(ctx, owner); err != nil || s != 5 {
+		t.Fatalf("the account's streak: %d %v", s, err)
+	}
+}
+
 // A guest's friends come to the account only as far as it has room (MaxFriends), the latest first, both ways.
 func TestMergeFriendsWithinMax(t *testing.T) {
 	w := setup(t)
