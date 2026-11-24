@@ -3,50 +3,31 @@
 // them), first while there are any, for a duel to play stays first here until it's played; the friends, each with
 // their day, the duels between you and „Дуел“ (the one way to start one here), and the one way to make more (by
 // потребителско име or email, one's own said under it); and the last ten duels played („Завършени дуели“, compact rows). Each duel holds all
-
 // there is of it (screens/duelcards.ts). A duel named in the address (`?duel=<id>`: one just played, or an old link
 // to it: screens/duel.ts) is first in its group. The day's board is on Днес's result (today.ts, dayBoard).
 
-import type { Kit } from "../kit.ts";
-import type { Child } from "../lib/dom.ts";
-import type { Look } from "../ui.ts";
-import type { Accepted, Duels, DuelView } from "./duel.ts";
-import { duelGroup } from "./duelcards.ts";
-
-// The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
-// only types.
-let {
-  acceptedLine,
-  api,
-  lastOf,
-  setIfNew,
-  errorText,
-  formatNumber,
-  h,
-  lifetime,
-  onCleanup,
-  nameWords,
+import { news } from "../game/news.ts";
+import { shareWordsOut } from "../game/share.ts";
+import { api, errorText, lastOf, setIfNew } from "../lib/api.ts";
+import { type Child, h, lifetime, onCleanup, signal, when } from "../lib/dom.ts";
+import { go, title } from "../lib/router.ts";
+import { withWord } from "../lib/words.ts";
+import { player, sawFriends, user } from "../state.ts";
+import {
   emailWords,
-  sheet,
-  signal,
-  when,
-  title,
-  sawFriends,
-  news,
-  loadFeel,
-  startDuel,
-  go,
-  player,
-  user,
   failure,
+  formatNumber,
+  inSight,
+  type Look,
+  nameWords,
+  playerRow,
   profileHref,
   record,
-  withWord,
+  sheet,
   who,
-  inSight,
-  playerRow,
-  shareWordsOut,
-} = {} as Kit;
+} from "../ui.ts";
+import { type Accepted, acceptedLine, type Duels, type DuelView, startDuel } from "./duel.ts";
+import { duelGroup } from "./duelcards.ts";
 
 interface Friend {
   id: number;
@@ -80,50 +61,18 @@ interface Friends {
   accepted?: Accepted | null;
 }
 
-export function friends(kit: Kit): Child {
-  ({
-    acceptedLine,
-    api,
-    lastOf,
-    setIfNew,
-    errorText,
-    formatNumber,
-    h,
-    lifetime,
-    onCleanup,
-    nameWords,
-    emailWords,
-    sheet,
-    signal,
-    when,
-    title,
-    sawFriends,
-    news,
-    loadFeel,
-    startDuel,
-    go,
-    player,
-    user,
-    failure,
-    profileHref,
-    record,
-    withWord,
-    who,
-    inSight,
-    playerRow,
-    shareWordsOut,
-  } = kit);
+export function friends(): Child {
   title("Приятели");
   // Opened: what has come here is seen, on every device, and the dot on Приятели goes.
   if (user.peek()) sawFriends();
   // The place's name is the page's heading, for a screen reader: its sections are headed in sight.
-  return h("section", { class: "screen" }, h("h1", { class: "sr" }, "Приятели"), page(kit));
+  return h("section", { class: "screen" }, h("h1", { class: "sr" }, "Приятели"), page());
 }
 
 /** The page: who asks to be friends, the duels open, the friends (each with their day and the duels between you, a
  * duel a tap away; while changing the list, removing them), the one field to add more and the requests that wait for
  * an answer, then the duels played. */
-function page(kit: Kit): Child {
+function page(): Child {
   const asked = new URLSearchParams(location.search);
   // The duel named in the address (just played, or an old link to its page): first in its group, where its result
   // lands once (duelcards.ts), with what its game brought under it, asked for once (game/news.ts: it marks the game
@@ -156,12 +105,7 @@ function page(kit: Kit): Child {
   const load = async () => {
     if (!user.peek()) return;
     try {
-      const [f, d] = await Promise.all([
-        api<Friends>("GET", "/api/friends"),
-        api<Duels>("GET", "/api/duels"),
-        // The landing's moment needs the game's feel; without it the card is whole, only still.
-        named && !top.peek() ? loadFeel().catch(() => null) : null,
-      ]);
+      const [f, d] = await Promise.all([api<Friends>("GET", "/api/friends"), api<Duels>("GET", "/api/duels")]);
       if (life.aborted) return;
       if (named) {
         const first =
@@ -245,7 +189,7 @@ function page(kit: Kit): Child {
   // A group of duels, drawn once the duels are in (duelcards.ts).
   const group = (which: "open" | "played") => () => {
     const d = duels();
-    return d ? duelGroup(kit, which, d, top(), brought, sight) : null;
+    return d ? duelGroup(which, d, top(), brought, sight) : null;
   };
 
   return [invitations(), group("open"), friendsList(), adding(), group("played")];

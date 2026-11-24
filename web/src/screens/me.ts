@@ -8,55 +8,16 @@
 // as others see it (/players/<tag>, which opens this page for one's own tag): it is this one without what's one's own
 // (the avatar's pencil, Настройки, the week's forgiving on the streak).
 
-import type { Kit } from "../kit.ts";
-import type { Child } from "../lib/dom.ts";
-import type { ChapterRank } from "../ui.ts";
-import type { Stats } from "./stats.ts";
+import { api, lastOf, setIfNew } from "../lib/api.ts";
+import { type Child, h, signal, when } from "../lib/dom.ts";
+import { go, title } from "../lib/router.ts";
+import { look, notice, user } from "../state.ts";
+import { avatar, type ChapterRank, failure, nameWords, profileHead, sealsSection } from "../ui.ts";
+import { pickAvatar } from "./avatar.ts";
+import { keepGame } from "./keep.ts";
+import { loadStats, type Stats } from "./stats.ts";
 
-// The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
-// only types.
-let {
-  api,
-  lastOf,
-  setIfNew,
-  h,
-  nameWords,
-  signal,
-  when,
-  go,
-  title,
-  user,
-  notice,
-  avatar,
-  look,
-  failure,
-  keepGame,
-  loadStats,
-  profileHead,
-  sealsSection,
-} = {} as Kit;
-
-export function me(kit: Kit) {
-  ({
-    api,
-    lastOf,
-    setIfNew,
-    h,
-    nameWords,
-    signal,
-    when,
-    go,
-    title,
-    user,
-    notice,
-    avatar,
-    look,
-    failure,
-    keepGame,
-    loadStats,
-    profileHead,
-    sealsSection,
-  } = kit);
+export function me() {
   title("Профил");
   // Nobody on this device yet: nothing of theirs to show, the way in instead (screens/signin.ts, signInPage).
   if (!user.peek()) {
@@ -97,15 +58,12 @@ export function me(kit: Kit) {
             },
           );
         else ranks.set([]);
-        // The avatars: a sheet of their own (screens/avatar.ts), loaded with the page so that a tap opens it at once.
-        const avatars = import("./avatar.ts");
-        const pick = () => avatars.then((m) => m.pickAvatar(kit));
         return [
           h(
             "div",
             { class: "me-intro" },
             said ? h("p", { class: "muted", role: "status" }, said) : null,
-            head(data, pick),
+            head(data, pickAvatar),
             () => (failed() && !data() ? failure(failed(), () => go("/me", true)) : null),
             // A guest keeps their game with an email, or signs in to a profile they have elsewhere: one line of ways
             // (not loose ones before anything else). Either way in, Профил again, as the profile has it.

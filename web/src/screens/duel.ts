@@ -11,7 +11,6 @@ import type { State } from "../game/types.ts";
 import { type ApiError, api, errorText } from "../lib/api.ts";
 import { type Child, effect, h, lifetime, slot } from "../lib/dom.ts";
 import { backOut, byTap, go, hold, title } from "../lib/router.ts";
-import { loadFeel } from "../lib/sound.ts";
 import { withWord } from "../lib/words.ts";
 import { player, user } from "../state.ts";
 import { avatar, failure, type Look } from "../ui.ts";
@@ -230,17 +229,13 @@ export function duelOne(params: string[]) {
 
   // Played as any game, the other's answers beside the player's (when the other has played: the run has them, each as
   // far as the player has come). Its end lands on its card in Приятели, first in its group, in place of this
-  // page: the duel is settled by then (play: finished), sent to the friend or with its result, whose moment needs
-  // the game's feel, asked for as the game starts.
-  // Приятели (its file, the friends, the duels) is asked for as the last answer shows, so that the game's end lands
-  // there in one draw, from them (api.ts, lastOf), never a blank page between.
+  // page: the duel is settled by then (play: finished), sent to the friend or with its result.
+  // Приятели (the friends, the duels) is asked for as the last answer shows, so that the game's end lands there in
+  // one draw, from them (api.ts, lastOf), never a blank page between.
   const play = (d: DuelView, s: State) => {
-    loadFeel().catch(() => {});
     let ahead: Promise<unknown> | null = null;
     const askAhead = () => {
-      ahead ??= Promise.all([import("./friends.ts"), api("GET", "/api/friends"), api("GET", "/api/duels")]).catch(
-        () => null,
-      );
+      ahead ??= Promise.all([api("GET", "/api/friends"), api("GET", "/api/duels")]).catch(() => null);
       return ahead;
     };
     screen.show(() =>

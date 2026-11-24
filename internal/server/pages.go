@@ -50,45 +50,15 @@ func isAppPath(path string) bool {
 	return false
 }
 
-// screens are the pages whose screen loads on its own (web/src/kit.ts), and the file it's in (the build's manifest
-// names it): the page asks for it with app.js, so that one opened by its link (a notification's, a bookmark's) waits
-// for no second round trip. TestScreensMatchTheClient holds it to the client's router.
-var screens = []struct {
-	path *regexp.Regexp
-	file string
-}{
-	{regexp.MustCompile(`^/me$`), "me.js"},
-	{regexp.MustCompile(`^/settings$`), "settings.js"},
-	{regexp.MustCompile(`^/almanac(/[a-z]+)?$`), "almanac.js"},
-	{regexp.MustCompile(`^/friends$`), "friends.js"},
-	{regexp.MustCompile(`^/players/[A-Za-z0-9_.]{3,20}$`), "player.js"},
-}
-
-// screenOf is the file of path's screen, if it loads on its own ("" if it's in app.js).
-func screenOf(path string) string {
-	for _, s := range screens {
-		if s.path.MatchString(path) {
-			return s.file
-		}
-	}
-	return ""
-}
-
-// files are what a page asks for at once: its style, its script, the scripts every page loads as it starts
-// (assets.FirstScripts) and its screen's (if it loads on its own), and the fonts its first paint is in; each as the
-// build named it.
+// files are what a page asks for at once: its style, its script (the whole client: cmd/build), and the fonts its first
+// paint is in; each as the build named it.
 type files struct {
-	CSS, JS, Screen string
-	Scripts, Fonts  []string
+	CSS, JS string
+	Fonts   []string
 }
 
-func filesOf(m map[string]string, path string) files {
-	f := files{CSS: m["app.css"], JS: m["app.js"], Screen: m[screenOf(path)]}
-	for _, js := range assets.FirstScripts {
-		if m[js] != "" {
-			f.Scripts = append(f.Scripts, m[js])
-		}
-	}
+func filesOf(m map[string]string) files {
+	f := files{CSS: m["app.css"], JS: m["app.js"]}
 	for _, font := range assets.FirstFonts {
 		if m[font] != "" {
 			f.Fonts = append(f.Fonts, m[font])
@@ -105,10 +75,8 @@ func (f files) link() string {
 	if f.CSS != "" {
 		links = append(links, "</"+f.CSS+">; rel=preload; as=style")
 	}
-	for _, js := range append([]string{f.JS, f.Screen}, f.Scripts...) {
-		if js != "" {
-			links = append(links, "</"+js+">; rel=modulepreload")
-		}
+	if f.JS != "" {
+		links = append(links, "</"+f.JS+">; rel=modulepreload")
 	}
 	for _, font := range f.Fonts {
 		links = append(links, "</"+font+`>; rel=preload; as=font; type="font/woff2"; crossorigin`)
@@ -143,9 +111,7 @@ var shell = template.Must(template.New("shell").Parse(`<!doctype html>
 <script src="/scheme.js"></script>
 {{with .Files}}{{range .Fonts}}<link rel="preload" href="/{{.}}" as="font" type="font/woff2" crossorigin>
 {{end}}{{if .CSS}}<link rel="stylesheet" href="/{{.CSS}}">{{end}}
-{{if .JS}}<script type="module" src="/{{.JS}}"></script>{{end}}
-{{range .Scripts}}<link rel="modulepreload" href="/{{.}}">
-{{end}}{{if .Screen}}<link rel="modulepreload" href="/{{.Screen}}">{{end}}{{end}}
+{{if .JS}}<script type="module" src="/{{.JS}}"></script>{{end}}{{end}}
 <script type="application/json" id="boot">{{.Boot}}</script>
 {{with .Site}}<script type="application/ld+json">{{.}}</script>
 {{end}}</head>
@@ -239,7 +205,7 @@ func (s *Server) page(w http.ResponseWriter, r *http.Request) {
 		}{shared, fmt.Sprintf("%d-%s", shared.Issue, shared.Code), u != nil && u.ID == shared.Owner}
 	}
 	boot, _ := json.Marshal(start) // escapes <, > and &: safe inside the script element
-	files := filesOf(m, r.URL.Path)
+	files := filesOf(m)
 	pv := s.preview(r, shared)
 	if pv.missing {
 		status = http.StatusNotFound

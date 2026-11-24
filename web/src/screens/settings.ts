@@ -1,92 +1,34 @@
 // Настройки: the name and tag (saved as they're left), the account and its email, reminders, and the data the game
 // keeps; and this device's look (Night or Day), sound and access, with a profile or without one.
 
-import type { Kit } from "../kit.ts";
-import type { ApiError } from "../lib/api.ts";
-import type { Child, Signal } from "../lib/dom.ts";
-import type { PushKind, PushPrefs } from "../lib/push.ts";
-import type { User } from "../state.ts";
-import type { MailPrefs } from "./keep.ts";
-
-// The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
-// only types.
-let {
-  inSight,
-  api,
-  emailWords,
-  errorText,
-  computed,
-  effect,
-  h,
-  onCleanup,
-  signal,
-  untracked,
-  when,
-  reportProblem,
-  schemeSwitch,
-  setTick,
-  tickOn,
+import { type ApiError, api, errorText } from "../lib/api.ts";
+import { type Child, computed, effect, h, onCleanup, type Signal, signal, untracked, when } from "../lib/dom.ts";
+import { reportProblem } from "../lib/errors.ts";
+import { setTick, tickOn } from "../lib/prefs.ts";
+import {
   needsHomeScreen,
+  type PushKind,
+  type PushPrefs,
   pushable,
   pushOn,
   pushPrefs,
   setPushPref,
   turnOff,
   turnOn,
-  go,
-  title,
-  quietWhenSilent,
-  setSound,
-  soundOn,
-  notice,
-  user,
-  back,
-  signIn,
-  noEmail,
-  mailAsk,
-} = {} as Kit;
+} from "../lib/push.ts";
+import { go, title } from "../lib/router.ts";
+import { quietWhenSilent, setSound, soundOn } from "../lib/sound.ts";
+import { notice, type User, user } from "../state.ts";
+import { back, emailWords, inSight, schemeSwitch } from "../ui.ts";
+import { type MailPrefs, mailAsk } from "./keep.ts";
+import { noEmail, signIn } from "./signin.ts";
 
 /** Signed out just now: said here, where it was done, and only here (Днес, next, doesn't say it again). */
 let signedOut: Signal<boolean>;
 /** What came of a code put in here just now (signIn: a game kept, a profile signed in to), said under the profile. */
 let signedIn: Signal<string>;
 
-export function settings(kit: Kit) {
-  ({
-    inSight,
-    api,
-    emailWords,
-    errorText,
-    computed,
-    effect,
-    h,
-    onCleanup,
-    signal,
-    untracked,
-    when,
-    reportProblem,
-    schemeSwitch,
-    setTick,
-    tickOn,
-    needsHomeScreen,
-    pushable,
-    pushOn,
-    pushPrefs,
-    setPushPref,
-    turnOff,
-    turnOn,
-    go,
-    title,
-    quietWhenSilent,
-    setSound,
-    soundOn,
-    notice,
-    user,
-    back,
-    signIn,
-    noEmail,
-    mailAsk,
-  } = kit);
+export function settings() {
   title("Настройки");
   notice.set("");
   signedOut = signal(false);

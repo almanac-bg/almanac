@@ -6,9 +6,9 @@
 // Browsers allow sound only once the player has touched the page, so the audio starts then. The bigger sounds (an
 // end, a win, a note…) take turns: one asked for while another still sounds follows it, never on top. On
 // a phone the sounds mix with whatever the player is listening to and keep quiet with the silent switch. The voices
-// themselves are in the game's feel (../feel.ts), a file of its own that the first touch sends for: here are the
-// switch, the audio and the turns.
+// themselves are in the game's feel (../feel.ts): here are the switch, the audio and the turns.
 
+import * as feel from "../feel.ts";
 import { signal } from "./dom.ts";
 
 export type SoundName =
@@ -66,29 +66,6 @@ export const quietWhenSilent = () =>
   /iPhone|iPad|iPod/.test(navigator.userAgent) ||
   (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 
-type Feel = typeof import("../feel.ts");
-let kit: Feel | null = null;
-let loading: Promise<Feel> | null = null;
-
-/** The game's feel (../feel.ts), loaded once, with the first touch: what's heard and seen only once the player plays.
- * A load that failed is tried again by the next touch. */
-export function loadFeel(): Promise<Feel> {
-  loading ??= import("../feel.ts").then(
-    (m) => {
-      kit = m;
-      return m;
-    },
-    (err) => {
-      loading = null;
-      throw err;
-    },
-  );
-  return loading;
-}
-
-/** The game's feel, if it's in: until then the game is whole, only plainer and quieter. */
-export const feelKit = (): Feel | null => kit;
-
 let audio: AudioContext | null = null;
 /** When (in the audio's time) the last of the sounds that take turns ends. */
 let freeAt = 0;
@@ -121,13 +98,11 @@ function unlock(c: AudioContext): void {
   silence.start();
 }
 
-/** Starts the audio on the player's touches and keys, the only time browsers allow it, and sends for the game's feel
- * with the first. An iPhone counts a touch only as it ends (touchend, click), never as the finger goes down. A phone
+/** Starts the audio on the player's touches and keys, the only time browsers allow it. An iPhone counts a touch only as it ends (touchend, click), never as the finger goes down. A phone
  * may stop the audio again (a call, the game in the background), sometimes leaving it "running" but mute: so this keeps
  * listening, and as the game comes back to the screen it stops the audio and starts it again. */
 export function prepareSound(): void {
   const start = () => {
-    loadFeel().catch(() => {});
     if (!soundOn.peek()) return;
     const c = context();
     if (c && c.state !== "running") unlock(c);
@@ -169,23 +144,13 @@ export function voice(name: SoundName, lift = 0): void {
     if (!touchedNow()) return;
     unlock(c);
   }
-  if (!kit) {
-    // The voices are on their way (the first touch sent for them): a sound asked for meanwhile plays as they come, if
-    // that's soon, and is left out if not.
-    const asked = performance.now();
-    loadFeel().then(
-      () => performance.now() - asked < 300 && voice(name, lift),
-      () => {},
-    );
-    return;
-  }
   let t0 = c.currentTime + 0.01;
   if (inTurn.has(name)) {
     if (freeAt - t0 > longestWait) return;
     t0 = Math.max(t0, freeAt);
-    freeAt = t0 + kit.length(name) + 0.15;
+    freeAt = t0 + feel.length(name) + 0.15;
   }
-  kit.sound(c, name, lift, t0);
+  feel.sound(c, name, lift, t0);
 }
 
 /** How an answer sounds: every right one the same, whatever came before it. */

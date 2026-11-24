@@ -1,6 +1,5 @@
 // A page kept current (web/src/fresh.ts): one loaded before a deploy loads anew at its next screen, never in the middle
-// of a question; a screen's file gone with a deploy loads the page anew for it; a profile gone in one tab is gone in the
-// others too.
+// of a question; a profile gone in one tab is gone in the others too.
 import { expect, type Page, test } from "@playwright/test";
 import { answer, openGame } from "./play.ts";
 
@@ -36,22 +35,6 @@ test("a page loaded before a deploy opens its next screen by loading anew, and n
   await expect(page).toHaveURL(/\/almanac$/);
   expect(await marked(page)).toBe(false);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-});
-
-test("a screen's own file gone with a deploy: the page loads anew for it, once", async ({ page }) => {
-  let refused = 0;
-  await page.route(
-    "**/assets/friends-*.js",
-    (route) => {
-      refused++;
-      return route.fulfill({ status: 404, body: "" });
-    },
-    { times: 1 },
-  );
-  await page.goto("/friends");
-  await expect(page.getByRole("heading", { name: "Приятели", level: 1 })).toBeVisible();
-  expect(refused).toBe(1);
-  await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
 test("a profile deleted in one tab: another tab of it loads anew as no one's", async ({ context }) => {

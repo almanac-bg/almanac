@@ -3,16 +3,15 @@
 // sheet over Профил (pickAvatar), opened by the player's own avatar or „Смени“ under it, never a part of the page: the
 // animals, each with its name, the one worn ringed; a tap wears it, and once it's kept the sheet goes.
 
-import type { Kit } from "../kit.ts";
+import { api, errorText } from "../lib/api.ts";
+import { h, signal } from "../lib/dom.ts";
+import { look, setLook } from "../state.ts";
+import { avatar, shapeNames, sheet } from "../ui.ts";
 
-// The app's pieces, set as the sheet opens: it loads on its own, with Профил (kit.ts), and imports only types.
-let { api, errorText, h, signal, avatar, shapeNames, look, setLook, sheet } = {} as Kit;
-
-/** The avatars on a sheet over Профил (`kit`: the app's pieces). A tap wears one at once (the bar's and Профил's with
+/** The avatars on a sheet over Профил. A tap wears one at once (the bar's and Профил's with
  * it: state.ts, look) and, once the server has kept it, puts the sheet away; refused, the one worn before is back and
  * the sheet says why. Esc, „Затвори“ or a tap beside it puts it away. */
-export function pickAvatar(kit: Kit): void {
-  ({ api, errorText, h, signal, avatar, shapeNames, look, setLook, sheet } = kit);
+export function pickAvatar(): void {
   const worn = (s: string) => s === (look() || "fox");
   const box = sheet({ class: "avatar-sheet", title: "Аватар" }, (close) => {
     const error = signal("");

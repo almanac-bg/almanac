@@ -11,9 +11,6 @@
 //   ka kb an avatar's own accents (an iris, a beak), la the first as a stroke: named, never picked by a layer's place
 //
 // The rules a picture is drawn to (an avatar's head and eyes, the light, how it reads at 32 px) are in DESIGN.md.
-//
-// This module is loaded on its own after the game starts (art/picture.ts), so its weight never holds up the first
-// screen. It imports nothing, so that it stays one file of its own.
 
 type Layer = [ink: string, d: string, attrs?: string];
 

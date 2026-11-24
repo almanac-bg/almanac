@@ -22,7 +22,7 @@ test("a chapter's game never tells how well the chapter is known, and the avatar
   await expect(sheet.locator(".pick:disabled")).toHaveCount(0);
   await sheet.getByRole("button", { name: "Рис", exact: true }).click();
   await expect(sheet).toHaveCount(0);
-  // Avatars are pictures (art/pictures.ts), loaded after the first screen: the lynx is drawn on its tile.
+  // Avatars are pictures (art/pictures.ts): the lynx is drawn on its tile.
   await expect(page.locator(".me-head .avatar.sh-lynx .avatar-pic path").first()).toBeAttached();
   // Kept: Профил shows it.
   await page.goto("/me");

@@ -248,7 +248,7 @@ test("the ways back pop the history; back comes to a page and its board where th
   await expect(page.getByRole("heading", { name: "Приятели", level: 1 })).toBeVisible();
   await page.getByRole("link", { name: "Профил" }).first().click();
   await expect(page).toHaveURL(/\/me$/);
-  await expect(page.getByRole("link", { name: "Настройки" })).toBeVisible(); // Профил loads on its own (kit.ts)
+  await expect(page.getByRole("link", { name: "Настройки" })).toBeVisible();
   // What Профил loads after it opens, in: scrolled before, the page would move as it comes (the browser keeps what's
   // in view), and be kept where it moved to.
   await expect(page.locator(".me-seals")).toBeVisible();

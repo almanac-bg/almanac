@@ -6,40 +6,27 @@
 // never shown.
 
 import type { Credit, Picture } from "../game/types.ts";
-import type { Kit } from "../kit.ts";
-import type { Child } from "../lib/dom.ts";
-
-// The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
-// only types.
-let {
-  api,
-  lastOf,
-  setIfNew,
+import { api, lastOf, setIfNew } from "../lib/api.ts";
+import { dayInBulgaria } from "../lib/day.ts";
+import { type Child, h, lifetime, onCleanup, signal } from "../lib/dom.ts";
+import { rename, title } from "../lib/router.ts";
+import { dateWords, searchWords } from "../lib/words.ts";
+import { chapters, user } from "../state.ts";
+import {
   back,
   chapterName,
-  dateWords,
-  dayInBulgaria,
   failure,
   formatNumber,
   glyph,
-  h,
   leaf,
-  lifetime,
-  missing,
   nameWords,
-  onCleanup,
   pictureCredit,
-  textWords,
-  standing,
-  rename,
   seal,
-  searchWords,
   sheet,
-  signal,
-  title,
-  chapters,
-  user,
-} = {} as Kit;
+  standing,
+  textWords,
+} from "../ui.ts";
+import { missing } from "./missing.ts";
 
 /** A chapter's rank, as kept (play.ChapterRank): level 0 is none yet. */
 interface Rank {
@@ -93,38 +80,6 @@ const perPage = 30;
 /** How many facts a chapter has before it offers to search them: fewer are read at a glance. */
 const searchFrom = 10;
 
-function setKit(kit: Kit) {
-  ({
-    api,
-    lastOf,
-    setIfNew,
-    back,
-    chapterName,
-    dateWords,
-    dayInBulgaria,
-    failure,
-    formatNumber,
-    glyph,
-    h,
-    leaf,
-    lifetime,
-    missing,
-    nameWords,
-    onCleanup,
-    pictureCredit,
-    textWords,
-    standing,
-    rename,
-    seal,
-    searchWords,
-    sheet,
-    signal,
-    title,
-    chapters,
-    user,
-  } = kit);
-}
-
 /** A chapter's game left unfinished today (play.Left): where it stopped. */
 interface Left {
   chapter: string;
@@ -137,8 +92,7 @@ const chapterIds = () => chapters.map((t) => t.id);
 const nameOf = (id: string) => chapterName(id) || id;
 
 /** Алманах: the book's head, then its chapters. */
-export function almanac(kit: Kit): Child {
-  setKit(kit);
+export function almanac(): Child {
   title("Алманах");
   // Not a player yet: the book as it starts, its chapters each a way to play one.
   if (!user.peek()) return book({ facts: [], found: 0, ink: {} });
@@ -260,8 +214,7 @@ function card(id: string, ink: number, r: Rank | undefined): Child {
  * to it, or a reload, opens the same. Opened at facts (?fact=<id>, one for each: the day's result's, of the facts the
  * day wrote), it opens on the page that holds them, the first of them in sight, each tinted in the chapter's colour
  * for a moment (app.css, .lit); they're read from the address once, and it becomes the page's own. */
-export function chapter(kit: Kit, [id = ""]: string[]): Child {
-  setKit(kit);
+export function chapter([id = ""]: string[]): Child {
   // A chapter the book doesn't have: the page that isn't there, not an empty chapter by that name.
   if (!chapterIds().includes(id)) return missing();
   const name = nameOf(id);
