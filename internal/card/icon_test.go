@@ -3,6 +3,7 @@ package card
 import (
 	"bytes"
 	"flag"
+	"image/png"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -34,10 +35,38 @@ func TestIcons(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !bytes.Equal(have, b) {
+		if !alike(t, have, b) {
 			t.Errorf("web/public/%s isn't what Icon draws: go test ./internal/card -run TestIcons -update", ic.File)
 		}
 	}
+}
+
+// alike says two PNGs are the same picture: the same size, and every pixel within a few levels of the other's (the
+// rasterizer's arithmetic differs a little between machines: an edge's antialiasing, never a colour).
+func alike(t *testing.T, a, b []byte) bool {
+	t.Helper()
+	ia, err := png.Decode(bytes.NewReader(a))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ib, err := png.Decode(bytes.NewReader(b))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ia.Bounds() != ib.Bounds() {
+		return false
+	}
+	near := func(x, y uint32) bool { return max(x, y)-min(x, y) <= 4<<8 }
+	for y := ia.Bounds().Min.Y; y < ia.Bounds().Max.Y; y++ {
+		for x := ia.Bounds().Min.X; x < ia.Bounds().Max.X; x++ {
+			r1, g1, b1, a1 := ia.At(x, y).RGBA()
+			r2, g2, b2, a2 := ib.At(x, y).RGBA()
+			if !near(r1, r2) || !near(g1, g2) || !near(b1, b2) || !near(a1, a2) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // The mark's SVGs (the browser's icon, the mail's BIMI) are painted in the icons' three colours and no other, with the
