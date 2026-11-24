@@ -16,7 +16,7 @@
 import { picture } from "../art/picture.ts";
 import type { FriendDay } from "../game/knew.ts";
 import { news } from "../game/news.ts";
-import { closeLine, count, percent, withOwn } from "../game/numbers.ts";
+import { closeLine, percent, withOwn } from "../game/numbers.ts";
 import { answerWords } from "../game/questions.ts";
 import { land, opensReview, perfectHead, reviewSheet } from "../game/results.ts";
 import { getReady, leftLine, playRun, shownHere, starting } from "../game/run.ts";
@@ -25,14 +25,14 @@ import type { Board, Mark, Reviewed, Score, State } from "../game/types.ts";
 import { api, errorText, lastOf, serverNow, setIfNew } from "../lib/api.ts";
 import { boot } from "../lib/boot.ts";
 import { dayInBulgaria, hourInBulgaria } from "../lib/day.ts";
-import { type Child, h, onCleanup, type Signal, signal, slot } from "../lib/dom.ts";
+import { type Child, h, lifetime, onCleanup, type Signal, signal, slot } from "../lib/dom.ts";
 import { handToken } from "../lib/embedded.ts";
 import { reportProblem } from "../lib/errors.ts";
 import { type RemindAsks, remindAnswered, remindAsks } from "../lib/keep.ts";
 import { ordinal } from "../lib/ordinal.ts";
 import { pushable, pushOn, turnOn } from "../lib/push.ts";
 import { go, goBack, hold, release, title } from "../lib/router.ts";
-import { dateWords, issueOf, onDay, stakeHour, weekday, withWord } from "../lib/words.ts";
+import { count, dateWords, issueOf, onDay, stakeHour, weekday, withWord } from "../lib/words.ts";
 import { cover, notice, player, playing, user } from "../state.ts";
 import {
   avatar,
@@ -44,6 +44,7 @@ import {
   nameWords,
   scoreRow,
   segmented,
+  sheet,
   stakeLine,
   textWords,
   tiles,
@@ -172,12 +173,10 @@ export function today() {
   // How many times Днес has asked the day again since yesterday's time was over, and still had it (a question shown
   // before then still in its time): each a while apart, and a few at most.
   let lateAsked = 0;
-  // The screen put away: an answer still on its way draws nothing, and sets no timer again.
-  let gone = false;
-  onCleanup(() => {
-    gone = true;
-    clearTimeout(lateEnds);
-  });
+  // The screen put away: an answer still on its way draws nothing, gives back no entry of the history (release), and
+  // sets no timer again.
+  const life = lifetime();
+  onCleanup(() => clearTimeout(lateEnds));
   // Днес drawn from what it showed last (come back to it: api.ts, lastOf), until the day comes: then drawn anew only
   // where it has changed, and only while the player hasn't moved on from it (a count, a game).
   let before: Today | null = null;
@@ -201,7 +200,7 @@ export function today() {
     try {
       const t = inPage ?? (await api<Today>("GET", "/api/day"));
       inPage = undefined;
-      if (gone) return;
+      if (life.aborted) return;
       const was = before;
       before = null;
       drawn = true;
@@ -217,7 +216,7 @@ export function today() {
       else screen.show(() => home(view, view.run, false));
     } catch (err) {
       // Drawn from what it showed last, it stays so: the line's trouble is said only over nothing.
-      if (gone || before) return;
+      if (life.aborted || before) return;
       screen.show(() => failure(err, load, null));
     }
   };
@@ -237,7 +236,7 @@ export function today() {
     // (a question shown before it ended is still in its time), the day is asked again 15 seconds on, a few times.
     const left = y.until - serverNow();
     lateAsked = left > 0 ? 0 : lateAsked + 1;
-    if (lateAsked <= lateAsks && !gone)
+    if (lateAsked <= lateAsks && !life.aborted)
       lateEnds = setTimeout(
         () => {
           if (!playing.peek() && !counting) load();
@@ -280,12 +279,14 @@ export function today() {
       screen.show(starting);
       try {
         const now = await api<State>("GET", `/api/runs/${left.id}`);
+        if (life.aborted) return;
         if (!now.done && now.question) {
           screen.show(() => playRun(now, (s) => home(t, s, true), "", "", undefined, via));
           scrollTo(0, 0);
           return;
         }
       } catch (err) {
+        if (life.aborted) return;
         failed = errorText(err);
         back(t);
         return;
@@ -304,9 +305,11 @@ export function today() {
               t.late && left
                 ? await api<State>("GET", `/api/runs/${left.id}`)
                 : await api<State>("POST", "/api/day", {});
+            if (life.aborted) return;
             counting = false;
             screen.show(() => playRun(s, (end) => home(t, end, true), "", "", undefined, via));
           } catch (err) {
+            if (life.aborted) return;
             failed = errorText(err);
             back(t);
           }
@@ -1145,11 +1148,7 @@ function shareSheet(run: State, t: Today, streak: number): void {
   const text = signal("");
   const said = signal("");
   const card = signal<File | null>(null);
-  const sheet = h("dialog", { class: "sheet share-sheet", "aria-labelledby": "share-title" }) as HTMLDialogElement;
-  const close = () => {
-    sheet.close();
-    sheet.remove();
-  };
+  const close = () => box.close();
   shareText(run.id, day).then(text.set, (err) => said.set(errorText(err)));
   // Fetched as the sheet opens, so a tap on „Сподели картинката“ shares at once; shown once it's here (from the
   // browser's cache), the tiles until then or without it.
@@ -1185,48 +1184,32 @@ function shareSheet(run: State, t: Today, streak: number): void {
     }
   };
   const canShare = typeof navigator.share === "function";
-  sheet.append(
+  const box = sheet({ class: "share-sheet", title: "Сподели резултата" }, () => [
+    h("div", { class: "share-card-box" }, () =>
+      card()
+        ? h("img", {
+            class: "share-card",
+            src: cardPath(issue, run.trail),
+            alt: `АЛМАНАХ, Брой ${issue}, ${dateWords(t.day)}: как мина всеки от десетте въпроса`,
+            width: 1200,
+            height: 630,
+          })
+        : tiles(run.trail, t.chapters ?? []),
+    ),
+    h("pre", { class: "share-text" }, () => text() || "…"),
     h(
       "div",
-      { class: "sheet-panel" },
-      h(
-        "div",
-        { class: "sheet-head" },
-        h("h2", { id: "share-title" }, "Сподели резултата"),
-        h("button", { class: "link", type: "button", onclick: close }, "Затвори"),
-      ),
-      h("div", { class: "share-card-box" }, () =>
-        card()
-          ? h("img", {
-              class: "share-card",
-              src: cardPath(issue, run.trail),
-              alt: `АЛМАНАХ, Брой ${issue}, ${dateWords(t.day)}: как мина всеки от десетте въпроса`,
-              width: 1200,
-              height: 630,
-            })
-          : tiles(run.trail, t.chapters ?? []),
-      ),
-      h("pre", { class: "share-text" }, () => text() || "…"),
-      h(
-        "div",
-        { class: "share-ways" },
-        canShare ? h("button", { class: "btn primary", type: "button", onclick: send }, "Сподели") : null,
-        h("button", { class: canShare ? "btn" : "btn primary", type: "button", onclick: copy }, "Копирай текста"),
-        () =>
-          canShareCard()
-            ? h("button", { class: "btn share-card-go", type: "button", onclick: sendCard }, "Сподели картинката")
-            : null,
-      ),
-      () => (said() ? h("p", { class: "share-said", role: "status" }, said()) : null),
-      h("p", { class: "small share-note" }, "Отговорите не се виждат. Който отвори връзката днес, играе същия брой."),
+      { class: "share-ways" },
+      canShare ? h("button", { class: "btn primary", type: "button", onclick: send }, "Сподели") : null,
+      h("button", { class: canShare ? "btn" : "btn primary", type: "button", onclick: copy }, "Копирай текста"),
+      () =>
+        canShareCard()
+          ? h("button", { class: "btn share-card-go", type: "button", onclick: sendCard }, "Сподели картинката")
+          : null,
     ),
-  );
-  sheet.addEventListener("click", (e) => {
-    if (e.target === sheet) close();
-  });
-  sheet.addEventListener("close", () => sheet.remove());
-  document.body.append(sheet);
-  sheet.showModal();
+    () => (said() ? h("p", { class: "share-said", role: "status" }, said()) : null),
+    h("p", { class: "small share-note" }, "Отговорите не се виждат. Който отвори връзката днес, играе същия брой."),
+  ]);
 }
 
 /** Yesterday's issue finished after midnight (`t.late`): in the asks' place, today's issue, out already, and the way

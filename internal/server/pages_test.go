@@ -184,7 +184,8 @@ func TestNachaloHasTheDayInItsPage(t *testing.T) {
 }
 
 // A page asks at once for its style, its script, the scripts every page loads as it starts (the pictures), its first
-// font and, where its screen loads on its own, that screen's file: in its head, and in a Link header.
+// fonts and, where its screen loads on its own, that screen's file: in its head, and in a Link header. The player's
+// Night or Day is on it before its first paint (scheme.js).
 func TestPagesAskForTheirFilesAtOnce(t *testing.T) {
 	g := start(t)
 	g.srv.client = fstest.MapFS{
@@ -203,6 +204,7 @@ func TestPagesAskForTheirFilesAtOnce(t *testing.T) {
 	}
 	res, body := get("/settings")
 	for _, want := range []string{
+		`<script src="/scheme.js"></script>`,
 		`<link rel="preload" href="/assets/sofia-sans-F.woff2" as="font" type="font/woff2" crossorigin>`,
 		`<link rel="stylesheet" href="/assets/app-C.css">`,
 		`<script type="module" src="/assets/app-J.js"></script>`,

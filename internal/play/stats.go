@@ -13,7 +13,6 @@ type Stats struct {
 	// played in it too, which the ranks count as it finishes): Профил's seals say it beside each rank.
 	Ink      map[string]int `json:"ink,omitempty"`
 	Streak   int            `json:"streak"`
-	Week     [7]bool        `json:"week"`     // this week's days played, Monday first
 	Forgiven [7]bool        `json:"forgiven"` // this week's day missed that the streak forgave
 	Spare    bool           `json:"spare"`    // whether this week has a day to forgive still
 }
@@ -31,9 +30,6 @@ func (g *Game) StatsOf(ctx context.Context, userID int64) (Stats, error) {
 		return s, err
 	}
 	s.Streak, s.Spare, s.Forgiven = streak.Days, streak.Spare, g.InWeek(streak.Forgiven)
-	if s.Week, err = g.Week(ctx, userID); err != nil {
-		return s, err
-	}
 	s.Ink, err = g.InkOf(ctx, userID)
 	return s, err
 }

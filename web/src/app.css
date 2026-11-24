@@ -162,15 +162,12 @@
     --i-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='10.5' cy='10.5' r='6.5'/%3E%3Cpath d='M15.5 15.5L21 21'/%3E%3C/svg%3E");
     --i-grip: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M5 8h14M5 12h14M5 16h14'/%3E%3C/svg%3E");
     --i-clock: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='8'/%3E%3Cpath d='M12 8v4.5l3 2'/%3E%3C/svg%3E");
-    --i-up: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 5l7 10H5z'/%3E%3C/svg%3E");
-    --i-flame: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 28'%3E%3Cpath d='M12 1c1.2 4.6 7 7.4 7 14.2a7 7 0 0 1-14 .4c0-3.6 1.9-6 3.8-7.6.2 2.4 1.2 3.8 2.7 4.3C11 9.2 11 5 12 1z'/%3E%3C/svg%3E");
     --i-share: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 15V4M7.5 8.5L12 4l4.5 4.5'/%3E%3Cpath d='M5 13v6h14v-6'/%3E%3C/svg%3E");
     --i-nib: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.5c2.6 3 5 6.2 5 9.3 0 2-1.1 3.4-2.6 4.1V18H9.6v-2.1C8.1 15.2 7 13.8 7 11.8c0-3.1 2.4-6.3 5-9.3zm0 6.3a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2zM8.6 19.4h6.8v2.1H8.6z'/%3E%3C/svg%3E");
     --i-gear: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M9.75 4.74L9.97 2h4.06l.22 2.74 1.3.54 2.09-1.78 2.86 2.86-1.78 2.09.54 1.3 2.74.22v4.06l-2.74.22-.54 1.3 1.78 2.09-2.86 2.86-2.09-1.78-1.3.54-.22 2.74H9.97l-.22-2.74-1.3-.54-2.09 1.78-2.86-2.86 1.78-2.09-.54-1.3L2 14.03V9.97l2.74-.22.54-1.3-1.78-2.09 2.86-2.86 2.09 1.78z'/%3E%3Ccircle cx='12' cy='12' r='3.2'/%3E%3C/svg%3E");
     --i-pencil: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17z'/%3E%3Cpath d='M13.5 8.5l2 2'/%3E%3C/svg%3E");
     --i-today: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='5' width='17' height='15.5' rx='3'/%3E%3Cpath d='M8 3v4M16 3v4M3.5 10h17'/%3E%3Ccircle cx='12' cy='15.25' r='1.75' fill='%23000' stroke='none'/%3E%3C/svg%3E");
     --i-book: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 18.5V5.5A2.5 2.5 0 0 1 7.5 3H19v14H7.5A2.5 2.5 0 0 0 5 19.5 1.5 1.5 0 0 0 6.5 21H19'/%3E%3Cpath d='M9 7.5h6'/%3E%3C/svg%3E");
-    --i-duel: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 4l16 16M13.5 18.5l5-5M20 4L4 20M10.5 18.5l-5-5'/%3E%3C/svg%3E");
     --i-friends: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='9' cy='8' r='3.25'/%3E%3Cpath d='M3 19.5c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5'/%3E%3Cpath d='M15.5 4.9a3.25 3.25 0 0 1 0 6.2M17.5 14.3c2 .6 3.5 2.4 3.5 5.2'/%3E%3C/svg%3E");
   }
 
@@ -506,11 +503,6 @@
     --i: var(--i-friends);
   }
 
-  /* Two swords crossed: the duels between two players (a friend's row). */
-  .i-duel {
-    --i: var(--i-duel);
-  }
-
   /* ---- The frame: the bar, the places ---- */
 
   #app {
@@ -589,7 +581,6 @@
     text-decoration: none;
   }
 
-  /* The three places on a phone: words at the foot where a thumb is, the current one on a well. */
   /* The places on a phone: a pill that floats over the page, clear of every edge, the home bar under it. */
   /* Never wider than the page's column (a tablet, large text on a laptop): in the middle, under it. */
   .places-foot {
@@ -1197,15 +1188,6 @@
   /* A picture takes its chapter's vivid as its tone wherever it's put. */
   :where([class^="ch-"], [class*=" ch-"]) {
     --tone: var(--tv);
-  }
-
-  .dot {
-    display: inline-block;
-    flex: none;
-    width: 10px;
-    height: 10px;
-    border-radius: var(--radius-full);
-    background: var(--tv, var(--tone, var(--ink)));
   }
 
   /* The ask to keep a guest's game (screens/keep.ts): the sign-in form on a card. */
@@ -3448,12 +3430,6 @@
     font-size: 0.875rem;
   }
 
-  .status {
-    color: var(--ink-3);
-    font-size: 0.9375rem;
-    font-weight: 700;
-  }
-
   /* Played second in a duel: how the question went for the other, under the player's own verdict (run.ts). */
   .their-line {
     margin: 0;
@@ -4280,10 +4256,6 @@
 
   /* ---- Results ---- */
 
-  /* Ten of ten: the rosette as a seal, and the words in gold, over the score. */
-
-  /* Днес on a later visit: the day played as one short card, its score a size down from the result's. */
-
   .board {
     display: grid;
     overflow: hidden;
@@ -4575,9 +4547,7 @@
   }
   .l0,
   .l1,
-  .l2,
   .l3,
-  .l4,
   .l5 {
     fill: none;
     stroke-width: 2;
@@ -4590,14 +4560,8 @@
   .l1 {
     stroke: var(--k1);
   }
-  .l2 {
-    stroke: var(--k2);
-  }
   .l3 {
     stroke: var(--k3);
-  }
-  .l4 {
-    stroke: var(--k4);
   }
   .l5 {
     stroke: var(--k5);
@@ -5181,21 +5145,6 @@
   .result-actions .btn {
     padding-inline: var(--space-4);
     white-space: nowrap;
-  }
-
-  /* „Сподели резултата“: the button fills its cell, a word of what went wrong under it; where it can neither share
-     nor copy, the text in its place, to copy by hand. */
-
-  /* A shared day's score over the same ten, as its link brought it. */
-
-  /* The picture by a streak's notice. */
-
-  /* A day missed that the streak forgave. */
-
-  .next {
-    display: grid;
-    justify-items: start;
-    gap: var(--space-3);
   }
 
   /* The avatars, each with its name under it, on their sheet (screens/avatar.ts): as many to a row as its width holds;
@@ -7288,12 +7237,6 @@
     }
   }
 
-  @keyframes star {
-    0% {
-      transform: rotate(-20deg);
-    }
-  }
-
   @keyframes shake {
     0%,
     100% {
@@ -7307,17 +7250,6 @@
     }
     75% {
       transform: translateX(-2px);
-    }
-  }
-
-  @keyframes rise {
-    0% {
-      opacity: 0;
-      transform: translateY(8px) scale(0.9);
-    }
-    100% {
-      opacity: 1;
-      transform: none;
     }
   }
 
@@ -7582,8 +7514,6 @@
       font-size: 0.8125rem;
     }
 
-    /* The longest chapter's name („Литература“) fits beside its picture. */
-
     /* A board's row gives its gaps to the name. */
     .row {
       gap: var(--space-2);
@@ -7817,13 +7747,6 @@
       --row: 4.75rem;
       font-size: 1.375rem;
     }
-
-    /* Днес: floats, so each column stacks on its own, whatever the other's height. */
-
-    /* The streak, the habit's reward, leads the column beside the day, level with its result: a row of its own, its
-       number big. */
-
-    /* A new player: the day and the chapters, one centred column. */
 
     /* The avatar's choice: bigger looks to choose from, more to a row. */
     .picker {
@@ -8528,10 +8451,6 @@
     line-height: 1.375rem;
   }
 
-  /* A line over the day, its way on („Виж“) after its last word, not pushed out of the screen by its longest one. */
-
-  /* The streak as tall as what it says. */
-
   /* A board's row: the place and the player, the score under the name. */
   .tight .row {
     grid-template-columns: 32px minmax(0, 1fr);
@@ -8597,7 +8516,6 @@
     flex-wrap: nowrap;
   }
 
-  /* „Вярно“ over „Невярно“, each a row. */
   /* A number with large text: the pad is taller than the screen, so what's typed stays in sight under the head while
      the pad is scrolled to (run.ts: --head). */
   .tight .run-question .number-out {

@@ -6,7 +6,7 @@ import { api, errorText } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { calm } from "../lib/prefs.ts";
 import { feelKit, play } from "../lib/sound.ts";
-import { avatar, chapterName, chip, fact, type Look, leaf, tiles, who } from "../ui.ts";
+import { avatar, chapterName, chip, fact, type Look, leaf, sheet, tiles, who } from "../ui.ts";
 import { type FriendDay, fewFriends, friendsLine, groupWords, markAt, shortName } from "./knew.ts";
 import { closeLine, closeWords } from "./numbers.ts";
 import { answered, crowdLine, picture } from "./questions.ts";
@@ -224,34 +224,14 @@ export function reviewSheet(o: ReviewOf): void {
   const all = signal<Reviewed[] | null>(null);
   let friends: FriendDay[] = [];
   const error = signal("");
-  const close = () => box.close();
-  const box = h(
-    "dialog",
-    { class: "sheet review-sheet", "aria-labelledby": "review-title" },
-    h(
-      "div",
-      { class: "sheet-panel" },
-      h(
-        "div",
-        { class: "sheet-head" },
-        h("h2", { id: "review-title" }, "Въпросите"),
-        h("button", { class: "link", type: "button", onclick: close }, "Затвори"),
-      ),
-      h("p", { class: "muted review-of" }, o.of),
-      () => {
-        const list = all();
-        if (list) return reviewed(list, o.versus, friends);
-        return error() ? h("p", { class: "bad", role: "alert" }, error()) : h("p", { class: "muted" }, "…");
-      },
-    ),
-  ) as HTMLDialogElement;
-  // A tap beside the sheet puts it away, as Esc does; put away, it goes (the router closes it with the screen).
-  box.addEventListener("click", (e) => {
-    if (e.target === box) close();
-  });
-  box.addEventListener("close", () => box.remove());
-  document.body.append(box);
-  box.showModal();
+  const box = sheet({ class: "review-sheet", title: "Въпросите" }, () => [
+    h("p", { class: "muted review-of" }, o.of),
+    () => {
+      const list = all();
+      if (list) return reviewed(list, o.versus, friends);
+      return error() ? h("p", { class: "bad", role: "alert" }, error()) : h("p", { class: "muted" }, "…");
+    },
+  ]);
   // The friends with the questions, drawn once (nothing moves under the player's eye); questions without them if they
   // didn't come.
   Promise.all([o.load(), o.friends?.().catch(() => []) ?? []]).then(

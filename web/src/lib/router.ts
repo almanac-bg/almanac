@@ -10,7 +10,6 @@
 //
 // A page that has fallen behind (a new version of the game out, another account signed in: fresh.ts) opens its next
 // screen by loading the page anew (loadAnew), not in place: a moment between screens, which costs the player nothing.
-// A link from outside the page (a notification, a link opened in the app) goes the way a tapped one does (navigate).
 // A screen that sends the player on as it's drawn goes on once it is drawn, so that the page sent to is what shows.
 // A screen whose heading comes after what it loads gets the focus with it (settle), as one drawn at once does. A sheet
 // over the page (a <dialog> on the body, outside any screen: a game's news, the name asked for) goes with the screen
@@ -127,25 +126,6 @@ export function start(target: Element, list: Route[], notFound: () => Child): vo
 
 /** Whether a path is a screen of the app's (else a page of the server's own: /privacy, /mail/off). */
 const routed = (pathname: string): boolean => routes.some((r) => r.path.test(pathname));
-
-/** Opens a link to the game that came from outside the page (a notification tapped, a link opened in the app) as a tap
- * on a link would: a game under way asks first; a page of the server's own loads as a page. */
-export function navigate(link: string): void {
-  let u: URL;
-  try {
-    u = new URL(link, location.href);
-  } catch {
-    return; // not a link: nothing to open
-  }
-  if (u.origin !== location.origin) return;
-  if (!routed(u.pathname)) {
-    location.assign(u.href);
-    return;
-  }
-  const to = u.pathname + u.search + u.hash;
-  const way = () => go(to);
-  if (!leaving?.(way)) way();
-}
 
 /** Whether the next screen opens by loading the page anew (fresh.ts says when), not in place. */
 let anew: () => boolean = () => false;

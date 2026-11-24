@@ -36,7 +36,3 @@ export function withOwn(c: Crowd, mine: number, right: boolean): Crowd {
   const picks = c.picks?.map((x, i) => (x * n + (i === mine ? 1 : 0)) / (n + 1));
   return { ...c, answers: n + 1, right: (c.right * n + (right ? 1 : 0)) / (n + 1), picks };
 }
-
-/** A count with its noun, one or many, in Bulgarian digits: „1 ден“, „12 дни“, „1 234 отговора“. */
-export const count = (n: number, one: string, many: string) =>
-  `${new Intl.NumberFormat("bg", { useGrouping: n >= 10000 }).format(n)} ${n === 1 ? one : many}`;

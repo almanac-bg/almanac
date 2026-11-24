@@ -1,5 +1,7 @@
-// The service worker: it shows the game's notifications, and opens the game where a tap on one points. Nothing else: no caching, so the game is always the one on the
-// server. A notification's tag names it: one sent again (after a restart of the server's) shows in its place.
+// The service worker: it shows the game's notifications, and opens the game where a tap on one points: in a window of
+// the game's already open (that page brought forward, or the window taken there), else in a new one. Nothing else: no
+// caching, so the game is always the one on the server. A notification's tag names it: one sent again (after a restart
+// of the server's) shows in its place.
 
 self.addEventListener("push", (event) => {
   let m = {};
@@ -23,11 +25,12 @@ self.addEventListener("notificationclick", (event) => {
   const data = event.notification.data || {};
   const url = new URL(data.url || "/", self.location.origin).href;
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
-      for (const w of windows) {
-        if (w.url === url && "focus" in w) return w.focus();
-      }
-      return self.clients.openWindow(url);
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (windows) => {
+      const w = windows.find((w) => w.url === url) ?? windows[0];
+      if (!w) return self.clients.openWindow(url);
+      await w.focus();
+      // A window this worker doesn't control (opened before it was) can't be taken elsewhere: a new one then.
+      if (w.url !== url) await w.navigate(url).catch(() => self.clients.openWindow(url));
     }),
   );
 });

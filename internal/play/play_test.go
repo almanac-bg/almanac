@@ -610,10 +610,6 @@ func TestBoardAndStreak(t *testing.T) {
 	if n, _ := w.g.Streak(ctx, ana); n != 1 {
 		t.Fatalf("streak %d after one day", n)
 	}
-	thursday := [7]bool{3: true} // 2026-11-12, Monday first
-	if week, _ := w.g.Week(ctx, ana); week != thursday {
-		t.Fatalf("week %v after Thursday", week)
-	}
 	w.wait(24 * time.Hour)
 	if n, _ := w.g.Streak(ctx, ana); n != 1 {
 		t.Fatalf("streak %d the next morning, before playing", n)
@@ -627,13 +623,7 @@ func TestBoardAndStreak(t *testing.T) {
 	if n, _ := w.g.Streak(ctx, ana); n != 2 {
 		t.Fatalf("streak %d after missing a day, which the week forgives", n)
 	}
-	if week, _ := w.g.Week(ctx, ana); week != [7]bool{3: true, 4: true} {
-		t.Fatalf("week %v on Sunday, after Thursday and Friday", week)
-	}
 	w.wait(24 * time.Hour)
-	if week, _ := w.g.Week(ctx, ana); week != [7]bool{} {
-		t.Fatalf("week %v on a new Monday", week)
-	}
 	if n, _ := w.g.Streak(ctx, ana); n != 2 {
 		t.Fatalf("streak %d after missing two days in a week, both forgiven", n)
 	}
@@ -664,7 +654,7 @@ func TestStreakForgives(t *testing.T) {
 		t.Fatalf("Sunday, the week's forgiving: %+v", s)
 	}
 	if week := w.g.InWeek([]string{"2026-11-14"}); week != [7]bool{5: true} {
-		t.Fatalf("the day forgiven on the week's strip: %v", week)
+		t.Fatalf("the day forgiven this week: %v", week)
 	}
 	w.playDay(ana)
 	streak("Sunday, the third day", 3, []string{"2026-11-14"}, true)

@@ -1,6 +1,6 @@
 // Sounds: made in the browser (no files), for a game's moments — a pick, the count before a game and its start, the
 // clock's last seconds, a right answer (every one the same: nothing counts a row of them), a wrong one or none,
-// the end (won, lost, perfect or just over), the result's pips and the streak, a note in the book, and something new
+// the end (won, lost, perfect or just over), the result's pips, a note in the book, and something new
 // waiting. On unless the player turns them off (kept on this device).
 //
 // Browsers allow sound only once the player has touched the page, so the audio starts then. The bigger sounds (an
@@ -20,7 +20,6 @@ export type SoundName =
   | "perfect"
   | "pip"
   | "dud"
-  | "streak"
   | "hurry"
   | "right"
   | "exact"

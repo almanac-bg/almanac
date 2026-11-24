@@ -11,6 +11,7 @@
 import { api, errorText } from "../lib/api.ts";
 import { h } from "../lib/dom.ts";
 import { player, type User, user } from "../state.ts";
+import { sheet } from "../ui.ts";
 
 /** Where the players asked on this device are kept. */
 const askedKey = "almanac.nameAsked";
@@ -55,7 +56,7 @@ async function ask(without?: () => Promise<boolean>): Promise<boolean> {
   if (!toAsk(u) || (without && (await without()))) return true;
   const here = location.pathname;
   return new Promise((done) =>
-    sheet(u, {
+    nameSheet(u, {
       heading: "Как да те виждат останалите?",
       lead: "С това име ще те виждат в класацията и в дуелите. Можеш да го смениш и после.",
       go: "Готово",
@@ -67,7 +68,7 @@ async function ask(without?: () => Promise<boolean>): Promise<boolean> {
 
 /** The sheet: its words, its gold button's, what follows an answer (`next`), and what a way out without one does
  * (`away`: Esc or a tap beside). */
-function sheet(
+function nameSheet(
   u: User,
   words: {
     heading: string;
@@ -84,6 +85,13 @@ function sheet(
     box.close();
     words.next();
   };
+  // Put away by the router, with the screen it was asked on: not an answer.
+  const here = location.pathname;
+  const away = () => {
+    if (answered) return;
+    if (location.pathname === here) markAsked(u.id);
+    words.away();
+  };
   const input = h("input", {
     name: "name",
     autocomplete: "nickname",
@@ -94,9 +102,7 @@ function sheet(
   });
   const error = h("p", { class: "bad", role: "alert", hidden: true });
   const go = h("button", { class: "btn primary big" }, words.go);
-  const box = h(
-    "dialog",
-    { class: "sheet", "aria-labelledby": "name-sheet-title" },
+  const box = sheet({ closed: away }, () =>
     h(
       "form",
       {
@@ -121,7 +127,7 @@ function sheet(
           answer();
         },
       },
-      h("h2", { id: "name-sheet-title" }, words.heading),
+      h("h2", { id: "sheet-title" }, words.heading),
       h("p", { class: "muted" }, words.lead),
       h("label", { class: "field" }, h("span", null, "Име"), input),
       error,
@@ -133,19 +139,5 @@ function sheet(
     error.textContent = text;
     error.hidden = false;
   };
-  // A tap beside the sheet puts it away, as Esc does.
-  box.addEventListener("click", (e) => {
-    if (e.target === box) box.close();
-  });
-  // Put away by the router, with the screen it was asked on: not an answer.
-  const here = location.pathname;
-  box.addEventListener("close", () => {
-    box.remove();
-    if (answered) return;
-    if (location.pathname === here) markAsked(u.id);
-    words.away();
-  });
-  document.body.append(box);
-  box.showModal();
   input.focus();
 }

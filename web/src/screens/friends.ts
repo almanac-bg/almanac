@@ -23,9 +23,11 @@ let {
   errorText,
   formatNumber,
   h,
+  lifetime,
   onCleanup,
   nameWords,
   emailWords,
+  sheet,
   signal,
   when,
   title,
@@ -87,9 +89,11 @@ export function friends(kit: Kit): Child {
     errorText,
     formatNumber,
     h,
+    lifetime,
     onCleanup,
     nameWords,
     emailWords,
+    sheet,
     signal,
     when,
     title,
@@ -147,6 +151,8 @@ function page(kit: Kit): Child {
   // A friend's yes, told once over the friends: kept as it was said while the list is asked again.
   const yes = signal<Child>(null);
 
+  // The page gone, an answer still on its way does nothing (news marks what it brings as told).
+  const life = lifetime();
   const load = async () => {
     if (!user.peek()) return;
     try {
@@ -156,6 +162,7 @@ function page(kit: Kit): Child {
         // The landing's moment needs the game's feel; without it the card is whole, only still.
         named && !top.peek() ? loadFeel().catch(() => null) : null,
       ]);
+      if (life.aborted) return;
       if (named) {
         const first =
           [...d.yours, ...d.theirs, ...d.played].find((o) => o.id === named) ??
@@ -164,6 +171,7 @@ function page(kit: Kit): Child {
             (r) => r.duel,
             () => null,
           ));
+        if (life.aborted) return;
         if (first?.runId && first.state !== "yours" && !brought) brought = news(first.runId);
         top.set(first);
       }
@@ -197,34 +205,24 @@ function page(kit: Kit): Child {
   };
   // A friend removed, once the player says so on a sheet over the page: at once, the duels open between them ending
   // with it (play.Unfriend).
-  const remove = (f: Friend) => {
-    const yes = () => {
-      box.close();
-      act(async () => {
-        await api("DELETE", `/api/friends/${f.id}`);
-        await load();
-      });
-    };
-    const box = h(
-      "dialog",
-      { class: "sheet", "aria-labelledby": "remove-title" },
-      h(
+  const remove = (f: Friend) =>
+    sheet({}, (close) => {
+      const yes = () => {
+        close();
+        act(async () => {
+          await api("DELETE", `/api/friends/${f.id}`);
+          await load();
+        });
+      };
+      return h(
         "div",
         { class: "card sheet-panel stack" },
-        h("h2", { id: "remove-title" }, `Премахваш ли ${f.name} от приятелите си?`),
+        h("h2", { id: "sheet-title" }, `Премахваш ли ${f.name} от приятелите си?`),
         h("p", { class: "muted" }, "Незавършените дуели между вас свършват."),
         h("button", { class: "btn danger big", type: "button", onclick: yes }, "Премахни"),
-        h("button", { class: "link tap sheet-skip", type: "button", onclick: () => box.close() }, "Отказ"),
-      ),
-    ) as HTMLDialogElement;
-    // A tap beside the sheet puts it away, as Esc does; put away, it goes (the router closes it with the screen).
-    box.addEventListener("click", (e) => {
-      if (e.target === box) box.close();
+        h("button", { class: "link tap sheet-skip", type: "button", onclick: close }, "Отказ"),
+      );
     });
-    box.addEventListener("close", () => box.remove());
-    document.body.append(box);
-    box.showModal();
-  };
   const accept = (r: Request) =>
     act(async () => {
       await api("POST", `/api/friends/requests/${r.id}/accept`, {});

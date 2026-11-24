@@ -30,9 +30,10 @@ func FS(dev bool) fs.FS {
 const ManifestFile = "manifest.json"
 
 // FirstFonts are the fonts the first paint of any page draws in, which the page asks for at once (server/pages.go),
-// before its style says it needs them; the rest load as text in them shows. cmd/build counts them in the first
-// screen's budget.
-var FirstFonts = []string{"sofia-sans.woff2"}
+// before its style says it needs them; the rest load as text in them shows. Днес's first paint has both: the text, and
+// the cover's big date in the narrow numerals, which, asked for only once drawn, came 0.4 s after it and jumped from
+// wide to narrow. cmd/build counts them in the first screen's budget.
+var FirstFonts = []string{"sofia-sans.woff2", "sofia-sans-extra-condensed.woff2"}
 
 // FirstScripts are the scripts every page loads as it starts besides the app's own (app.js), each a file of its own:
 // the pictures (the cover's ten glyphs are theirs). The page asks for them at once (server/pages.go), beside the app,

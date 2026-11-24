@@ -427,7 +427,7 @@ func (g *Game) Streak(ctx context.Context, userID int64) (int, error) {
 	return s.Days, err
 }
 
-// InWeek is which of these days (YYYY-MM-DD) are in this week, Monday first: the days forgiven on the streak's strip.
+// InWeek is which of these days (YYYY-MM-DD) are in this week, Monday first: the days the streak forgave this week.
 func (g *Game) InWeek(days []string) [7]bool {
 	var week [7]bool
 	today, _ := time.Parse(time.DateOnly, g.Today())
@@ -439,28 +439,4 @@ func (g *Game) InWeek(days []string) [7]bool {
 		}
 	}
 	return week
-}
-
-// Week is which days of this week, Monday first, a player has finished the day's questions on: the streak's strip.
-func (g *Game) Week(ctx context.Context, userID int64) ([7]bool, error) {
-	var week [7]bool
-	today, _ := time.Parse(time.DateOnly, g.Today())
-	monday := today.AddDate(0, 0, -((int(today.Weekday()) + 6) % 7))
-	rows, err := g.DB.Read.QueryContext(ctx, `SELECT day FROM runs WHERE user_id = ? AND kind = 'day'
-		AND finished_at IS NOT NULL AND day >= ? AND day <= ?`, userID, monday.Format(time.DateOnly), today.Format(time.DateOnly))
-	if err != nil {
-		return week, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var day string
-		if err := rows.Scan(&day); err != nil {
-			return week, err
-		}
-		d, _ := time.Parse(time.DateOnly, day)
-		if i := int(d.Sub(monday) / (24 * time.Hour)); i >= 0 && i < len(week) {
-			week[i] = true
-		}
-	}
-	return week, rows.Err()
 }
