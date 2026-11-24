@@ -1,13 +1,13 @@
 // The page kept current. A page stays open for days (a tab, the app's web view) while the game changes under it: a
-// deploy (several a day) renames the files its screens load and may change the API, and another tab may sign in, out,
+// deploy (several a day) renames the files the page loads and may change the API, and another tab may sign in, out,
 // or as someone else.
 //
 // Every API answer says the server's version (X-Almanac-Version: server/api.go); a session the server says has ended
 // ends here too; and each tab tells the others of the player it has (a BroadcastChannel). A page that has fallen behind
 // (stale) loads itself anew at the next moment that costs the player nothing: the next screen opened (router.ts,
 // loadAnew: that screen is going anyway), or the page come back into view while no game is under way (playing). Back
-// after a while away (a phone's app brought back), the page asks the server first (GET /api/me) whether it's behind. A screen's own file that doesn't load is most
-// likely one of a version gone by: the page loads anew for it, once (recover).
+// after a while away (a phone's app brought back), the page asks the server first (GET /api/me) whether it's
+// behind.
 
 import { api, hearing } from "./lib/api.ts";
 import { version } from "./lib/boot.ts";
@@ -95,25 +95,4 @@ export function keepFresh(): void {
     else if (stale.peek()) catchUp();
     else if (hiddenAt && Date.now() - hiddenAt >= away) void check();
   });
-}
-
-/** A file of the page's own that didn't load (a screen's, loaded the first time it opens): if the server answers, the
- * line is fine and the file most likely one of a version gone by, so the page loads anew (true), once for the page and
- * version (a file truly missing isn't loaded again and again). False: no line, or loaded anew already. */
-export async function recover(): Promise<boolean> {
-  try {
-    await api("GET", "/api/me");
-  } catch {
-    return false;
-  }
-  const key = "almanac.anew";
-  const mark = `${version} ${location.pathname}`;
-  try {
-    if (sessionStorage.getItem(key) === mark) return false;
-    sessionStorage.setItem(key, mark);
-  } catch {
-    return false; // no storage: not a reload that might never end
-  }
-  location.reload();
-  return true;
 }

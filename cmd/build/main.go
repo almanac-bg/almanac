@@ -1,6 +1,6 @@
 // Command build turns the web client (web/) into the files the server serves (internal/assets/dist): the first
-// screen's script and stylesheet (app.js, app.css), every screen a daily visit doesn't open as a script of its own
-// (web/src/kit.ts), the illustrations, the game's feel, and the fonts, all minified and named by their content, each
+// client's script and stylesheet (app.js, app.css: every screen, the illustrations and the game's feel in one file)
+// and the fonts, all minified and named by their content, each
 // script and stylesheet beside a copy compressed ahead (brotli at its best, and gzip: the server sends the one the
 // browser takes), plus web/public as it is. It writes a manifest of what each became (app.js → assets/app-3F2A9C.js;
 // a font by its own name, sofia-sans.woff2 → assets/sofia-sans-7C1D0E.woff2), says how big each is as a browser
@@ -37,14 +37,18 @@ import (
 )
 
 // firstScreen is how big, brotli-compressed as it's sent, what Днес needs before it draws may be: firstFiles and the
-// fonts the page preloads (assets.FirstFonts). Every daily player downloads it again after each release. A screen a
-// daily visit doesn't open loads on its own (web/src/kit.ts) and doesn't count here. About 128 kB in November 2026, 60
-// of them the two fonts (each cached until it changes).
-const firstScreen = 136 << 10
+// fonts the page preloads (assets.FirstFonts). Every daily player downloads it again after each release. About 137 kB
+// in November 2026, 60 of them the two fonts (each cached until it changes).
+//
+// Raised once, from 136 kB, by what one file costs (10 kB), on 25 November 2026: until then the screens a daily visit
+// doesn't open (Алманах, Приятели, Профил…) and the pictures loaded as files of their own, kept off this budget by a
+// hand-kept registry of what each used (a new screen touched six places, and nothing could be shared with app.js).
+// Timed cold before and after, all the split saved was 46 ms of a 2-second first paint on slow 4G and 10 ms on a fair
+// line: one file is worth that. Past the budget, find what grew; don't split the client again to make room.
+const firstScreen = 146 << 10
 
-// firstFiles are the scripts and styles Днес draws with: the app, and the scripts every page loads as it starts
-// (assets.FirstScripts: the pictures, whose are the cover's ten glyphs).
-var firstFiles = append([]string{"app.js", "app.css"}, assets.FirstScripts...)
+// firstFiles are the script and style Днес draws with: the whole client's.
+var firstFiles = []string{"app.js", "app.css"}
 
 // fontCeiling is how big the fonts a page of Bulgarian may need together may grow: each face's first file (the
 // second, <face>-rest, loads only where a letter of another language shows: web/src/fonts/subset.sh). Two faces
@@ -81,7 +85,7 @@ func build(watch, sourceMaps bool) error {
 		Write:       true,
 		Metafile:    true,
 		Format:      api.FormatESModule,
-		Splitting:   true, // each import() a file of its own
+		Splitting:   false, // one file: every screen in app.js
 		Target:      api.ES2022,
 		// The oldest browsers the game is for: what it uses (CSS, JS, the DOM) must be in all three, held by
 		// web/src/engines.test.ts for what tsc can't see.
@@ -139,8 +143,7 @@ func build(watch, sourceMaps bool) error {
 	return checkSize(out)
 }
 
-// writeManifest records which file each entry became (app.js → assets/app-3F2A9C.js; a screen loaded on its own by
-// its file's name, settings.js) and each font (sofia-sans.woff2 → assets/sofia-sans-7C1D0E.woff2).
+// writeManifest records which file each entry became (app.js → assets/app-3F2A9C.js) and each font (sofia-sans.woff2 → assets/sofia-sans-7C1D0E.woff2).
 func writeManifest(out, metafile string) error {
 	var meta struct {
 		Outputs map[string]struct {
@@ -278,23 +281,11 @@ func checkSize(out string) error {
 	}
 	switch {
 	case first > firstScreen:
-		return fmt.Errorf("the first screen is %d kB as sent, past its budget of %d kB: load what Днес doesn't draw on its own (web/src/kit.ts)", first>>10, firstScreen>>10)
+		return fmt.Errorf("the first screen is %d kB as sent, past its budget of %d kB: find what grew, and what it's worth to every player", first>>10, firstScreen>>10)
 	case fonts > fontCeiling:
 		return fmt.Errorf("the fonts for Bulgarian are %d kB, past their ceiling of %d kB: cut them to what the texts use (web/src/fonts/subset.sh)", fonts>>10, fontCeiling>>10)
 	case all > ceiling:
 		return fmt.Errorf("the client is %d kB as sent, past its ceiling of %d kB: something grew by far more than a feature does", all>>10, ceiling>>10)
-	}
-	// A script that's no entry's is code a screen loaded on its own shares with app.js, split off for every page to
-	// load first: the screen must take it from web/src/kit.ts instead.
-	files, err := filepath.Glob(filepath.Join(out, "assets", "*.js"))
-	if err != nil {
-		return err
-	}
-	known := slices.Collect(maps.Values(manifest))
-	for _, f := range files {
-		if !slices.Contains(known, "assets/"+filepath.Base(f)) {
-			return fmt.Errorf("%s is shared by app.js and a screen of its own: hand that screen what it needs in web/src/kit.ts", filepath.Base(f))
-		}
 	}
 	return nil
 }

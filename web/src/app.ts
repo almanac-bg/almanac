@@ -4,18 +4,21 @@
 // aside while one is under way. A new visitor's cover (the day alone: screens/today.ts) and the sign-in page
 // (`/signin`) have the frame bare: the mark where it always is, no places (and on the sign-in page no „Вход“).
 
-import { loadPictures } from "./art/picture.ts";
 import { keepFresh } from "./fresh.ts";
-import { later } from "./kit.ts";
 import { effect, h, mount } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { applyPrefs } from "./lib/prefs.ts";
 import { preparePush } from "./lib/push.ts";
 import { path, start } from "./lib/router.ts";
 import { prepareSound } from "./lib/sound.ts";
+import { almanac, chapter as bookChapter } from "./screens/almanac.ts";
 import { duelOne } from "./screens/duel.ts";
+import { friends } from "./screens/friends.ts";
+import { me } from "./screens/me.ts";
 import { missing } from "./screens/missing.ts";
 import { chapter } from "./screens/play.ts";
+import { playerProfile } from "./screens/player.ts";
+import { settings } from "./screens/settings.ts";
 import { signInPage } from "./screens/signin.ts";
 import { sharedDay, today } from "./screens/today.ts";
 import { cover, friendsNews, look, playing, user, watchNews } from "./state.ts";
@@ -33,9 +36,6 @@ const places: [href: string, label: string, icon: string, here: (p: string) => b
 reportErrors();
 applyPrefs();
 keepFresh();
-// The illustrations, in a file of their own: asked for with the page (server/pages.go, a modulepreload) and on their way
-// at once.
-const pictures = loadPictures().catch(() => {});
 
 /** The places as links (the bar's on a big screen, the foot's on a phone): the one here marked; a dot on Приятели
  * while something has come there since the player last looked (friendsNews). */
@@ -55,11 +55,8 @@ const placeLinks = () =>
     ),
   );
 
-// The first screen drawn with its pictures (the cover's ten glyphs, the avatar): their file is a sixth of the app's and
-// asked for beside it, so it's nearly always in first, but its module comes a moment after the app's, and a cold
-// load painted the cover's glyphs as empty tiles that popped in. Never held for them more than a moment.
 const root = document.getElementById("app");
-if (root) Promise.race([pictures, new Promise((r) => setTimeout(r, 500))]).then(() => draw(root));
+if (root) draw(root);
 
 /** The frame and the screen under it, started. */
 function draw(root: HTMLElement): void {
@@ -93,32 +90,17 @@ function draw(root: HTMLElement): void {
       { path: /^\/$/, view: today },
       { path: /^\/play\/([a-z]+)$/, view: chapter },
       { path: /^\/duel\/([0-9]+)$/, view: duelOne },
-      { path: /^\/almanac$/, view: later(() => import("./screens/almanac.ts").then((m) => m.almanac)) },
-      { path: /^\/almanac\/([a-z]+)$/, view: later(() => import("./screens/almanac.ts").then((m) => m.chapter)) },
-      { path: /^\/friends$/, view: later(() => import("./screens/friends.ts").then((m) => m.friends)) },
-      { path: /^\/settings$/, view: later(() => import("./screens/settings.ts").then((m) => m.settings)) },
+      { path: /^\/almanac$/, view: almanac },
+      { path: /^\/almanac\/([a-z]+)$/, view: bookChapter },
+      { path: /^\/friends$/, view: friends },
+      { path: /^\/settings$/, view: settings },
       { path: /^\/d\/([0-9]{1,5})-([a-z2-9]{8})$/, view: sharedDay },
-      { path: /^\/me$/, view: later(() => import("./screens/me.ts").then((m) => m.me)) },
+      { path: /^\/me$/, view: me },
       { path: /^\/signin$/, view: signInPage },
-      {
-        path: /^\/players\/([A-Za-z0-9_.]{3,20})$/,
-        view: later(() => import("./screens/player.ts").then((m) => m.playerProfile)),
-      },
+      { path: /^\/players\/([A-Za-z0-9_.]{3,20})$/, view: playerProfile },
     ],
     missing,
   );
-  // The places' own code, once the first screen is in and the browser has a moment: a place opened later is drawn at
-  // once, its file already here (later's load comes from memory), never a blank page while it comes.
-  const places = () => {
-    for (const load of [
-      () => import("./screens/almanac.ts"),
-      () => import("./screens/friends.ts"),
-      () => import("./screens/me.ts"),
-    ])
-      load().catch(() => {});
-  };
-  if (typeof requestIdleCallback === "function") requestIdleCallback(places, { timeout: 5000 });
-  else setTimeout(places, 2000);
   // In a game the frame steps aside (app.css): the question gets the screen.
   effect(() => document.documentElement.classList.toggle("playing", playing()));
   // The frame bare, no places: a new visitor's cover (Днес at its own address), and the sign-in page.

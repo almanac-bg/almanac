@@ -2,10 +2,11 @@
 // laid out the same on every result screen. The questions gone over are one dialog for every game (reviewSheet): the
 // day's issue, a chapter's game, a duel.
 
+import * as feel from "../feel.ts";
 import { api, errorText } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
 import { calm } from "../lib/prefs.ts";
-import { feelKit, play } from "../lib/sound.ts";
+import { play } from "../lib/sound.ts";
 import { avatar, chapterName, chip, fact, type Look, leaf, sheet, tiles, who } from "../ui.ts";
 import { type FriendDay, fewFriends, friendsLine, groupWords, markAt, shortName } from "./knew.ts";
 import { closeLine, closeWords } from "./numbers.ts";
@@ -139,8 +140,7 @@ const moments = new Map<number, Promise<void>>();
 export const landed = (run: number): Promise<void> => moments.get(run) ?? Promise.resolve();
 
 /** A game's result as a moment as it ends (feel.ts: the pips, the score, the motif), once: never again on its way
- * back to the screen; the day's pips a little slower. Without the feel loaded, the result is as it is, with the end's
- * sound. */
+ * back to the screen; the day's pips a little slower. */
 export function land(hero: HTMLElement, run: number, perfect: boolean, day: boolean): void {
   const key = `almanac.landed.${run}`;
   try {
@@ -149,14 +149,9 @@ export function land(hero: HTMLElement, run: number, perfect: boolean, day: bool
   } catch {
     // no storage: the moment plays, as it would the first time
   }
-  const kit = feelKit();
-  if (!kit) {
-    play(perfect ? "perfect" : "end");
-    return;
-  }
   moments.set(
     run,
-    new Promise((done) => requestAnimationFrame(() => kit.result(hero, perfect, hands(), day ? 85 : 60).then(done))),
+    new Promise((done) => requestAnimationFrame(() => feel.result(hero, perfect, hands(), day ? 85 : 60).then(done))),
   );
 }
 

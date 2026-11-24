@@ -6,30 +6,13 @@
 // only one's own (Смени, Настройки). One's own, opened by its tag, is Профил: the page goes there (ui.ts, profileHref,
 // links there already).
 
-import type { Kit } from "../kit.ts";
-import type { Child } from "../lib/dom.ts";
-import type { ChapterRank } from "../ui.ts";
-
-// The app's pieces, set as the screen opens: it loads on its own, the first time it's opened (kit.ts), and imports
-// only types.
-let {
-  api,
-  errorText,
-  h,
-  nameWords,
-  signal,
-  title,
-  checkNews,
-  user,
-  avatar,
-  go,
-  lifetime,
-  startDuel,
-  withWord,
-  profileHead,
-  sealsSection,
-  isOwnTag,
-} = {} as Kit;
+import { api, errorText } from "../lib/api.ts";
+import { type Child, h, lifetime, signal } from "../lib/dom.ts";
+import { go, title } from "../lib/router.ts";
+import { withWord } from "../lib/words.ts";
+import { checkNews, user } from "../state.ts";
+import { avatar, type ChapterRank, isOwnTag, nameWords, profileHead, sealsSection } from "../ui.ts";
+import { startDuel } from "./duel.ts";
 
 interface Profile {
   name: string;
@@ -46,25 +29,7 @@ interface Profile {
   id?: number;
 }
 
-export function playerProfile(kit: Kit, [tag]: string[]): Child {
-  ({
-    api,
-    errorText,
-    h,
-    nameWords,
-    signal,
-    title,
-    checkNews,
-    user,
-    avatar,
-    go,
-    lifetime,
-    startDuel,
-    withWord,
-    profileHead,
-    sealsSection,
-    isOwnTag,
-  } = kit);
+export function playerProfile([tag]: string[]): Child {
   // One's own: Профил, the page with what's one's own on it.
   if (isOwnTag(tag ?? "")) {
     go("/me", true);

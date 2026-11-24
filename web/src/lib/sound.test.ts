@@ -74,8 +74,8 @@ class FakeAudio {
 const touch = { isActive: false };
 Object.defineProperty(globalThis.navigator, "userActivation", { value: touch, configurable: true });
 
-const { loadFeel, play, playAnswer, playCount, setSound } = await import("./sound.ts");
-await loadFeel(); // in the game, the first touch sends for the voices
+const { play, playAnswer, playCount, setSound } = await import("./sound.ts");
+const { length } = await import("../feel.ts");
 
 beforeEach(() => {
   setSound(true);
@@ -148,8 +148,7 @@ test("the count before a game sounds only for its last three seconds", () => {
   assert.equal(tones.filter((t) => near(t.hz, 880)).length, 3);
 });
 
-test("the answers' sounds are short, the moments' longer but under a second and a half", async () => {
-  const { length } = await loadFeel();
+test("the answers' sounds are short, the moments' longer but under a second and a half", () => {
   for (const name of ["tap", "key", "tick", "hurry", "right", "exact", "partial", "wrong", "time", "pip"] as const)
     assert.ok(length(name) < 0.5, `${name}: ${length(name)} s`);
   for (const name of ["end", "perfect", "win"] as const) assert.ok(length(name) <= 1.4, `${name}: ${length(name)} s`);

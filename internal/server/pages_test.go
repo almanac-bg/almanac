@@ -188,15 +188,13 @@ func TestNachaloHasTheDayInItsPage(t *testing.T) {
 	}
 }
 
-// A page asks at once for its style, its script, the scripts every page loads as it starts (the pictures), its first
-// fonts and, where its screen loads on its own, that screen's file: in its head, and in a Link header. The player's
-// Night or Day is on it before its first paint (scheme.js).
+// A page asks at once for its style, its script (the whole client) and its first fonts: in its head, and in a Link
+// header. The player's Night or Day is on it before its first paint (scheme.js).
 func TestPagesAskForTheirFilesAtOnce(t *testing.T) {
 	g := start(t)
 	g.srv.client = fstest.MapFS{
 		"manifest.json": {Data: []byte(`{"app.css": "assets/app-C.css", "app.js": "assets/app-J.js",
-			"sofia-sans.woff2": "assets/sofia-sans-F.woff2", "settings.js": "assets/settings-S.js",
-			"pictures.js": "assets/pictures-P.js"}`)},
+			"sofia-sans.woff2": "assets/sofia-sans-F.woff2"}`)},
 	}
 	get := func(path string) (*http.Response, string) {
 		res, err := http.Get(g.url + path)
@@ -213,8 +211,6 @@ func TestPagesAskForTheirFilesAtOnce(t *testing.T) {
 		`<link rel="preload" href="/assets/sofia-sans-F.woff2" as="font" type="font/woff2" crossorigin>`,
 		`<link rel="stylesheet" href="/assets/app-C.css">`,
 		`<script type="module" src="/assets/app-J.js"></script>`,
-		`<link rel="modulepreload" href="/assets/settings-S.js">`,
-		`<link rel="modulepreload" href="/assets/pictures-P.js">`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("/settings has no %s", want)
@@ -223,19 +219,11 @@ func TestPagesAskForTheirFilesAtOnce(t *testing.T) {
 	link := res.Header.Get("Link")
 	for _, want := range []string{
 		"</assets/app-C.css>; rel=preload; as=style", "</assets/app-J.js>; rel=modulepreload",
-		"</assets/settings-S.js>; rel=modulepreload", "</assets/pictures-P.js>; rel=modulepreload",
 		`</assets/sofia-sans-F.woff2>; rel=preload; as=font; type="font/woff2"; crossorigin`,
 	} {
 		if !strings.Contains(link, want) {
 			t.Errorf("/settings's Link header %q has no %s", link, want)
 		}
-	}
-	res, body = get("/")
-	if strings.Contains(body, "settings") || strings.Contains(res.Header.Get("Link"), "settings") {
-		t.Errorf("Днес asks for a screen of its own: %q", res.Header.Get("Link"))
-	}
-	if !strings.Contains(res.Header.Get("Link"), "</assets/pictures-P.js>; rel=modulepreload") {
-		t.Errorf("Днес doesn't ask for the pictures at once: %q", res.Header.Get("Link"))
 	}
 }
 

@@ -1,10 +1,8 @@
-// The game's feel, in a file of its own: the sounds' voices, the result's moment (a game's end as a short sequence),
-// a duel's. It loads after the player's first touch
-// (lib/sound.ts starts it), since nothing sounds or ends before one, and the first screen doesn't wait for it; until
-// it's in, the game is whole and only plainer: the screens always draw the end state, and this only moves them there.
-// Like a screen that loads on its own (kit.ts), it imports nothing of the app but types: what it needs comes as
-// arguments, so nothing is split into a file every page would load first. Its motion is in the Web Animations API and
-// its few styles through the CSSOM (the page's CSP allows no style element), so it needs no stylesheet of its own.
+// The game's feel: the sounds' voices, the result's moment (a game's end as a short sequence), a duel's. The screens
+// always draw the end state, and this only moves them there. It imports nothing of the app but types: what it needs
+// comes as arguments (Hands), so lib/sound.ts, which plays its voices, can import it. Its motion is in the Web
+// Animations API and its few styles through the CSSOM (the page's CSP allows no style element), so it needs no
+// stylesheet of its own.
 //
 // Motion is quiet and once: no confetti, no particles, nothing that loops. With less motion („По-малко движение“) every
 // moment shows its end state at once, with its sound.

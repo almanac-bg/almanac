@@ -9,34 +9,16 @@
 // (no list of them: one is played at a time, the next comes up). The duel just played, or named by an old
 // link to it (`top`), comes first in its own group (a result first of the played, one sent first of those waiting for a
 // friend), in sight, and its score counts up once as it lands (feel.ts: duel), never again.
-//
-// It's Приятели's, loaded with it, and is handed the app's pieces: it imports only types.
 
+import * as feel from "../feel.ts";
+import { hands, reviewSheet } from "../game/results.ts";
 import type { Reviewed } from "../game/types.ts";
-import type { Kit } from "../kit.ts";
-import type { Child } from "../lib/dom.ts";
+import { api, errorText } from "../lib/api.ts";
+import { type Child, h, signal } from "../lib/dom.ts";
 import type { SoundName } from "../lib/sound.ts";
-import type { Look } from "../ui.ts";
+import { leftWords, withWord } from "../lib/words.ts";
+import { avatar, formatNumber, type Look, mini, nameWords, sheet } from "../ui.ts";
 import type { DuelMark, Duels, DuelView, PlayedPage, Side } from "./duel.ts";
-
-// The app's pieces, set as the cards are drawn (duelGroup).
-let {
-  api,
-  avatar,
-  errorText,
-  feelKit,
-  formatNumber,
-  h,
-  hands,
-  leftWords,
-  mini,
-  nameWords,
-  play,
-  reviewSheet,
-  sheet,
-  signal,
-  withWord,
-} = {} as Kit;
 
 /** How many questions a duel has. */
 const total = 10;
@@ -309,16 +291,10 @@ function firstTime(key: string): boolean {
 }
 
 /** A duel's result as a moment, the first time its card shows at the top (feel.ts: duel: the marks fill pair by
- * pair, the score counts up with them, then the chip lands with the end's sound); without the feel, its sound alone.
- * A duel still waiting for the friend has no result to land. */
+ * pair, the score counts up with them, then the chip lands with the end's sound). A duel still waiting for the friend has no result to land. */
 function land(card: HTMLElement, d: DuelView): void {
   if (!ended(d) || !firstTime(`${d.id}:${d.state}`)) return;
   const end: SoundName = d.state === "won" ? "win" : d.state === "lost" ? "lose" : "end";
-  const feel = feelKit();
-  if (!feel) {
-    play(end);
-    return;
-  }
   const rights = (s?: Side) => (s?.marks ?? []).map((m) => (m.right ? 1 : 0));
   void feel.duel(card, { mine: rights(d.you), theirs: rights(d.opponent), end }, hands());
 }
@@ -332,30 +308,12 @@ function land(card: HTMLElement, d: DuelView): void {
  * for a friend; what its game brought under it (`under`: game/news.ts), its result landing once, brought into sight
  * once a visit (`sight`: one object for the visit, marked done). */
 export function duelGroup(
-  kit: Kit,
   which: "open" | "played",
   d: Duels,
   top: DuelView | null,
   under: Child = null,
   sight: { done: boolean; at?: number } = { done: true },
 ): Child {
-  ({
-    api,
-    avatar,
-    errorText,
-    feelKit,
-    formatNumber,
-    h,
-    hands,
-    leftWords,
-    mini,
-    nameWords,
-    play,
-    reviewSheet,
-    sheet,
-    signal,
-    withWord,
-  } = kit);
   sighted = sight;
   const rest = (v: DuelView) => v.id !== top?.id;
   const named = top && shown(top);
