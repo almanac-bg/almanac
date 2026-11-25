@@ -8,8 +8,13 @@ import (
 	"time"
 )
 
+// frame is the bar the server's own pages share (plainPage, /admin's: adminFrame), as the app draws it: the mark, and
+// the three places ("places", again at the foot of a plain page).
+const frame = `{{define "header"}}<header class="frame"><div class="bar"><a class="brand" href="/"><svg class="rosette" viewBox="5 5 54 54" aria-hidden="true"><path class="petal gold" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(-45 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(45 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(135 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(225 32 32)"/></svg>АЛМАНАХ</a><nav class="places" aria-label="Основна навигация">{{template "places"}}</nav></div></header>{{end}}
+{{- define "places"}}<a href="/"><span class="i i-today" aria-hidden="true"></span>Днес</a><a href="/almanac"><span class="i i-book" aria-hidden="true"></span>Алманах</a><a href="/friends"><span class="i i-friends" aria-hidden="true"></span>Приятели</a>{{end}}`
+
 // The server's own pages: plain HTML in the app's style, no script.
-var plainPage = template.Must(template.New("page").Parse(`<!doctype html>
+var plainPage = template.Must(template.New("page").Parse(frame + `<!doctype html>
 <html lang="bg">
 <head>
 <meta charset="utf-8">
@@ -23,7 +28,7 @@ var plainPage = template.Must(template.New("page").Parse(`<!doctype html>
 </head>
 <body>
 <div id="app">
-<header class="frame"><div class="bar"><a class="brand" href="/"><svg class="rosette" viewBox="5 5 54 54" aria-hidden="true"><path class="petal gold" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(-45 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(45 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(135 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(225 32 32)"/></svg>АЛМАНАХ</a><nav class="places" aria-label="Основна навигация">{{template "places"}}</nav></div></header>
+{{template "header"}}
 <main id="main" class="screen prose">
 <div class="intro">{{with .Back}}<a class="back" href="{{.Href}}"><span class="i i-left back-i" aria-hidden="true"></span>{{.Label}}</a>{{end}}<h1>{{.Title}}</h1></div>
 {{.Body}}
@@ -32,7 +37,7 @@ var plainPage = template.Must(template.New("page").Parse(`<!doctype html>
 </div>
 </body>
 </html>
-{{define "places"}}<a href="/"><span class="i i-today" aria-hidden="true"></span>Днес</a><a href="/almanac"><span class="i i-book" aria-hidden="true"></span>Алманах</a><a href="/friends"><span class="i i-friends" aria-hidden="true"></span>Приятели</a>{{end}}`))
+`))
 
 // back is the way back a page of the server's own shows over its title: to where it's reached from in the game. On
 // a phone with the game put on its screen there is no browser's own back (the manifest's standalone).

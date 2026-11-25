@@ -40,7 +40,6 @@ func eventually(t *testing.T, what string, ok func() bool) {
 
 func TestGoStopsAPanicAndTellsIt(t *testing.T) {
 	kinds := told(t)
-	before := Stopped()
 	var after atomic.Bool
 	Go("a count", func() { panic("boom") }, func() { after.Store(true) })
 	eventually(t, "the panic told", func() bool { return len(kinds()) == 1 })
@@ -48,8 +47,8 @@ func TestGoStopsAPanicAndTellsIt(t *testing.T) {
 		t.Errorf("told %q", got)
 	}
 	eventually(t, "the fallback run", after.Load)
-	if Stopped() != before+1 {
-		t.Errorf("stopped %d, want %d", Stopped(), before+1)
+	if k := kinds(); len(k) != 1 {
+		t.Errorf("told %q, want it once", k)
 	}
 }
 

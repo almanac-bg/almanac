@@ -2,6 +2,7 @@
 // laid out the same on every result screen. The questions gone over are one dialog for every game (reviewSheet): the
 // day's issue, a chapter's game, a duel.
 
+import { petal } from "../art/pictures.ts";
 import * as feel from "../feel.ts";
 import { api, errorText } from "../lib/api.ts";
 import { type Child, h, signal } from "../lib/dom.ts";
@@ -172,11 +173,11 @@ function perfectMark(): SVGElement {
     // Turned by its group, so the petal itself is free to grow (feel.ts) about the centre.
     const group = document.createElementNS(ns, "g");
     group.setAttribute("transform", `rotate(${turn} 32 32)`);
-    const petal = document.createElementNS(ns, "path");
-    petal.setAttribute("d", "M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z");
-    petal.setAttribute("class", turn < 0 ? "petal gold" : "petal");
-    petal.style.transformOrigin = "32px 32px";
-    group.append(petal);
+    const path = document.createElementNS(ns, "path");
+    path.setAttribute("d", petal);
+    path.setAttribute("class", turn < 0 ? "petal gold" : "petal");
+    path.style.transformOrigin = "32px 32px";
+    group.append(path);
     svg.append(group);
   }
   return svg;

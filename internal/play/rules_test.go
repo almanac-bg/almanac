@@ -99,7 +99,7 @@ func TestRunEndedByTheClock(t *testing.T) {
 	if d, _ := w.g.DuelsOf(ctx, vi); len(d.Played) != 1 || d.Played[0].State != DuelLost {
 		t.Fatalf("Vi's duel: %+v", d)
 	}
-	if err := w.g.settleDuel(ctx, duel, 0, false); err != nil {
+	if err := w.g.settleDuel(ctx, duel, false); err != nil {
 		t.Fatalf("a duel settled twice: %v", err)
 	}
 	if d, _ := w.g.DuelsOf(ctx, vi); len(d.Played) != 1 || d.Played[0].State != DuelLost {

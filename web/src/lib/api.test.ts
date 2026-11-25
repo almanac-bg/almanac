@@ -119,11 +119,11 @@ test("an answer is sent again while it doesn't get through and its question is o
   let asked = serve("down", json(502, {}), "down", json(200, { ok: true }));
   assert.deepEqual(await live(() => true), { ok: true });
   assert.equal(asked.length, 4);
-  // A „no“ of the server's (too late) ends it at once.
-  asked = serve(json(409, { error: "not_now", message: "Вече е късно за това." }));
+  // A „no“ of the server's ends it at once.
+  asked = serve(json(409, { error: "out_of_step", message: "Играта е продължила другаде. Зареждаме я наново." }));
   await assert.rejects(
     live(() => true),
-    { code: "not_now" },
+    { code: "out_of_step" },
   );
   assert.equal(asked.length, 1);
   // The question gone meanwhile: no more sends.

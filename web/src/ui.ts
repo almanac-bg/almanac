@@ -2,6 +2,7 @@
 // chapter's colour. The stylesheet draws them; these only say what to draw.
 
 import { picture } from "./art/picture.ts";
+import { petal } from "./art/pictures.ts";
 import type { Credit, Score } from "./game/types.ts";
 import { errorText, passing } from "./lib/api.ts";
 import { hourInBulgaria } from "./lib/day.ts";
@@ -527,11 +528,11 @@ export function rosette(): SVGSVGElement {
   svg.setAttribute("class", "rosette");
   svg.setAttribute("aria-hidden", "true");
   for (const turn of [-45, 45, 135, 225]) {
-    const petal = document.createElementNS(ns, "path");
-    petal.setAttribute("d", "M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z");
-    petal.setAttribute("transform", `rotate(${turn} 32 32)`);
-    petal.setAttribute("class", turn < 0 ? "petal gold" : "petal");
-    svg.append(petal);
+    const path = document.createElementNS(ns, "path");
+    path.setAttribute("d", petal);
+    path.setAttribute("transform", `rotate(${turn} 32 32)`);
+    path.setAttribute("class", turn < 0 ? "petal gold" : "petal");
+    svg.append(path);
   }
   return svg;
 }

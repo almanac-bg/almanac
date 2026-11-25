@@ -2,6 +2,7 @@ package card
 
 import (
 	"bytes"
+	"encoding/binary"
 	"flag"
 	"image/png"
 	"os"
@@ -35,10 +36,24 @@ func TestIcons(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !alike(t, have, b) {
+		if !alike(t, icoPNG(t, have), icoPNG(t, b)) {
 			t.Errorf("web/public/%s isn't what Icon draws: go test ./internal/card -run TestIcons -update", ic.File)
 		}
 	}
+}
+
+// icoPNG is the PNG in an icon's file: the file itself, or the one image after an ICO's header (Draw), the header
+// checked.
+func icoPNG(t *testing.T, b []byte) []byte {
+	t.Helper()
+	if !bytes.HasPrefix(b, []byte{0, 0, 1, 0}) {
+		return b
+	}
+	if len(b) < icoHeader || binary.LittleEndian.Uint16(b[4:]) != 1 || binary.LittleEndian.Uint32(b[18:]) != icoHeader ||
+		int(binary.LittleEndian.Uint32(b[14:])) != len(b)-icoHeader {
+		t.Fatalf("an ICO not as Draw makes it: % x", b[:min(len(b), icoHeader)])
+	}
+	return b[icoHeader:]
 }
 
 // alike says two PNGs are the same picture: the same size, and every pixel within a few levels of the other's (the
@@ -70,8 +85,19 @@ func alike(t *testing.T, a, b []byte) bool {
 }
 
 // The mark's SVGs (the browser's icon, the mail's BIMI) are painted in the icons' three colours and no other, with the
-// rosette's own petal.
+// rosette's own petal; and the client draws it (art/pictures.ts, petal) and the server's pages' bar (server/privacy.go,
+// frame) with the same petal.
 func TestMarkSVGs(t *testing.T) {
+	const petal = "M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z"
+	for _, path := range []string{"../../web/src/art/pictures.ts", "../server/privacy.go"} {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(b), petal) {
+			t.Errorf("%s hasn't the rosette's petal", path)
+		}
+	}
 	want := []string{"#16132b", "#e0a81e", "#f5f3ff"}
 	for _, name := range []string{"favicon.svg", "bimi.svg"} {
 		b, err := os.ReadFile(filepath.Join(public, name))
@@ -88,7 +114,7 @@ func TestMarkSVGs(t *testing.T) {
 		if !slices.Equal(have, want) {
 			t.Errorf("%s is painted %v, not the mark's %v", name, have, want)
 		}
-		if !strings.Contains(string(b), "M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z") {
+		if !strings.Contains(string(b), petal) {
 			t.Errorf("%s hasn't the rosette's petal", name)
 		}
 	}

@@ -9,7 +9,9 @@
 // accident (a font's whole alphabet built in), not a limit to write around.
 //
 // A release has no source maps: nobody but a developer reads one, and the build is the same from the same commit (to
-// read a stack from production, build its release's commit with -maps: the files and their names come out the same).
+// read a stack from production, build its release's commit with -maps: the code comes out the same, line and column,
+// but each file's name differs, as the map's comment at its end is in its hash; read a line of app-<release>.js through
+// app-<this build>.js.map).
 //
 //	go run ./cmd/build           a release build
 //	go run ./cmd/build -maps     a release build with its source maps beside it (not for a release)
