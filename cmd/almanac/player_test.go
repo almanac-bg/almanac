@@ -25,10 +25,16 @@ func TestPlayerDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The persona with an address that the database holds most of; its address kept in the mail's tables too.
-	var who seed.Persona
+	// The persona with an address that the database holds most of, the admin aside (whose days count for nobody, so
+	// leave no tombstone: below); its address kept in the mail's tables too. The seed's history differs from run to
+	// run, and the admin, who plays most days, is now and then the one it holds most of.
+	var who, admin seed.Persona
 	most := -1
 	for _, p := range personas {
+		if p.Key == "admin" {
+			admin = p
+			continue
+		}
 		var n int
 		if err := db.Read.QueryRow(`SELECT (SELECT count(*) FROM runs WHERE user_id = ?1)
 			+ (SELECT count(*) FROM duels WHERE a_id = ?1 OR b_id = ?1)`, p.ID).Scan(&n); err != nil {
@@ -48,9 +54,10 @@ func TestPlayerDelete(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// An open duel, a friend's waiting for them, if the seed left none.
+	// An open duel waiting for them, a friend's if they have one (the seed's history may leave them none).
 	if _, err := db.Write.Exec(`INSERT INTO duels (questions, a_id, b_id, created_at, sent_at, expires_at)
-		SELECT '[]', friend_id, user_id, 1, 1, 9999999999999 FROM friends WHERE user_id = ? LIMIT 1`, who.ID); err != nil {
+		SELECT '[]', u.id, ?1, 1, 1, 9999999999999 FROM users u WHERE u.id <> ?1
+		ORDER BY EXISTS (SELECT 1 FROM friends WHERE user_id = ?1 AND friend_id = u.id) DESC, u.id LIMIT 1`, who.ID); err != nil {
 		t.Fatal(err)
 	}
 	count := func(q string, args ...any) int {
@@ -92,6 +99,17 @@ func TestPlayerDelete(t *testing.T) {
 	residue(t, db, who.ID, who.Email, who.Tag)
 	if n := count(`SELECT count(*) FROM active_days WHERE user_id = ?`, -who.ID); n == 0 || n > days {
 		t.Errorf("%d days in the tombstone, of %d", n, days)
+	}
+
+	// An admin's days aren't counted, and play.Forget keeps only those that are: none kept.
+	if admin.ID == 0 || count(`SELECT count(*) FROM active_days WHERE user_id = ?`, admin.ID) == 0 {
+		t.Fatal("no admin, or one who played no day")
+	}
+	if err := deletePlayer(ctx, db, "@"+admin.Tag, true, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if n := count(`SELECT count(*) FROM active_days WHERE user_id IN (?1, -?1)`, admin.ID); n != 0 {
+		t.Errorf("%d of the admin's days kept", n)
 	}
 }
 

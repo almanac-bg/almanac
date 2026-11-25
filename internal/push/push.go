@@ -13,6 +13,7 @@ package push
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -190,10 +191,26 @@ type Sender struct {
 	Keys *Keys
 	// Subject is how a push service can reach whoever runs the game (mailto:…).
 	Subject string
-	Client  *http.Client
+	// Client, when set, replaces the one pushes are posted with (client: the tests' own, its transport limited the
+	// same way).
+	Client *http.Client
 	// Services, when set, replaces the push services the game posts to (the tests' own).
 	Services []string
 }
+
+// MaxConnsPerHost is how many connections pushes open to one host of a push service at most, those being dialed
+// included. A burst of pushes (the evening's reminders, hundreds at once) waits for a connection or a few and goes
+// over them, many to each (HTTP/2), rather than dialing one per push: hundreds of handshakes at once, all but one
+// connection closed as soon as it's up, and some refused by the service's full queue of connections to accept (reset:
+// each push Busy, and sent only when tried again).
+const MaxConnsPerHost = 16
+
+// client posts pushes, when the Sender is given none.
+var client = func() *http.Client {
+	t := http.DefaultTransport.(*http.Transport).Clone()
+	t.MaxConnsPerHost = MaxConnsPerHost
+	return &http.Client{Timeout: 15 * time.Second, Transport: t}
+}()
 
 // Check says whether a subscription is one a push service gave, at a push service the game posts to.
 func (s *Sender) Check(sub Subscription) error {
@@ -261,13 +278,10 @@ func (s *Sender) Send(ctx context.Context, sub Subscription, m Message) error {
 	if m.Tag != "" {
 		req.Header.Set("Topic", m.Tag) // one the service still holds with the same tag is replaced (RFC 8030, 5.4)
 	}
-	client := http.Client{Timeout: 15 * time.Second}
-	if s.Client != nil {
-		client = *s.Client
-	}
+	c := *cmp.Or(s.Client, client)
 	// A push service answers; it doesn't send the post on elsewhere.
-	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	res, err := client.Do(req)
+	c.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	res, err := c.Do(req)
 	if err != nil {
 		return unreached(err)
 	}

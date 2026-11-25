@@ -227,7 +227,8 @@ func (w *world) playDuel(p *player, id int64) error {
 }
 
 // duelsWaiting are the duels a player's friends sent them, played as they come by: most of them, the rest left for
-// later (some to lapse).
+// later (some to lapse). One whose time runs out while the ones before it are played is over when it's reached, as
+// it would be for a player: it's left.
 func (w *world) duelsWaiting(p *player) error {
 	d, err := w.g.DuelsOf(w.ctx, p.id)
 	if err != nil {
@@ -237,7 +238,7 @@ func (w *world) duelsWaiting(p *player) error {
 		if !v.First && w.chance(0.3) {
 			continue
 		}
-		if err := w.playDuel(p, v.ID); err != nil {
+		if err := w.playDuel(p, v.ID); err != nil && !errors.Is(err, play.ErrDuelOver) {
 			return err
 		}
 	}
