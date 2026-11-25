@@ -545,6 +545,27 @@ func TestQuietNights(t *testing.T) {
 	}
 }
 
+// A push service keeps a notification only while it's of use: the day's reminder at 21:30 till midnight, not into
+// the next morning for a phone away for the night; word of a friend, half a day.
+func TestPushesKeptWhileOfUse(t *testing.T) {
+	s, g, fake, subscribe := pushWorld(t)
+	ana, anaID := g.guest()
+	subscribe(ana, "/ana")
+	clock := time.Date(2030, 1, 7, 21, 30, 0, 0, bulgaria())
+	s.game.Now = func() time.Time { return clock }
+	if n := s.remindSent(t.Context(), clock); n != 1 || fake.count("/ana") != 1 {
+		t.Fatalf("reminded %d, %d pushes", n, fake.count("/ana"))
+	}
+	if ttl, _ := strconv.Atoi(fake.header("/ana", "TTL")); ttl <= 0 || ttl > 9000 {
+		t.Fatalf("the day's reminder at 21:30 kept %q seconds", fake.header("/ana", "TTL"))
+	}
+	clock = clock.Add(-8 * time.Hour)
+	s.notifySent(t.Context(), pushFriends, push.Message{Title: "Т", Body: "Т", URL: "/"}, anaID)
+	if ttl := fake.header("/ana", "TTL"); ttl != "43200" {
+		t.Fatalf("word of a friend kept %q seconds", ttl)
+	}
+}
+
 // The night's end, by the clocks of Bulgaria, on the nights they change too.
 func TestMorning(t *testing.T) {
 	for at, want := range map[string]string{

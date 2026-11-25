@@ -7,7 +7,8 @@
 // ErrGone, it's no more (forget it); Refused, the service won't take pushes for it (forget it if that goes on); Busy,
 // the service can't take one now (try again, after what it asked). Any other error is the game's own (its message)
 // and says nothing of the browser. A message's Tag makes a second send of it replace the first, at the service and on
-// the device, so that a notification sent twice shows once.
+// the device, so that a notification sent twice shows once; its TTL, how long the service keeps it for a device that's
+// away (half a day at most), so that one of no use by then is never shown late.
 package push
 
 import (
@@ -27,7 +28,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/big"
 	"net"
 	"net/http"
 	"net/url"
@@ -50,13 +50,15 @@ func NewKeys() (public, private string, err error) {
 	if err != nil {
 		return "", "", err
 	}
-	ek, err := k.ECDH()
+	pub, err := k.PublicKey.Bytes()
 	if err != nil {
 		return "", "", err
 	}
-	priv := make([]byte, 32)
-	k.D.FillBytes(priv)
-	return b64.EncodeToString(ek.PublicKey().Bytes()), b64.EncodeToString(priv), nil
+	priv, err := k.Bytes()
+	if err != nil {
+		return "", "", err
+	}
+	return b64.EncodeToString(pub), b64.EncodeToString(priv), nil
 }
 
 // ParseKeys reads a key pair from its two base64url halves.
@@ -65,17 +67,12 @@ func ParseKeys(public, private string) (*Keys, error) {
 	if err != nil || len(d) != 32 {
 		return nil, errors.New("PUSH_PRIVATE_KEY must be 32 bytes, base64url")
 	}
-	k, err := ecdh.P256().NewPrivateKey(d)
+	priv, err := ecdsa.ParseRawPrivateKey(elliptic.P256(), d)
 	if err != nil {
 		return nil, err
 	}
-	if b64.EncodeToString(k.PublicKey().Bytes()) != public {
+	if pub, err := priv.PublicKey.Bytes(); err != nil || b64.EncodeToString(pub) != public {
 		return nil, errors.New("PUSH_PUBLIC_KEY isn't PUSH_PRIVATE_KEY's")
-	}
-	pub := k.PublicKey().Bytes()
-	priv := &ecdsa.PrivateKey{
-		PublicKey: ecdsa.PublicKey{Curve: elliptic.P256(), X: new(big.Int).SetBytes(pub[1:33]), Y: new(big.Int).SetBytes(pub[33:])},
-		D:         new(big.Int).SetBytes(d),
 	}
 	return &Keys{Public: public, private: priv}, nil
 }
@@ -117,7 +114,14 @@ type Message struct {
 	// Tag, if set, names this notification: one sent again with the same tag replaces it, at the service and on the
 	// device (up to 32 letters, digits, '-' and '_').
 	Tag string `json:"tag,omitempty"`
+	// TTL, if set, is how long the service keeps it for a device that's away, MaxTTL at most (and if not set): a
+	// reminder of the day is of no use the next morning. Not sent to the device.
+	TTL time.Duration `json:"-"`
 }
+
+// MaxTTL is the longest a push service is asked to keep a notification for a device that's away: an old one is no
+// use.
+const MaxTTL = 12 * time.Hour
 
 // ErrGone means the browser unsubscribed (or the subscription expired, or can't be one): forget it.
 var ErrGone = errors.New("the subscription is gone")
@@ -247,7 +251,11 @@ func (s *Sender) Send(ctx context.Context, sub Subscription, m Message) error {
 	}
 	req.Header.Set("Content-Encoding", "aes128gcm")
 	req.Header.Set("Content-Type", "application/octet-stream")
-	req.Header.Set("TTL", "43200") // half a day: an old reminder is no use
+	ttl := MaxTTL
+	if m.TTL > 0 {
+		ttl = min(m.TTL, MaxTTL)
+	}
+	req.Header.Set("TTL", strconv.Itoa(int(ttl/time.Second)))
 	req.Header.Set("Urgency", "normal")
 	req.Header.Set("Authorization", "vapid t="+jwt+", k="+s.Keys.Public)
 	if m.Tag != "" {

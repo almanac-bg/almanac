@@ -2,6 +2,13 @@
 // the game's already open (that page brought forward, or the window taken there), else in a new one. Nothing else: no
 // caching, so the game is always the one on the server. A notification's tag names it: one sent again (after a restart
 // of the server's) shows in its place.
+//
+// A new worker takes over at once (skipWaiting), never waits for every window of the game to close: with no cache
+// there's nothing for an older page and a newer worker to disagree on, and a fix here reaches a player who keeps the
+// game open on their next page. The one thing the two say to each other is {open: url}, which a page goes to itself
+// (sw.test.ts holds both: a window is never navigated from here).
+
+self.addEventListener("install", () => self.skipWaiting());
 
 self.addEventListener("push", (event) => {
   let m = {};

@@ -195,6 +195,35 @@ test("a deleted profile lets go of the browser's notifications", async ({ page }
   expect(await page.evaluate(() => localStorage.getItem("unsubscribed"))).toBe("1");
 });
 
+// An iPad's Safari says it's a Mac, and in a browser tab has no notifications, as an iPhone's: told how they come
+// (the home screen), never that the browser can't have them. A Mac's Safari, without a touch screen, isn't.
+test("an iPad's browser tab is told notifications come from the home screen", async ({ browser, baseURL }) => {
+  const mac =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15";
+  for (const [touch, says] of [
+    [5, "На iPhone и iPad известията идват, щом добавиш АЛМАНАХ към началния екран"],
+    [0, "Този браузър не поддържа известия."],
+  ] as const) {
+    const context = await browser.newContext({
+      baseURL,
+      locale: "bg-BG",
+      userAgent: mac,
+      viewport: { width: 820, height: 1180 },
+    });
+    await context.addInitScript((touch) => {
+      delete (window as { PushManager?: unknown }).PushManager;
+      Object.defineProperty(Navigator.prototype, "maxTouchPoints", { get: () => touch });
+    }, touch);
+    const page = await context.newPage();
+    await becomeGuest(page);
+    await page.goto("/settings");
+    await expect(
+      page.locator("section.stack").filter({ has: page.getByRole("heading", { name: "Известия" }) }),
+    ).toContainText(says);
+    await context.close();
+  }
+});
+
 test("„Вход“ is a page of its own: the form alone, back where it was come from, and signed in there", async ({
   page,
 }, info) => {

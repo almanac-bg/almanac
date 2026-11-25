@@ -744,13 +744,13 @@ func b2f(b bool) float64 {
 	return 0
 }
 
-// fakePushService takes pushes and counts them, with the chapter of each path's last; or answers a path with its status
-// (answer), uncounted.
+// fakePushService takes pushes and counts them, with the headers of each path's last; or answers a path with its
+// status (answer), uncounted.
 type fakePushService struct {
 	mu     sync.Mutex
 	hits   map[string]int
 	answer map[string]int
-	topics map[string]string
+	last   map[string]http.Header
 }
 
 func (f *fakePushService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -761,10 +761,10 @@ func (f *fakePushService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f.hits[r.URL.Path]++
-	if f.topics == nil {
-		f.topics = map[string]string{}
+	if f.last == nil {
+		f.last = map[string]http.Header{}
 	}
-	f.topics[r.URL.Path] = r.Header.Get("Topic")
+	f.last[r.URL.Path] = r.Header.Clone()
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -778,11 +778,14 @@ func (f *fakePushService) answering(path string, status int) {
 	f.answer[path] = status
 }
 
-func (f *fakePushService) topic(path string) string {
+// header is a header of the last push to a path.
+func (f *fakePushService) header(path, name string) string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.topics[path]
+	return f.last[path].Get(name)
 }
+
+func (f *fakePushService) topic(path string) string { return f.header(path, "Topic") }
 
 func (f *fakePushService) count(path string) int {
 	f.mu.Lock()
