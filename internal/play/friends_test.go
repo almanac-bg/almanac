@@ -2,6 +2,7 @@ package play
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -321,6 +322,49 @@ func TestAcceptAsTheRequestIsWithdrawn(t *testing.T) {
 		case accepted != nil && !errors.Is(accepted, ErrNoRequest), withdrawn != nil && !errors.Is(withdrawn, ErrNoRequest):
 			t.Fatalf("yes: %v; called off: %v", accepted, withdrawn)
 		}
+	}
+}
+
+// Requests made at the same moment to someone with one place left take one place: the cap on what waits for one
+// player is counted in the write that makes the request, not before it (#751 had it in the server, outside it).
+func TestWaitingCappedAtOnce(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	var tag string
+	if err := w.db.Read.QueryRow(`SELECT tag FROM users WHERE id = ?`, ana).Scan(&tag); err != nil {
+		t.Fatal(err)
+	}
+	for range MaxWaiting - 1 {
+		if _, err := w.g.Request(ctx, w.user(), tag, false); err != nil {
+			t.Fatal(err)
+		}
+	}
+	askers := make([]int64, 8)
+	for i := range askers {
+		askers[i] = w.user()
+	}
+	errs := make([]error, len(askers))
+	var wg sync.WaitGroup
+	for i, from := range askers {
+		wg.Go(func() { _, errs[i] = w.g.Request(ctx, from, tag, false) })
+	}
+	wg.Wait()
+	sent := 0
+	for _, err := range errs {
+		switch {
+		case err == nil:
+			sent++
+		case !errors.Is(err, ErrManyWaiting):
+			t.Fatal(err)
+		}
+	}
+	if n := w.requestsIn(ana); sent != 1 || n != MaxWaiting {
+		t.Fatalf("%d of %d asking at once sent, %d waiting; want 1 and %d", sent, len(askers), n, MaxWaiting)
+	}
+	// Asked again, one waiting already isn't refused.
+	if _, err := w.g.Request(ctx, askers[slices.IndexFunc(errs, func(err error) bool { return err == nil })], tag, false); err != nil {
+		t.Fatalf("asking again, the list full: %v", err)
 	}
 }
 

@@ -1308,7 +1308,7 @@ func TestAcceptWhenFriendsFull(t *testing.T) {
 	}
 }
 
-// Strangers can pile only so many requests on one player (maxWaiting, by tag or by their address), who has no way to
+// Strangers can pile only so many requests on one player (play.MaxWaiting, by tag or by their address), who has no way to
 // block them; and a full list keeps nobody from the people they know: one the player asked first, or a friend.
 func TestRequestsWaitingCapped(t *testing.T) {
 	g := start(t)
@@ -1324,9 +1324,9 @@ func TestRequestsWaitingCapped(t *testing.T) {
 	if status, out := ana.call("POST", "/api/friends/requests", map[string]string{"to": "@" + tagOf(cy)}); status != 200 {
 		t.Fatalf("Ana asks Cy: %d %v", status, out)
 	}
-	// maxWaiting from strangers: all but one to her tag, one to her address.
+	// play.MaxWaiting from strangers: all but one to her tag, one to her address.
 	if _, err := g.db.Write.Exec(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?)
-		INSERT INTO users (name, tag, created_at, seen_at) SELECT 'Играч', 'flood' || i, 0, 0 FROM n`, maxWaiting); err != nil {
+		INSERT INTO users (name, tag, created_at, seen_at) SELECT 'Играч', 'flood' || i, 0, 0 FROM n`, play.MaxWaiting); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := g.db.Write.Exec(`INSERT INTO friend_requests (from_id, to_id, to_email, at)
@@ -1337,7 +1337,7 @@ func TestRequestsWaitingCapped(t *testing.T) {
 	for _, to := range []string{"@" + tagOf(ana), "ana@example.com"} {
 		if status, out := bo.call("POST", "/api/friends/requests", map[string]string{"to": to}); status != http.StatusConflict ||
 			out["error"] != "many_waiting" {
-			t.Fatalf("Bo asks %s past %d waiting: %d %v", to, maxWaiting, status, out)
+			t.Fatalf("Bo asks %s past %d waiting: %d %v", to, play.MaxWaiting, status, out)
 		}
 	}
 	if status, out := cy.call("POST", "/api/friends/requests", map[string]string{"to": "@" + tagOf(ana)}); status != 200 ||
@@ -1355,6 +1355,34 @@ func TestRequestsWaitingCapped(t *testing.T) {
 	}
 	if status, out := bo.call("POST", "/api/friends/requests", map[string]string{"to": "@" + tagOf(ana)}); status != 200 {
 		t.Fatalf("Bo asks with room: %d %v", status, out)
+	}
+}
+
+// A request by a shared link to someone play.MaxWaiting requests wait for already answers as any other (a refusal
+// would tell whose the link is to whoever filled that list), and waits only in its sender's list.
+func TestRequestByLinkWaitingCapped(t *testing.T) {
+	g := start(t)
+	sharer, link := sharedLink(g)
+	sender := playedDay(g)
+	_, me := sharer.call("GET", "/api/me", nil)
+	sharerID := me["user"].(map[string]any)["id"]
+	if _, err := g.db.Write.Exec(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < ?)
+		INSERT INTO users (name, tag, created_at, seen_at) SELECT 'Играч', 'flood' || i, 0, 0 FROM n`, play.MaxWaiting); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := g.db.Write.Exec(`INSERT INTO friend_requests (from_id, to_id, at) SELECT id, ?, 0 FROM users
+		WHERE tag LIKE 'flood%'`, sharerID); err != nil {
+		t.Fatal(err)
+	}
+	if status, out := sender.call("POST", "/api/friends/requests", map[string]string{"link": link}); status != 200 ||
+		out["ok"] != true {
+		t.Fatalf("asking by the link, the sharer's list full: %d %v", status, out)
+	}
+	if out := requestsOut(sender); len(out) != 1 || out[0]["via"] == nil {
+		t.Fatalf("the sender's requests: %v", out)
+	}
+	if _, theirs := sharer.call("GET", "/api/friends", nil); len(theirs["requests"].(map[string]any)["in"].([]any)) != play.MaxWaiting {
+		t.Fatalf("the sharer's requests: %d, want %d", len(theirs["requests"].(map[string]any)["in"].([]any)), play.MaxWaiting)
 	}
 }
 
