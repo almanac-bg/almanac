@@ -137,6 +137,44 @@ func TestGuestSigningInMergesIntoAccount(t *testing.T) {
 	}
 }
 
+// A guest who chose a name signs in to an account still with the one drawn for it: the chosen name, and its tag, are
+// the player's after (audit 2026-11-24, A25b-6), as the guest's avatar is. A name the account chose stays.
+func TestSignInKeepsTheChosenName(t *testing.T) {
+	a, _, out, in := setup(t)
+	ctx := t.Context()
+	signIn := func(email, accountName, guestName, guestTag string) User {
+		t.Helper()
+		owner, _, err := a.Verify(ctx, code(t, a, out, in, email), "")
+		if err != nil || !owner.Drawn() {
+			t.Fatalf("a new account: %+v %v", owner, err)
+		}
+		if accountName != "" {
+			if _, _, err := a.Rename(ctx, owner.ID, &accountName, nil); err != nil {
+				t.Fatal(err)
+			}
+		}
+		guest, session, _ := a.Guest(ctx)
+		if _, _, err := a.Rename(ctx, guest.ID, &guestName, &guestTag); err != nil {
+			t.Fatal(err)
+		}
+		u, token, err := a.Verify(ctx, code(t, a, out, in, email), session)
+		if err != nil || u.ID != owner.ID {
+			t.Fatalf("signed in as %+v, %v", u, err)
+		}
+		if again, _, _ := a.Session(ctx, token); again == nil || again.Name != u.Name || again.Tag != u.Tag {
+			t.Fatalf("signed in as %+v, kept as %+v", u, again)
+		}
+		return u
+	}
+	if u := signIn("drawn@example.com", "", "Мария Тестова", "maria_test"); u.Name != "Мария Тестова" ||
+		u.Tag != "maria_test" {
+		t.Fatalf("the account with its drawn name: %+v", u)
+	}
+	if u := signIn("chosen@example.com", "Иван", "Петя", "petya_test"); u.Name != "Иван" || u.Tag == "petya_test" {
+		t.Fatalf("the account with its chosen name: %+v", u)
+	}
+}
+
 // notified turns notifications on for a player in a browser (its session; "" for one turned on before they were
 // tied to sessions), as a browser does.
 func notified(t *testing.T, db *store.DB, userID int64, session, name string) {

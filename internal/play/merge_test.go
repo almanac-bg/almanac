@@ -301,11 +301,10 @@ func (w *world) since(user int64, d time.Duration) {
 	}
 }
 
-// The day's ten played as several guests, and signed in from the best of them, races nobody: a guest's day brought
-// to an account that was there already counts for the player alone, a shadow (review 2026-11-18, S4). It's theirs
-// still (their streak, their board), and the account has the day: no other guest's comes after it, nor a game of its
-// own. A guest's day from before the account was there is a day like any other.
-func TestMergeShadowsAGuestsDay(t *testing.T) {
+// A guest's day brought to an account that was there already is the account's day like any other: its streak, its
+// place on the day's board, and its friends see it there (audit 2026-11-24, C-25: it was a shadow, hidden from them).
+// The account has the day: no other guest's comes after it, nor a game of its own.
+func TestMergeBringsAGuestsDay(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
 	day := w.g.Today()
@@ -319,11 +318,15 @@ func TestMergeShadowsAGuestsDay(t *testing.T) {
 	if n, err := w.g.DaysLeft(ctx, owner, brought); err != nil || n != 0 {
 		t.Fatalf("the guest's day brought: %d left behind, %v", n, err)
 	}
-	if w.shadow(run) != ShadowGuest {
+	if w.shadow(run) != 0 {
 		t.Fatalf("the guest's day brought to the account: shadow %d", w.shadow(run))
 	}
-	if b, err := w.g.BoardOf(ctx, day, rival); err != nil || b.Players != 2 {
+	if b, err := w.g.BoardOf(ctx, day, rival); err != nil || b.Players != 3 {
 		t.Fatalf("the board as another sees it: %+v %v", b, err)
+	}
+	w.befriend(rival, owner)
+	if f, err := w.g.FriendsBoard(ctx, day, rival); err != nil || len(f) != 2 {
+		t.Fatalf("the day among the account's friend: %+v %v", f, err)
 	}
 	if b, err := w.g.BoardOf(ctx, day, owner); err != nil || b.Place != 1 || b.Mine == nil {
 		t.Fatalf("the board as the account sees it: %+v %v", b, err)
@@ -342,15 +345,6 @@ func TestMergeShadowsAGuestsDay(t *testing.T) {
 	}
 	if s, err := w.g.StartDay(ctx, owner); err != nil || s.ID != run || !s.Done {
 		t.Fatalf("the account's day after: %+v %v", s, err)
-	}
-
-	// A guest who played before the account was made (kept with an email elsewhere later) brings a day like any.
-	early, later := w.user(), w.user()
-	first := w.dayGame(early, nil)
-	w.since(later, -time.Minute)
-	w.fold(early, later)
-	if w.shadow(first) != 0 {
-		t.Fatalf("a day from before the account: shadow %d", w.shadow(first))
 	}
 }
 
@@ -425,6 +419,51 @@ func TestMergeFriendsWithinMax(t *testing.T) {
 	if !friends(owner, newest) || !friends(newest, owner) || friends(owner, newer) || friends(newer, owner) ||
 		friends(owner, old) || !friends(owner, both) || !friends(both, owner) {
 		t.Fatal("the friends the guest brought")
+	}
+}
+
+// The account's room for the guest's friends doesn't count the guest itself, who goes (audit 2026-11-24, A25b-4): an
+// account a friend short of MaxFriends but for the guest takes two of the guest's.
+func TestMergeFriendsRoomLeavesTheGuestOut(t *testing.T) {
+	w := setup(t)
+	owner, guest := w.user(), w.user()
+	befriend := func(a, b int64) {
+		if _, err := w.db.Write.Exec(`INSERT INTO friends (user_id, friend_id, since) VALUES (?1, ?2, 0), (?2, ?1, 0)`,
+			a, b); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for range MaxFriends - 2 {
+		befriend(owner, w.user())
+	}
+	befriend(owner, guest)
+	befriend(guest, w.user())
+	befriend(guest, w.user())
+	w.fold(guest, owner)
+	if n := w.count(`SELECT count(*) FROM friends WHERE user_id = ?`, owner); n != MaxFriends {
+		t.Fatalf("the account has %d friends, room for %d", n, MaxFriends)
+	}
+}
+
+// A request the guest sent to the account's own address isn't the account's: it would be one to itself (audit
+// 2026-11-24, A25b-3). The guest's others are.
+func TestMergeDropsARequestToOneself(t *testing.T) {
+	w := setup(t)
+	owner, guest := w.user(), w.user()
+	for _, q := range []string{
+		`UPDATE users SET email = 'me@example.org' WHERE id = ?1`,
+		`INSERT INTO friend_requests (from_id, to_email, at) VALUES (?2, 'me@example.org', 1), (?2, 'you@example.org', 1)`,
+	} {
+		if _, err := w.db.Write.Exec(q, owner, guest); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	w.fold(guest, owner)
+	if n := w.count(`SELECT count(*) FROM friend_requests WHERE from_id = ? AND to_email = 'me@example.org'`, owner); n != 0 {
+		t.Fatalf("the account asks itself: %d", n)
+	}
+	if n := w.count(`SELECT count(*) FROM friend_requests WHERE from_id = ? AND to_email = 'you@example.org'`, owner); n != 1 {
+		t.Fatalf("the guest's other request: %d", n)
 	}
 }
 

@@ -864,10 +864,13 @@ func (a *Accounts) Verify(ctx context.Context, p Proof, session string) (User, s
 				return err
 			}
 		}
-		if fold {
-			return a.fold(tx, current.ID, owner.ID)
+		if !fold {
+			return nil
 		}
-		return nil
+		if err := a.fold(tx, current.ID, owner.ID); err != nil {
+			return err
+		}
+		return tx.QueryRow(`SELECT name, tag FROM users WHERE id = ?`, u.ID).Scan(&u.Name, &u.Tag) // the guest's, maybe
 	})
 	if wrong != nil && err == nil {
 		err = wrong
@@ -878,14 +881,28 @@ func (a *Accounts) Verify(ctx context.Context, p Proof, session string) (User, s
 	return u, token, nil
 }
 
-// fold moves what player `from` has into player `to` (Merge), and deletes `from`.
+// fold moves what player `from` has into player `to` (Merge), and deletes `from`. A name `from` chose, with its tag,
+// becomes `to`'s if `to` still has the one drawn for it (Drawn): the player's own look, as the avatar is (Merge),
+// chosen beats drawn. The tag is taken once `from` is gone, since a tag is one player's.
 func (a *Accounts) fold(tx *sql.Tx, from, to int64) error {
+	guest, account := User{ID: from}, User{ID: to}
+	if err := tx.QueryRow(`SELECT g.name, g.tag, a.name FROM users g, users a WHERE g.id = ? AND a.id = ?`, from, to).
+		Scan(&guest.Name, &guest.Tag, &account.Name); err != nil {
+		return err
+	}
 	for _, merge := range a.Merge {
 		if err := merge(tx, from, to); err != nil {
 			return err
 		}
 	}
-	return a.remove(tx, from)
+	if err := a.remove(tx, from); err != nil {
+		return err
+	}
+	if !account.Drawn() || guest.Drawn() {
+		return nil
+	}
+	_, err := tx.Exec(`UPDATE users SET name = ?, tag = ? WHERE id = ?`, guest.Name, guest.Tag, to)
+	return err
 }
 
 // Animal is what a new player starts as, until they choose: a name (with a number), a tag (with digits) and the

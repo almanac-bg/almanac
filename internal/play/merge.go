@@ -23,30 +23,27 @@ type mergeStep struct {
 
 var mergeSteps = []mergeStep{
 	// All the guest's runs but a day the account has played itself, which stays the account's: one game of a day is
-	// ever an account's. A day's run the guest played while the account was there already comes as a shadow
-	// (ShadowGuest, fair.go): the player's own, for their streak and their numbers, never on the others' boards, so
-	// that the day played as several guests, and signed in from the best of them, races nobody.
-	{sql: `UPDATE runs SET shadow = ` + strconv.Itoa(ShadowGuest) + ` WHERE user_id = ?2 AND kind = 'day'
-		AND shadow = 0 AND started_at >= (SELECT created_at FROM users WHERE id = ?1)`},
-	// A day the account began and left, that the guest played through, the account hasn't played: the finished game
+	// ever an account's, a day like any other. A day the account began and left, that the guest played through, the account hasn't played: the finished game
 	// is the day's, as everywhere else, so the begun one goes (and the guest's comes, by the next step).
 	{sql: `DELETE FROM runs WHERE user_id = ?1 AND kind = 'day' AND finished_at IS NULL
 		AND day IN (SELECT day FROM runs WHERE user_id = ?2 AND kind = 'day' AND finished_at IS NOT NULL)`},
 	{carries: []string{"runs.user_id"}, sql: `UPDATE runs SET user_id = ?1 WHERE user_id = ?2
 		AND NOT (kind = 'day' AND day IN (SELECT day FROM runs WHERE user_id = ?1 AND kind = 'day'))`},
 	// The guest's friends become the account's (the two aren't friends with themselves), as many as the account has
-	// room for (MaxFriends), the latest first: a guest's game brought along can't give it more friends than befriending
-	// could.
+	// room for (MaxFriends: the guest, who goes, takes none of it), the latest first: a guest's game brought along can't
+	// give it more friends than befriending could.
 	{carries: []string{"friends.user_id", "friends.friend_id"}, sql: `INSERT INTO friends (user_id, friend_id, since, asked)
 		SELECT ?1, friend_id, since, asked FROM friends WHERE user_id = ?2 AND friend_id <> ?1
 			AND friend_id NOT IN (SELECT friend_id FROM friends WHERE user_id = ?1)
-		ORDER BY since DESC LIMIT max(0, ` + strconv.Itoa(MaxFriends) + ` - (SELECT count(*) FROM friends WHERE user_id = ?1))`},
+		ORDER BY since DESC LIMIT max(0, ` + strconv.Itoa(MaxFriends) + ` - (SELECT count(*) FROM friends WHERE user_id = ?1
+			AND friend_id <> ?2))`},
 	{sql: `INSERT OR IGNORE INTO friends (user_id, friend_id, since, asked)
 		SELECT user_id, ?1, since, asked FROM friends WHERE friend_id = ?2 AND user_id <> ?1
 			AND user_id IN (SELECT friend_id FROM friends WHERE user_id = ?1)`},
 	{sql: `DELETE FROM friends WHERE user_id = ?2 OR friend_id = ?2`},
-	// The guest's duels are the account's. One between the two goes with the guest: what's left of the guest's duels
-	// then.
+	// The guest's duels are the account's. One between the two is deleted (what's left of the guest's then): its games
+	// come along with the guest's others, games no duel names, their facts grey. The two may have had duels open to the
+	// same friend: the account may then have up to twice DuelsToOne open to them, which holds only a new one back.
 	{carries: []string{"duels.a_id", "duels.b_id"},
 		sql: `UPDATE duels SET a_id = ?1 WHERE a_id = ?2 AND coalesce(b_id, 0) <> ?1`},
 	{sql: `UPDATE duels SET b_id = ?1 WHERE b_id = ?2 AND coalesce(a_id, 0) <> ?1`},
@@ -82,7 +79,9 @@ var mergeSteps = []mergeStep{
 	// The guest's avatar, where the account hasn't chosen one.
 	{carries: []string{"users.avatar"}, sql: `UPDATE users SET avatar = coalesce(users.avatar, g.avatar)
 		FROM (SELECT avatar FROM users WHERE id = ?2) g WHERE users.id = ?1`},
-	// Friend requests: the guest's become the account's (none to itself).
+	// Friend requests: the guest's become the account's, but one to the account, by its id or its address: it would be
+	// a request to itself.
+	{sql: `DELETE FROM friend_requests WHERE from_id = ?2 AND to_email = (SELECT email FROM users WHERE id = ?1)`},
 	{carries: []string{"friend_requests.from_id", "friend_requests.to_id"},
 		sql: `UPDATE OR IGNORE friend_requests SET from_id = ?1 WHERE from_id = ?2 AND (to_id IS NULL OR to_id <> ?1)`},
 	{sql: `UPDATE OR IGNORE friend_requests SET to_id = ?1 WHERE to_id = ?2 AND from_id <> ?1`},
@@ -110,9 +109,10 @@ var mergeSteps = []mergeStep{
 
 // mergeLeft are the references to a player that Merge leaves with the guest, to go with them, and why.
 var mergeLeft = map[string]string{
-	"users.id":         "the account's",
-	"users.name":       "the account's: the name its player chose",
-	"users.tag":        "the account's: friends know it by it",
+	"users.id": "the account's",
+	"users.name": "the account's, but where it's still the one drawn for it and the guest chose theirs: then the " +
+		"guest's, with its tag (account.fold, once the guest is gone: a tag is one player's)",
+	"users.tag":        "the account's (friends know it by it), or the guest's with its chosen name (account.fold)",
 	"users.email":      "the account's (a guest has none)",
 	"users.admin":      "the account's (a guest is never one)",
 	"sessions.user_id": "a guest's sessions end: the browser that signed in gets the account's (account.Verify)",
