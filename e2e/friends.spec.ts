@@ -412,6 +412,29 @@ test("a day isn't rubbed in: a place on the board of all България only i
   }
 });
 
+// The first open on a slow line (a notification's tap, cold): „…“ until the lists come, then the page whole, never the
+// friends' heading alone, pushed down as the requests and duels come above it. A new visitor's page is there at once.
+test("Приятели's first open waits for its lists whole; a new visitor's page is there at once", async ({ page }) => {
+  await page.goto("/friends");
+  await expect(page.locator(".friends").getByRole("button", { name: "Добави приятел" })).toBeVisible();
+  await page.evaluate(() => fetch("/api/guest", { method: "POST", body: "{}" }));
+  let come = () => {};
+  const held = new Promise<void>((done) => {
+    come = done;
+  });
+  await page.route("**/api/friends", async (route) => {
+    await held;
+    await route.continue();
+  });
+  await page.reload();
+  await expect(page.locator(".screen").getByText("…", { exact: true })).toBeVisible();
+  await expect(page.locator(".sect")).toHaveCount(0);
+  come();
+  await expect(page.locator(".sect.friends h2")).toHaveText("Приятели");
+  await expect(page.getByLabel("Потребителско име или имейл на приятел")).toBeVisible();
+  await expect(page.locator(".screen").getByText("…", { exact: true })).toHaveCount(0);
+});
+
 test.describe("on a 320 × 568 phone", () => {
   test.use({ viewport: { width: 320, height: 568 }, hasTouch: true });
 

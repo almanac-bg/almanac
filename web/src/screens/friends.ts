@@ -192,7 +192,14 @@ function page(): Child {
     return d ? duelGroup(which, d, top(), brought, sight) : null;
   };
 
-  return [invitations(), group("open"), friendsList(), adding(), group("played")];
+  // A player's lists not here yet (the first open, a notification's tap on a slow line): „…“, then the page whole,
+  // not the friends' heading alone, pushed down as the requests and duels come above it. A new visitor's page (no
+  // player: nothing to ask for) and a failure are drawn at once.
+  return when(
+    () => !user() || data() || failed(),
+    () => [invitations(), group("open"), friendsList(), adding(), group("played")],
+    () => h("p", { class: "muted" }, "…"),
+  );
 
   /** Who asks to be friends, at the page's top: each as every row of players has them (their avatar and name, a way
    * to their profile), what they ask on a line of its own under the name, and the two answers. */
@@ -462,7 +469,7 @@ function row(f: Friend, remove: () => void, challenge: () => void, editing: () =
         { class: "friend-record" },
         played ? ["Дуели помежду ви: ", h("b", null, record(f.won, f.lost, f.drawn))] : "Още нямате дуели",
       ),
-      f.full ? h("span", { class: "friend-full" }, "Три дуела чакат. Нов — щом изиграе някой.") : null,
+      f.full ? h("span", { class: "friend-full" }, "Три дуела чакат. Нов — щом изиграе един от тях.") : null,
     ],
     null,
     () =>

@@ -113,3 +113,50 @@ test("after the day: one gold thing to do next", async ({ page }) => {
   await expect(gold).toHaveText("Сподели");
   await expect(page.locator(".open-goals, .goal")).toHaveCount(0);
 });
+
+// On a slow line what the game brought comes a while after the score: what goes under the score waits for it, drawn
+// whole, so the one action isn't pushed down under the thumb as it comes; the focus is the score's, not the page's.
+test("the result lands still: its action drawn once, under what the day wrote, and the focus on the score", async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  await page.goto("/");
+  await playedBefore(page, 1);
+  await page.reload();
+  await page.route("**/api/me/news", async (route) => {
+    await new Promise((done) => setTimeout(done, 1500));
+    await route.fulfill({ json: { ink: 2, chapters: [{ chapter: "history", ink: 2, facts: [] }] } });
+  });
+  // Where the action is first drawn, and whether what the day wrote was there over it then.
+  await page.evaluate(() => {
+    new MutationObserver((_, seen) => {
+      const action = document.querySelector(".result-share");
+      if (!action) return;
+      seen.disconnect();
+      const at = Math.round(action.getBoundingClientRect().top + scrollY);
+      document.body.dataset.action = JSON.stringify({ at, news: !!document.querySelector(".day-news") });
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+  await startDay(page);
+  await playRun(page);
+  await expect(page.locator("h1.score")).toBeFocused();
+  const action = page.locator(".result-share");
+  await expect(action.getByRole("button", { name: "Сподели" })).toBeEnabled();
+  await expect(page.locator(".day-board")).toBeVisible();
+  const first = JSON.parse((await page.locator("body").getAttribute("data-action")) ?? "{}");
+  expect(first.news).toBe(true);
+  expect(await action.evaluate((a) => Math.round(a.getBoundingClientRect().top + scrollY))).toBe(first.at);
+});
+
+test("the result's action comes all the same when what the day wrote can't", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto("/");
+  await playedBefore(page, 1);
+  await page.reload();
+  await page.route("**/api/me/news", (route) => route.abort());
+  await startDay(page);
+  await playRun(page);
+  await expect(page.locator(".result-share").getByRole("button", { name: "Сподели" })).toBeEnabled();
+  await expect(page.locator(".today-streak")).toBeVisible();
+  await expect(page.locator(".day-news")).toHaveCount(0);
+});
