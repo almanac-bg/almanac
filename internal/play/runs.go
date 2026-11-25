@@ -131,7 +131,8 @@ func (g *Game) StartDay(ctx context.Context, userID int64) (State, error) {
 
 // Unfinished is yesterday's issue as the player left it half-way, while it can still be finished (DayGrace after its
 // midnight, or a question shown before then still in its time: dayOver): the game allows it, and it counts for its own
-// day, so Днес offers it („Продължи“) until then. Nil for none: not begun, finished, or over.
+// day, so Днес offers it („Продължи“) until then. Nil for none: not begun, finished, or over. Its look settles it as any
+// does (settles): one left on its last question, whose time ran out before the day closed, is finished.
 func (g *Game) Unfinished(ctx context.Context, userID int64) (*State, error) {
 	yesterday := DayShift(g.Today(), -1)
 	var id int64
@@ -143,18 +144,20 @@ func (g *Game) Unfinished(ctx context.Context, userID int64) (*State, error) {
 	if err != nil {
 		return nil, err
 	}
-	var over bool
+	var over, due bool
 	if err := g.read(ctx, func(tx *sql.Tx) error {
 		r, err := load(tx, userID, id)
-		if err == nil {
-			over = r.dayOver(g.Now())
+		if err != nil {
+			return err
 		}
+		over = r.dayOver(g.Now())
+		due, err = g.settles(tx, r)
 		return err
-	}); err != nil || over {
+	}); err != nil || over && !due {
 		return nil, err
 	}
-	s, err := g.State(ctx, userID, id) // a question whose time ran out ends as at any look
-	if err != nil || s.Done {
+	s, err := g.State(ctx, userID, id) // a question whose time ran out ends as at any look, past the day too (settles)
+	if err != nil || s.Done || over {
 		return nil, err
 	}
 	return &s, nil

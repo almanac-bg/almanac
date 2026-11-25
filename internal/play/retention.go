@@ -16,9 +16,10 @@ import (
 // person that day, not at a script's speed. That is judged as the days are read (personDays), never as they're kept: a
 // game becomes a script's only after some of its answers, and may be let out of it. A player who goes leaves their days as nobody's (Forget), judged as they go: only those that counted are kept.
 
-// markActive keeps that a player played today.
-func (g *Game) markActive(tx *sql.Tx, userID int64) error {
-	_, err := tx.Exec(`INSERT OR IGNORE INTO active_days (user_id, day) VALUES (?, ?)`, userID, g.Today())
+// markActive keeps that a player played on the day of `at`: when an answer came, or when a question's time ran out,
+// however much later that's settled (settle).
+func (g *Game) markActive(tx *sql.Tx, userID int64, at time.Time) error {
+	_, err := tx.Exec(`INSERT OR IGNORE INTO active_days (user_id, day) VALUES (?, ?)`, userID, dayOf(at))
 	return err
 }
 

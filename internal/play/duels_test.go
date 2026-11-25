@@ -774,3 +774,105 @@ func TestDuelsWaiting(t *testing.T) {
 		t.Fatalf("all played, still waiting: %+v", got)
 	}
 }
+
+// A duel's question shown before its week ends gets its full time, as a day's does (pastClose): an answer in time is
+// taken though the week ended meanwhile, and the sweep waits for it. What isn't answered is the sweep's, never a
+// look's: a run opened past the duel's time, its last question's own time run out (before the week ended, or only
+// after), isn't played out by the look, and nobody is told the friend played it (review of #762).
+func TestDuelGivesItsLastQuestionItsTime(t *testing.T) {
+	type duelOn struct {
+		w           *world
+		h           *heard
+		bo, id, run int64
+		ends        time.Time // the duel's week
+		limit       time.Duration
+	}
+	// nineIn has Ana's side played, and Bo's nine of ten, an hour before the week ends.
+	nineIn := func(t *testing.T) duelOn {
+		w := setup(t)
+		d := duelOn{w: w, h: &heard{}}
+		d.h.listen(w.g)
+		ana := w.user()
+		d.bo = w.user()
+		w.befriend(ana, d.bo)
+		d.id, _ = w.g.DuelFriend(t.Context(), ana, d.bo)
+		w.playSide(ana, d.id, repeat(w.wrong, Length))
+		var ends int64
+		if err := w.db.Read.QueryRow(`SELECT expires_at FROM duels WHERE id = ?`, d.id).Scan(&ends); err != nil {
+			t.Fatal(err)
+		}
+		d.ends = time.UnixMilli(ends)
+		w.now = d.ends.Add(-time.Hour)
+		d.run = w.playSide(d.bo, d.id, repeat(w.right, Length-1))
+		q, _ := w.b.Get(w.picks(d.run)[Length-1].ID)
+		d.limit = Limit(q)
+		d.h.take()
+		return d
+	}
+	// standing is how the duel stands for Bo once the sweep has come by: its state, and Bo's answers.
+	standing := func(t *testing.T, d duelOn) (string, int) {
+		t.Helper()
+		if err := d.w.g.SettleDue(t.Context()); err != nil {
+			t.Fatal(err)
+		}
+		d.w.g.AftersDone(t.Context())
+		v, err := d.w.g.DuelOf(t.Context(), d.bo, d.id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var answers int
+		_ = d.w.db.Read.QueryRow(`SELECT count(*) FROM answers WHERE run_id = ?`, d.run).Scan(&answers)
+		return v.State, answers
+	}
+
+	t.Run("answered in its time past the week", func(t *testing.T) {
+		d := nineIn(t)
+		d.w.now = d.ends.Add(-5 * time.Second)
+		d.w.show(d.bo, d.run)
+		d.w.now = d.ends.Add(3 * time.Second)
+		if state, _ := standing(t, d); state != DuelYours {
+			t.Fatalf("the sweep, a question in its time: %s", state)
+		}
+		d.w.now = d.ends.Add(d.limit - 10*time.Second)
+		if res, err := d.w.answer(d.bo, d.run, Length-1, d.w.right(d.run, Length-1)); err != nil || res.TimedOut ||
+			!res.State.Done {
+			t.Fatalf("an answer in its time, past the week: %+v %v", res, err)
+		}
+		if state, answers := standing(t, d); state != DuelWon || answers != Length {
+			t.Fatalf("the duel played out in time: %s, %d answers", state, answers)
+		}
+		if news := d.h.take(); len(news) != 1 || !news[0].Played {
+			t.Fatalf("the news of a duel played out in time: %+v", news)
+		}
+	})
+	for _, c := range []struct {
+		why   string
+		shown time.Duration // before the week ends
+	}{
+		{"its time run out before the week ended", 2 * time.Minute},
+		{"its time running past the week", 5 * time.Second},
+	} {
+		t.Run(c.why, func(t *testing.T) {
+			d := nineIn(t)
+			d.w.now = d.ends.Add(-c.shown)
+			d.w.show(d.bo, d.run)
+			d.w.now = d.ends.Add(-c.shown + d.limit + LateGrace + time.Second) // past its own time
+			if d.w.now.Before(d.ends) {
+				d.w.now = d.ends.Add(time.Second)
+			}
+			if s, err := d.w.g.State(t.Context(), d.bo, d.run); err != nil || s.Done || s.At != Length-1 {
+				t.Fatalf("the run looked at past the week: %+v %v", s, err)
+			}
+			d.w.now = d.ends.Add(LongestLimit + LateGrace + time.Second)
+			if s, err := d.w.g.State(t.Context(), d.bo, d.run); err != nil || s.Done {
+				t.Fatalf("the run looked at past the week, its question's grace over: %+v %v", s, err)
+			}
+			if state, answers := standing(t, d); state != DuelWon || answers != Length-1 {
+				t.Fatalf("the duel ended by its time: %s, %d answers", state, answers)
+			}
+			if news := d.h.take(); len(news) != 0 {
+				t.Fatalf("news of a duel ended by its time: %+v", news)
+			}
+		})
+	}
+}

@@ -259,7 +259,7 @@ func (g *Game) passVoid(tx *sql.Tx, r *run) error {
 	r.skipVoid()
 	r.shownAt = sql.NullInt64{}
 	if r.at >= len(r.picks) {
-		return g.finish(tx, r)
+		return g.finish(tx, r, g.Now())
 	}
 	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL WHERE id = ?`, r.at, r.id)
 	return err

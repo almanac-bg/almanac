@@ -9,8 +9,9 @@
 // gets the pictures only (bank.PicturesView): its words and options come with its time, and an answer before it is
 // refused, so that nobody reads a question off the clock. Between questions a player reads the answer and its fact for
 // as long as they like; a question of the day's ten dealt on its own date („На този ден“) shows its day's line with
-// them (dealtOn). A question left showing past its time counts as unanswered, whenever the run is next looked at while
-// it can still be played (a past day's stays as it was left: dayOver). A question is graded against the version of it
+// them (dealtOn). A question left showing past its time counts as unanswered, kept when its time ran out, whenever the
+// run is next looked at, by the run's own clock alone: one whose time would run out only after its day or its duel
+// closed is left as it was (settles). A question is graded against the version of it
 // that showed, whatever the bank has become meanwhile (versions.go); the day's ten hold still for their day, and one found wrong during it counts for nobody that day (day.go). Everything a
 // run does goes through the database, so a refresh, a second tab or a restart of the server changes nothing. A run left
 // half-way goes on where it stopped: the day's when the player comes back to it that day (a run of the day's questions
@@ -214,13 +215,36 @@ func (r *run) dayOver(now time.Time) bool {
 	if r.kind != "day" || r.finished {
 		return false
 	}
+	return r.pastClose(r.dayCloses(), now)
+}
+
+// dayCloses is when a run of the day's questions closes: DayGrace after its day.
+func (r *run) dayCloses() time.Time {
 	_, end := dayBounds(r.day)
-	closes := time.UnixMilli(end).Add(DayGrace)
+	return time.UnixMilli(end).Add(DayGrace)
+}
+
+// pastClose is whether a run that closes at `closes` (its day's: dayOver; its duel's: duelOver) can't be played on at
+// `now`: past it, and no question shown before it still in its time, the longest a question's can be (LongestLimit),
+// and the LateGrace its answer has to arrive in. A question shown before the close gets its full time.
+func (r *run) pastClose(closes, now time.Time) bool {
 	if shown := time.UnixMilli(r.shownAt.Int64); r.shownAt.Valid && shown.Before(closes) &&
 		shown.Add(LongestLimit+LateGrace).After(closes) {
 		closes = shown.Add(LongestLimit + LateGrace)
 	}
 	return now.After(closes)
+}
+
+// closes is when a run closes, if it does: a day's (dayCloses), a duel's while the duel is on (duelCloses); zero for
+// any other game, played on whenever.
+func (g *Game) closes(tx *sql.Tx, r *run) (time.Time, error) {
+	switch r.kind {
+	case "day":
+		return r.dayCloses(), nil
+	case "duel":
+		return duelCloses(tx, r.id)
+	}
+	return time.Time{}, nil
 }
 
 // dealtOn is the day a run's questions are dealt for, as „На този ден“ goes: the day's questions' date, "" for any
@@ -363,59 +387,84 @@ func (g *Game) state(tx *sql.Tx, r *run) (State, error) {
 // one that counts for nobody (day.go), so the run can go on. It reports whether that ended the run: then, once the
 // transaction is done, the caller follows it with finished, as an answer that ends a run does.
 func (g *Game) settle(tx *sql.Tx, r *run) (bool, error) {
-	if !g.settles(tx, r) {
-		return false, nil
+	if due, err := g.settles(tx, r); err != nil || !due {
+		return false, err
 	}
 	if r.voidNow() {
 		err := g.passVoid(tx, r)
 		return err == nil && r.finished, err
 	}
 	d, ok := g.deal(tx, r.picks[r.at])
-	ms := int64(0)
+	ms, at := int64(0), g.Now()
 	if ok {
-		ms = Limit(d.Question()).Milliseconds()
+		limit := Limit(d.Question())
+		ms = limit.Milliseconds()
+		// Kept at the moment its time ran out, the run's, not the look's: a past day's is that day's (markActive).
+		if ran := time.UnixMilli(r.shownAt.Int64).Add(limit); ran.Before(at) {
+			at = ran
+		}
 	}
-	_, err := g.record(tx, r, bank.Graded{}, false, ms)
+	_, err := g.record(tx, r, bank.Graded{}, false, ms, at)
 	return err == nil && r.finished, err
 }
 
 // settles says whether settle has anything to do: a question showing past its time, or gone from the bank; or one that
-// counts for nobody, where the run stands. Nothing, once the run's day is over: it stays as it was left (dayOver), so
-// a later look doesn't finish a past day. Its question is read through tx, the transaction the caller holds.
-func (g *Game) settles(tx *sql.Tx, r *run) bool {
-	if r.finished || r.dayOver(g.Now()) {
-		return false
+// counts for nobody, where the run stands. Its question is read through tx, the transaction the caller holds.
+//
+// What it does hangs on the run's own clock, never on when the run is looked at. A question whose time ran out before
+// the run closed (closes: its day's, its duel's) counted as unanswered then, so it's settled whenever the run is next
+// looked at, past its close too: a day's run whose tenth ran out before its day closed is finished, and counts for
+// its day, whether it's looked at at 23:59 or the next morning. One whose time would run out only after the close is
+// left as it was: unanswered, the run stays unfinished. Past its close nothing else is settled (dayOver, duelOver),
+// and a duel past its time is the sweep's, which ends it as it stood (SettleDue): nobody is told it was played.
+func (g *Game) settles(tx *sql.Tx, r *run) (bool, error) {
+	if r.finished {
+		return false, nil
 	}
+	closes, err := g.closes(tx, r)
+	if err != nil {
+		return false, err
+	}
+	open := closes.IsZero() || !r.pastClose(closes, g.Now())
 	if r.voidNow() {
-		return true
+		return open, nil
 	}
 	if !r.shownAt.Valid {
-		return false
+		return false, nil
 	}
 	d, ok := g.deal(tx, r.picks[r.at])
 	if !ok {
-		return true
+		return open, nil
 	}
 	// A question's answer may still come, timed within its limit by the screen, until LateGrace after it (late.go).
-	late := Limit(d.Question()) + LateGrace
-	return g.Now().Sub(time.UnixMilli(r.shownAt.Int64)) > late
+	ends := time.UnixMilli(r.shownAt.Int64).Add(Limit(d.Question()) + LateGrace)
+	switch {
+	case !g.Now().After(ends):
+		return false, nil
+	case closes.IsZero():
+		return true, nil
+	case ends.After(closes):
+		return false, nil
+	}
+	return open || r.kind == "day", nil
 }
 
 // record keeps an answer (to a number, if it's one: what decides a tie, tiebreak), and moves the run to the next
-// question (or its end). It says whether the answer wrote its fact in ink (writeFact).
-func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, number bool, ms int64) (bool, error) {
+// question (or its end), as kept at `at`: when it came, or when its time ran out (settle). It says whether the answer wrote
+// its fact in ink (writeFact).
+func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, number bool, ms int64, at time.Time) (bool, error) {
 	var given, shown any
 	if gr.Given != nil {
 		given, shown = string(gr.Given), string(gr.Shown)
 	}
-	now := store.Ms(g.Now())
+	now := store.Ms(at)
 	p := r.picks[r.at]
 	if _, err := tx.Exec(`INSERT INTO answers (run_id, n, question_id, given, shown, score, is_right, ms, at, version)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, r.id, r.at, p.ID, given, shown, gr.Score, gr.Right, ms, now,
 		g.versionOf(p)); err != nil {
 		return false, err
 	}
-	if err := g.markActive(tx, r.userID); err != nil {
+	if err := g.markActive(tx, r.userID, at); err != nil {
 		return false, err
 	}
 	if err := g.judgeAnswer(tx, r, gr, ms); err != nil {
@@ -433,18 +482,18 @@ func (g *Game) record(tx *sql.Tx, r *run, gr bank.Graded, number bool, ms int64)
 	r.shownAt = sql.NullInt64{}
 	r.skipVoid()
 	if r.at >= len(r.picks) {
-		return ink, g.finish(tx, r)
+		return ink, g.finish(tx, r, at)
 	}
 	_, err = tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, rights = ?, closeness = ? WHERE id = ?`,
 		r.at, r.rights, r.tie.closeness, r.id)
 	return ink, err
 }
 
-// finish ends a run where it is, and notes that what follows it is due (after.go).
-func (g *Game) finish(tx *sql.Tx, r *run) error {
+// finish ends a run where it is, at `at` (its last answer's), and notes that what follows it is due (after.go).
+func (g *Game) finish(tx *sql.Tx, r *run, at time.Time) error {
 	r.finished = true
 	_, err := tx.Exec(`UPDATE runs SET at = ?, shown_at = NULL, rights = ?, closeness = ?, finished_at = ? WHERE id = ?`,
-		r.at, r.rights, r.tie.closeness, store.Ms(g.Now()), r.id)
+		r.at, r.rights, r.tie.closeness, store.Ms(at), r.id)
 	if err != nil {
 		return err
 	}
@@ -471,8 +520,8 @@ func (g *Game) State(ctx context.Context, userID, runID int64) (State, error) {
 		if err != nil {
 			return err
 		}
-		if write = g.settles(tx, r); write {
-			return nil
+		if write, err = g.settles(tx, r); err != nil || write {
+			return err
 		}
 		s, err = g.state(tx, r)
 		return err
@@ -642,7 +691,7 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 			res.TimedOut = true // only an answer is taken late: no answer late is the time run out (late.go)
 		}
 		number := d.Question().Base().Type == "number"
-		if res.Ink, err = g.record(tx, r, gr, number, min(took, limit).Milliseconds()); err != nil {
+		if res.Ink, err = g.record(tx, r, gr, number, min(took, limit).Milliseconds(), g.Now()); err != nil {
 			return err
 		}
 		if err := g.markByLink(ctx, tx, r); err != nil {

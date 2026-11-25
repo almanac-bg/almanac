@@ -369,10 +369,14 @@ function stuckAt(s: State, err: unknown, retry: () => void): Child {
   );
 }
 
-/** Where a run that can't go on leads: a day's run past its day (play.ErrDayOver), to Днес and today's questions;
- * otherwise nowhere but the run's own arrow out. */
+/** Where a run that can't go on leads: a day's run past its day (play.ErrDayOver), to Днес and today's questions; a
+ * duel's past its time (play.ErrDuelOver), to Приятели, where the duel shows how it ended; otherwise nowhere but the
+ * run's own arrow out. */
 function wayOut(err: unknown): [href: string, label: string] | null {
-  return (err as ApiError).code === "day_over" ? ["/", "Към Днес"] : null;
+  const code = (err as ApiError).code;
+  if (code === "day_over") return ["/", "Към Днес"];
+  if (code === "duel_over") return ["/friends", "Към Приятели"];
+  return null;
 }
 
 /** A run's progress: a pip for each question, marked by how it went (and the one being asked, if any, in its chapter's
@@ -831,7 +835,11 @@ function question(
   // the player comes back to it („Продължи“). Once the answer is in, leaving costs nothing and asks nothing.
   const leaveAsk = guardLeaving(
     "Ако излезеш сега, въпросът остава без отговор.",
-    () => !ans.locked(),
+    // A run that can't go on (its day or its duel over: wayOut) costs nothing to leave: its way out just goes.
+    () => {
+      const p = ans.problem();
+      return !ans.locked() && !(p && wayOut(p.err));
+    },
     async (on) => {
       leaving = true;
       // Given up (unless an answer is on its way or in): its time runs out on the server all the same if this
