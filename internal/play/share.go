@@ -19,7 +19,7 @@ import (
 // their links with them, and a guest's day that a sign-in drops (merge.go) its link. Opened (Shared), a link tells
 // the day, its issue and the shape (how each of the ten went), never an answer, nor whose it was. Whoever played the day
 // by it may ask its owner to be friends, still without learning who it is unless they say yes (AskSharer); and a new
-// player whose first game was played by one is marked so, and nothing of whose (markByLink), for /admin's count.
+// player whose first game began by one is marked so, and nothing of whose (markByLink), for /admin's count.
 //
 // The text shared is Share.Text; the picture a link shows where it's sent, internal/card.
 
@@ -248,19 +248,21 @@ type link struct {
 }
 
 // ByLink is ctx with the shared day's link (its issue and code) the page that plays a game was opened at: a new
-// player's first game, finished, is marked as one played by a link (markByLink).
+// player's first game, begun there, is marked as one played by a link (markByLink).
 func ByLink(ctx context.Context, issue int, code string) context.Context {
 	return context.WithValue(ctx, linkKey{}, link{issue, code})
 }
 
-// markByLink marks a player's first game as played by a shared link (runs_by_link), as it ends: a day's issue,
-// played at a person's pace (as /admin counts people: People), by someone who had no game before it, on a page opened
-// at a link (ByLink) to anyone's shared day but their own (of any day: one gone by opens today's). That it came by a
-// link is all that's kept, not whose. /admin's „Нови по връзка“ counts the new whose first game it still is
-// (Activity): a guest who signs in to an account that played before isn't new, and isn't counted.
+// markByLink marks a player's first game as played by a shared link (runs_by_link), at its first answer, since that
+// comes from the page the link opened (a reload, or a later visit, goes on at the day's address, without it): a day's
+// issue, by someone who had no game before it, on a page opened at a link (ByLink) to anyone's shared day but their
+// own (of any day: one gone by opens today's). That it came by a link is all that's kept, not whose. /admin's „Нови
+// по връзка“ counts the new whose first game it still is, played at a person's pace (Activity, as /admin counts
+// people: People; a game is found a script's only after some of its answers): a guest who signs in to an account that
+// played before isn't new, and isn't counted.
 func (g *Game) markByLink(ctx context.Context, tx *sql.Tx, r *run) error {
 	l, ok := ctx.Value(linkKey{}).(link)
-	if !ok || !r.finished || r.kind != "day" || r.shadow == ShadowScript || len(l.code) != CodeLength {
+	if !ok || r.kind != "day" || r.shadow == ShadowScript || len(l.code) != CodeLength {
 		return nil
 	}
 	_, err := tx.Exec(`INSERT OR IGNORE INTO runs_by_link (run_id) SELECT ?1

@@ -906,8 +906,13 @@ func playRun(p *player, run map[string]any) { playRunBy(p, run, "", 3*time.Secon
 // playRunBy plays a run with every answer `took` after its question showed (under a second or so is a script's:
 // play/fair.go), sent from a page opened at a shared day's link (`via`, as the page sends it), if any.
 func playRunBy(p *player, run map[string]any, via string, took time.Duration) {
+	playAnswers(p, run, 0, play.Length, via, took)
+}
+
+// playAnswers answers a run's questions from `from` up to `to`, as playRunBy does.
+func playAnswers(p *player, run map[string]any, from, to int, via string, took time.Duration) {
 	id := strconv.Itoa(int(run["id"].(float64)))
-	for n := range 10 {
+	for n := from; n < to; n++ {
 		_, st := p.call("POST", "/api/runs/"+id+"/show", map[string]any{})
 		// Answered `took` after it showed (playRun: three seconds, a person's pace).
 		if _, err := p.g.db.Write.Exec(`UPDATE runs SET shown_at = ? WHERE id = ?`,
