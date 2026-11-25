@@ -4,9 +4,9 @@
 // script and stylesheet beside a copy compressed ahead (brotli at its best, and gzip: the server sends the one the
 // browser takes), plus web/public as it is. It writes a manifest of what each became (app.js → assets/app-3F2A9C.js;
 // a font by its own name, sofia-sans.woff2 → assets/sofia-sans-7C1D0E.woff2), says how big each is as a browser
-// gets it, and fails past three lines: the first screen's budget (what every visit after a release downloads before
-// Днес draws), the fonts' ceiling and the whole client's. The ceilings are guards against an accident (a library
-// pulled in, data built into the code), not limits to write around; the budget is the one to keep in mind.
+// gets it, and fails past two lines: the first screen's budget (what every visit after a release downloads before
+// Днес draws: the player's whole client, the one size to keep in mind) and the fonts' ceiling, a guard against an
+// accident (a font's whole alphabet built in), not a limit to write around.
 //
 // A release has no source maps: nobody but a developer reads one, and the build is the same from the same commit (to
 // read a stack from production, build its release's commit with -maps: the files and their names come out the same).
@@ -54,11 +54,6 @@ var firstFiles = []string{"app.js", "app.css"}
 // second, <face>-rest, loads only where a letter of another language shows: web/src/fonts/subset.sh). Two faces
 // since the bright almanac (Sofia Sans and its Extra Condensed numerals): about 60 kB in November 2026.
 const fontCeiling = 80 << 10
-
-// ceiling is how big, brotli-compressed, every script and stylesheet together may grow: about two and a half times the
-// game in November 2026. Growing with the game never reaches it; something pulled in by mistake does. Past it, find
-// what grew; raise it only for something worth that much to every player.
-const ceiling = 256 << 10
 
 func main() {
 	watch := flag.Bool("watch", false, "rebuild on every change")
@@ -244,7 +239,7 @@ func checkSize(out string) error {
 	}
 	kb := func(n int) string { return fmt.Sprintf("%5.1f kB", float64(n)/1024) }
 	names := slices.Sorted(maps.Keys(manifest))
-	first, fonts, all := 0, 0, 0
+	first, fonts := 0, 0
 	for _, name := range names {
 		n, err := sent(out, manifest[name])
 		if err != nil {
@@ -255,12 +250,8 @@ func checkSize(out string) error {
 			return err
 		}
 		fmt.Printf("%-38s %s, %s as sent\n", name, kb(int(raw.Size())), kb(n))
-		if filepath.Ext(name) == ".woff2" {
-			if !strings.HasSuffix(name, "-rest.woff2") {
-				fonts += n
-			}
-		} else {
-			all += n
+		if filepath.Ext(name) == ".woff2" && !strings.HasSuffix(name, "-rest.woff2") {
+			fonts += n
 		}
 		if slices.Contains(firstFiles, name) || slices.Contains(assets.FirstFonts, name) {
 			first += n
@@ -268,7 +259,6 @@ func checkSize(out string) error {
 	}
 	fmt.Printf("%-38s %s as sent (budget %d kB)\n", "the first screen", kb(first), firstScreen>>10)
 	fmt.Printf("%-38s %s (ceiling %d kB)\n", "fonts for Bulgarian", kb(fonts), fontCeiling>>10)
-	fmt.Printf("%-38s %s as sent (ceiling %d kB)\n", "scripts and styles", kb(all), ceiling>>10)
 	for _, f := range assets.FirstFonts {
 		if manifest[f] == "" {
 			return fmt.Errorf("the page preloads %s (assets.FirstFonts), but no style uses it", f)
@@ -284,8 +274,6 @@ func checkSize(out string) error {
 		return fmt.Errorf("the first screen is %d kB as sent, past its budget of %d kB: find what grew, and what it's worth to every player", first>>10, firstScreen>>10)
 	case fonts > fontCeiling:
 		return fmt.Errorf("the fonts for Bulgarian are %d kB, past their ceiling of %d kB: cut them to what the texts use (web/src/fonts/subset.sh)", fonts>>10, fontCeiling>>10)
-	case all > ceiling:
-		return fmt.Errorf("the client is %d kB as sent, past its ceiling of %d kB: something grew by far more than a feature does", all>>10, ceiling>>10)
 	}
 	return nil
 }
