@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { expect, test } from "@playwright/test";
 import { knows, readText } from "./play.ts";
+import { expect, test } from "./test.ts";
 
 /** Every live question with a fact in the sample bank (in one chapter's file, `chapter`). */
 function sampleFacts(chapter = ""): string[] {

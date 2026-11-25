@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
-import { expect, type Page, test } from "@playwright/test";
 import { answer, moveOn, openGame, playRun, startDay } from "./play.ts";
+import { expect, type Page, test } from "./test.ts";
 
 /** Text on a chapter's sheet (`.leaf`) in anything but the sheet's own ink: the page's greys (--ink-2, --ink-3,
  * --grey) are made for the page, and on a chapter's colour they fall as low as 1.05:1 by night. Text on a ground of its

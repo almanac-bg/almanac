@@ -1,8 +1,9 @@
 // Duels on one's own time (play/duels.go), with a friend, challenged from their row in Приятели: played first and
 // sent, played back when the friend can, its end on its row in Приятели (there is no page of a duel's result), with
 // its questions in their dialog, on any day. Приятели is one page: the duels waiting, the friends, the duels played.
-import { expect, type Page, test } from "@playwright/test";
+
 import { answer, befriend, endedBefore, meetAs, moveOn, playRun, startDay } from "./play.ts";
+import { expect, type Page, test } from "./test.ts";
 
 /** A game opened by a tap: its count, cut short. */
 async function countIn(page: Page): Promise<void> {

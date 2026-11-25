@@ -2,8 +2,9 @@
 // render that runs again, asks again each time (the chapters' tiles asking for the player's stats); a page that
 // loads itself anew asks for all of it again. Counted here over the ways a player goes round Днес and the chapters, a
 // deploy among them: a visit that asks for anything twice fails, and so does a deploy that loads the page more than once.
-import { expect, type Page, type Request, test } from "@playwright/test";
+
 import { playRun, startDay } from "./play.ts";
+import { expect, type Page, type Request, test } from "./test.ts";
 
 /** What the page asks the server (GETs of the API) while `go` opens a screen, until it's quiet: none in flight, and
  * none for a moment. */

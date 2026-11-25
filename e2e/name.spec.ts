@@ -1,7 +1,8 @@
 // A name of the player's own, asked the first time others will see them (screens/name.ts): saved before the game goes
 // on, however slow the line, and one refused said in the sheet; one ask for a double tap.
-import { type Browser, expect, type Page, test } from "@playwright/test";
+
 import { befriend } from "./play.ts";
+import { type Browser, expect, type Page, test } from "./test.ts";
 
 /** The name's saving held back `ms`, as on a slow line, then sent on to the server. */
 async function slowName(page: Page, ms: number): Promise<void> {

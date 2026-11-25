@@ -1,5 +1,5 @@
-import { expect, type Page, test } from "@playwright/test";
 import { playRun, startDay } from "./play.ts";
+import { expect, type Page, test } from "./test.ts";
 
 /** Where each of the three places' links sits and how wide it is, in the bar on a big screen or at the foot on a
  * phone. */

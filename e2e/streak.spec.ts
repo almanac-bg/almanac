@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
 import { daysPlayed, openGame, playRun, startDay } from "./play.ts";
+import { expect, test } from "./test.ts";
 
 test("a streak that ended is told as a new one beginning, once, never as the loss", async ({ page }) => {
   await page.goto("/");

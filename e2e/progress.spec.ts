@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
 import { openGame, playedBefore, playRun, startDay } from "./play.ts";
+import { expect, test } from "./test.ts";
 
 test("a chapter's game never tells how well the chapter is known, and the avatar is anyone's to choose", async ({
   page,

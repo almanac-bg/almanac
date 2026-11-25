@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
 import { daysPlayed, playedBefore, playRun, ranked, startDay } from "./play.ts";
+import { expect, test } from "./test.ts";
 
 test("Профил: one list of seals, never chosen, none on the avatar; only animals as avatars", async ({ page }) => {
   await page.goto("/");

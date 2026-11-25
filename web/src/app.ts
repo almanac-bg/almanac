@@ -5,7 +5,7 @@
 // (`/signin`) have the frame bare: the mark where it always is, no places (and on the sign-in page no „Вход“).
 
 import { keepFresh } from "./fresh.ts";
-import { effect, h, mount } from "./lib/dom.ts";
+import { computed, effect, h, mount } from "./lib/dom.ts";
 import { reportErrors } from "./lib/errors.ts";
 import { applyPrefs } from "./lib/prefs.ts";
 import { preparePush } from "./lib/push.ts";
@@ -61,6 +61,17 @@ if (root) draw(root);
 /** The frame and the screen under it, started. */
 function draw(root: HTMLElement): void {
   const main = h("main", { id: "main" });
+  // The bar's corner: the player's avatar, Профил (and Настройки in it; not on Профил itself, whose page has it).
+  // Without a profile yet (or on the cover, not signed in), the way in; on the way in itself, nothing. Drawn again only
+  // when which of these it is changes, or the face: a link drawn anew on every change to the player went from under a
+  // press when a name, saved as the press left Настройки, came back before the release, and the click went nowhere.
+  const corner = computed(() => {
+    if (path() === "/signin") return null;
+    const u = user();
+    if (!u || (cover() && !u.email)) return "in";
+    return path() === "/me" ? null : "me";
+  });
+  const face = computed(look);
   mount(root, () => [
     h(
       "header",
@@ -70,14 +81,11 @@ function draw(root: HTMLElement): void {
         { class: "bar" },
         h("a", { href: "/", class: "brand", "aria-label": "АЛМАНАХ, днешният брой" }, rosette(), "АЛМАНАХ"),
         h("nav", { class: "places", "aria-label": "Основна навигация" }, placeLinks()),
-        // The player's avatar: Профил, and Настройки in it (not on Профил itself, whose page
-        // has it). Without a profile yet (or on the cover, not signed in), the way in; on the way in itself, nothing.
         () => {
-          if (path() === "/signin") return null;
-          const u = user();
-          if (!u || (cover() && !u.email)) return h("a", { class: "bar-in", href: "/signin" }, "Вход");
-          if (path() === "/me") return null;
-          return h("a", { class: "bar-me", href: "/me", "aria-label": "Профил" }, () => avatar(look()));
+          const c = corner();
+          if (c === "in") return h("a", { class: "bar-in", href: "/signin" }, "Вход");
+          if (c === "me") return h("a", { class: "bar-me", href: "/me", "aria-label": "Профил" }, () => avatar(face()));
+          return null;
         },
       ),
     ),
