@@ -33,7 +33,7 @@ interface Rank {
   chapter: string;
   level: number;
   name: string;
-  /** The ink its rank starts at: past Летопис, its bar is the way from here to `nextAt` (ui.ts, wayOf). */
+  /** The ink its rank starts at: past Летопис, its bar is the way from here to `nextAt` (ui.ts, barOf). */
   from: number;
   ink: number;
   next: string;

@@ -10,9 +10,9 @@
 // connections open between requests: opening one sets it up and reads the whole schema, which under load would cost
 // more than the reads themselves.
 //
-// The pool is about as big as the machine has cores, and no bigger: the driver's memory is one allocator behind one
-// lock for the whole process, so reads that sort or fill a page cache do no more side by side than the cores can, and
-// past a few at once they do less (measured: a sort over a player's answers peaked at two at once, and fell by a
+// The pool is small, sized by the machine's cores (Open: a few over them, for reads that wait on the disk): the
+// driver's memory is one allocator behind one lock for the whole process, so reads that sort or fill a page cache do
+// no more side by side than the cores can, and past a few at once they do less (measured: a sort over a player's answers peaked at two at once, and fell by a
 // quarter at sixteen). Waiting for a connection is the gate that keeps them at their best. The reads that go over a
 // whole table (the counts over everyone's answers) take seconds, and have a small pool of their own (Scan), so they
 // never take the connections the requests need, however many cores there are (two, on the server).

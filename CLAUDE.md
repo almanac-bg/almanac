@@ -7,6 +7,10 @@ owner provides money and access only: ask for those as one short, concrete step,
 
 This file is the way in. Read it first; it says where everything else is. `DECISIONS.md` holds the owner's calls and
 their reasons: read it before changing what a player sees or how the game plays, and don't undo one on your own.
+Where two written sources disagree, DECISIONS.md wins over every other, memory included, and `web/DESIGN.md` over
+comments; the code and its tests are what runs. The stale copy is fixed in the pull request that finds it, but code
+that has drifted from DECISIONS.md is said to the owner, never settled either way. Memory is for this machine and
+how to work with the owner: a product call goes in DECISIONS.md.
 
 ## The game, in a paragraph
 
@@ -30,14 +34,14 @@ most). A change is judged by whether players come back: the retention numbers in
 
 | Path | What |
 | --- | --- |
-| `cmd/almanac` | The program: `serve`, `bank check/fmt`, `backup now/list/restore/verify/keys` |
+| `cmd/almanac` | The program: `serve`, the bank's tools, backups, a player's deletion; `almanac` with no arguments lists every command (its doc comment says what each does) |
 | `cmd/build` | Builds the client into `internal/assets/dist` (esbuild; precompressed; the first screen's budget, which is the player's whole client, and the fonts' ceiling) |
 | `internal/play` | The game's rules and data: runs and their scores (`play.go`, `board.go`), the streak (`runs.go`), the Алманах, its ink and seals (`almanac.go`, `ink.go`, `rank.go`), duels on one's own time (`duels.go`: a friend's, challenged directly), friends |
 | `internal/server` | HTTP: the API (`api.go` maps errors to Bulgarian messages), routes (`server.go`), pages (`pages.go`: the paths it sends the app for, the client's router's list again; a test holds them equal) |
 | `internal/store` | SQLite; migrations in `internal/store/migrations`, applied once each by name |
 | `internal/bank` | Question types, the bank on disk, its checks |
 | `internal/card` | The game's icons (`icon.go`: drawn, never by hand) and the pictures a link shows (1200 × 630 PNG): a shared day's card, which the browser also shares as the day's picture (`/card/<issue>-<shape>.png`), and the site's own (`/og.png`); drawn in Go with the game's fonts (static cuts made by `web/src/fonts/subset.sh`) and the chapters' glyphs (`glyphs.json`, from `art/pictures.ts`) |
-| `internal/account`, `mail`, `push`, `backup` | Players and sign-in, email, Web Push, backups to R2 every 15 minutes (each checked before it's sent, encrypted to a key kept off the server, one brought back daily) |
+| `internal/account`, `mail`, `push`, `backup` | Players and sign-in, email, Web Push, backups to R2 (each checked before it's sent, encrypted to a key kept off the server, one brought back daily) |
 | `web/src` | The client, plain TypeScript, no framework: `lib/` (DOM, signals, router), `game/` (questions, a run), `screens/` (one file per page), `ui.ts`, `app.css` |
 | `web/DESIGN.md` | How it looks and speaks: tokens, components, copy rules. Follow it for any UI |
 | `e2e` | The game in real browsers (Playwright) |
@@ -51,18 +55,18 @@ package, and keep it true after.
 
 ```bash
 go run ./cmd/build -watch & DEV=1 go run ./cmd/almanac serve   # http://localhost:8080, mail in the log
-go vet ./... && go test ./...                                  # the server: about 15 seconds
+go vet ./... && go test ./...                                  # the server: under a minute
 go test -race ./internal/<package>                             # the race detector, on a package you changed that runs things at once
 npm run check && npm test                                      # the client: types, lint, unit tests, language
 npx playwright test -c e2e --project=chromium e2e/<spec>       # the browser specs your change touches (`=`, or the spec reads as a project)
-DEV=1 DB_PATH=/tmp/seeded.db go run ./cmd/almanac seed -state /tmp/personas   # 60 days of 200 players (minutes); prints personas
+DEV=1 DB_PATH=/tmp/seeded.db go run ./cmd/almanac seed -state /tmp/personas   # weeks of play by many players (minutes); prints personas
 ```
 
 A review or a look at a screen is of a game played for a while, not only of a new guest's empty pages: seed a new
 database (then `serve` it with the same `DB_PATH`) and be its personas, a new guest to a long-time player (each one's `sid`
 cookie, or `-state`'s Playwright storage state per persona).
 
-CI runs the race detector on everything (`go test -race ./...`, about eight minutes, in a job no merge waits for);
+CI runs the race detector on everything (`go test -race ./...`, several minutes, in a job no merge waits for);
 locally run it where goroutines meet (`server`, or `play` when you touch its locks), not on everything: the SQLite driver is
 Go, so under the detector every query is instrumented, and the whole tree takes minutes instead of seconds. A test gets
 its database from `storetest.Open(t)` (migrated once per test program, copied) and the sample bank from
@@ -141,7 +145,7 @@ named; the rest is judgement, so weigh every change against it.
 
 Fast is the rule: several sessions work at once, and every wait multiplies across them.
 
-- **A pull request waits only for the fast checks** (Server, Client, PR title: two minutes or so). Open it and queue
+- **A pull request waits only for the fast checks** (Server, Client, PR title: a few minutes). Open it and queue
   the merge in one go — `gh pr merge <n> --auto --squash` — then move on: GitHub merges it when they pass. Don't
   watch CI, and don't merge `main` into a branch unless GitHub says it conflicts. One thing blocks a merge with
   every check green: a CodeQL alert of severity *error* (`go/log-injection`, `go/allocation-size-overflow`, even at
@@ -166,7 +170,7 @@ Fast is the rule: several sessions work at once, and every wait multiplies acros
   changed firewall or sshd file goes back by itself in ten minutes unless `almanac-harden confirm` comes from a new
   ssh login: `deploy/harden.sh`); until then the Deploy run is red. Nothing a player does may live in the server's memory
   alone: anything new kept there must survive a restart (the limits' counts do: `limits.go`).
-- **The browser tests run after the merge, on `main`** (about 10 minutes, all three engines, each in shards side by
+- **The browser tests run after the merge, on `main`** (all three engines, each in shards side by
   side). They hold nothing up; if one fails, whoever sees it fixes it, at once (a session is told as it starts:
   `.claude/hooks/main-red.sh`).
   Before opening a PR, run only the specs your change touches, in Chromium:
@@ -200,7 +204,7 @@ This runs on the owner's own Mac, with other sessions beside you. When your work
 ## Production
 
 One Hetzner server (ARM) behind Cloudflare; the program runs under systemd as `almanac`, serves HTTPS itself, keeps
-SQLite in `/var/lib/almanac`, and backs it up to R2 every 15 minutes. Deploys come from CI (above). By hand, as root:
+SQLite in `/var/lib/almanac`, and backs it up to R2 (README, „Резервни копия“). Deploys come from CI (above). By hand, as root:
 `almanac-deploy vX.Y.Z` (also how to go back: an older version, within the same minor (`vX.Y.*`: the same migrations); to an older minor only by
 the steps below, as the older version refuses the migrated database; a release is taken only signed, so
 one from before signatures only while it's kept in `/usr/local/lib/almanac`, the five used latest), `almanac-bank` (check the new
@@ -208,7 +212,8 @@ questions apart, then pull and reload them), `journalctl -u almanac` (logs). A b
 once (they share a lock: `TestDeployAndBankShareALock`). The `almanac backup` commands need the service's settings:
 `systemd-run --pipe --wait --collect -p User=almanac -p EnvironmentFile=/etc/almanac/env /usr/local/bin/almanac backup verify`
 brings the latest copy back and checks it (the server does this itself daily). Health: `https://almanac.bg/api/health`
-shows the live version and the bank played (its commit; one refused).
+shows the live version and the bank played (its commit; one refused). A new server, and what is set up outside the
+code (Cloudflare, mail, where each secret is kept): README, „Нов сървър и каквото е извън кода“.
 
 Going back to an older minor (vOLD) from the version live now (vNEW) puts the database back as it was before the
 migration: by hand, as root, in this order and no other. A copy put in beside the database's `-wal` comes out corrupt

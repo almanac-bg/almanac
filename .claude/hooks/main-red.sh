@@ -25,7 +25,7 @@ for workflow in CI Deploy; do
 	else
 		echo "main's deploy is red: the release and deploy of „$(jq -r .displayTitle <<<"$last")“ failed${jobs:+ in $jobs} ($(jq -r .url <<<"$last")); the latest release may not be live (deploy/deploy.sh says why a deploy stops)."
 	fi
-	echo "CLAUDE.md: whoever sees it fixes it, now or with their change; \`gh run view $id --log-failed | grep -E '✘|Error|::error|not '\` names what failed."
+	echo "CLAUDE.md: whoever sees it fixes it, at once; \`gh run view $id --log-failed | grep -E '✘|Error|::error|not '\` names what failed."
 	fixes=1
 done
 # Dependabot's pull requests: nobody else merges them (one waited green for a day, the audit of 2026-11-24). Its

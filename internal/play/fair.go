@@ -32,7 +32,7 @@ import (
 const ShadowScript = 1
 
 // People is a SQL condition on a run (its columns, unaliased) that /admin counts it as a player's game: one population
-// on the whole page, the same that its days played are (retention.go, personDays). Not one at a script's speed
+// on the whole page, the same that its days played are (retention.go, personDay). Not one at a script's speed
 // (ShadowScript), nor an admin's (whoever keeps the game, trying it).
 var People = personRun + ` AND user_id NOT IN (SELECT id FROM users WHERE admin)`
 

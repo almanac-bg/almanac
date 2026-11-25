@@ -340,7 +340,7 @@ func TestOnThisDay(t *testing.T) {
 }
 
 // A game is gone over on the day it ended (one ended just before midnight, right after it too), never days later;
-// a duel's on any day (TestDuelWithAFriend).
+// a duel's on any day (TestFriendDuel).
 func TestReviewOnItsDay(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()

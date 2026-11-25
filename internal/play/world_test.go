@@ -9,7 +9,7 @@ import (
 )
 
 // Every game a test makes is newGame's, and no test sets a game's bank by hand: a game made otherwise isn't waited for
-// as its test ends (its counts wrote into a database closed, a folder removed: TestRelabelPaysAsShown), and Game.Bank
+// as its test ends (its counts wrote into a database closed, a folder removed), and Game.Bank
 // set while the game's background work reads it is a race (TestGradedAsShown). Both turned main's checks red.
 func TestGamesMadeByTheWorld(t *testing.T) {
 	files, _ := filepath.Glob("*_test.go")

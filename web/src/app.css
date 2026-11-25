@@ -2406,7 +2406,7 @@
     mask: var(--i-back) center / contain no-repeat;
   }
 
-  /* The number answered: what the player said, big, and on a scale beside the answer (questions.ts, nearScale). */
+  /* The number answered: what the player said, big, and on a scale beside the answer (questions.ts, scale). */
   .number-result {
     display: grid;
     gap: var(--space-3);
@@ -7546,8 +7546,8 @@
       grid-template-columns: minmax(0, 1fr);
     }
 
-    /* Three ways on under a result (a duel sent: „Към Приятели“, „Прегледай въпросите“, „Нов дуел“): one row of
-       three, each a third. */
+    /* Three ways on under a result (a chapter's game: „Още десет въпроса“, „Прегледай въпросите“, „Към темата“):
+       one row of three, each a third. */
     .summary > .actions:has(> .result-actions > :nth-child(2):last-child) {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }

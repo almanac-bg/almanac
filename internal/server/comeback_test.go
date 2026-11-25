@@ -30,7 +30,7 @@ func TestComeBack(t *testing.T) {
 	if today["back"] != nil {
 		t.Fatalf("played yesterday, welcomed back: %v", today["back"])
 	}
-	// Cy played five days in a row, then went away: welcomed back, once, with the longest streak.
+	// Cy played five days in a row, then went away: welcomed back, once, with no streak's number.
 	cy, cyID := g.guest()
 	for d := 5; d <= 9; d++ {
 		g.dayOf(cyID, time.Date(2026, 11, d, 0, 0, 0, 0, play.Bulgaria).Format(time.DateOnly), 6)

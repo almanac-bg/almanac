@@ -10,8 +10,8 @@ this file passes the rule for later (DECISIONS.md).
 ## Principles
 
 - **Colour belongs to the chapters,** always with their glyph: a chapter's sheet, its tile, its seal. Everything
-  else is ink on a light page by day and a light ink on a deep violet-blue page by night. There is no gold button, no
-  green or red.
+  else is ink on a light page by day and a light ink on a deep violet-blue page by night. There is no gold button, and
+  right and wrong are never green and red: the one red is a step that can't be undone (`--danger`).
 - **Right and wrong lead with shape and fill:** right is ink, filled, with a solid ✓; wrong is hollow and dashed, a ✕
   in a dashed ring; близо is half filled (a square its upper left half, ◩). Colour is never their only sign. **Dashes
   mean wrong**, and only that.
@@ -98,8 +98,8 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
      (`.missed-day`): the first four, each its dashed tile, the question, the right answer (an order, a match, a split
      in lines) and its fact, and „Прегледай въпросите“ under them; no word of praise. A best rank risen, the big moment, right
      under the score, on its chapter's sheet: „Нов печат“, the seal set large, the rank's name, what made it („40
-     факта от Кино и телевизия са с мастило в твоя Алманах.“), the ladder from Бележка to Летопис (`ladder()`), the
-     art it brings, and other ranks risen with it in a line.
+     факта от Кино и телевизия са с мастило в твоя Алманах.“), the ladder from Бележка to Летопис (`ladder()`), and
+     other ranks risen with it in a line.
   2. On the first results (a guest's first day, a game just brought here, an app's own browser): the action, right
      under what the day wrote in the book (3: what keeping the game keeps, in the first screen) — keeping the game and being reminded, or the way out to the phone's browser (a button: on Android
      it opens the phone's browser, elsewhere it copies the link for it; the app's menu named under it, „Или от менюто
@@ -237,10 +237,9 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   duel starts from the friend's row. Nothing ringed but the duel to play, no time on any of it: time never counts.
   Every duel the player has to play is in one stack, whoever sent it (owner, 2026-11-22), in the order they were
   challenged: the first on top, its card whole, the edges of one or two more under it, each a little narrower, as
-  sheets lie in a stack (`.duel-pile`); under its „Играй“, „Виж всички (4)“ opens them all in a dialog („Чакат те 4
-  дуела“), in the same order, a row each: who it's with (avatar and name, no link), how long is left
-  („Довърши своята игра“ before it, of one the player began), and its own „Играй“; „Затвори“ in its head, beside the
-  title, as every sheet that's gone through has it.
+  sheets lie in a stack (`.duel-pile`), and no list of them: one is played at a time, and the next comes up (owner,
+  2026-11-25: „Виж всички“ and its dialog, removed on 23 Nov, stay removed; the first challenged plays first, fair to
+  whoever waited longest).
   A duel named in the address (`?duel=<id>`: its game just ended, or an old link to its page) is first in its group,
   brought into sight, and its result lands there once (`feel.duel`: the marks fill pair by pair, the score counts
   up, the chip lands with the end's sound), never again. The record between two is the friend's row's, never a duel's. Friends are added in one field under „Добави приятел“, „име или
@@ -454,7 +453,7 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
 - **What a tap brings up** under it (an ask, an answer: „Нова връзка“, „Добави“, „Изтрий профила“) is scrolled into
   sight whole, clear of a phone's places at the foot (`inSight()`).
 - **Rows of players:** `who()` (the avatar and the name), `playerRow()` (a friend's
-  `.friend` and a board's `.rank-row`, one build: Приятели and the day's board), `.duel-pick` (a friend to start a duel with: a button, its name never a link). A duel in a list is a card, not a row (`.duel-card`). **Avatars** (`avatar()`): the drawn animal
+  `.friend` and a board's `.rank-row`, one build: Приятели and the day's board). A duel in a list is a card, not a row (`.duel-card`). **Avatars** (`avatar()`): the drawn animal
   on a rounded tile of its scene, nothing on it. Only the fifteen animals: an avatar is a face.
 - **What went wrong** is never a dead end: `failure()` says what happened, offers „Опитай пак“ where it can help, and
   always a way on.
@@ -650,17 +649,11 @@ Look at all of them together after changing one: 200, 64, 40 and 32px, by day an
 
 ## In code
 
-- `ui.ts`: `leaf`, `glyph`, `chip`, `tiles`, `mini`, `seal`, `standing`, `sealList`, `ladder`, `avatar`, `who`, `verdict`,
-  `fact`, `filed`, `segmented`, `tabDot`, `failure`, `rosette`, `back`, `nameWords`, `textWords`, `emailWords`, `inSight`.
-- `game/run.ts`: `trail`, `questionHead`, `timer`, `settle`; `game/questions.ts` each kind; `game/news.ts` what a game
-  wrote; `game/share.ts` the share.
+- **The pieces several screens share** are `web/src/ui.ts`'s exports (a game's own are `web/src/game/`'s): use one
+  before making another.
 - **Selectors:** a part has its own class (`.status-n`), not a tag under a class; Biome flags the other kind. A class
   nothing names any more goes, with its rules.
-- **Test hooks** the browser tests depend on: `.question-head`, `.options .option`, `.keypad`, `.sortable-list`,
-  `.verdict`, `.right-said`, `.after`, `.up-next-go`; `.issue`, `.issue-go`, `.today-side`, `.result`, `.result-main`, `.score-n`,
-  `.tiles .tile`, `.tomorrow`, `.asks`, `.result-share`, `.share-sheet`, `.streak-chip`, `.streak-notice`, `.day-news`, `.missed-day`;
-  `.summary`, `.reviewed`, `.news-facts`; `.toc-row`, `.entry`; `.day-board`, `.rank-row`, `.friend`, `.invitation`,
-  `.accepted-notice`, `.duels`, `.duel-cards`, `.duel-card` (`.turn`, `.landed`, `.s-<state>`), `.duel-card-mid`, `.duel-card-go`, `.duel-card-open`, `.duel-pile`, `.duel-stack`, `.duel-chip`, `.duel-card-marks`, `.review-sheet`, `.review-of`, `.duel-q-side`, `.friends-on`, `.friends-row`, `.friends-faces`, `.friends-list`, `.friends-chip`, `.tile-tap`, `.lit`, `.friend-record`, `.friend-full`, `.their-line`; `.me-ladder`, `.ladder`.
+- **A class an `e2e/` spec names is a test hook:** grep `e2e/` before renaming or removing one.
 
 ## Before a UI change ships
 

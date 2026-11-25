@@ -480,7 +480,7 @@ export interface Look {
   avatar?: string;
 }
 
-/** Every avatar's name: the animals, each anyone's to choose from the first day (play.Animals), in the order the
+/** Every avatar's name: the animals, each anyone's to choose from the first day (account.Animals), in the order the
  * choice shows them. */
 export const shapeNames: Record<string, string> = {
   fox: "Лисица",

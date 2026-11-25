@@ -1,7 +1,6 @@
-// What the player has set for this device: Night or Day, less motion, the text's size, whether the clock ticks. Kept
-// in the browser (like the sounds' switch), and put on the page: Night or Day as `data-scheme` and less
-// motion as a class on <html>, which the CSS reads, the text's size as <html>'s own (everything is sized from it, in
-// rem).
+// What the player has set for this device: Night or Day, and whether the clock ticks, kept in the browser (like the
+// sounds' switch); Night or Day goes on the page as `data-scheme` on <html>, which the CSS reads. Less motion and the
+// text's size are the device's own settings, never the game's: the page follows them (calm, measure).
 
 import { signal } from "./dom.ts";
 

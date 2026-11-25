@@ -83,7 +83,8 @@ packages' doc comments; this file holds only what must not drift.
     achievements, notes as rewards, lifetime totals, rating, divisions, leagues, rooms). Anything live stays out until
     the owner reopens it.
     Профил names the book's whole ink beside „Печати“ (2026-11-22): it is ink, summed, earned only by the day's issue,
-    so it adds no second score.
+    so it adds no second score. No statistics of one's answers on it (2026-11-22, the owner: a chapter's „% верни“ on
+    the profile was mocked up and declined, „не ме кефи, остави“): not to be proposed again.
   - **The streak counts days the issue was played** and forgives up to two missed days a week by itself; an ended
     streak's number is never named. Днес shows it from its first day (2026-11-23, the owner: a player's second day,
     the one that decides whether they stay, showed nothing of the first), and on the result too.
@@ -99,7 +100,9 @@ packages' doc comments; this file holds only what must not drift.
     on another day, and its questions are what the two talk over). Every duel is a card,
     „Чакащи дуели“ and „Завършени дуели“ (2026-11-22, the owner: the cards read better than compact rows): one the
     player's to play acts only by its „Играй“; every duel they have to play is in one stack, whoever sent it, the first
-    challenged on top, opened in a dialog in that order to choose which to play (2026-11-22, the owner); one whose side
+    challenged on top (2026-11-22, the owner), played one at a time in that order, with no list of them to choose from
+    (2026-11-25, the owner: „Виж всички“ and its dialog, removed on 23 Nov, stay removed: the first challenged plays
+    first, fair to whoever waited longest, and it is one dialog fewer); one whose side
     they've played opens its questions; no name on a duel is a link to a profile, which opens from the friends'
     list (2026-11-22, the owner). Nothing else: „Реванш“ is
     gone (2026-11-22, the owner), a new duel starts from the friend's row or profile. A duel's game ends on Приятели,

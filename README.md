@@ -13,14 +13,14 @@
 - **Сървърът** (`cmd/almanac`, `internal/`) е един статичен файл: HTTP, HTTPS, базата данни (SQLite), пощата и
   клиентът са вътре. Зависи само от драйвера за SQLite, от age, с който се шифроват резервните копия, и от
   golang.org/x/image, с който се рисуват картите за споделяне.
-- **Клиентът** (`web/`) се строи с esbuild през `go run ./cmd/build`. Първият екран е около 95 kB заедно с
-  шрифтовете (бюджет 110 kB, пазен в CI), а играта се изпитва в Chromium, WebKit и Firefox (`e2e/`). Шрифтовете
-  (Sofia Sans, с българските форми на буквите) са наши файлове: браузърът не пита никой друг за нищо.
+- **Клиентът** (`web/`) се строи с esbuild през `go run ./cmd/build`, който казва и колко е първият екран заедно със
+  шрифтовете и какъв е бюджетът му (пазен в CI), а играта се изпитва в Chromium, WebKit и Firefox (`e2e/`).
+  Шрифтовете (Sofia Sans, с българските форми на буквите) са наши файлове: браузърът не пита никой друг за нищо.
 - **Въпросите** (`internal/bank`) са сърцето на играта: всеки вид въпрос (с избор, с число, за подреждане) сам се
   проверява, раздава и оценява. Нов вид е нов файл тук и неговият изглед в клиента.
 
 ```
-cmd/almanac      програмата: serve, bank check/fmt, backup now/list/restore/verify/keys
+cmd/almanac      програмата: serve, банката, копията, изтриване на играч (`almanac` без нищо изрежда командите)
 cmd/build        строи клиента в internal/assets/dist
 internal/bank    въпросите: видовете, банката на диска, проверките
 internal/store   SQLite и миграциите (internal/store/migrations)
@@ -53,7 +53,7 @@ DEV=1 go run ./cmd/almanac serve     # http://localhost:8080 — пощата о
 go vet ./... && go test -race ./...
 npm ci && npm run check && npm test
 npm run e2e                          # играта в Chromium, WebKit и Firefox (BROWSER_PATH: свой Chromium)
-go run ./cmd/almanac bank check      # банката в private/ (пада, ако не е напълно балансирана)
+go run ./cmd/almanac bank check      # банката в private/ (пада на каквото сървърът би отказал, на правилата ѝ и на баланса: cmd/almanac/bank.go)
 go run ./cmd/almanac bank check -sample bank/sample   # извадката
 ```
 
@@ -148,14 +148,61 @@ almanac.db`.
 (или `@потребителско-име`) казва кой е и какво пази базата за него, без да променя нищо; с `-yes` преди имейла го
 изтрива. Без настройките командата не намира базата и отказва.
 
-**Нов сървър:** първо ключ на root за въпросите (`ssh-keygen -t ed25519` като root, публичната част като deploy key
-само за четене на `almanac-questions` в GitHub): без него `setup.sh` не може да изтегли банката. После
-`deploy/setup.sh` и `almanac-harden confirm` от нов вход; `/etc/almanac/env` и `origin.key`/`origin.pem` от мениджъра на
-пароли (виж по-долу); `almanac-deploy vX.Y.Z` (тръгва на празна база, която не се праща никъде); после спиране,
-възстановяване и пускане както горе; DNS накрая.
+### Нов сървър и каквото е извън кода
 
-**Тайните извън сървъра.** `/etc/almanac/env` и `origin.key`/`origin.pem` се пазят и в мениджъра
-на пароли и се обновяват там при всяка промяна. Без `PUSH_PRIVATE_KEY` известията спират за всички.
+Стъпките, в този ред. Стойностите не са тук: те са в мениджъра на пароли на собственика и в конзолите.
+
+1. **Сървърът** в Hetzner Cloud (console.hetzner.cloud): ARM (изданията са само `linux-arm64`), Ubuntu, ключът на
+   собственика за root, резервните образи на Hetzner (*Backups*) включени. Защитната стена на Hetzner пред него е
+   `deploy/hetzner-firewall.json`: `hcloud firewall replace-rules СТЕНА --rules-file deploy/hetzner-firewall.json`, после
+   `hcloud firewall apply-to-resource СТЕНА --type server --server СЪРВЪР` (или същите правила на ръка в конзолата).
+2. **Ключ на root за въпросите:** `ssh-keygen -t ed25519` като root, публичната част като deploy key само за четене
+   на `almanac-questions` в GitHub. Без него `setup.sh` не може да изтегли банката.
+3. **`deploy/` на сървъра** (`scp -r deploy root@АДРЕС:`) и като root `sh deploy/setup.sh`, после
+   `almanac-harden confirm` от нов вход до десет минути (иначе защитната стена и ssh се връщат сами).
+4. **Настройките:** `/etc/almanac/env` и `/etc/almanac/origin.pem`/`origin.key` от мениджъра на пароли, всеки с
+   `install -o root -g almanac -m 640`. Каквото липсва там, е описано в `deploy/env.example`; в него `MTA_STS_MODE` е
+   `testing`, а в играта е `enforce`.
+5. **R2:** токенът на сървъра (R2 → *Manage API tokens*) пуска само адресите в своя *Client IP filtering*: добави
+   новите адреси (IPv4 и IPv6) там, преди да възстановяваш, иначе сървърът не стига до копията. Старите се махат,
+   щом старият сървър го няма.
+6. **Първото пускане:** `almanac-deploy vX.Y.Z` (последното издание) на ръка. Тръгва на празна база, която не се
+   праща никъде. На ръка, не от CI: издание, което не тръгне, CI не пуска пак.
+7. **Ключът на CI:** в `/root/.ssh/authorized_keys` редът, който дава `deploy/deploy-ci.sh` (най-горе в него), с
+   публичната част на тайната `DEPLOY_KEY` (средата `production` в GitHub): от стария сървър, а ако я няма, нова
+   двойка (`ssh-keygen -t ed25519 -N '' -C almanac-ci-deploy -f ci-deploy`, частната с
+   `gh secret set DEPLOY_KEY --env production < ci-deploy`, после двата файла се изтриват). Адресът на сървъра и
+   ключът на хоста са в `.github/workflows/deploy.yml` (стъпката „The server's key“: `known_hosts` и `HostName`): новите
+   (`ssh-keyscan -t ed25519 АДРЕС`) влизат там със сливане в `main`.
+8. **Преминаването:** на стария сървър, ако още върви, `systemctl stop almanac.socket almanac` и `almanac-backup now`
+   (последното копие); на новия спиране, възстановяване на най-новото копие и пускане, както горе.
+9. **DNS накрая**, в Cloudflare: записите A и AAAA на `almanac.bg`, `www` и `mta-sts` към новите адреси, през
+   Cloudflare (*Proxied*). Готово е, когато `https://almanac.bg/api/health` показва версията и `"ok":true`. Мониторите
+   на Better Stack гледат името, не адреса: не се пипат.
+
+**Cloudflare** (dash.cloudflare.com, зоната `almanac.bg`), каквото не е в кода: *SSL/TLS* в режим *Full (strict)*,
+най-малко TLS 1.2, *Always Use HTTPS* (HSTS идва от програмата); сертификатът за сървъра е *Origin Server* (той е
+`origin.pem`/`origin.key`); правилото за пренасочване `www` → `almanac.bg`; правилото за честота на заявките
+(*Security → WAF → Rate limiting rules*) пред входа и гостите; кофата `almanac-backups` в R2 (горе). DNSSEC е включен
+в Cloudflare (*DNS → Settings*); записът DS, който Cloudflare дава там, се поставя при регистратора (Register.BG).
+**Преди DNS да се премести от Cloudflare, DS се маха при регистратора** и се чака да изтече: иначе името спира да се
+отваря за всеки, който проверява подписите.
+
+**Пощата.** Излиза през Scaleway TEM (console.scaleway.com: домейнът `almanac.bg` и ключът в `SMTP_URL`, който има
+срок, видим там), влиза в Proton (privacy@, abuse@, postmaster@). Записите ѝ са в зоната на Cloudflare и не зависят
+от сървъра: MX, SPF, DKIM (на Proton и на Scaleway), DMARC, `_mta-sts` и `_smtp._tls`, CAA и записите за потвърждение
+(Google, Proton, GitHub). Ако зоната някога се мести, първо *DNS → Records → Export*: оттам се правят наново.
+
+**Тайните извън сървъра.**
+
+- `/etc/almanac/env` и `origin.key`/`origin.pem`: в мениджъра на пароли, обновявани там при всяка промяна. Без
+  `PUSH_PRIVATE_KEY` известията спират за всички.
+- Тайният ключ на копията: в мениджъра на пароли и още веднъж на хартия или флашка (горе).
+- `DEPLOY_KEY` и `RELEASE_SIGNING_KEY`: само в средата `production` в GitHub. Загубен се прави наново: първият както
+  в стъпка 7, вторият както казва `deploy/release-signers`.
+- Ключът на сървъра за въпросите: само на сървъра, нов с всеки сървър (стъпка 2).
+- Профилите в Hetzner, Cloudflare, Register.BG, Scaleway, Proton, Better Stack и GitHub: на собственика, с вход в
+  мениджъра на пароли.
 
 ### Наблюдение
 
@@ -180,7 +227,6 @@ Stack):
 
 ALMANAC (АЛМАНАХ) is a Bulgarian quiz game at [almanac.bg](https://almanac.bg): ten questions a day, the same for
 everyone in Bulgaria; each right answer writes its fact in ink in your book, and each chapter's seal says how much of it
-you hold; friends, the day's board and duels in each one's own time. One Go program (stdlib + SQLite) serves a plain
-TypeScript client with no framework. Run it with `go run
-./cmd/build && DEV=1 go run ./cmd/almanac serve`. Free software under the AGPL-3.0; issues and pull requests in
-English are welcome.
+you hold; friends, the day's board and duels in each one's own time. One Go program (the standard library, a pure-Go
+SQLite driver, age and x/image) serves a plain TypeScript client with no framework. Run it with `go run ./cmd/build &&
+DEV=1 go run ./cmd/almanac serve`. Free software under the AGPL-3.0; issues and pull requests in English are welcome.

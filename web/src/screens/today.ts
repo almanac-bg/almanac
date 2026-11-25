@@ -618,15 +618,8 @@ function streakSection(t: Today, stats: () => Stats | null, done: boolean, said?
 /** How many a day's right answers are out of: all but those that count for nobody (Mark.void). */
 const outOf = (s: State) => s.total - (s.void ?? 0);
 
-/** The day played, as a page, in its budget's order (DESIGN.md, The result), the HTML's order too:
- *
- *   1. the score on its sheet, the tiles, how many knew the tenth, how all of България did on average, and come by
- *      the day's shared link (`shared`), the score shared („По връзката: 2 от 10“);
- *   2. what the day wrote in the book („Днес в Алманаха“: its ink, by chapter; a rank risen);
- *   3. the action: sharing it (on the first results, keeping the game and being reminded, or the way out of an app's
- *      browser, which come right under what the day wrote instead);
- *   4. tomorrow;
- *   5. the day's board, Приятели · България (dayBoard).
+/** The day played, as a page, in its budget's order (DESIGN.md, „The result“), the HTML's order too; the day's board
+ * last (dayBoard).
  *
  * Everything else (the questions and their facts) is in the questions' dialog (results.ts, reviewSheet), opened by
  * „Прегледай въпросите“, by a tap on the score's card, and by a tile, at its question. As it's
@@ -777,7 +770,7 @@ function result(
           return d ? duelGo(d) : shareButton(run, t, streak, known);
         },
   );
-  // The left page is the player's own day: the score, what it wrote in the book, the action, tomorrow; the right page
+  // The left page is the player's own day: the score, what it wrote in the book, the action; the right page
   // is everyone's, the day's board, with the room to itself. On a phone, one column in that order.
   const page = h(
     "section",
@@ -1314,8 +1307,8 @@ function tellStreak(key: string): boolean {
 }
 
 /** What came of the days just missed — the week forgave one, or it had forgiven all it does and the streak ended — or,
- * back after days away, a welcome with the longest streak the player has had: said once, over the day (the server
- * sends it until it's told). */
+ * back after days away, a welcome, never with a streak's number: said once, over the day (the server sends it until
+ * it's told). */
 function streakNotice(t: Today): StreakSaid | null {
   const key = t.forgiven
     ? `forgiven:${t.forgiven}`

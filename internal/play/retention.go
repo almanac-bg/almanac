@@ -13,7 +13,7 @@ import (
 //
 // /admin counts people, one population on the whole page but its shares, which are anyone's, the owner's too, since
 // any link may bring players (People, fair.go): a day counts when the player isn't an admin and played a game as a
-// person that day, not at a script's speed. That is judged as the days are read (personDays), never as they're kept: a
+// person that day, not at a script's speed. That is judged as the days are read (personDay), never as they're kept: a
 // game becomes a script's only after some of its answers, and may be let out of it. A player who goes leaves their days as nobody's (Forget), judged as they go: only those that counted are kept.
 
 // markActive keeps that a player played on the day of `at`: when an answer came, or when a question's time ran out,
