@@ -331,7 +331,7 @@ export function result(hero: HTMLElement, perfect: boolean, hands: Hands, gap = 
     for (const [i, li] of pips.entries())
       moving.push(
         li.animate([{}, { background: gold, boxShadow: `0 0 14px ${gold}` }, {}], {
-          duration: 420,
+          duration: 400,
           delay: lands + 200 + i * 40,
         }),
       );

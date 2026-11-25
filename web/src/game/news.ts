@@ -2,10 +2,10 @@
 // at a glance („+6 с мастило“) over the chapters it went to, each its tile and its „+1“, a tap from those facts in
 // its chapter, marked there for a moment (/almanac/<chapter>?fact=<id>: screens/almanac.ts); a right answer in the issue
 // that stayed grey because the book had its fact already; and the ranks it raised (play/rank.go): several as one line
-// (one chapter's with its ladder of ranks), and a rise of the player's best rank as the result's one big moment, the
-// seal set large on its ladder. A game that ended without its result on screen has
-// its news told on Днес later (play/told.go): under its result, if it's the day's; else under a line that says whose it
-// is. A bad game is never celebrated: what's said is what's true of it.
+// (one chapter's with its ladder of ranks), and a rise of the player's best rank as a big moment of the result (ten of
+// ten the other; on the rare day both come, both show), the seal set large on its ladder. A game that ended without
+// its result on screen has its news told on Днес later (play/told.go): under its result, if it's the day's; else under
+// a line that says whose it is. A bad game is never celebrated: what's said is what's true of it.
 
 import { picture } from "../art/picture.ts";
 import { api } from "../lib/api.ts";
@@ -141,7 +141,7 @@ function metLine(n: number): Child {
   );
 }
 
-/** Ranks risen, the best not among them (or beside a ten of ten): the seals risen, drawn, and one line for them all,
+/** Ranks risen, the best not among them: the seals risen, drawn, and one line for them all,
  * each chapter's name a tap from its page: „Нов печат: „Страница“ в История.“, „Нови печати: „Страница“ в География и
  * в Технологии и игри.“ */
 function roseLine(r: NonNullable<News["rose"]>): Child {
@@ -178,7 +178,7 @@ export function risen(ranks: Risen, link: (chapter: string) => Child = chapterLi
 
 const chapterLink = (chapter: string) => h("a", { href: `/almanac/${chapter}` }, chapterName(chapter));
 
-/** The player's best rank risen: the result's one big moment, on its chapter's sheet: „Нов печат“, the seal set
+/** The player's best rank risen: a big moment of the result, on its chapter's sheet: „Нов печат“, the seal set
  * large, its rank's name, what made it („40 факта от История са с мастило в твоя Алманах.“) and its ladder; other
  * ranks risen with it in a line under them. */
 function rankUp(r: NonNullable<News["rose"]>): Child {

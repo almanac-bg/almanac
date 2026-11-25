@@ -455,7 +455,6 @@
     width: 1em;
     height: 1em;
     background: currentColor;
-    -webkit-mask: var(--i) center / contain no-repeat;
     mask: var(--i) center / contain no-repeat;
   }
 
@@ -2135,7 +2134,6 @@
     width: 16px;
     height: 16px;
     background: currentColor;
-    -webkit-mask: var(--i) center / contain no-repeat;
     mask: var(--i) center / contain no-repeat;
   }
 
@@ -2226,7 +2224,6 @@
     inset: 0;
     border-radius: 50%;
     background: repeating-conic-gradient(currentColor 0 15deg, transparent 15deg 30deg);
-    -webkit-mask: radial-gradient(closest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring)));
     mask: radial-gradient(closest-side, transparent calc(100% - var(--ring)), #000 calc(100% - var(--ring)));
   }
 
@@ -2406,7 +2403,6 @@
     width: 30px;
     height: 30px;
     background: currentColor;
-    -webkit-mask: var(--i-back) center / contain no-repeat;
     mask: var(--i-back) center / contain no-repeat;
   }
 
@@ -2562,7 +2558,6 @@
     cursor: pointer;
     touch-action: pan-y;
     user-select: none;
-    -webkit-user-select: none;
     -webkit-touch-callout: none;
   }
 
@@ -2607,7 +2602,6 @@
     width: 20px;
     height: 20px;
     background: var(--ink-3);
-    -webkit-mask: var(--i-grip) center / contain no-repeat;
     mask: var(--i-grip) center / contain no-repeat;
   }
 
@@ -3300,7 +3294,6 @@
     width: 22px;
     height: 22px;
     background: currentColor;
-    -webkit-mask: var(--i) center / contain no-repeat;
     mask: var(--i) center / contain no-repeat;
   }
 
@@ -3812,9 +3805,10 @@
     }
   }
 
+  /* Reached by the keyboard, the house's ring (3px of ink), drawn inside the card, which would clip it outside. */
   .duel-card-open:focus-visible {
     outline: none;
-    box-shadow: inset 0 0 0 2px var(--line-2);
+    box-shadow: inset 0 0 0 3px var(--ink);
   }
 
   /* A card on a sheet, the sheet's white around it: on the page's ground, as on the page. */
@@ -3846,19 +3840,30 @@
     text-align: center;
   }
 
-  /* Large text, few words to a line: where the page is on a line of its own, the two buttons under it, at its ends
-     (in a row, „По-стари“ ran off the screen and the page scrolled sideways). */
+  /* Large text, few words to a line: where the page is on a line of its own, the two buttons under it at its ends,
+     each in half the row, its word wrapping at its hyphen („По-“) where even half is too narrow (in a row, „По-стари“
+     ran off the screen and the page scrolled sideways; under it whole, it still did on a 320px phone). */
   .tight .pages {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
   .tight .pages-at {
     grid-area: 1 / 1 / 2 / -1;
   }
 
+  .tight .pages > .btn {
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .tight .pages > .btn:first-child {
+    justify-self: start;
+  }
+
   .tight .pages > .btn:last-child {
-    grid-column: 3;
+    grid-column: 2;
+    justify-self: end;
   }
 
   /* The duels to play, one stack: the first challenged on top, the edges of one or two more under it, each a little
@@ -5665,7 +5670,6 @@
     border-radius: 3px;
     background: color-mix(in srgb, var(--tv) 35%, transparent);
     color: var(--ink);
-    -webkit-box-decoration-break: clone;
     box-decoration-break: clone;
   }
 
@@ -6207,8 +6211,10 @@
     background: var(--surface);
   }
 
-  /* „+6 с мастило“: its words go under the figure where they don't fit beside it (large text at 320 px). */
+  /* „+6 с мастило“: its words go under the figure where they don't fit beside it (large text at 320 px). A finger's
+     44px to tap, drawn no taller: 7px more above and below (the chapters under it are 12px away). */
   .ink-row {
+    position: relative;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -6216,6 +6222,12 @@
     color: var(--ink);
     font: 800 1.0625rem / 1.2 var(--font-sans);
     text-decoration: none;
+  }
+
+  .ink-row::after {
+    content: "";
+    position: absolute;
+    inset: -7px 0;
   }
 
   .ink-row .i {
@@ -7110,6 +7122,18 @@
     overflow-wrap: anywhere;
   }
 
+  /* A request sent to a player: their name, a way to their profile, a finger's 44px to tap within its row's height,
+     above and below only („Отмени“ is beside it). */
+  .waiting li > a {
+    position: relative;
+  }
+
+  .waiting li > a::after {
+    content: "";
+    position: absolute;
+    inset: -11px 0;
+  }
+
   /* Someone asks to be friends: their line, and under it „Приеми“ and „Откажи“, on a card over the list as every card
      is (no frame of its own). */
   .invitation {
@@ -7253,36 +7277,6 @@
     }
   }
 
-  /* Less motion: the device's setting (prefers-reduced-motion, mirrored as the .calm class by prefs.ts). The
-     timer and the count before a run still move: they are information. */
-  @media (prefers-reduced-motion: reduce) {
-    .btn,
-    .option,
-    .option.crowd,
-    .split-card,
-    .chip {
-      transition: none;
-    }
-
-    .option.right,
-    .option.wrong,
-    .number-out.live .typed::after {
-      animation: none;
-    }
-  }
-
-  :root.calm *:not(.time-bar, .ready-arc),
-  :root.calm *::before,
-  :root.calm *::after {
-    animation: none;
-    transition: none;
-  }
-
-  /* What a tap led to is still marked (.lit), as long, and then isn't: shown and gone, with no fade between. */
-  :root.calm .lit::after {
-    animation: lit 1.8s step-end;
-  }
-
   /* A switch: a row with words on the left and a knob on the right, all of it the switch's to tap (a label). */
   .switch-row {
     display: flex;
@@ -7291,7 +7285,6 @@
     gap: var(--space-4);
     min-height: 44px;
     cursor: pointer;
-    -webkit-user-select: none;
     user-select: none;
   }
 
@@ -8613,9 +8606,91 @@
   .tight .result-actions .btn {
     white-space: normal;
   }
+
+  /* A friend's duel waiting (Днес): the face and the line, which has the row's width beside it, „Играй“ under the
+     line (beside them both, the line was a word or two wide and the row taller than the screen). */
+  .tight .duel-waiting {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .tight .duel-waiting-text {
+    flex-basis: calc(100% - 52px);
+  }
+
+  .tight .duel-waiting > .btn {
+    margin-left: 52px;
+  }
+
+  /* Ten of ten: the mark and „Всички верни“ a row over the date and the score, which have the sheet's width (in a
+     column beside them, the score read „1“ over „0“ and the date a letter to a line). */
+  .tight .score-leaf:has(> .perfect) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tight .score-leaf > .perfect {
+    display: flex;
+    grid-row: auto;
+    grid-column: 1;
+    align-items: center;
+    justify-self: start;
+    gap: var(--space-3);
+  }
+
+  .tight .perfect-mark {
+    width: 56px;
+  }
+
+  .tight .perfect-words {
+    white-space: normal;
+  }
+
+  /* A best rank risen: its name whole on a line, the longest („Страница“, „Тетрадка“) on a 320px phone. */
+  .tight .rankup-name {
+    font-size: calc(12px + 0.875rem);
+  }
+
+  /* A name whose last word holds no syllable to break at (a name ending in figures) breaks where it must, „ти“ still
+     with it; the player's own @username too. */
+  .tight .name-end {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .tight .own-tag {
+    overflow-wrap: anywhere;
+  }
+
+  /* A national day's cover: its date a step smaller and its name a line, a little under the dateline's size (both
+     near their usual size), so that „Започни“ stays in sight over the places' bar with the longest name („Рожденият
+     ден на Левски“) on the narrowest phone. */
+  .tight .issue-date:has(.issue-national) .issue-day {
+    font-size: min(4rem, 10dvh, 64px);
+  }
+
+  .tight .issue-national {
+    font-size: calc(4px + 0.5rem);
+  }
 }
 
 /* Hidden is hidden, whatever a component's display (unlayered: it beats the layer). */
 [hidden] {
   display: none;
+}
+
+/* Less motion, the device's setting: no animation or transition anywhere, the server's own pages too (unlayered: it
+   beats the layer, whatever a component's selector). The timer and the count before a run still move: they are
+   information. The script's own movements (feel.ts, a run's beats) ask the same setting (lib/prefs.ts, calm). */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.time-bar, .ready-arc),
+  *::before,
+  *::after {
+    animation: none;
+    transition: none;
+  }
+
+  /* What a tap led to is still marked (.lit), as long, and then isn't: shown and gone, with no fade between. */
+  .lit::after {
+    animation: lit 1.8s step-end;
+  }
 }

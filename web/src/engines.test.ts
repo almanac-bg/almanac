@@ -1,7 +1,9 @@
 // The game is for the browsers cmd/build names (its Engines). tsc's lib holds the language to ES2023, but its DOM types
 // are the newest browsers', so a DOM member newer than those engines passes every check: URLSearchParams.size (Safari
 // 17) left every page link of a chapter pointing at page 1 on iOS 16 (the audit of 2026-11-24). Each member here is
-// one the engines lack; a use of one needs a guard (`typeof x === "function"`) and a line in `guarded`.
+// one the engines lack; a use of one needs a guard (`typeof x === "function"`) and a line in `guarded`. The style
+// likewise: esbuild passes CSS it can't lower for those engines through without a word, so the sheets are read here
+// for what would break there (not what merely does less: `text-wrap: balance` wraps as before).
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -58,4 +60,32 @@ test("the client uses nothing its engines lack", () => {
     [],
     "the build's engines lack these: use something older, or guard it and list it",
   );
+});
+
+// What the engines lack in a style sheet, as text a use of it would show, and the first versions that have it: each
+// would break a page there, not only do less (light-dark() leaves every colour it gives unset in Safari 16.4; a rule
+// inside @scope never applies).
+const newerStyle: [RegExp, string][] = [
+  [/\blight-dark\(/, "Safari 17.5, Chrome 123, Firefox 120"],
+  [/@scope\b/, "Safari 17.4, Chrome 118, not in Firefox"],
+];
+
+/** What of `newerStyle` a sheet uses, its comments aside. */
+const styleLacks = (css: string): string[] =>
+  newerStyle.flatMap(([pattern, since]) => {
+    const m = css.replace(/\/\*[\s\S]*?\*\//g, "").match(pattern);
+    return m ? [`${m[0]} (${since})`] : [];
+  });
+
+test("the client's style uses nothing its engines lack", () => {
+  assert.deepEqual(styleLacks(":root { --ink: light-dark(#16132b, #f3f4fa); }"), [
+    "light-dark( (Safari 17.5, Chrome 123, Firefox 120)",
+  ]);
+  assert.deepEqual(styleLacks("/* never light-dark( */ @media (prefers-color-scheme: dark) {}"), []);
+  const sheets = readdirSync(join(root, "web/src")).filter((f) => f.endsWith(".css"));
+  assert.ok(sheets.includes("app.css") && sheets.includes("admin.css"), "the check no longer reads the sheets?");
+  const found = sheets.flatMap((f) =>
+    styleLacks(readFileSync(join(root, "web/src", f), "utf8")).map((x) => `${f}: ${x}`),
+  );
+  assert.deepEqual(found, [], "the build's engines lack these: use something older");
 });

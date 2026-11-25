@@ -22,16 +22,20 @@ import { answerAs, beside, closeable, flaws, kinds, panelFlaws, type Q, unseenAn
 import {
   befriend,
   cutOrOverlapping,
+  dayAs,
   daysPlayed,
   dealt,
   givenUp,
   keptPlayer,
   knows,
   linkedNames,
+  longestNational,
   mailedCode,
   moveOn,
   playedBefore,
   playRun,
+  ranked,
+  rose,
   startDay,
 } from "./play.ts";
 
@@ -301,7 +305,8 @@ async function brokenWords(page: Page, selector: string): Promise<string[]> {
 }
 
 /** The long words of players' names in `selector` broken anywhere but at a syllable, where a hyphen shows (a soft
- * hyphen: ui.ts, nameWords), in either alphabet („Maximilia / n“ once). */
+ * hyphen: ui.ts, nameWords), in either alphabet („Maximilia / n“ once); or at figures, which no syllable saves (a name
+ * ending in a year: DESIGN.md, Names). */
 async function offSyllable(page: Page, selector: string): Promise<string[]> {
   return page.evaluate((selector) => {
     const out: string[] = [];
@@ -322,7 +327,8 @@ async function offSyllable(page: Page, selector: string): Promise<string[]> {
           for (let i = m.index + 1; i < m.index + m[0].length; i++) {
             const now = top(i);
             if (now === null) continue;
-            if (was !== null && now > was + 2 && text[i - 1] !== "­")
+            const figures = /\p{N}/u.test(text[i - 1] ?? "") || /\p{N}/u.test(text[i] ?? "");
+            if (was !== null && now > was + 2 && text[i - 1] !== "­" && !figures)
               out.push(`a name broken off its syllables: ${m[0].replaceAll("­", "")}`);
             was = now;
           }
@@ -695,6 +701,107 @@ for (const size of sizes)
           await settled(cover);
           expect.soft(await byDayAndNight(cover, () => placeFlaws(cover)), `/signin${at}`).toEqual([]);
           await cover.context().close();
+        }
+      });
+
+      // What a fresh game never draws: the cover on the longest national day with a friend's duel waiting, a chapter of
+      // several pages, and the day's two big moments at once (ten of ten, a best rank risen to „Страница“, the longest
+      // rank's name), the player's name ending in figures beside „ти“ on the day's board.
+      test("a long-time player's moments: a national day, a chapter's pages, ten of ten and a best rank risen", async ({
+        page,
+      }) => {
+        test.setTimeout(150_000);
+        if (big) await textAt(page, text);
+        await dayAs(page, (day) => {
+          day.national = longestNational;
+          day.duel = { id: 1, from: { name: "Maximilian von Bulgarien", look: { avatar: "fox" } }, more: 2 };
+          const run = day.run as { total: number; rights: number; trail: unknown[] } | null;
+          if (run) [run.rights, run.trail] = [run.total, run.trail.map(() => ({ right: true }))];
+        });
+        await page.route(/\/api\/almanac\?/, async (route) => {
+          const res = await route.fetch();
+          const p = await res.json();
+          if (new URL(route.request().url()).searchParams.get("chapter") === "geography")
+            Object.assign(p, {
+              found: 95,
+              facts: Array.from({ length: 30 }, (_, i) => ({
+                id: `geo-${i}`,
+                chapter: "geography",
+                question: `Въпрос ${i + 1}`,
+                answer: `Отговор ${i + 1}`,
+                fact: "Факт.",
+                at: Date.now() - i * 60_000,
+                kind: "day",
+                issue: 3,
+              })),
+            });
+          await route.fulfill({ response: res, json: p });
+        });
+        await page.goto("/");
+        await ranked(page, 1);
+        await daysPlayed(page, 1, 2, 3);
+        await knows(page, ["geo-001"], Date.now(), true);
+        await page.request.patch("/api/me", { data: { name: "Константинова2009" } });
+        const passes = size.width === 320 && big ? [200, 150] : [text];
+        for (const percent of passes) {
+          if (big) await textNow(page, percent);
+          const at = big ? `, ${percent} %` : "";
+          await page.goto("/");
+          await expect(page.locator(".issue-national")).toHaveText(longestNational);
+          await expect(page.locator(".duel-waiting")).toBeVisible();
+          await textIs(page, percent);
+          await settled(page);
+          expect.soft(await byDayAndNight(page, () => placeFlaws(page)), `the national cover${at}`).toEqual([]);
+          const cover = await page.evaluate(() => {
+            const bar = document.querySelector(".places-foot")?.getBoundingClientRect();
+            const go = document.querySelector(".issue-go")?.getBoundingClientRect();
+            const words = document.querySelector(".duel-waiting-text");
+            const em = words ? Number.parseFloat(getComputedStyle(words).fontSize) : 1;
+            return {
+              go: go ? [go.top, go.bottom - (bar?.height ? bar.top : innerHeight)] : [],
+              duel: (words?.getBoundingClientRect().width ?? 0) / em,
+            };
+          });
+          expect.soft(cover.go[0] ?? -1, `„Започни“ over the screen's top${at}`).toBeGreaterThanOrEqual(0);
+          expect.soft(cover.go[1] ?? 1, `„Започни“ under the places' bar${at}`).toBeLessThanOrEqual(1);
+          // The duel's line a line's width, not a word or two to a line.
+          expect.soft(cover.duel, `the duel's line in em${at}`).toBeGreaterThanOrEqual(5);
+          await page.goto("/almanac/geography");
+          await expect(page.locator(".chapter-facts .pages")).toBeVisible();
+          await settled(page);
+          expect.soft(await byDayAndNight(page, () => placeFlaws(page)), `a chapter's pages${at}`).toEqual([]);
+          const off = await page
+            .locator(".chapter-facts .pages > *")
+            .evaluateAll((all) =>
+              all
+                .filter((e) => e.getBoundingClientRect().left < 0 || e.getBoundingClientRect().right > innerWidth)
+                .map((e) => e.textContent),
+            );
+          expect.soft(off, `a chapter's pages past the screen${at}`).toEqual([]);
+        }
+        // The day played (as the server has it, none right; drawn all right), three chapters risen to „Страница“,
+        // the best rank with them.
+        const run = (await (await page.request.post("/api/day", { data: {} })).json()) as { id: number };
+        await givenUp(page, run.id);
+        for (const percent of passes) {
+          if (big) await textNow(page, percent);
+          const at = big ? `, ${percent} %` : "";
+          await rose(page, 2, ["history", "movies", "sports"]);
+          await page.goto("/");
+          await expect(page.locator(".result .perfect")).toBeVisible();
+          await expect(page.locator(".rankup .rankup-name")).toHaveText("Страница");
+          await settled(page);
+          expect.soft(await byDayAndNight(page, () => placeFlaws(page)), `ten of ten, a rank risen${at}`).toEqual([]);
+          const lines = await page.evaluate(() =>
+            [".score-n", ".score-kicker", ".rankup-name"].map((s) => {
+              const el = document.querySelector(s);
+              if (!el) return `${s} missing`;
+              const r = el.getBoundingClientRect();
+              const n = Math.round(r.height / Number.parseFloat(getComputedStyle(el).lineHeight));
+              return n === 1 || (s === ".score-kicker" && n <= 2) ? "" : `${s} on ${n} lines: „${el.textContent}“`;
+            }),
+          );
+          expect.soft(lines.filter(Boolean), `the big moments' words${at}`).toEqual([]);
         }
       });
     });
@@ -1162,15 +1269,17 @@ test.describe("a finger's room", () => {
     }
   });
 
-  test("a kept player's too: a friend, a request each way, Настройки with an email", async ({
+  test("a kept player's too: a friend, a request each way, Настройки with an email, a day played", async ({
     page,
     browser,
   }, info) => {
     test.setTimeout(120_000);
-    // A friend (their name a link, „Премахни приятел“ over them), someone asking (their „Откажи“), a request sent
-    // („Отмени“), and an email to sign in with („Излез“, „Излез от другите устройства“).
+    // A friend (their name a link, „Премахни приятел“ over them), someone asking (their „Откажи“), a request sent to
+    // an email and one to a player (their name a link, „Отмени“ beside it), an email to sign in with („Излез“, „Излез
+    // от другите устройства“), and the day played, what it wrote in the book („+3 с мастило“, a link).
     const friend = await (await browser.newContext()).newPage();
     const asks = await (await browser.newContext()).newPage();
+    const asked = await (await browser.newContext()).newPage();
     await page.goto("/");
     await befriend(page, friend);
     await asks.goto("/friends");
@@ -1185,6 +1294,12 @@ test.describe("a finger's room", () => {
     await page.getByLabel("Потребителско име или имейл на приятел").fill("someone@example.com");
     await page.getByRole("button", { name: "Добави", exact: true }).click();
     await expect(page.locator(".waiting")).toContainText("someone@example.com");
+    await asked.goto("/friends");
+    await asked.locator(".friends").getByRole("button", { name: "Добави приятел" }).click();
+    const player = await asked.evaluate(async () => (await (await fetch("/api/me")).json()).user.tag as string);
+    await page.getByLabel("Потребителско име или имейл на приятел").fill(`@${player}`);
+    await page.getByRole("button", { name: "Добави", exact: true }).click();
+    await expect(page.locator(".waiting li > a")).toHaveCount(1);
     await expect(page.locator(".invitation")).toHaveCount(1);
     await expect(page.locator(".friend")).toHaveCount(1);
     expect(await smallTargets(page), "/friends").toEqual([]);
@@ -1199,8 +1314,25 @@ test.describe("a finger's room", () => {
     await page.getByRole("button", { name: "Потвърди" }).click();
     await expect(page.getByRole("button", { name: "Излез от другите устройства" })).toBeVisible();
     expect(await smallTargets(page), "/settings").toEqual([]);
+    await page.route("**/api/me/news", (route) =>
+      route.fulfill({
+        json: {
+          ink: 3,
+          chapters: [
+            { chapter: "history", ink: 2, facts: ["his-002", "his-003"] },
+            { chapter: "movies", ink: 1, facts: ["mov-001"] },
+          ],
+        },
+      }),
+    );
+    const run = (await (await page.request.post("/api/day", { data: {} })).json()) as { id: number };
+    await givenUp(page, run.id);
+    await page.goto("/");
+    await expect(page.locator(".ink-row")).toBeVisible();
+    expect(await smallTargets(page), "/, the day played").toEqual([]);
     await friend.context().close();
     await asks.context().close();
+    await asked.context().close();
   });
 });
 

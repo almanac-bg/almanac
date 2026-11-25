@@ -25,12 +25,10 @@ function keep(key: string, on: boolean): void {
 const calmQuery = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
 
 /** Less motion: no animations or transitions but the timer's. The device's own setting, and only it: the game asks
- * nothing of its own (Настройки had a switch nobody used). */
+ * nothing of its own (Настройки had a switch nobody used). The script's movements ask it here; the style's, by the
+ * same media query (app.css, at its end). */
 export const calm = signal(!!calmQuery?.matches);
-calmQuery?.addEventListener("change", (e) => {
-  calm.set(e.matches);
-  apply();
-});
+calmQuery?.addEventListener("change", (e) => calm.set(e.matches));
 /** The clock's last seconds of a question (the other sounds have their own switch). */
 export const tickOn = signal(read("almanac.tick", true));
 
@@ -55,7 +53,6 @@ const barColour = { night: "#0e0c1d", day: "#f3f4fa" };
 
 function apply(): void {
   const root = document.documentElement;
-  root.classList.toggle("calm", calm.peek());
   const chosen = scheme.peek();
   if (chosen === "device") root.removeAttribute("data-scheme");
   else root.dataset.scheme = chosen;

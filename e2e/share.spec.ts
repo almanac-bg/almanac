@@ -1,5 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-import { daysPlayed, mailedCode, playRun, startDay } from "./play.ts";
+import { dayAs, daysPlayed, mailedCode, playRun, startDay } from "./play.ts";
 
 /** What the page sent to the share sheet and to the clipboard, each stood in for (`sheet`: whether there is a share
  * sheet at all). */
@@ -144,27 +144,8 @@ test("a national day: the cover names it under the date, and the share says it a
   test.setTimeout(120_000);
   // Today made 3 March as the server sends it (bank.NationalName): in the page's boot and in GET /api/day.
   const name = "Освобождението";
-  await page.route(
-    (url) => url.pathname === "/",
-    async (route) => {
-      const res = await route.fetch();
-      const body = (await res.text()).replace(
-        /(<script type="application\/json" id="boot">)([\s\S]*?)(<\/script>)/,
-        (_, open: string, json: string, close: string) => {
-          const boot = JSON.parse(json);
-          if (boot.day) boot.day.national = name;
-          return open + JSON.stringify(boot).replaceAll("<", "\\u003c") + close;
-        },
-      );
-      await route.fulfill({ response: res, body });
-    },
-  );
-  await page.route("**/api/day", async (route) => {
-    if (route.request().method() !== "GET") return route.continue();
-    const res = await route.fetch();
-    const t = await res.json();
-    t.national = name;
-    await route.fulfill({ response: res, json: t });
+  await dayAs(page, (day) => {
+    day.national = name;
   });
   await standIn(page, false);
   await page.goto("/");
@@ -172,7 +153,7 @@ test("a national day: the cover names it under the date, and the share says it a
   const line = page.locator(".issue .issue-national");
   await expect(line).toHaveText(name);
   await expect(page.getByRole("heading", { name: "Десет въпроса за днес" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Започни" })).toBeInViewport();
+  await expect(page.getByRole("button", { name: "Започни" })).toBeInViewport({ ratio: 1 });
   await daysPlayed(page, 1);
   await page.reload();
   await expect(line).toHaveText(name);
