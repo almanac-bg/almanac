@@ -1,8 +1,9 @@
 // Leaving a game and coming back to it: back asks while a question's time runs (the browser's back too), a game
 // starts only after a tap, a reload goes back to the question it left, and back comes to a page where it was left.
-import { expect, test } from "@playwright/test";
+
 import { kinds } from "./kinds.ts";
 import { answer, dealt, moveOn, openGame, startDay } from "./play.ts";
+import { expect, test } from "./test.ts";
 
 const asked = "Ако излезеш сега, въпросът остава без отговор.";
 

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test.ts";
 
 // The device says Day; the player chooses Night, then Day, then the device's again („Изглед“ in Настройки), and the
 // choice holds over a reload and on the pages the server draws alone.

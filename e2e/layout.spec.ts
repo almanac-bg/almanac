@@ -17,7 +17,7 @@
 //
 // And what plays along with them: the sounds start with a tap (and come back from the background), and a question
 // that's over isn't kept in memory. FIT_SHOTS=<folder> keeps a picture of each question before and after its answer.
-import { expect, type Page, test } from "@playwright/test";
+
 import { answerAs, beside, closeable, flaws, kinds, panelFlaws, type Q, unseenAnswers } from "./kinds.ts";
 import {
   befriend,
@@ -38,6 +38,7 @@ import {
   rose,
   startDay,
 } from "./play.ts";
+import { expect, type Page, test } from "./test.ts";
 
 const sizes = [
   { width: 320, height: 568, go: 500 },

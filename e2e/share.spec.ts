@@ -1,5 +1,5 @@
-import { expect, type Page, test } from "@playwright/test";
 import { dayAs, daysPlayed, mailedCode, playRun, startDay } from "./play.ts";
+import { expect, type Page, test } from "./test.ts";
 
 /** What the page sent to the share sheet and to the clipboard, each stood in for (`sheet`: whether there is a share
  * sheet at all). */

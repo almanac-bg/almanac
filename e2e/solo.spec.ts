@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
 import { answer, moveOn, openGame, playedFair, playRun, startDay } from "./play.ts";
+import { expect, test } from "./test.ts";
 
 test("the day: ten questions, the result, the review, and one try only", async ({ page }) => {
   test.setTimeout(120_000);

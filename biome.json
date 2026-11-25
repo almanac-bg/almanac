@@ -21,6 +21,25 @@
       }
     }
   },
+  "overrides": [
+    {
+      "includes": ["e2e/**/*.spec.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@playwright/test": "Import from ./test.ts: its test fails on an error the page throws."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "assist": {
     "actions": {
       "source": {

@@ -1,5 +1,5 @@
-import { expect, type Locator, test } from "@playwright/test";
 import { befriend, linkedNames, playedBefore, playedFair, playRun, readText, startDay } from "./play.ts";
+import { expect, type Locator, test } from "./test.ts";
 
 test("friends on the day: who has played it, and how each went", async ({ browser }) => {
   test.setTimeout(240_000);

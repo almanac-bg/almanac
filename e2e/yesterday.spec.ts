@@ -2,8 +2,9 @@
 // (play.DayGrace): said to be yesterday's, with until when; then the way on to today's, and Днес today's once its time
 // is over; and Днес drawn before midnight, begun after it. The server's clock can't be set back here, so its day says it
 // has yesterday's: today's own run, standing in.
-import { expect, type Page, test } from "@playwright/test";
+
 import { playRun } from "./play.ts";
+import { expect, type Page, test } from "./test.ts";
 
 /** Днес as the server would draw it just after midnight, with a day's run (today's, begun, standing in for
  * yesterday's) still to be finished until `until` (ms): asked for again, as Днес does after its first draw. */

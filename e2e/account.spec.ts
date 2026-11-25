@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
-import { expect, type Page, test } from "@playwright/test";
 import { mailedCode, openGame } from "./play.ts";
+import { expect, type Page, test } from "./test.ts";
 
 /** Plays a chapter's first question in, which makes the page a guest. */
 async function becomeGuest(page: Page) {
@@ -132,8 +132,15 @@ test("a name changed in Настройки is kept on leaving, and a deleted pro
   await becomeGuest(page);
   await page.goto("/settings");
   await page.getByLabel("Име", { exact: true }).fill("Светулка");
-  // Left without „Запази“: kept all the same.
-  await page.getByRole("link", { name: "Профил" }).first().click();
+  // Left without „Запази“: kept all the same. Saved as the press takes the field's focus, and the name back before the
+  // press is let go (a slow tap, a mouse): the link pressed is still there to be followed.
+  const box = await page.locator(".bar-me").boundingBox();
+  if (!box) throw new Error("no avatar in the bar");
+  const saved = page.waitForResponse((r) => r.request().method() === "PATCH" && r.url().endsWith("/api/me"));
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await saved;
+  await page.mouse.up();
   await expect(page.getByRole("heading", { level: 1, name: "Светулка" })).toBeVisible();
   await page.goto("/settings");
   await page.getByRole("button", { name: "Изтрий профила" }).click();
@@ -180,10 +187,14 @@ test("a deleted profile lets go of the browser's notifications", async ({ page }
       active: {},
       pushManager: { getSubscription: async () => (localStorage.getItem("unsubscribed") ? null : sub) },
     };
-    Object.defineProperty(navigator, "serviceWorker", {
-      configurable: true,
-      value: { getRegistration: async () => reg, register: async () => reg, ready: Promise.resolve(reg) },
+    // A worker's container as a browser has it: one that hears the worker's messages too (preparePush).
+    const worker = Object.assign(new EventTarget(), {
+      getRegistration: async () => reg,
+      register: async () => reg,
+      ready: Promise.resolve(reg),
+      startMessages: () => {},
     });
+    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: worker });
     for (const api of ["PushManager", "Notification"])
       if (!(api in window)) Object.defineProperty(window, api, { configurable: true, value: class {} });
   });

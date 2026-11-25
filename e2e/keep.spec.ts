@@ -2,8 +2,9 @@
 // the way out to the phone's browser, the game with it); where no notification can come (as in these tests: the
 // test server has no keys for them), by the reminder by mail, which asks for the email from the first day; on
 // Профил from the first game; and the way in for a player with a profile elsewhere.
-import { expect, test } from "@playwright/test";
+
 import { daysPlayed, mailedCode, playRun, startDay } from "./play.ts";
+import { expect, test } from "./test.ts";
 
 test("from the second day, where no notification comes, the reminder by mail asks for the email and keeps the game", async ({
   page,

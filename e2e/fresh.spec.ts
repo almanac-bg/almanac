@@ -1,7 +1,8 @@
 // A page kept current (web/src/fresh.ts): one loaded before a deploy loads anew at its next screen, never in the middle
 // of a question; a profile gone in one tab is gone in the others too.
-import { expect, type Page, test } from "@playwright/test";
+
 import { answer, openGame, playRun } from "./play.ts";
+import { expect, type Page, test } from "./test.ts";
 
 /** Marks the page as it is now: a page loaded anew no longer has the mark. */
 const mark = (page: Page) => page.evaluate(() => Object.assign(window, { before: true }));

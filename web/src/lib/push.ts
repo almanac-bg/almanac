@@ -8,9 +8,10 @@ import { reportProblem } from "./errors.ts";
 import { appleTouch } from "./platform.ts";
 import { navigate } from "./router.ts";
 
-/** Whether this browser can take notifications from the game. */
+/** Whether this browser can take notifications from the game. A browser can name a service worker and have none
+ * (`navigator.serviceWorker` undefined, as in an app's own browser on an iPhone): asked for the worker itself. */
 export const pushable = () =>
-  !!pushKey && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  !!pushKey && !!navigator.serviceWorker && "PushManager" in window && "Notification" in window;
 
 /** An iPhone or iPad in a browser tab: notifications come only once the game is added to the home screen. */
 export const needsHomeScreen = () =>

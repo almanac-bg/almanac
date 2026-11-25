@@ -1,7 +1,8 @@
 // What goes wrong is never a dead end: a screen that can't load says why, offers „Опитай пак“ where trying again can
 // help (and tries again by itself as the line comes back), and a way on; a run offline keeps its clock and its frame.
-import { expect, test } from "@playwright/test";
+
 import { answer, moveOn, openGame } from "./play.ts";
+import { expect, test } from "./test.ts";
 
 test("Днес that can't load tries again, by a tap", async ({ page }) => {
   // Днес's page comes with the day in it, and Днес come back to is drawn from it (or from the day asked last): the

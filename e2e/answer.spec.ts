@@ -3,9 +3,9 @@
 // docking at the screen's foot, and it ends between the two, in sight, its pop waiting for it to get there. Where
 // every kind of question ends at each size is layout.spec.ts's.
 
-import { expect, type Page, test } from "@playwright/test";
 import { beside } from "./kinds.ts";
 import { answer, moveOn, startDay } from "./play.ts";
+import { expect, type Page, test } from "./test.ts";
 
 /** What watching an answer come into place saw: how many times the head changed size, in how many frames the right
  * answer was under the panel, and the right answer's way and pop: where it was drawn as the panel showed and where it
