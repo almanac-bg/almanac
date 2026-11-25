@@ -131,9 +131,13 @@ func (g *Game) StartDay(ctx context.Context, userID int64) (State, error) {
 
 // Unfinished is yesterday's issue as the player left it half-way, while it can still be finished (DayGrace after its
 // midnight, or a question shown before then still in its time: dayOver): the game allows it, and it counts for its own
-// day, so Днес offers it („Продължи“) until then. Nil for none: not begun, finished, or over. Its look settles it as any
-// does (settles): one left on its last question, whose time ran out before the day closed, is finished.
+// day, so Днес offers it („Продължи“) until then. Nil for none: not begun, finished, or over. The player's runs are
+// settled by their own clocks first (SettleLeft): one left on its last question, whose time ran out before its day
+// closed, is finished, not offered.
 func (g *Game) Unfinished(ctx context.Context, userID int64) (*State, error) {
+	if err := g.SettleLeft(ctx, userID); err != nil {
+		return nil, err
+	}
 	yesterday := DayShift(g.Today(), -1)
 	var id int64
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT id FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?
@@ -144,23 +148,109 @@ func (g *Game) Unfinished(ctx context.Context, userID int64) (*State, error) {
 	if err != nil {
 		return nil, err
 	}
-	var over, due bool
+	var over bool
 	if err := g.read(ctx, func(tx *sql.Tx) error {
 		r, err := load(tx, userID, id)
-		if err != nil {
-			return err
-		}
-		over = r.dayOver(g.Now())
-		due, err = g.settles(tx, r)
+		over = err == nil && r.dayOver(g.Now())
 		return err
-	}); err != nil || over && !due {
+	}); err != nil || over {
 		return nil, err
 	}
-	s, err := g.State(ctx, userID, id) // a question whose time ran out ends as at any look, past the day too (settles)
-	if err != nil || s.Done || over {
+	s, err := g.State(ctx, userID, id)
+	if err != nil || s.Done {
 		return nil, err
 	}
 	return &s, nil
+}
+
+// leftWithin is how far back the minute's sweep looks for a day's run left with a question showing (SettleLeft): well
+// past the day just closed, for a server that was down a while; one older is settled when its player next looks.
+const leftWithin = 7 * 24 * time.Hour
+
+// SettleLeft settles the day's runs left with a question showing whose time has run out, by their own clocks
+// (settles, settle): the same rule and the same stamps as any look at them, so that what a day's run counts for (the
+// streak, the day's board, the friends' boards) never waits on when, or whether, it's looked at. A question whose time
+// ran out before its day closed is kept unanswered as it ran out, and, the run's last, finishes the run on its own
+// day; one whose time ran past the close is left as it was. Of one player (userID): every run of theirs, first thing
+// wherever their past days are read or played on (Днес, Unfinished). Of every player (0), those shown within
+// leftWithin: the minute's sweep, beside SettleDue, so a day just closed counts as it closes. The runs are read in one
+// read, and each settled in a write of its own: the writer is held a moment at a time.
+func (g *Game) SettleLeft(ctx context.Context, userID int64) error {
+	now := g.Now()
+	ripe := store.Ms(now.Add(-LateGrace)) // no question's time, and its answer's LateGrace, ends sooner after it shows
+	var rows *sql.Rows
+	var err error
+	if userID != 0 {
+		rows, err = g.DB.Read.QueryContext(ctx, `SELECT id, user_id FROM runs WHERE user_id = ? AND kind = 'day'
+			AND finished_at IS NULL AND shown_at IS NOT NULL AND shown_at <= ?`, userID, ripe)
+	} else {
+		rows, err = g.DB.Read.QueryContext(ctx, `SELECT id, user_id FROM runs WHERE kind = 'day'
+			AND finished_at IS NULL AND shown_at IS NOT NULL AND shown_at BETWEEN ? AND ?`,
+			store.Ms(now.Add(-leftWithin)), ripe)
+	}
+	if err != nil {
+		return err
+	}
+	type left struct{ id, user int64 }
+	var all []left
+	for rows.Next() {
+		var l left
+		if err := rows.Scan(&l.id, &l.user); err != nil {
+			rows.Close()
+			return err
+		}
+		all = append(all, l)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil || len(all) == 0 {
+		return err
+	}
+	var due []left
+	if err := g.read(ctx, func(tx *sql.Tx) error {
+		for _, l := range all {
+			r, err := load(tx, l.user, l.id)
+			if errors.Is(err, ErrNoRun) {
+				continue // gone since: its player deleted
+			}
+			if err != nil {
+				return err
+			}
+			if ok, err := g.settles(tx, r); err != nil {
+				return err
+			} else if ok {
+				due = append(due, l)
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	var errs []error // one run's failure keeps none of the others from being settled
+	for _, l := range due {
+		ended := false
+		err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+			r, err := load(tx, l.user, l.id)
+			if errors.Is(err, ErrNoRun) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			ended, err = g.settle(tx, r) // settled meanwhile (an answer, another look), it has nothing to do
+			return err
+		})
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			errs = append(errs, err)
+			continue
+		}
+		if ended {
+			g.finished(ctx, l.user, l.id)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // MixChapter is every chapter at once: what a duel draws from (Draw). A game of every chapter is shaped by how well

@@ -9,9 +9,10 @@
 // gets the pictures only (bank.PicturesView): its words and options come with its time, and an answer before it is
 // refused, so that nobody reads a question off the clock. Between questions a player reads the answer and its fact for
 // as long as they like; a question of the day's ten dealt on its own date („На този ден“) shows its day's line with
-// them (dealtOn). A question left showing past its time counts as unanswered, kept when its time ran out, whenever the
-// run is next looked at, by the run's own clock alone: one whose time would run out only after its day or its duel
-// closed is left as it was (settles). A question is graded against the version of it
+// them (dealtOn). A question left showing past its time counts as unanswered, kept when its time ran out, by the run's
+// own clock alone, never by when or whether it's looked at: a day's run is settled by the server's sweep within the
+// minute, or sooner by any look, the player's Днес first of all (SettleLeft); one whose time would run out only after
+// its day or its duel closed is left as it was (settles). A question is graded against the version of it
 // that showed, whatever the bank has become meanwhile (versions.go); the day's ten hold still for their day, and one found wrong during it counts for nobody that day (day.go). Everything a
 // run does goes through the database, so a refresh, a second tab or a restart of the server changes nothing. A run left
 // half-way goes on where it stopped: the day's when the player comes back to it that day (a run of the day's questions
@@ -182,21 +183,28 @@ func scanRun(row scanner) (*run, error) {
 }
 
 // loadPlayed reads a player's run to play on: a day's whose day is over (dayOver) is over, and a duel's whose time is
-// up (duelOver).
-func (g *Game) loadPlayed(tx *sql.Tx, userID, runID int64) (*run, error) {
-	r, err := load(tx, userID, runID)
-	if err != nil {
-		return nil, err
+// up (duelOver). Past its day, a day's run is settled by its own clock first (settles), as any look settles it: one
+// whose last question's time ran out before the day closed comes back finished, with its result, not over; ended says
+// that this ended it (the caller follows it with finished, once the transaction is done).
+func (g *Game) loadPlayed(tx *sql.Tx, userID, runID int64) (r *run, ended bool, err error) {
+	if r, err = load(tx, userID, runID); err != nil {
+		return nil, false, err
 	}
 	if r.dayOver(g.Now()) {
-		return nil, ErrDayOver
+		if ended, err = g.settle(tx, r); err != nil {
+			return nil, false, err
+		}
+		if !r.finished {
+			return nil, false, ErrDayOver // what it settled (a question before the last) waits for a look, or the sweep
+		}
+		return r, ended, nil
 	}
 	if over, err := g.duelOver(tx, r); err != nil {
-		return nil, err
+		return nil, false, err
 	} else if over {
-		return nil, ErrDuelOver
+		return nil, false, ErrDuelOver
 	}
-	return r, nil
+	return r, false, nil
 }
 
 // DayGrace is how long after its day a run of the day's questions can still be played on: one begun before midnight
@@ -412,11 +420,12 @@ func (g *Game) settle(tx *sql.Tx, r *run) (bool, error) {
 // counts for nobody, where the run stands. Its question is read through tx, the transaction the caller holds.
 //
 // What it does hangs on the run's own clock, never on when the run is looked at. A question whose time ran out before
-// the run closed (closes: its day's, its duel's) counted as unanswered then, so it's settled whenever the run is next
-// looked at, past its close too: a day's run whose tenth ran out before its day closed is finished, and counts for
-// its day, whether it's looked at at 23:59 or the next morning. One whose time would run out only after the close is
-// left as it was: unanswered, the run stays unfinished. Past its close nothing else is settled (dayOver, duelOver),
-// and a duel past its time is the sweep's, which ends it as it stood (SettleDue): nobody is told it was played.
+// the run closed (closes: its day's, its duel's) counted as unanswered then, so it's settled at the next look, or by
+// the sweep (SettleLeft), past its close too: a day's run whose tenth ran out before its day closed is finished, and
+// counts for its day, whether it's looked at at 23:59, the next morning, or never. One whose time would run out only
+// after the close is left as it was: unanswered, the run stays unfinished. Past its close nothing else is settled
+// (dayOver, duelOver), and a duel past its time is the sweep's, which ends it as it stood (SettleDue): nobody is told
+// it was played.
 func (g *Game) settles(tx *sql.Tx, r *run) (bool, error) {
 	if r.finished {
 		return false, nil
@@ -553,13 +562,14 @@ func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 	var s State
 	ended := false
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		r, err := g.loadPlayed(tx, userID, runID)
+		r, settled, err := g.loadPlayed(tx, userID, runID)
 		if err != nil {
 			return err
 		}
 		if ended, err = g.settle(tx, r); err != nil {
 			return err
 		}
+		ended = ended || settled
 		if !r.finished && !r.shownAt.Valid {
 			start := g.Now()
 			d, ok := g.deal(tx, r.picks[r.at])
@@ -582,9 +592,11 @@ func (g *Game) Show(ctx context.Context, userID, runID int64) (State, error) {
 // Start starts the time of question n, shown and waiting for its pictures, now that the player's screen has them in.
 func (g *Game) Start(ctx context.Context, userID, runID int64, n int) (State, error) {
 	var s State
+	ended := false
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		r, err := g.loadPlayed(tx, userID, runID)
-		if err != nil {
+		var r *run
+		var err error
+		if r, ended, err = g.loadPlayed(tx, userID, runID); err != nil {
 			return err
 		}
 		now := g.Now()
@@ -596,6 +608,9 @@ func (g *Game) Start(ctx context.Context, userID, runID int64, n int) (State, er
 		s, err = g.state(tx, r)
 		return err
 	})
+	if err == nil && ended {
+		g.finished(ctx, userID, runID)
+	}
 	return s, err
 }
 
@@ -654,7 +669,7 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 	finished := false
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var err error
-		if r, err = g.loadPlayed(tx, userID, runID); err != nil {
+		if r, finished, err = g.loadPlayed(tx, userID, runID); err != nil {
 			return err
 		}
 		if r.justBefore(n) {
@@ -691,7 +706,11 @@ func (g *Game) answer(ctx context.Context, userID, runID int64, n int, answer js
 			res.TimedOut = true // only an answer is taken late: no answer late is the time run out (late.go)
 		}
 		number := d.Question().Base().Type == "number"
-		if res.Ink, err = g.record(tx, r, gr, number, min(took, limit).Milliseconds(), g.Now()); err != nil {
+		kept := g.Now()
+		if res.TimedOut && due.Before(kept) {
+			kept = due // its time ran out: kept then, as settle keeps it, not when the screen said so
+		}
+		if res.Ink, err = g.record(tx, r, gr, number, min(took, limit).Milliseconds(), kept); err != nil {
 			return err
 		}
 		if err := g.markByLink(ctx, tx, r); err != nil {
@@ -771,11 +790,29 @@ type Reviewed struct {
 	Void bool `json:"void,omitempty"`
 }
 
-// reviewOpen says whether a run that ended at `ended` can still be gone over: until the end of the day it ended on, in
-// Bulgaria, and DayGrace at least (one ended at 23:59 is gone over after).
-func (g *Game) reviewOpen(ended int64) bool {
+// reviewOpen says whether a finished run can still be gone over (Review: a duel's on any day): until the end of the
+// day it ended on, in Bulgaria, and DayGrace after it at least (one ended at 23:59 is gone over after). One that ended
+// as its last question's time ran out ended out of its player's sight, perhaps, and is kept as ended then however much
+// later its result is seen (settle); it's measured as if it ended DayGrace later, the grace a player had to come back
+// in and finish it by a look. So one that ran out in its day's last quarter hour is gone over through the next day, as
+// one finished by a look just after midnight is; one that ran out earlier, on its own day only.
+func (g *Game) reviewOpen(ctx context.Context, r *run) (bool, error) {
+	var ended, ms int64
+	var n int
+	var unanswered bool
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT r.finished_at, coalesce(a.n, -1), coalesce(a.given IS NULL, 0),
+		coalesce(a.ms, 0) FROM runs r LEFT JOIN answers a ON a.run_id = r.id AND a.n = (SELECT max(n) FROM answers
+		WHERE run_id = r.id) WHERE r.id = ?`, r.id).Scan(&ended, &n, &unanswered, &ms)
+	if err != nil {
+		return false, err
+	}
+	if unanswered && n >= 0 && n < len(r.picks) {
+		if d, ok := g.deal(g.DB.Read, r.picks[n]); ok && ms >= Limit(d.Question()).Milliseconds() {
+			ended += DayGrace.Milliseconds() // its time ran out
+		}
+	}
 	_, dayEnd := dayBounds(dayOf(time.UnixMilli(ended)))
-	return store.Ms(g.Now()) < max(dayEnd, ended+DayGrace.Milliseconds())
+	return store.Ms(g.Now()) < max(dayEnd, ended+DayGrace.Milliseconds()), nil
 }
 
 // Review goes over a finished run, question by question (an unfinished one would give answers away). The day's issue
@@ -791,12 +828,12 @@ func (g *Game) Review(ctx context.Context, userID, runID int64) ([]Reviewed, err
 	if !r.finished {
 		return nil, ErrOutOfStep
 	}
-	var ended int64
-	if err := g.DB.Read.QueryRowContext(ctx, `SELECT finished_at FROM runs WHERE id = ?`, r.id).Scan(&ended); err != nil {
-		return nil, err
-	}
-	if r.kind != "duel" && !g.reviewOpen(ended) {
-		return nil, ErrReviewOver
+	if r.kind != "duel" {
+		if open, err := g.reviewOpen(ctx, r); err != nil {
+			return nil, err
+		} else if !open {
+			return nil, ErrReviewOver
+		}
 	}
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT n, shown, score, is_right FROM answers WHERE run_id = ? ORDER BY n`, r.id)
 	if err != nil {

@@ -46,6 +46,12 @@ func (s *Server) todayOf(ctx context.Context, u *account.User) (map[string]any, 
 	done := false // the viewer has finished the day's ten
 	if u != nil {
 		viewer = u.ID
+		// The player's runs settled by their own clocks before anything of their days is read (the minute's sweep
+		// does it as each day closes; this is for a look sooner): a day whose tenth ran out with nobody there counts
+		// for the streak and its notices on the first look, as on the next.
+		if err := s.game.SettleLeft(ctx, u.ID); err != nil {
+			return nil, err
+		}
 		s.game.AfterWait(ctx, u.ID) // a game just finished: what it brought (its notes) is in
 		streak, err := s.game.StreakOf(ctx, u.ID)
 		if err != nil {

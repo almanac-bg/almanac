@@ -233,6 +233,9 @@ func (w *world) sweep() error {
 	if err := w.g.SettleDue(w.ctx); err != nil {
 		return fmt.Errorf("settling: %w", err)
 	}
+	if err := w.g.SettleLeft(w.ctx, 0); err != nil {
+		return fmt.Errorf("settling the day's runs: %w", err)
+	}
 	if err := w.g.AfterDue(w.ctx); err != nil {
 		return fmt.Errorf("after runs: %w", err)
 	}

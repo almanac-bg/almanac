@@ -621,24 +621,23 @@ type FriendDay struct {
 // gone over (ErrReviewOver). Not a day's game: none. A player has at most MaxFriends, so it's at most that many rows of
 // ten marks, read as the board reads its first rows' (trailsOf): one read of their answers.
 func (g *Game) FriendsOn(ctx context.Context, userID, runID int64) ([]FriendDay, error) {
-	var day, kind string
-	var finished sql.NullInt64
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT coalesce(day, ''), kind, finished_at FROM runs WHERE id = ? AND user_id = ?`,
-		runID, userID).Scan(&day, &kind, &finished)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNoRun
-	}
-	switch {
-	case err != nil:
+	r, err := scanRun(g.DB.Read.QueryRowContext(ctx, `SELECT `+runColumns+` FROM runs WHERE id = ? AND user_id = ?`,
+		runID, userID))
+	if err != nil {
 		return nil, err
-	case !finished.Valid:
+	}
+	if !r.finished {
 		return nil, ErrOutOfStep
-	case !g.reviewOpen(finished.Int64):
+	}
+	if open, err := g.reviewOpen(ctx, r); err != nil {
+		return nil, err
+	} else if !open {
 		return nil, ErrReviewOver
-	case kind != "day":
+	}
+	if r.kind != "day" {
 		return []FriendDay{}, nil
 	}
-	board, err := g.friendsBoard(ctx, day, userID, MaxFriends+1)
+	board, err := g.friendsBoard(ctx, r.day, userID, MaxFriends+1)
 	if err != nil {
 		return nil, err
 	}
