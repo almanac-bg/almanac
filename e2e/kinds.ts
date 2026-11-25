@@ -154,8 +154,19 @@ export async function answerAs(page: Page, q: Q, how: How): Promise<void> {
     }
     case "split": {
       const items = q.items ?? [];
+      // The card waiting under the top one lays its words out as it will on top: else they jump (two lines to one)
+      // as it comes up. The words' height, whatever holds them, without the scale the card waits at.
+      const height = (card: string) =>
+        ask.locator(`.split-card.${card}`).evaluate((c: HTMLElement) => {
+          const words = document.createRange();
+          words.selectNodeContents(c.querySelector(".split-text") ?? c);
+          return Math.round((words.getBoundingClientRect().height * c.offsetHeight) / c.getBoundingClientRect().height);
+        });
+      let waited = 0;
       for (let i = 0; i < items.length; i++) {
         await expect(ask.locator(".split-pips b.done")).toHaveCount(i);
+        if (waited) expect(await height("top"), "the card's words as they waited under the top one").toBe(waited);
+        waited = i + 1 < items.length ? await height("under") : 0;
         const text = bare(await ask.locator(".split-card.top .split-text").textContent());
         const item = items.find((x) => x.text === text);
         const group = item?.group ?? 0;
