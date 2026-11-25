@@ -36,8 +36,9 @@ import (
 // A duel the player started and left unfinished is gone on with when they start one with the same friend again; one
 // never finished goes at its time, as if never started (SettleDue). One left before its first question showed (a tap,
 // then „Отказ“ or away) isn't a duel yet: it isn't listed, and goes with its run DuelUnbegun after it was made
-// (SettleDue), so that nothing lingers as „Твой ред“ that nobody played. A friend's side left half-way counts as it
-// stood when the time runs out.
+// (SettleDue), so that nothing lingers as „Твой ред“ that nobody played. A duel ends when its time does: nothing more
+// of it is played after (PlayDuel, duelOver), though the sweep that ends it comes within the minute; a friend's side
+// left half-way counts as it stood then, and nobody is told it was played.
 
 const (
 	// DuelFor is how long a friend has to play a duel sent to them, a week from when it was sent (DECISIONS.md, „The
@@ -138,7 +139,8 @@ type DuelMark struct {
 }
 
 // DuelNews is a duel news to another player, for the server to tell them (a push through notifyFrom): sent to them
-// (From played their side), or played back (From played the second side: the result is in).
+// (From played their side), or played back (From played the second side to its end: the result is in). A side ended
+// where it stood, by its time or an unfriending, isn't news: the dot on Приятели tells of its result (FriendsNews).
 type DuelNews struct {
 	DuelID   int64
 	From, To int64
@@ -210,14 +212,15 @@ func (g *Game) DuelFriend(ctx context.Context, userID, friendID int64) (int64, e
 
 // PlayDuel is the player's run in a duel that's theirs to play (DuelYours): their own side, or, sent to them, the
 // same ten as the friend played them, made as they first play it. ErrNoDuel if it isn't theirs to play (not theirs,
-// not sent yet), ErrDuelGone if there's no such duel, ErrDuelOver once it's over.
+// not sent yet), ErrDuelGone if there's no such duel, ErrDuelOver once it's over: a result, lapsed, or its time up
+// (the sweep ends it within the minute, SettleDue).
 func (g *Game) PlayDuel(ctx context.Context, userID, duelID int64) (int64, error) {
 	var run int64
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		var a, b, aRun, bRun sql.NullInt64
 		var sent, ended bool
-		err := tx.QueryRow(`SELECT a_id, b_id, a_run, b_run, sent_at IS NOT NULL, ended_at IS NOT NULL FROM duels WHERE id = ?`,
-			duelID).Scan(&a, &b, &aRun, &bRun, &sent, &ended)
+		err := tx.QueryRow(`SELECT a_id, b_id, a_run, b_run, sent_at IS NOT NULL, ended_at IS NOT NULL OR expires_at <= ?
+			FROM duels WHERE id = ?`, store.Ms(g.Now()), duelID).Scan(&a, &b, &aRun, &bRun, &sent, &ended)
 		switch {
 		case errors.Is(err, sql.ErrNoRows):
 			return ErrDuelGone
@@ -345,7 +348,7 @@ func (g *Game) settleRun(ctx context.Context, runID int64) error {
 		return err
 	}
 	if !first {
-		return g.settleDuel(ctx, duelID, runID)
+		return g.settleDuel(ctx, duelID, runID, false)
 	}
 	if sent || !b.Valid {
 		return nil
@@ -369,10 +372,12 @@ func (g *Game) duelNews(ctx context.Context, n DuelNews) {
 	}
 }
 
-// settleDuel ends a duel both sides of which are played, with its result (duelScore). A duel ended already (both sides
-// finished at once, and the other settled it) is left as it is. finished is the run that has just ended it, whose own
-// follow-up this is (after.go); the other side's is due again, with the result.
-func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
+// settleDuel ends a duel both sides of which are played, with its result (duelScore), and tells the first side the
+// friend played theirs (cut: unless the friend's side was ended where it stood, by its time or an unfriending: endDue,
+// when the friend didn't play it out). A duel ended already (both sides finished at once, and the other settled it) is
+// left as it is. finished is the run that has just ended it, whose own follow-up this is (after.go); the other side's is
+// due again, with the result.
+func (g *Game) settleDuel(ctx context.Context, duelID, finished int64, cut bool) error {
 	type side struct {
 		id, run       int64
 		score         duelScore
@@ -440,7 +445,9 @@ func (g *Game) settleDuel(ctx context.Context, duelID, finished int64) error {
 			slog.Error("after a duel", "duel", duelID, "run", s.run, "err", err)
 		}
 	}
-	g.duelNews(ctx, DuelNews{DuelID: duelID, From: b.id, To: a.id, Played: true})
+	if !cut {
+		g.duelNews(ctx, DuelNews{DuelID: duelID, From: b.id, To: a.id, Played: true})
+	}
 	return nil
 }
 
@@ -457,11 +464,6 @@ func (g *Game) SettleDue(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	type due struct {
-		id   int64
-		sent bool
-		bRun int64
-	}
 	var list []due
 	for rows.Next() {
 		var d due
@@ -476,20 +478,46 @@ func (g *Game) SettleDue(ctx context.Context) error {
 		return err
 	}
 	for _, d := range list {
-		switch {
-		case d.bRun != 0:
-			err = g.endDue(ctx, d.id, d.bRun)
-		case d.sent:
-			_, err = g.DB.Write.ExecContext(ctx, `UPDATE duels SET ended_at = ?, outcome = 'expired' WHERE id = ?
-				AND ended_at IS NULL`, store.Ms(g.Now()), d.id)
-		default:
-			_, err = g.DB.Write.ExecContext(ctx, `DELETE FROM duels WHERE id = ? AND ended_at IS NULL`, d.id)
-		}
-		if err != nil {
+		if err := g.endOne(ctx, d); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// due is a duel whose time is up, as it was read: sent or not, and its second side's run (0: not begun).
+type due struct {
+	id   int64
+	sent bool
+	bRun int64
+}
+
+// endOne ends a duel whose time is up, as SettleDue says. Each write repeats what chose it, so that a duel read a
+// moment before (sent, or begun, since) is left for the next look.
+func (g *Game) endOne(ctx context.Context, d due) error {
+	var err error
+	switch {
+	case d.bRun != 0:
+		err = g.endDue(ctx, d.id, d.bRun)
+	case d.sent:
+		_, err = g.DB.Write.ExecContext(ctx, `UPDATE duels SET ended_at = ?, outcome = 'expired' WHERE id = ?
+			AND ended_at IS NULL AND b_run IS NULL`, store.Ms(g.Now()), d.id)
+	default:
+		_, err = g.DB.Write.ExecContext(ctx, `DELETE FROM duels WHERE id = ? AND ended_at IS NULL AND sent_at IS NULL`, d.id)
+	}
+	return err
+}
+
+// duelOver is whether a run of a duel can't be played on any more: the duel's time is up. The sweep ends it within the
+// minute, as it stood (SettleDue); until then, nothing more of it is played.
+func (g *Game) duelOver(tx *sql.Tx, r *run) (bool, error) {
+	if r.kind != "duel" || r.finished {
+		return false, nil
+	}
+	var over bool
+	err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM duels WHERE (a_run = ?1 OR b_run = ?1) AND ended_at IS NULL
+		AND expires_at <= ?2)`, r.id, store.Ms(g.Now())).Scan(&over)
+	return over, err
 }
 
 // dropUnbegun deletes the duels made more than DuelUnbegun ago whose first side never showed a question (a tap that
@@ -555,7 +583,7 @@ func (g *Game) endDue(ctx context.Context, duelID, runID int64) error {
 			return err
 		}
 	}
-	if err := g.settleDuel(ctx, duelID, 0); err != nil {
+	if err := g.settleDuel(ctx, duelID, 0, ended); err != nil {
 		return err
 	}
 	if ended { // what follows the run, as a run ended by its last answer has

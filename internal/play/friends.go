@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"slices"
 	"strings"
 	"time"
@@ -308,22 +309,42 @@ func (g *Game) SawFriends(ctx context.Context, userID int64) error {
 }
 
 // Unfriend ends a friendship, for both, and the duels open between them with it: their time is up now, and each ends
-// as one whose time ran out does (SettleDue: a side left half-way counts as it stood, one never started lapses, one
-// never sent goes), so that neither is left a „Твой ред“ that can't be played. The record between them stays.
+// at once as one whose time ran out does (endOne: a side left half-way counts as it stood, one never started lapses,
+// one never sent goes), so that neither is left a „Твой ред“ that can't be played. The record between them stays. Only
+// their duels: another pair's whose time is up are the sweep's (SettleDue), as is one of theirs whose ending fails here.
 func (g *Game) Unfriend(ctx context.Context, userID, friendID int64) error {
+	var open []due
 	err := g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		open = nil
 		if _, err := tx.Exec(`DELETE FROM friends WHERE (user_id = ?1 AND friend_id = ?2)
 			OR (user_id = ?2 AND friend_id = ?1)`, userID, friendID); err != nil {
 			return err
 		}
-		_, err := tx.Exec(`UPDATE duels SET expires_at = min(expires_at, ?3) WHERE ended_at IS NULL
-			AND ((a_id = ?1 AND b_id = ?2) OR (a_id = ?2 AND b_id = ?1))`, userID, friendID, store.Ms(g.Now()))
-		return err
+		rows, err := tx.Query(`UPDATE duels SET expires_at = min(expires_at, ?3) WHERE ended_at IS NULL
+			AND ((a_id = ?1 AND b_id = ?2) OR (a_id = ?2 AND b_id = ?1))
+			RETURNING id, sent_at IS NOT NULL, coalesce(b_run, 0)`, userID, friendID, store.Ms(g.Now()))
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var d due
+			if err := rows.Scan(&d.id, &d.sent, &d.bRun); err != nil {
+				return err
+			}
+			open = append(open, d)
+		}
+		return rows.Err()
 	})
 	if err != nil {
 		return err
 	}
-	return g.SettleDue(ctx)
+	for _, d := range open {
+		if err := g.endOne(ctx, d); err != nil {
+			slog.Error("ending a duel with a friendship", "duel", d.id, "err", err)
+		}
+	}
+	return nil
 }
 
 // Friend returns a friend's name, or ErrNotFriends.
