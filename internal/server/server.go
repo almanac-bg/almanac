@@ -178,6 +178,29 @@ func (s *Server) Count(ctx context.Context) error { return s.game.Count(ctx) }
 // KeepDays draws the day's questions ahead, in transactions of their own (play.Game.KeepDays), until ctx ends.
 func (s *Server) KeepDays(ctx context.Context) { s.game.KeepDays(ctx) }
 
+// daysShort is the problem told when the days ahead stop short: a place of the day has no question left that fits it,
+// so the days stop being drawn ahead (play.drawAhead), and those after them are drawn on their morning, held out of no
+// other game. The issue still has the days drawn; the bank needs a batch for that place before they run out.
+const daysShort = "bank: the days ahead stop short: a place of the day is out of questions " +
+	"(`almanac bank check -used` names it; the next batch writes for it)"
+
+// checkDaysAhead tells whoever runs the game (Problem: once a day, over restarts too) when the days ahead stop short
+// of play.Ahead. It waits for them to be drawn for this day and bank first (EnsureDays, one keeping at a time), so a
+// redraw under way (a bank reloaded) is never taken for a stop.
+func (s *Server) checkDaysAhead(ctx context.Context) {
+	today := s.game.Today()
+	if err := s.game.EnsureDays(ctx); err != nil {
+		return // logged by KeepDays, which tries again
+	}
+	used, err := s.game.DaysUsed(ctx)
+	if err != nil || s.game.Today() != today {
+		return // the day turned meanwhile: the next look
+	}
+	if used.Through < play.DayShift(today, play.Ahead) {
+		s.Problem(daysShort)
+	}
+}
+
 func (s *Server) Handler() http.Handler { return s.handler }
 
 func (s *Server) routes() http.Handler {
