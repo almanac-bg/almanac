@@ -180,7 +180,8 @@ func scanRun(row scanner) (*run, error) {
 	return &r, json.Unmarshal([]byte(picks), &r.picks)
 }
 
-// loadPlayed reads a player's run to play on: a day's whose day is over (dayOver) is over.
+// loadPlayed reads a player's run to play on: a day's whose day is over (dayOver) is over, and a duel's whose time is
+// up (duelOver).
 func (g *Game) loadPlayed(tx *sql.Tx, userID, runID int64) (*run, error) {
 	r, err := load(tx, userID, runID)
 	if err != nil {
@@ -188,6 +189,11 @@ func (g *Game) loadPlayed(tx *sql.Tx, userID, runID int64) (*run, error) {
 	}
 	if r.dayOver(g.Now()) {
 		return nil, ErrDayOver
+	}
+	if over, err := g.duelOver(tx, r); err != nil {
+		return nil, err
+	} else if over {
+		return nil, ErrDuelOver
 	}
 	return r, nil
 }

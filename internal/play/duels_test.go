@@ -469,6 +469,77 @@ func TestDuelWaitsAWeek(t *testing.T) {
 	}
 }
 
+// A duel ends when its week does, not when the sweep comes by a minute later: past its time, one the friend never
+// began can't be begun, one begun can't be played on (it's ended as it stood), and nobody is told the friend played it.
+func TestDuelEndsWithItsWeek(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	var h heard
+	h.listen(w.g)
+	ana, bo := w.user(), w.user()
+	w.befriend(ana, bo)
+	unbegun, _ := w.g.DuelFriend(ctx, ana, bo)
+	w.playSide(ana, unbegun, repeat(w.wrong, Length))
+	begun, _ := w.g.DuelFriend(ctx, ana, bo)
+	w.playSide(ana, begun, repeat(w.wrong, Length))
+	h.take()
+
+	w.wait(DuelFor - 2*time.Minute)
+	run := w.playSide(bo, begun, repeat(w.right, 3))
+	w.show(bo, run) // the fourth, showing as the week ends
+	w.wait(2*time.Minute + 20*time.Second)
+
+	if _, err := w.g.PlayDuel(ctx, bo, unbegun); !errors.Is(err, ErrDuelOver) {
+		t.Fatalf("a duel begun after its time: %v", err)
+	}
+	if _, err := w.g.PlayDuel(ctx, bo, begun); !errors.Is(err, ErrDuelOver) {
+		t.Fatalf("a duel gone on with after its time: %v", err)
+	}
+	if _, err := w.answer(bo, run, 3, w.right(run, 3)); !errors.Is(err, ErrDuelOver) {
+		t.Fatalf("a duel answered after its time: %v", err)
+	}
+	if _, err := w.g.Show(ctx, bo, run); !errors.Is(err, ErrDuelOver) {
+		t.Fatalf("a duel's question shown after its time: %v", err)
+	}
+	if err := w.g.SettleDue(ctx); err != nil {
+		t.Fatal(err)
+	}
+	w.g.AftersDone(ctx)
+	if d, _ := w.g.DuelOf(ctx, bo, unbegun); d.State != DuelExpired || d.Lapsed != "you" {
+		t.Fatalf("the duel never begun: %+v", d)
+	}
+	if d, _ := w.g.DuelOf(ctx, bo, begun); d.State != DuelWon || d.You.Rights != 3 || !d.You.Done {
+		t.Fatalf("the duel begun, as it stood: %+v", d)
+	}
+	if news := h.take(); len(news) != 0 {
+		t.Fatalf("news of duels ended by their time: %+v", news)
+	}
+}
+
+// The sweep ends a duel as it read it: one begun since (PlayDuel, a moment before its time) isn't marked lapsed, and one
+// sent since isn't deleted.
+func TestSweepRereadsTheDuel(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo := w.user(), w.user()
+	w.befriend(ana, bo)
+	id, _ := w.g.DuelFriend(ctx, ana, bo)
+	w.playSide(ana, id, repeat(w.wrong, Length))
+	if err := w.g.endOne(ctx, due{id: id}); err != nil { // read as never sent
+		t.Fatal(err)
+	}
+	if there, _ := w.g.DuelExists(ctx, id); !there {
+		t.Fatal("a duel sent since the sweep read it is deleted")
+	}
+	w.playSide(bo, id, repeat(w.right, 2))
+	if err := w.g.endOne(ctx, due{id: id, sent: true}); err != nil { // read as sent, not begun
+		t.Fatal(err)
+	}
+	if d, _ := w.g.DuelOf(ctx, bo, id); d.State != DuelYours {
+		t.Fatalf("a duel begun since the sweep read it: %+v", d)
+	}
+}
+
 // The same right answers and as close on the number: a draw, however much quicker one was (time never counts); a
 // closer number wins.
 func TestDuelEvenIsADraw(t *testing.T) {
@@ -540,8 +611,16 @@ func TestDuelsListsTheLastTen(t *testing.T) {
 func TestUnfriendEndsTheirDuels(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
+	var h heard
+	h.listen(w.g)
 	ana, bo := w.user(), w.user()
 	w.befriend(ana, bo)
+	// Another pair's duel, due: the sweep's to end, not Bo's click.
+	cy, dan := w.user(), w.user()
+	w.befriend(cy, dan)
+	theirs, _ := w.g.DuelFriend(ctx, cy, dan)
+	w.playSide(cy, theirs, repeat(w.right, Length))
+	w.wait(DuelFor + time.Second)
 	played := w.duel(ana, bo, repeat(w.right, Length), repeat(w.wrong, Length))
 	sent, _ := w.g.DuelFriend(ctx, ana, bo)
 	w.playSide(ana, sent, repeat(w.right, Length))
@@ -550,11 +629,18 @@ func TestUnfriendEndsTheirDuels(t *testing.T) {
 	w.playSide(bo, halfway, repeat(w.right, 3))
 	unsent, _ := w.g.DuelFriend(ctx, bo, ana)
 	w.playSide(bo, unsent, repeat(w.right, 2))
+	h.take()
 
 	if err := w.g.Unfriend(ctx, bo, ana); err != nil {
 		t.Fatal(err)
 	}
 	w.g.AftersDone(ctx)
+	if news := h.take(); len(news) != 0 {
+		t.Fatalf("news of duels ended with the friendship: %+v", news)
+	}
+	if d, _ := w.g.DuelOf(ctx, dan, theirs); d.State != DuelYours {
+		t.Fatalf("another pair's duel ended by an unfriending: %+v", d)
+	}
 	for _, who := range []int64{ana, bo} {
 		if d, _ := w.g.DuelsOf(ctx, who); len(d.Yours)+len(d.Theirs) != 0 {
 			t.Fatalf("open duels left for %d: %+v", who, d)
