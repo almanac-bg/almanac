@@ -98,3 +98,24 @@ test("an answer tried again offline, by hand and as the line comes back, goes on
   await expect(page.locator(".question-head")).toContainText("2 от 10", { timeout: 10_000 });
   expect(answers).toEqual([200]);
 });
+
+test("an answer to a duel past its time says so, with the way to Приятели, where the duel shows how it ended", async ({
+  page,
+}) => {
+  await openGame(page, "/play/history");
+  const q = page.locator("article.question");
+  await expect(q.locator(".question-head")).toContainText("1 от 10");
+  // The server's word on an answer to a duel whose time ran out meanwhile (play.ErrDuelOver), as the API says it.
+  await page.route("**/api/runs/*/answer", (route) =>
+    route.fulfill({
+      status: 410,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "duel_over", message: "Този дуел вече свърши." }),
+    }),
+  );
+  await answer(page);
+  await expect(q.getByRole("alert")).toContainText("Този дуел вече свърши.");
+  await q.getByRole("link", { name: "Към Приятели" }).click();
+  await expect(page).toHaveURL(/\/friends$/);
+  await expect(page.getByRole("heading", { name: "Приятели", level: 1 })).toBeVisible();
+});

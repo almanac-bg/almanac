@@ -36,8 +36,9 @@ import (
 // never finished goes at its time, as if never started (SettleDue). One left before its first question showed (a tap,
 // then „Отказ“ or away) isn't a duel yet: it isn't listed, and goes with its run DuelUnbegun after it was made
 // (SettleDue), so that nothing lingers as „Твой ред“ that nobody played. A duel ends when its time does: nothing more
-// of it is played after (PlayDuel, duelOver), though the sweep that ends it comes within the minute; a friend's side
-// left half-way counts as it stood then, and nobody is told it was played.
+// of it is played after (PlayDuel, duelOver), but the answer to a question shown before it, in its own time, as a
+// day's run has (pastClose); the sweep that ends it comes within the minute, after that answer's time; a friend's
+// side left half-way counts as it stood then, and nobody is told it was played.
 
 const (
 	// DuelFor is how long a friend has to play a duel sent to them, a week from when it was sent (DECISIONS.md, „The
@@ -431,13 +432,17 @@ func (g *Game) settleDuel(ctx context.Context, duelID int64, cut bool) error {
 // SettleDue ends the duels whose time is up. A friend's side left half-way counts as it stood: it's finished there,
 // and the duel has its result. One the friend never started lapses, without a result. One whose first side was never
 // finished goes, as if never started (its run stays the player's, a game left half-way). One whose first question never
-// showed goes with its run DuelUnbegun after it was made (dropUnbegun). Run every few minutes.
+// showed goes with its run DuelUnbegun after it was made (dropUnbegun). One whose side being played has a question
+// shown before the duel's time, still in its own, waits for it (duelOver). Run every few minutes.
 func (g *Game) SettleDue(ctx context.Context) error {
 	if err := g.dropUnbegun(ctx); err != nil {
 		return err
 	}
 	rows, err := g.DB.Read.QueryContext(ctx, `SELECT d.id, d.sent_at IS NOT NULL, coalesce(d.b_run, 0)
-		FROM duels d WHERE d.ended_at IS NULL AND d.expires_at <= ?`, store.Ms(g.Now()))
+		FROM duels d LEFT JOIN runs r ON r.id = CASE WHEN d.sent_at IS NULL THEN d.a_run ELSE d.b_run END
+		WHERE d.ended_at IS NULL AND d.expires_at <= ?1 AND NOT coalesce(r.finished_at IS NULL
+			AND r.shown_at < d.expires_at AND r.shown_at + ?2 >= ?1, 0)`,
+		store.Ms(g.Now()), (LongestLimit + LateGrace).Milliseconds())
 	if err != nil {
 		return err
 	}
@@ -485,16 +490,29 @@ func (g *Game) endOne(ctx context.Context, d due) error {
 	return err
 }
 
-// duelOver is whether a run of a duel can't be played on any more: the duel's time is up. The sweep ends it within the
-// minute, as it stood (SettleDue); until then, nothing more of it is played.
+// duelOver is whether a run of a duel can't be played on any more: the duel's time is up, and no question shown
+// before it is still in its time (pastClose: a question shown before the end gets its full time, as a day's does). The
+// sweep ends it within the minute, as it stood (SettleDue); until then, nothing more of it is played.
 func (g *Game) duelOver(tx *sql.Tx, r *run) (bool, error) {
 	if r.kind != "duel" || r.finished {
 		return false, nil
 	}
-	var over bool
-	err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM duels WHERE (a_run = ?1 OR b_run = ?1) AND ended_at IS NULL
-		AND expires_at <= ?2)`, r.id, store.Ms(g.Now())).Scan(&over)
-	return over, err
+	closes, err := duelCloses(tx, r.id)
+	return err == nil && !closes.IsZero() && r.pastClose(closes, g.Now()), err
+}
+
+// duelCloses is when a duel's run closes: the duel's time, while the duel is on (zero for none: ended, or gone).
+func duelCloses(tx *sql.Tx, runID int64) (time.Time, error) {
+	var at int64
+	err := tx.QueryRow(`SELECT expires_at FROM duels WHERE (a_run = ?1 OR b_run = ?1) AND ended_at IS NULL`, runID).
+		Scan(&at)
+	if errors.Is(err, sql.ErrNoRows) {
+		return time.Time{}, nil
+	}
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.UnixMilli(at), nil
 }
 
 // dropUnbegun deletes the duels made more than DuelUnbegun ago whose first side never showed a question (a tap that
@@ -554,7 +572,7 @@ func (g *Game) endDue(ctx context.Context, duelID, runID int64) error {
 				return err
 			}
 			ended = true
-			return g.finish(tx, r)
+			return g.finish(tx, r, g.Now())
 		})
 		if err != nil {
 			return err
