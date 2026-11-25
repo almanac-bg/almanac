@@ -239,7 +239,7 @@ test("every duel to play is in one stack, the first challenged on top, played fr
   // Hers aren't listed: his to play. Three wait for him: no fourth until he plays one, and his row says so, „Дуел“ off.
   await a.goto("/friends");
   await expect(a.locator(".duels-open")).toHaveCount(0);
-  await expect(a.locator(".friend .friend-full")).toHaveText("Три дуела чакат. Нов — щом изиграе някой.");
+  await expect(a.locator(".friend .friend-full")).toHaveText("Три дуела чакат. Нов — щом изиграе един от тях.");
   await expect(a.locator(".friend").getByRole("button", { name: /^Дуел/ })).toBeDisabled();
   await expect(a.locator(".duel-pile")).toHaveCount(0);
   await send(c, "Цвети", 0);

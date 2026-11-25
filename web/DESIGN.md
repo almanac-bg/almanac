@@ -203,7 +203,7 @@ places it in columns, never with `order`: `contrast.test.ts` forbids it; `e2e/la
   „Дуел“ at the row's end, a button (`.btn.inline`, 44px high), the one way to start a duel here (the other is the
   friend's profile): there is no „Нов дуел“ and no picker. While three duels the player sent wait for the friend
   (play.DuelsToOne), „Дуел“ is off and a quiet line under the record says why („Три дуела чакат. Нов — щом изиграе
-  някой.“). With no friends yet, one paragraph says what a friend brings, for duels can't be found before one
+  един от тях.“). With no friends yet, one paragraph says what a friend brings, for duels can't be found before one
   (owner, 2026-11-22): „Още нямаш приятели тук. С приятел можете да играете дуели: едни и същи десет въпроса, всеки
   ги играе, когато може. И всеки ден ще виждате как сте изиграли днешния брой. Добави приятел по потребителско име
   или имейл.“ A friend removed only after a sheet asks „Премахваш ли Иво от приятелите си?“, „Премахни“ in red and

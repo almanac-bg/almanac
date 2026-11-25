@@ -25,7 +25,7 @@ import type { Board, Mark, Reviewed, Score, State } from "../game/types.ts";
 import { api, errorText, keepAnswer, lastOf, serverNow, setIfNew } from "../lib/api.ts";
 import { boot } from "../lib/boot.ts";
 import { dayInBulgaria, hourInBulgaria } from "../lib/day.ts";
-import { type Child, h, lifetime, onCleanup, type Signal, signal, slot } from "../lib/dom.ts";
+import { type Child, h, lifetime, onCleanup, type Signal, signal, slot, when } from "../lib/dom.ts";
 import { handToken } from "../lib/embedded.ts";
 import { reportProblem } from "../lib/errors.ts";
 import { type RemindAsks, remindAnswered, remindAsks } from "../lib/keep.ts";
@@ -309,6 +309,16 @@ export function today() {
                 : await api<State>("POST", "/api/day", {});
             if (life.aborted) return;
             counting = false;
+            // Midnight passed since Днес was drawn: the day dealt is the new day's (the server's day decides). Днес drawn
+            // again for it, said once, so its result and its share don't name the issue that was on the screen; its
+            // first question isn't shown yet, so the tap again costs nothing.
+            if (!t.late && s.day && s.day !== t.day) {
+              notice.set(`Брой\u00a0${t.issue ?? issueOf(t.day)} вече мина. Ето днешния.`);
+              release();
+              scrollTo(0, 0);
+              load();
+              return;
+            }
             screen.show(() => playRun(s, (end) => home(t, end, true), "", "", undefined, via));
           } catch (err) {
             if (life.aborted) return;
@@ -590,13 +600,14 @@ function streakSection(t: Today, stats: () => Stats | null, done: boolean, said?
             ? h(
                 "span",
                 { class: "streak-note" },
+                // A week forgives two at most (play.Forgives).
                 forgiven === 1
                   ? "Тази седмица един пропуснат ден е простен."
-                  : forgiven === 2
-                    ? "Тази седмица два пропуснати дни са простени."
-                    : `Тази седмица ${forgiven} пропуснати дни са простени.`,
+                  : "Тази седмица два пропуснати дни са простени.",
               )
-            : done
+            : // None on yesterday's issue (lateView): finishing it is what keeps the streak then, as its own line says
+              // („Довърши го до 00:15“), not today's issue.
+              done || t.late
               ? null
               : stakeLine(days, t.spare ?? true),
       ),
@@ -631,23 +642,38 @@ function result(
   sharerAsked = signal(false),
 ): Child {
   const fresh = signal<Today>(t);
-  // The day as it stands with the game just played (its streak, its friends): until it's here, the streak with today's
-  // isn't known, and the share (which says it) waits for it.
-  const known = signal(!just || !!t.late);
-  const now = just && !t.late ? api<Today>("GET", "/api/day") : null;
-  now?.then(fresh.set, () => {}).finally(() => known.set(true));
+  // The day's questions, once they're here (the tenth's line; none right, those missed): set before what waits for
+  // them is drawn (known, below), so it's drawn with them.
+  const questions = signal<Reviewed[] | null>(null);
+  const review = reviewOf(run.id);
+  review.then(questions.set, () => {});
+  // Just played, what goes under the score waits for what the game brings, each come or failed: the day as it stands
+  // (the streak with today's, which the share says; the board), what it wrote in the book (news) and its questions
+  // (the tenth's line, those missed). Then it's drawn whole, so nothing under the score is pushed down as it comes:
+  // the one action stays where the thumb goes. On a later visit, the day is known, and it's drawn at once.
+  const known = signal(!just);
+  let newsIn = () => {};
+  if (just)
+    Promise.allSettled([
+      t.late ? null : api<Today>("GET", "/api/day"),
+      new Promise<void>((done) => {
+        newsIn = done;
+      }),
+      review,
+    ]).then(([day]) => {
+      if (day.status === "fulfilled" && day.value) fresh.set(day.value);
+      known.set(true);
+    });
   const of = outOf(run);
   const perfect = of > 0 && run.rights === of;
   // None right: the questions missed and their facts, open right under the score, the rest a tap away.
   const zero = of > 0 && run.rights === 0;
-  const review = reviewOf(run.id);
   // None right: the questions missed, under the score, once they're here (none, while the review hasn't come: the
   // button „Прегледай въпросите“ stays, to ask for them again).
-  const missedList = signal<Reviewed[] | null>(null);
+  const missedList = () => (zero ? questions() : null);
   // Come by that day's link, someone else's: on the board's Приятели while the player has no friends, the one way to
   // whoever sent it (askSharer).
   const sharer = shared && !shared.mine ? askSharer(shared.link, sharerAsked) : null;
-  if (zero) review.then(missedList.set, () => {});
   // The day's board's tab, as the player chose it (none yet: dayBoard opens it).
   const among = signal<Among | null>(null);
   // The day's questions in their dialog, at one of them (`at`: a tile's); asked again if they failed (reviewOf keeps
@@ -687,6 +713,13 @@ function result(
   const shareQuiet = () =>
     away || duel() || (askFirst && (ask?.deciding() || ask?.showing())) ? shareLink(run, t, streak, known) : null;
   // 1. The score, the cover's heavy numeral on the sheet of the issue's first chapter.
+  const score = h(
+    "h1",
+    { class: "score" },
+    h("b", { class: "score-n" }, String(run.rights)),
+    h("span", { class: "score-of" }, `от ${of}`),
+    closeLine(run.trail) ? h("span", { class: "score-close" }, closeLine(run.trail)) : null,
+  );
   const hero = leaf(
     order[0] ?? "general",
     [
@@ -696,28 +729,37 @@ function result(
         { class: "kicker score-kicker" },
         `Брой\u00a0${t.issue ?? issueOf(t.day)}\u00a0· ${dateWords(t.day).replace(" ", "\u00a0")}`,
       ),
-      h(
-        "h1",
-        { class: "score" },
-        h("b", { class: "score-n" }, String(run.rights)),
-        h("span", { class: "score-of" }, `от ${of}`),
-        closeLine(run.trail) ? h("span", { class: "score-close" }, closeLine(run.trail)) : null,
-      ),
+      score,
       tiles(run.trail, order, run.total, undefined, openReview),
-      shareQuiet,
-      tenthLine(review),
-      () => {
-        const avg = fresh().board.average;
-        return avg ? h("p", { class: "score-bg" }, `България днес: средно ${averageWords(avg)}`) : null;
-      },
-      shared ? h("p", { class: "score-bg" }, `По връзката: ${sharedWords(shared.shape)}`) : null,
+      // Under the tiles, with what goes under the score (known).
+      when(known, () => [
+        shareQuiet,
+        tenthLine(questions),
+        () => {
+          const avg = fresh().board.average;
+          return avg ? h("p", { class: "score-bg" }, `България днес: средно ${averageWords(avg)}`) : null;
+        },
+        shared ? h("p", { class: "score-bg" }, `По връзката: ${sharedWords(shared.shape)}`) : null,
+      ]),
     ],
     "result-score score-leaf",
   );
   opensReview(hero, () => openReview());
-  if (just) land(hero, run.id, perfect, true);
+  if (just) {
+    land(hero, run.id, perfect, true);
+    // The game's way on („Към резултата“) gone with it, the focus is the score's, as a page's heading has it once it
+    // opens (router.ts, settle): not the page's body, from where Tab starts at the top.
+    requestAnimationFrame(() => {
+      const at = document.activeElement;
+      if (!score.isConnected || (at && at !== document.body && at.isConnected)) return;
+      score.tabIndex = -1;
+      score.focus({ preventScroll: true });
+    });
+  }
   // A best rank risen, the result's one big moment: first, right under the score.
   const best = signal<Child>(null);
+  // Asked for now, drawn with the rest under the score.
+  const told = news(run.id, { bestTo: best.set, head: "Днес в Алманаха", settled: newsIn });
   const action = h(
     "div",
     { class: first ? "result-share result-first" : "result-share" },
@@ -745,25 +787,27 @@ function result(
       "div",
       { class: "result-main page-1" },
       hero,
-      best,
-      zero ? missed(missedList, () => openReview()) : null,
-      // 2. What the day wrote in the book. Asked on every visit: the ink is counted again; a rank risen is told once
-      // (play.NewsOf).
-      news(run.id, 0, undefined, best.set, "Днес в Алманаха"),
-      // The first results' action (keeping the game, or the way out of an app's browser) right under it: what the
-      // game wrote is what keeping it keeps, and on a phone it was under the ask, out of the first screen.
-      first ? action : null,
-      // The streak with today's in it, lit: the day just played is what made it (owner, 2026-11-23: it grew out of
-      // sight). Once the day as it stands has come.
-      () => (known() && !t.late ? streakSection(fresh(), () => null, true) : null),
-      // 3. The action, once the first results are past.
-      first ? null : action,
-      // The day's questions, the player's own day's: on its page, never under the board (a phone had it after twenty
-      // rows of everyone's). None right: the first questions are open under the score already, with the way to them
-      // all there (once they came).
-      () => (missedList()?.length ? null : reviewButton(() => openReview())),
-      // 4. Yesterday's issue finished after midnight: on to today's. Otherwise the asks, if any.
-      t.late ? onToToday(t, t.late.today) : asks(stake, first ? null : ask, reload),
+      when(known, () => [
+        best,
+        zero ? missed(missedList, () => openReview()) : null,
+        // 2. What the day wrote in the book. Asked on every visit: the ink is counted again; a rank risen is told once
+        // (play.NewsOf).
+        told,
+        // The first results' action (keeping the game, or the way out of an app's browser) right under it: what the
+        // game wrote is what keeping it keeps, and on a phone it was under the ask, out of the first screen.
+        first ? action : null,
+        // The streak with today's in it, lit: the day just played is what made it (owner, 2026-11-23: it grew out of
+        // sight).
+        t.late ? null : () => streakSection(fresh(), () => null, true),
+        // 3. The action, once the first results are past.
+        first ? null : action,
+        // The day's questions, the player's own day's: on its page, never under the board (a phone had it after
+        // twenty rows of everyone's). None right: the first questions are open under the score already, with the way
+        // to them all there (once they came).
+        () => (missedList()?.length ? null : reviewButton(() => openReview())),
+        // 4. Yesterday's issue finished after midnight: on to today's. Otherwise the asks, if any.
+        t.late ? onToToday(t, t.late.today) : asks(stake, first ? null : ask, reload),
+      ]),
     ),
     h(
       "div",
@@ -922,24 +966,22 @@ const lastWords = [
 
 /** How many knew the day's tenth, its hard number: „На десетия въпрос вярно отговарят 14 %“ (the player among them, as
  * the issue said it); nothing before there's a crowd (the tenth is always the hardest: saying so says nothing). */
-function tenthLine(review: Promise<Reviewed[]>): Child {
-  const said = signal("");
-  review.then(
-    (all) => {
-      // The last that counts: the tenth, unless it counts for nobody (Mark.void), then the one before it.
-      const last = all.filter((q) => !q.void).at(-1);
-      if (!last) return;
-      const which = lastWords[last.n] ?? "Последният";
-      const c = last.reveal.crowd;
-      // The share as the issue said it when it was answered (crowdLine): the player among them.
-      if (c?.answers)
-        said.set(
-          `На ${which.slice(0, -1).toLowerCase()} въпрос вярно отговарят ${percent(withOwn(c, -1, last.right).right)}`,
-        );
-    },
-    () => {},
-  );
-  return () => (said() ? h("p", { class: "tenth" }, said()) : null);
+function tenthLine(questions: () => Reviewed[] | null): Child {
+  return () => {
+    // The last that counts: the tenth, unless it counts for nobody (Mark.void), then the one before it.
+    const last = questions()
+      ?.filter((q) => !q.void)
+      .at(-1);
+    const c = last?.reveal.crowd;
+    if (!last || !c?.answers) return null;
+    const which = lastWords[last.n] ?? "Последният";
+    // The share as the issue said it when it was answered (crowdLine): the player among them.
+    return h(
+      "p",
+      { class: "tenth" },
+      `На ${which.slice(0, -1).toLowerCase()} въпрос вярно отговарят ${percent(withOwn(c, -1, last.right).right)}`,
+    );
+  };
 }
 
 /** Where the day's board looks: among the player and their friends, or at all of България. */
@@ -1257,7 +1299,7 @@ function untold(t: Today, run?: number): Child {
   const id = t.untold;
   if (!id || (run !== undefined && id !== run)) return null;
   t.untold = undefined;
-  return news(id, 0, { title: run ? "" : "От последната ти игра" });
+  return news(id, { late: { title: run ? "" : "От последната ти игра" } });
 }
 
 /** The streak notices told on this page: the server keeps them as told (play.TellStreak), and each is said once. */

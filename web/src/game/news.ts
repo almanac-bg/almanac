@@ -43,25 +43,37 @@ function factsHref(c: ChapterInk): string {
  * Told `late` (on Днес, of a game whose result was never on screen), it comes under a line that says whose it is
  * (`late.title`), if any. A best rank risen, the big moment, goes to `bestTo`, where given, not with the rest (the
  * day's result puts it first, under the score). `head`: the section's heading over it, while there's something to
- * tell (the day's result: „Днес в Алманаха“).
+ * tell (the day's result: „Днес в Алманаха“). `settled`: called once the answer is in, or it failed (the day's result
+ * draws what goes under the news then, so that nothing there is pushed down as the news comes).
  */
 export function news(
   run: number,
-  delay = 0,
-  late?: { title?: string },
-  bestTo?: (view: Child) => void,
-  head?: string,
+  {
+    delay = 0,
+    late,
+    bestTo,
+    head,
+    settled,
+  }: {
+    delay?: number;
+    late?: { title?: string };
+    bestTo?: (view: Child) => void;
+    head?: string;
+    settled?: () => void;
+  } = {},
 ): Child {
   const data = signal<News | null>(null);
   const t = setTimeout(
     () =>
-      api<News>("POST", "/api/me/news", { run }).then(
-        (n) => {
-          data.set(n);
-          if (n.rose?.best && bestTo) bestTo(rankUp(n.rose));
-        },
-        () => {},
-      ),
+      api<News>("POST", "/api/me/news", { run })
+        .then(
+          (n) => {
+            data.set(n);
+            if (n.rose?.best && bestTo) bestTo(rankUp(n.rose));
+          },
+          () => {},
+        )
+        .finally(settled),
     delay,
   );
   onCleanup(() => clearTimeout(t));
