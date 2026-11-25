@@ -27,6 +27,60 @@ func TestE2EFactsRule(t *testing.T) {
 	}
 }
 
+// The book's rewrite (factsRule) and metBefore run inside the one writer, and go from the player's runs to their own
+// answers by its key whatever the statistics say: with none (a new database), and with statistics that make a
+// question's answers look few (a young database's, kept on a grown one: `PRAGMA optimize` analyses again only at ten
+// times the rows). Left to the planner, they went by the question to everyone's answers to it (answers_question):
+// 88 ms against 7 ms for one player's book on a seeded database (audit 24 Nov 2026, C-34). The CROSS JOINs and the `+`
+// in them hold the order; this holds them.
+func TestHistoryQueriesGoByThePlayer(t *testing.T) {
+	w := setup(t)
+	db := w.db.Write // one connection: the statistics set below are the ones it plans by
+	plan := func(q string, args ...any) string {
+		t.Helper()
+		rows, err := db.Query("EXPLAIN QUERY PLAN "+q, args...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer rows.Close()
+		var steps []string
+		for rows.Next() {
+			var id, parent, unused int
+			var detail string
+			if err := rows.Scan(&id, &parent, &unused, &detail); err != nil {
+				t.Fatal(err)
+			}
+			steps = append(steps, detail)
+		}
+		return strings.Join(steps, "\n")
+	}
+	const byKey = "SEARCH a USING PRIMARY KEY (run_id=?)"
+	check := func(stats string) {
+		t.Helper()
+		if p := plan(factsRule, 1); strings.Contains(p, "answers_question") || strings.Count(p, byKey) != 2 {
+			t.Errorf("%s: factsRule goes by everyone's answers to a question:\n%s", stats, p)
+		}
+		// Its first half goes by the question on purpose (the few answers before the day); the second, by the player.
+		if p := plan(metBeforeSQL, "his-001", 1, 0, 0, 1); strings.Count(p, "answers_question") > 1 ||
+			!strings.Contains(p, byKey) {
+			t.Errorf("%s: metBefore goes by everyone's answers to a question:\n%s", stats, p)
+		}
+	}
+	check("no statistics")
+	for _, s := range []string{
+		`ANALYZE`,
+		`DELETE FROM sqlite_stat1`,
+		`INSERT INTO sqlite_stat1 (tbl, idx, stat) VALUES ('answers', 'answers', '1000000 10 1'),
+			('answers', 'answers_question', '1000000 1 1'), ('runs', 'runs_user', '100000 100 1')`,
+		`ANALYZE sqlite_schema`, // read again
+	} {
+		if _, err := db.Exec(s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	check("a question's answers looking few")
+}
+
 // book is a player's book as kept: by question, ink (true) or pencil (false).
 func (w *world) book(user int64) map[string]bool {
 	w.t.Helper()

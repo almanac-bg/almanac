@@ -35,12 +35,18 @@ var shadowWrites = `r.shadow <> ` + strconv.Itoa(ShadowScript)
 // factsRule writes a player's book (?1) from their answers by the rule above, the whole of it: the first time they met
 // each question (any answer, any game), and of their answers that write, for each question the one that's ink if any
 // is (right, in a day's issue, at that first meeting), else the first.
+//
+// It runs inside the one writer (a game found a script's, a merge), so both joins go from the player's runs
+// (runs_user) to their answers by its key, and CROSS JOIN keeps that order whatever the statistics say: left to the
+// planner, once `PRAGMA optimize` had analysed the answers, it went from each question met to everyone's answers to it
+// (answers_question): 88 ms against 7 ms for the same facts on a seeded database, seconds on a larger one whose
+// statistics lag (audit 24 Nov 2026, C-34; TestHistoryQueriesGoByThePlayer).
 var factsRule = `WITH met AS (
-		SELECT a.question_id, min(a.at) AS at FROM answers a JOIN runs r ON r.id = a.run_id
+		SELECT a.question_id, min(a.at) AS at FROM runs r CROSS JOIN answers a ON a.run_id = r.id
 		WHERE r.user_id = ?1 GROUP BY a.question_id),
 	meets AS (
 		SELECT a.question_id, a.at, a.run_id, a.is_right AND r.kind = 'day' AND NOT r.pencil AND a.at = m.at AS ink
-		FROM answers a JOIN runs r ON r.id = a.run_id JOIN met m ON m.question_id = a.question_id
+		FROM runs r CROSS JOIN answers a ON a.run_id = r.id CROSS JOIN met m ON m.question_id = a.question_id
 		WHERE r.user_id = ?1 AND ` + shadowWrites + ` AND NOT ` + voidAt + `),
 	ranked AS (
 		SELECT *, row_number() OVER (PARTITION BY question_id ORDER BY ink DESC, at, run_id) AS k FROM meets)
@@ -101,13 +107,21 @@ func (g *Game) writeFact(tx *sql.Tx, r *run, at int64, right bool) (bool, error)
 func metBefore(tx *sql.Tx, r *run, id string) (bool, error) {
 	start, _ := dayBounds(r.day)
 	var met bool
-	err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM answers a JOIN runs o ON o.id = a.run_id
-			WHERE a.question_id = ?1 AND a.at < ?3 AND o.user_id = ?2)
-		OR EXISTS (SELECT 1 FROM runs o JOIN answers a ON a.run_id = o.id
-			WHERE o.user_id = ?2 AND o.started_at >= ?4 AND o.id <> ?5 AND a.question_id = ?1)`,
-		id, r.userID, start, start-(DuelFor+dayLate).Milliseconds(), r.id).Scan(&met)
+	err := tx.QueryRow(metBeforeSQL, id, r.userID, start, start-(DuelFor+dayLate).Milliseconds(), r.id).Scan(&met)
 	return met, err
 }
+
+// metBeforeSQL is metBefore's question (?1), player (?2), day's start (?3), the start of the games that may still be
+// played into it (?4) and the run (?5). It runs in the one writer, on every right answer in the issue. Its second half
+// goes from the player's runs to their answers by its key: CROSS JOIN keeps runs first, and the `+` on question_id is
+// no typo: it keeps the planner off everyone's answers to the question (answers_question) there, which it otherwise
+// takes once per run of the player's, with CROSS JOIN or without (audit 24 Nov 2026, C-34;
+// TestHistoryQueriesGoByThePlayer). The first half goes by the question on purpose: only the few answers from before
+// its day.
+const metBeforeSQL = `SELECT EXISTS (SELECT 1 FROM answers a JOIN runs o ON o.id = a.run_id
+		WHERE a.question_id = ?1 AND a.at < ?3 AND o.user_id = ?2)
+	OR EXISTS (SELECT 1 FROM runs o CROSS JOIN answers a ON a.run_id = o.id
+		WHERE o.user_id = ?2 AND o.started_at >= ?4 AND o.id <> ?5 AND +a.question_id = ?1)`
 
 // Written is a fact as the book has it: its question, and ink or grey.
 type written struct {
