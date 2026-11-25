@@ -1209,7 +1209,15 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
     const cards: HTMLElement[] = [];
     const nextText = view.items[at + 1];
     if (nextText !== undefined)
-      cards.push(h("div", { class: "split-card under", "aria-hidden": "true" }, wholeWords(nextText)));
+      // Its words in one box, as on the top card: straight in the card (a grid), each hyphenated word was a row of its
+      // own, and the text jumped from two lines to one as the card came up.
+      cards.push(
+        h(
+          "div",
+          { class: "split-card under", "aria-hidden": "true" },
+          h("span", { class: "split-text" }, wholeWords(nextText)),
+        ),
+      );
     const text = view.items[at];
     if (text !== undefined) {
       const card = h(
@@ -1286,7 +1294,7 @@ function split(view: SplitView, submit: (a: Answer) => void, locked: Signal<bool
         h(
           "ul",
           { class: "options split-items", "aria-label": `${view.groups[0]} или ${view.groups[1]}?` },
-          view.items.map((text) => h("li", { class: "option" }, wholeWords(text))),
+          view.items.map((text) => h("li", { class: "option" }, h("span", null, wholeWords(text)))),
         ),
       )
     : h(
