@@ -66,7 +66,7 @@ func TestSharingTheDay(t *testing.T) {
 		t.Fatalf("someone else's day shared: %d", status)
 	}
 	// /admin's table counts it, once, on the day it was played.
-	rows, err := g.srv.dayRows(t.Context())
+	rows, _, err := g.srv.dayRows(t.Context())
 	if err != nil || len(rows) == 0 || rows[0].Day != short(day) || rows[0].Shared != 1 {
 		t.Fatalf("/admin's days: %v %+v", err, rows[:min(len(rows), 1)])
 	}

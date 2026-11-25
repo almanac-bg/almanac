@@ -65,8 +65,10 @@ var adminBody = template.Must(template.New("admin").Funcs(template.FuncMap{"n": 
 След 1, 7 и 30 дни: колко от новите са играли пак точно тогава. Споделени: колко резултата от броя на този ден са
 споделени с връзка. Нови по връзка: колко от новите са започнали първата си игра, броя на деня, на страница, отворена
 от споделена връзка (при нея пазим само, че е по връзка, не по чия; влезе ли после в по-стар профил, не е нов и не се
-брои).</p>
+брои). Общо: всички дни заедно, защото един ден има твърде малко нови, за да се чете сам; там „След“ е от новите
+само на дните, от които вече са минали толкова дни.</p>
 <div class="table-scroll"><table class="admin-table"><thead><tr><th>Ден</th><th class="num">Играли</th><th class="num">Нови</th><th class="num">Споделени</th><th class="num">Нови по връзка</th><th class="num">След 1 ден</th><th class="num">След 7 дни</th><th class="num">След 30 дни</th></tr></thead><tbody>
+{{with .Pooled}}<tr><td><strong>{{.Day}}</strong></td><td class="num">—</td><td class="num"><strong>{{n .New}}</strong></td><td class="num"><strong>{{n .Shared}}</strong></td><td class="num"><strong>{{n .ByLink}}</strong></td>{{range .Back}}<td class="num"><strong>{{.}}</strong></td>{{end}}</tr>{{end}}
 {{range .Days}}<tr><td>{{.Day}}</td><td class="num">{{n .Played}}</td><td class="num">{{n .New}}</td><td class="num">{{n .Shared}}</td><td class="num">{{n .ByLink}}</td>{{range .Back}}<td class="num">{{.}}</td>{{end}}</tr>{{end}}
 </tbody></table></div>
 </section>
