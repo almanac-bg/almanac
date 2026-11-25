@@ -2,7 +2,8 @@
 // alone, OpenMigrating: a version that brings migrations keeps a copy from before them, KeepCopy; any other command
 // is refused a database with migrations still to apply, Open), and the few helpers every query uses. The migrations
 // apply in the order of their names, and are checked so that the schema comes out the same wherever they ran, whatever
-// order they landed in (migrate).
+// order they landed in (migrate), and a release starts only on a database whose schema is what its migrations make
+// (CheckShape).
 //
 // SQLite takes one writer at a time, so writes go through a single connection (Write) and never wait on each other's
 // locks; reads go through a pool (Read) and run alongside, thanks to the write-ahead log. The pool keeps its
@@ -237,6 +238,9 @@ func (db *DB) Close() error {
 //     that makes the schema of a new database migrated in name order, the database is refused before anything is
 //     applied, and the program doesn't start (a deploy then goes back by itself). The late migration never ran
 //     there, so it can be changed to hold after the others, or given a number after the latest.
+//
+// A release's server makes that trial whether a migration is late or not, before it copies the database (CheckShape):
+// so a migration that has run is never changed (but its comments), nor renumbered; a change is a new migration.
 func (db *DB) migrate() error { return db.migrateTo(-1) }
 
 var migrationName = regexp.MustCompile(`^[0-9]{4}_[a-z0-9_]+\.sql$`)
@@ -344,25 +348,88 @@ func (db *DB) migrateTo(n int) error {
 	return db.applyAll(todo)
 }
 
-// tryLate applies the migrations still to do (todo, some of them late: named before the latest one the database has
-// had) to a copy of the database's schema, without its rows. Unless the schema that makes is the one a new database
-// migrated with all of them in order (names) has, it says how they differ, and nothing is applied.
+// tryLate is tryAll for migrations that arrive late (some of todo, named before the latest one the database has had).
 func (db *DB) tryLate(names, todo, late []string, last string) error {
-	refuse := func(err error) error {
+	if err := tryAll(db.Write, names, todo); err != nil {
+		var no refused
+		if !errors.As(err, &no) {
+			return err
+		}
 		return fmt.Errorf("migrations %s arrive after %s, which the database has had already: %w. Nothing is "+
 			"applied. They never ran on it: change them to hold after the others too, or give them numbers after "+
 			"the latest", strings.Join(late, ", "), last, err)
 	}
+	return nil
+}
+
+// CheckShape is the server's check as a release starts, before it copies the database (KeepCopy) and migrates it:
+// the migrations still to apply, tried on a copy of the database's schema (tryAll), make the schema of a new database
+// migrated in order. Otherwise it says how they differ, and nothing is changed: the server doesn't start, and the
+// deploy goes back with the database as it is (no copy made, nothing migrated: deploy/deploy.sh).
+//
+// The migrations table keeps names only, so this is what sees a migration production has had and that was changed
+// since (in more than its comments and spaces: shapeOf), which every test and new database would take as it is now and
+// production never would; and a change made by hand on the server; and a late migration that doesn't hold after the
+// others (migrate). A database that isn't there yet, has had no migration, or has one this program doesn't know (a
+// newer one: migrate refuses it) has nothing to check here.
+func CheckShape(path string) error {
+	if _, err := os.Stat(path); errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	names, err := migrationNames()
+	if err != nil {
+		return err
+	}
+	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro&_pragma=busy_timeout(5000)")
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	had, err := migrationsIn(db, names)
+	if err != nil || len(had) == 0 {
+		return err
+	}
+	var todo []string
+	for _, name := range names {
+		if _, ok := had[name]; !ok {
+			todo = append(todo, name)
+		}
+	}
+	for name := range had {
+		if !slices.Contains(names, name) {
+			return nil
+		}
+	}
+	if err := tryAll(db, names, todo); err != nil {
+		var no refused
+		if !errors.As(err, &no) {
+			return err
+		}
+		return fmt.Errorf("the database isn't as its migrations make it (%d still to apply): %w. Nothing is applied. "+
+			"A migration it has had was changed since (never edit one that may have run, but its comments: write a "+
+			"new one), its schema was changed by hand, or a late migration doesn't hold after the others (change it, "+
+			"or give it a number after the latest)", len(todo), err)
+	}
+	return nil
+}
+
+// refused is why tryAll refuses the migrations: the schema they make, or a failure to apply them.
+type refused struct{ error }
+
+// tryAll applies the migrations still to do (todo) to a copy of from's schema, without its rows. Unless the schema
+// that makes is the one a new database migrated with all of them in order (names) has, it says how they differ
+// (refused), and from is never changed.
+func tryAll(from querier, names, todo []string) error {
 	trial, err := memory()
 	if err != nil {
 		return err
 	}
 	defer trial.Close()
-	if err := copySchema(db.Write, trial.Write); err != nil {
+	if err := copySchema(from, trial.Write); err != nil {
 		return err
 	}
 	if err := trial.applyAll(todo); err != nil {
-		return refuse(err)
+		return refused{err}
 	}
 	fresh, err := memory()
 	if err != nil {
@@ -373,7 +440,7 @@ func (db *DB) tryLate(names, todo, late []string, last string) error {
 		return err
 	}
 	if err := fresh.applyAll(names); err != nil {
-		return refuse(fmt.Errorf("a new database can't be migrated with them: %w", err))
+		return refused{fmt.Errorf("a new database can't be migrated with them: %w", err)}
 	}
 	have, err := shapeOf(trial.Write)
 	if err != nil {
@@ -384,7 +451,7 @@ func (db *DB) tryLate(names, todo, late []string, last string) error {
 		return err
 	}
 	if diff := unlike(have, want); len(diff) > 0 {
-		return refuse(fmt.Errorf("the schema would differ from a new database's: %s", strings.Join(diff, "; ")))
+		return refused{fmt.Errorf("the schema would differ from a new database's: %s", strings.Join(diff, "; "))}
 	}
 	return nil
 }

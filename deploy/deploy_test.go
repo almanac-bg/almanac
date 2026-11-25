@@ -514,6 +514,33 @@ func TestBackFromACrash(t *testing.T) {
 	}
 }
 
+// One that brings a migration and refuses to start before it copies the database (store.CheckShape: its schema isn't
+// what the migrations make) goes back on the database as it is, and is marked alone: nothing of it migrated, and its
+// new migration isn't what failed, so a release that brings it is tried (one with the schema's cause fixed starts).
+func TestBackFromARefusedStart(t *testing.T) {
+	t.Parallel()
+	m := newMachine(t)
+	brings := append(slices.Clone(healthy.migrations), mig('3', "0003_c.sql"))
+	m.publish(release{tag: "v1.1.0", migrations: brings, behave: "never"})
+	out, code := m.deploy("v1.1.0", "ci")
+	expect(t, out, code, 1, "isn't healthy: it didn't answer", "back to almanac-v1.0.0 (on the database as it is: v1.1.0 didn't migrate it)")
+	if m.live() != "v1.0.0" || strings.TrimSpace(m.read(filepath.Join(m.world, "running"))) != "v1.0.0" {
+		t.Fatalf("not back: %s, %v", m.live(), m.log())
+	}
+	if db := m.read(filepath.Join(m.data, "almanac.db")); db != "the game\n" {
+		t.Fatalf("the database: %q", db)
+	}
+	if failed, _ := filepath.Glob(filepath.Join(m.data, "failed-*")); len(failed) > 0 {
+		t.Fatalf("a failed database kept: %v", failed)
+	}
+	if mark := m.read(filepath.Join(m.marks, "unhealthy-v1.1.0")); strings.Contains(mark, "migration") {
+		t.Fatalf("the mark: %q", mark)
+	}
+	m.publish(release{tag: "v1.1.1", migrations: brings, migrates: true})
+	out, code = m.deploy("v1.1.1", "ci")
+	expect(t, out, code, 0, "live: v1.1.1")
+}
+
 // The watch after a good start: one write that stalls (a 503, held 30 s by /api/health) keeps the release, whenever
 // in the two minutes it comes, as on 23 Nov 2026 it didn't; a server that stops answering goes back.
 func TestWatch(t *testing.T) {

@@ -58,7 +58,8 @@ import (
 // The server plays a copy of BANK_DIR kept beside the database (banks.go: outside development), and starts on the
 // last good copy when BANK_DIR has errors. SIGHUP reloads the bank (deploy/bank.sh), from the moment the program
 // starts (one that comes during the start is taken once it's up). SIGTERM or SIGINT stop the server after the requests under way finish. A version that brings a migration copies the database as it first starts, before
-// migrating it (store.KeepCopy); one without makes no copy, and starts at once. Started by systemd's socket
+// migrating it (store.KeepCopy); one without makes no copy. Before either, a release refuses a database whose schema
+// isn't what its migrations make (store.CheckShape). Started by systemd's socket
 // (deploy/almanac.socket), it serves on that socket, and ADDR is left aside.
 func serve([]string) error {
 	// First of all: a reload asked while the server starts would kill it (the default for SIGHUP).
@@ -144,8 +145,13 @@ func serve([]string) error {
 	if err != nil {
 		return err
 	}
-	// A release's version copies the database if it has migrations to apply, to go back to if they went wrong.
+	// A release's version starts only on a database whose schema is what its migrations make (nothing copied or
+	// migrated if not: the deploy goes back on the database as it is), and copies it if it has migrations to apply, to
+	// go back to if they went wrong.
 	if !dev && strings.HasPrefix(version, "v") {
+		if err := store.CheckShape(dbPath()); err != nil {
+			return fmt.Errorf("not starting %s: %w", version, err)
+		}
 		if made, err := store.KeepCopy(dbPath(), version); err != nil {
 			return fmt.Errorf("copying the database before %s: %w", version, err)
 		} else if made {
