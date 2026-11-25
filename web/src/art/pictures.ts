@@ -429,8 +429,9 @@ const marks: Record<string, Layer[]> = {
 // the tone itself (k3) is the picture's main colour.
 
 const ground: Layer = ["kt", C(32, 32, 30)];
-/** A petal of the game's rosette (the logo, favicon.svg), upright: turned about the centre for the others. */
-const petal = "M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z";
+/** A petal of the game's rosette (the logo: favicon.svg, ui.ts's rosette, the perfect game's mark), upright: turned about the
+ * centre for the others. */
+export const petal = "M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z";
 
 const chapters: Record<string, Layer[]> = {
   general: [

@@ -36,12 +36,6 @@ func Tell(fn func(kind string)) {
 	tell.Store(&fn)
 }
 
-// stopped counts the panics stopped since the program started.
-var stopped atomic.Int64
-
-// Stopped is how many panics have been stopped since the program started.
-func Stopped() int64 { return stopped.Load() }
-
 // logEvery is how often a panic in the same work is logged with its stack; in between, a line without it.
 const logEvery = time.Minute
 
@@ -53,7 +47,6 @@ var logged struct {
 // Report logs a panic stopped in what, with the stack where it is now (call it from the deferred function that
 // recovered it), and tells it (Tell).
 func Report(what string, v any) {
-	stopped.Add(1)
 	now := time.Now()
 	logged.Lock()
 	if logged.at == nil {

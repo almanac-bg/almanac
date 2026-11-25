@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"os"
+	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -27,6 +30,30 @@ func TestRankLadder(t *testing.T) {
 		if c.level > 0 && RankAt(RankFrom(c.level)) != c.level {
 			t.Errorf("level %d starts at %d, which makes %d", c.level, RankFrom(c.level), RankAt(RankFrom(c.level)))
 		}
+	}
+}
+
+// The client draws the ladder's names itself (seal.ts, rankNames), and shows the server's beside them: the two lists
+// are one.
+func TestRankNamesAreTheClients(t *testing.T) {
+	src, err := os.ReadFile("../../web/src/seal.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	list := regexp.MustCompile(`export const rankNames = \[([^\]]*)\]`).FindSubmatch(src)
+	if list == nil {
+		t.Fatal("seal.ts has no rankNames")
+	}
+	var client []string
+	for _, m := range regexp.MustCompile(`"([^"]*)"`).FindAllSubmatch(list[1], -1) {
+		client = append(client, string(m[1]))
+	}
+	var server []string
+	for _, r := range Ranks {
+		server = append(server, r.Name)
+	}
+	if !slices.Equal(client, server) {
+		t.Errorf("seal.ts's rankNames %q, play.Ranks' %q", client, server)
 	}
 }
 

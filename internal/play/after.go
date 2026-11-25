@@ -13,8 +13,9 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// After a run: once its last answer is kept, a run has more to do, each in a write of its own: its duel is settled
-// once both sides have played (settleRun), and what it brought is kept (afterRun: the ranks counted again from the book).
+// After a run: once its last answer is kept, a run has more to do, each in a write of its own: a duel's run sends its
+// duel (the first side) or settles it (the second: settleRun), and a day's issue keeps what it brought (afterRun: the
+// ranks counted again from the book). Nothing else follows a run; settling a duel doesn't make its other side's due again.
 // The transaction that finishes the run notes that it's due (runs_after, afterDue), so none of it is lost to a closed connection or a restart in between: the request that finished the run settles it at
 // once, on a context of its own that the player leaving doesn't cancel (finished: the result shows the duel's outcome), and
 // hands the rest to the background (afterLater), so that the last answer doesn't wait for the player's history to be

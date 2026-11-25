@@ -13,7 +13,7 @@ const { risen } = await import("./news.ts");
 
 const words = (...ranks: [string, string][]) =>
   risen(
-    ranks.map(([name, chapter]) => ({ name, chapter })),
+    ranks.map(([name, chapter]) => ({ name, chapter, to: 2 })),
     (c) => `[${c}]`,
   )
     .join("")
@@ -26,7 +26,7 @@ test("one chapter, two and three, each with its „в“ and „и“ only befor
     words(["Страница", "history"], ["Страница", "movies"], ["Страница", "sports"]),
     "„Страница“ в [history], в [movies] и в [sports]",
   );
-  const raw = risen([{ name: "Страница", chapter: "history" }], (c) => c).join("");
+  const raw = risen([{ name: "Страница", chapter: "history", to: 2 }], (c) => c).join("");
   assert.equal(raw, "„Страница“ в\u00a0history", "„в“ never at a line's end");
 });
 

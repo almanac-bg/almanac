@@ -175,7 +175,7 @@ export function answering<R>(spec: AnswerSpec<R>): Answering<R> {
     } catch (e) {
       const err = e instanceof ApiError ? e : new ApiError("server", errorText(e));
       if (!life.aborted && spec.handles?.(err)) return undefined;
-      const late = err.code === "not_now" || !untracked(spec.open);
+      const late = !untracked(spec.open);
       const retry = !late && passing(err) ? () => void go(answer) : null;
       st.problem.set({ err, retry });
       // Refused, not late: the options are free again (while there's time). Late, or given up on: not.

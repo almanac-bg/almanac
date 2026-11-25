@@ -11,7 +11,7 @@ import { picture } from "../art/picture.ts";
 import { api } from "../lib/api.ts";
 import { type Child, h, onCleanup, signal } from "../lib/dom.ts";
 import { formatNumber } from "../lib/words.ts";
-import { rankName, rankNames } from "../seal.ts";
+import { rankName } from "../seal.ts";
 import { chapterName, ladder, seal } from "../ui.ts";
 
 interface News {
@@ -23,7 +23,7 @@ interface News {
   /** Right answers in the issue to questions the book had already: their facts stay grey (play: „вече срещан“). */
   metBefore?: number;
   /** The ranks risen since last told, as one (play.Rose): Бележка never; `best`, the player's best rank rose. */
-  rose?: { ranks: { chapter: string; name: string; to?: number; ink?: number }[]; best?: boolean };
+  rose?: { ranks: { chapter: string; name: string; to: number; ink?: number }[]; best?: boolean };
 }
 
 interface ChapterInk {
@@ -152,11 +152,11 @@ function roseLine(r: NonNullable<News["rose"]>): Child {
     h(
       "span",
       { class: "rose-seals" },
-      r.ranks.map((x) => seal(x.chapter, x.to ?? rankNames.indexOf(x.name) + 1, 40)),
+      r.ranks.map((x) => seal(x.chapter, x.to, 40)),
     ),
     h("p", null, r.ranks.length === 1 ? "Нов печат: " : "Нови печати: ", risen(r.ranks), "."),
     // One chapter risen: where it stands among the ranks.
-    one ? ladder(one.chapter, one.to ?? rankNames.indexOf(one.name) + 1) : null,
+    one ? ladder(one.chapter, one.to) : null,
   );
 }
 
@@ -184,7 +184,7 @@ const chapterLink = (chapter: string) => h("a", { href: `/almanac/${chapter}` },
 function rankUp(r: NonNullable<News["rose"]>): Child {
   const top = r.ranks[0];
   if (!top) return null;
-  const level = top.to ?? rankNames.indexOf(top.name) + 1;
+  const level = top.to;
   const others = r.ranks.slice(1);
   return h(
     "section",

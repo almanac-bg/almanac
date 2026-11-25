@@ -2,10 +2,12 @@ package card
 
 import (
 	"bytes"
+	"encoding/binary"
 	"image"
 	"image/color"
 	"image/draw"
 	"image/png"
+	"strings"
 )
 
 // light is the mark's petals on the ink tile: the night's ink (app.css, --petal by night).
@@ -28,14 +30,36 @@ type Icon struct {
 // Icons are the icons the game serves (server/pages.go lists the files; badge-96.png, a notification's white
 // silhouette, has no colour and isn't drawn here).
 var Icons = []Icon{
+	{File: "favicon.ico", Size: 48, Round: true, Span: 0.625},
 	{File: "icon-192.png", Size: 192, Round: true, Span: 0.625},
 	{File: "icon-512.png", Size: 512, Round: true, Span: 0.625},
 	{File: "icon-maskable-512.png", Size: 512, Span: 0.47},
 	{File: "apple-touch-icon.png", Size: 180, Span: 0.625},
 }
 
-// Draw draws the icon as a PNG.
+// Draw draws the icon: a PNG, or, for a .ico file (what a browser asks for by itself), the same PNG after an ICO's
+// header.
 func (ic Icon) Draw() ([]byte, error) {
+	b, err := ic.png()
+	if err != nil || !strings.HasSuffix(ic.File, ".ico") {
+		return b, err
+	}
+	ico := make([]byte, icoHeader)
+	binary.LittleEndian.PutUint16(ico[2:], 1)               // an icon
+	binary.LittleEndian.PutUint16(ico[4:], 1)               // one image
+	ico[6], ico[7] = byte(ic.Size), byte(ic.Size)           // its width and height (under 256)
+	binary.LittleEndian.PutUint16(ico[10:], 1)              // planes
+	binary.LittleEndian.PutUint16(ico[12:], 32)             // bits a pixel
+	binary.LittleEndian.PutUint32(ico[14:], uint32(len(b))) // its length
+	binary.LittleEndian.PutUint32(ico[18:], icoHeader)      // where it starts
+	return append(ico, b...), nil
+}
+
+// icoHeader is an ICO's header with one image's entry: 6 bytes, then 16.
+const icoHeader = 6 + 16
+
+// png draws the icon as a PNG.
+func (ic Icon) png() ([]byte, error) {
 	s := float64(ic.Size)
 	img := image.NewRGBA(image.Rect(0, 0, ic.Size, ic.Size))
 	if ic.Round {

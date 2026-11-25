@@ -14,7 +14,7 @@ var adminSections = []struct{ ID, Name string }{
 	{"days", "По дни"}, {"players", "Играчи"},
 }
 
-var adminFrame = template.Must(template.New("admin-page").Parse(`<!doctype html>
+var adminFrame = template.Must(template.New("admin-page").Parse(frame + `<!doctype html>
 <html lang="bg">
 <head>
 <meta charset="utf-8">
@@ -26,7 +26,7 @@ var adminFrame = template.Must(template.New("admin-page").Parse(`<!doctype html>
 </head>
 <body>
 <div id="app" class="admin-app">
-<header class="frame"><div class="bar"><a class="brand" href="/"><svg class="rosette" viewBox="5 5 54 54" aria-hidden="true"><path class="petal gold" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(-45 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(45 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(135 32 32)"/><path class="petal" d="M32 30.2C24.5 24.7 21.5 14.7 26 9.9c3.2-3.4 8.8-3.4 12 0 4.5 4.8 1.5 14.8-6 20.3z" transform="rotate(225 32 32)"/></svg>АЛМАНАХ</a><nav class="places" aria-label="Основно"><a href="/">Днес</a><a href="/almanac">Алманах</a><a href="/friends">Приятели</a></nav></div></header>
+{{template "header"}}
 <main class="admin">
 <h1>{{.Title}}</h1>
 <nav class="admin-nav" aria-label="Части">{{range .Sections}}<a href="/admin#{{.ID}}">{{.Name}}</a>{{end}}<a href="/admin/questions"{{if eq $.Title "Въпроси"}} aria-current="page"{{end}}>Въпроси</a></nav>

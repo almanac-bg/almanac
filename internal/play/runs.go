@@ -160,9 +160,8 @@ func (g *Game) Unfinished(ctx context.Context, userID int64) (*State, error) {
 	return &s, nil
 }
 
-// MixChapter is every chapter at once: what a duel draws from, and the chapter of a game of all of them kept from
-// before (runs.chapter), which a duel may take as a recording. Its games are shaped by how well the player knows all
-// the chapters, and count toward each question's own chapter.
+// MixChapter is every chapter at once: what a duel draws from (Draw). A game of every chapter is shaped by how well
+// the player knows all the chapters, and counts toward each question's own chapter.
 const MixChapter = "mix"
 
 // StartChapter starts a run of one of the bank's chapters (a chapter's game), shaped by how well the player knows it;
@@ -175,8 +174,8 @@ func (g *Game) StartChapter(ctx context.Context, userID int64, chapter string) (
 	return g.startChapter(ctx, userID, chapter)
 }
 
-// startChapter is StartChapter for any chapter, MixChapter too: a game of every chapter, as players had before (the
-// tests make them; a duel takes one as a recording).
+// startChapter is StartChapter for any chapter, MixChapter too: a chapter's game of every chapter, which no player can
+// start (StartChapter takes the bank's chapters alone) and the tests make, for a game over the whole bank.
 func (g *Game) startChapter(ctx context.Context, userID int64, chapter string) (State, error) {
 	b := g.Bank()
 	known := chapter // how well the player knows a game of every chapter's questions: all the chapters

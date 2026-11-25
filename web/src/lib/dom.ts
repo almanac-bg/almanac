@@ -79,7 +79,6 @@ interface Computation {
 }
 
 let tracking: Computation | null = null;
-let batchDepth = 0;
 const pending = new Set<Computation>();
 
 export interface Signal<T> {
@@ -105,20 +104,10 @@ export function signal<T>(initial: T): Signal<T> {
     if (Object.is(next, value)) return;
     value = next;
     for (const c of [...readers]) pending.add(c);
-    if (batchDepth === 0) flush();
+    flush();
   };
   read.update = (fn) => read.set(fn(value));
   return read;
-}
-
-/** Changes several signals; effects run once, after the last. */
-export function batch(fn: () => void): void {
-  batchDepth++;
-  try {
-    fn();
-  } finally {
-    if (--batchDepth === 0) flush();
-  }
 }
 
 const first = <T>(set: Set<T>): T | undefined => set.values().next().value;
@@ -168,7 +157,9 @@ function untrack(c: Computation): void {
   c.sources.clear();
 }
 
-/** A value derived from signals, recomputed when they change. */
+/** A value derived from signals, recomputed when they change. Make it before the effects that read it: a change runs
+ * what it wakes in the order they came to read it, not by what depends on what, so an effect made first would run
+ * once more, with the old value, before the computed catches up. */
 export function computed<T>(fn: () => T): () => T {
   const s = signal<T>(undefined as T);
   effect(() => s.set(fn()));

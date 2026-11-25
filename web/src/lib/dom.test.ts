@@ -1,7 +1,7 @@
 // The signals and scopes the UI rests on (the DOM parts are covered by the browser tests).
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { batch, computed, effect, lifetime, onCleanup, safeURL, scope, signal, slot } from "./dom.ts";
+import { computed, effect, lifetime, onCleanup, safeURL, scope, signal, slot } from "./dom.ts";
 
 test("a scope's lifetime ends with it, so what was on its way when it ended does nothing", async () => {
   const opened: string[] = [];
@@ -42,24 +42,6 @@ test("an effect follows only what its last run read", () => {
   left.set("L"); // no longer read
   right.set("R");
   assert.deepEqual(seen, ["l", "r", "R"]);
-});
-
-test("a batch runs each effect once", () => {
-  const a = signal(1);
-  const b = signal(1);
-  let runs = 0;
-  scope(() =>
-    effect(() => {
-      a();
-      b();
-      runs++;
-    }),
-  );
-  batch(() => {
-    a.set(2);
-    b.set(2);
-  });
-  assert.equal(runs, 2);
 });
 
 test("cleanups run before each rerun and at the end, nested effects with them", () => {
@@ -155,15 +137,13 @@ test("an effect that throws breaks only itself: the others a change wakes run in
     });
     effect(() => seen.push(phase()));
   });
-  batch(() => {
-    players.set(null);
-    phase.set("question");
-  });
+  players.set(null);
+  phase.set("question"); // wakes both: the first throws, the second still runs
   phase.set("reveal");
   players.set([]);
   phase.set("question");
   assert.deepEqual(seen, ["lobby", "question", "reveal", "question"]);
-  assert.equal(reported.length, 2); // the two flushes while players was null
+  assert.equal(reported.length, 3); // the three flushes while players was null
   assert.ok(reported[0] instanceof TypeError);
 });
 
