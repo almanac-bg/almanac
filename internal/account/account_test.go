@@ -1,6 +1,7 @@
 package account
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -137,24 +138,44 @@ func TestGuestSigningInMergesIntoAccount(t *testing.T) {
 	}
 }
 
-// A guest who chose a name signs in to an account still with the one drawn for it: the chosen name, and its tag, are
-// the player's after (audit 2026-11-24, A25b-6), as the guest's avatar is. A name the account chose stays.
+// A guest who chose a name or a tag signs in to an account still with the one drawn for it: what the guest chose is
+// the player's after (audit 2026-11-24, A25b-6), as the guest's avatar is; what the account chose stays. Name and tag
+// are chosen apart (Настройки saves each on its own), so each is decided on its own.
 func TestSignInKeepsTheChosenName(t *testing.T) {
 	a, _, out, in := setup(t)
 	ctx := t.Context()
-	signIn := func(email, accountName, guestName, guestTag string) User {
-		t.Helper()
+	chosen := func(s string) *string {
+		if s == "" {
+			return nil
+		}
+		return &s
+	}
+	for i, c := range []struct {
+		why                                          string
+		accountName, accountTag, guestName, guestTag string // "" for the drawn one
+		name, tag                                    string // whose the player's is after: "account" or "guest"
+	}{
+		{"the account drawn, the guest chose both", "", "", "Мария Тестова", "maria_test", "guest", "guest"},
+		{"the account chose both", "Иван", "ivan_both", "Петя", "petya_both", "account", "account"},
+		{"the account chose its name", "Иван", "", "Петя", "petya_name", "account", "guest"},
+		{"the account chose its tag", "", "ivan_chosen", "Петя", "petya_tag", "guest", "account"},
+		{"the account chose its tag, the guest its name", "", "ivan_kept", "Петя", "", "guest", "account"},
+		{"the account drawn, the guest chose its name", "", "", "Петя", "", "guest", "account"},
+		{"the account drawn, the guest chose its tag", "", "", "", "petya_only", "account", "guest"},
+	} {
+		email := fmt.Sprintf("player%d@example.com", i)
 		owner, _, err := a.Verify(ctx, code(t, a, out, in, email), "")
-		if err != nil || !owner.Drawn() {
+		if err != nil || !owner.Drawn() || !owner.TagDrawn() {
 			t.Fatalf("a new account: %+v %v", owner, err)
 		}
-		if accountName != "" {
-			if _, _, err := a.Rename(ctx, owner.ID, &accountName, nil); err != nil {
-				t.Fatal(err)
-			}
+		if _, _, err := a.Rename(ctx, owner.ID, chosen(c.accountName), chosen(c.accountTag)); err != nil {
+			t.Fatal(err)
 		}
 		guest, session, _ := a.Guest(ctx)
-		if _, _, err := a.Rename(ctx, guest.ID, &guestName, &guestTag); err != nil {
+		if !guest.Drawn() || !guest.TagDrawn() {
+			t.Fatalf("a new guest: %+v", guest)
+		}
+		if _, _, err := a.Rename(ctx, guest.ID, chosen(c.guestName), chosen(c.guestTag)); err != nil {
 			t.Fatal(err)
 		}
 		u, token, err := a.Verify(ctx, code(t, a, out, in, email), session)
@@ -164,14 +185,13 @@ func TestSignInKeepsTheChosenName(t *testing.T) {
 		if again, _, _ := a.Session(ctx, token); again == nil || again.Name != u.Name || again.Tag != u.Tag {
 			t.Fatalf("signed in as %+v, kept as %+v", u, again)
 		}
-		return u
-	}
-	if u := signIn("drawn@example.com", "", "Мария Тестова", "maria_test"); u.Name != "Мария Тестова" ||
-		u.Tag != "maria_test" {
-		t.Fatalf("the account with its drawn name: %+v", u)
-	}
-	if u := signIn("chosen@example.com", "Иван", "Петя", "petya_test"); u.Name != "Иван" || u.Tag == "petya_test" {
-		t.Fatalf("the account with its chosen name: %+v", u)
+		owner.Name, owner.Tag = cmp.Or(c.accountName, owner.Name), cmp.Or(c.accountTag, owner.Tag)
+		guest.Name, guest.Tag = cmp.Or(c.guestName, guest.Name), cmp.Or(c.guestTag, guest.Tag)
+		mine := map[string]User{"account": owner, "guest": guest}
+		if u.Name != mine[c.name].Name || u.Tag != mine[c.tag].Tag {
+			t.Errorf("%s: %q @%s, want the %s's name %q and the %s's tag @%s", c.why, u.Name, u.Tag,
+				c.name, mine[c.name].Name, c.tag, mine[c.tag].Tag)
+		}
 	}
 }
 
