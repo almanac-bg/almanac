@@ -182,9 +182,9 @@ func TestUnfinishedAfterMidnight(t *testing.T) {
 }
 
 // A day's run left with its last question showing counts by its own clock, never by when it's next looked at (audit
-// 2026-11-24, C-14, and its review): one whose time ran out before its day closed (DayGrace after midnight) is
-// finished, kept on its own day, at any later look (a tab woken on it, or Днес the next morning), past DayGrace too;
-// one shown just before the close, whose time would run out after it, is left as it was, unfinished, at any look.
+// 2026-11-24, C-14, and its reviews): one whose time ran out in its run's time, before its day closed (DayGrace after
+// midnight) or, shown before the close, after it, is finished, kept on its own day, at any later look (a tab woken on
+// it, or Днес the next morning), past DayGrace too.
 func TestPastDayLeftOnItsLastQuestion(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -192,12 +192,12 @@ func TestPastDayLeftOnItsLastQuestion(t *testing.T) {
 		why       string
 		user, run int64
 		shown     time.Time
-		counts    bool
+		limit     time.Duration
 	}
 	var all []*left
 	// leave plays the nine before the tenth of Tuesday the 17th's issue, a player a minute apart.
-	leave := func(why string, counts bool) *left {
-		l := &left{why: why, user: w.user(), counts: counts}
+	leave := func(why string) *left {
+		l := &left{why: why, user: w.user()}
 		w.at(17, 23, 40+len(all), 0)
 		s, err := w.g.StartDay(ctx, l.user)
 		if err != nil {
@@ -205,6 +205,11 @@ func TestPastDayLeftOnItsLastQuestion(t *testing.T) {
 		}
 		l.run = s.ID
 		w.playOn(l.user, s.ID, 0, repeat(w.right, Length-1)...)
+		q, ok := w.b.Get(w.picks(s.ID)[Length-1].ID)
+		if !ok {
+			t.Fatal("the tenth gone from the bank")
+		}
+		l.limit = Limit(q)
 		all = append(all, l)
 		return l
 	}
@@ -214,11 +219,14 @@ func TestPastDayLeftOnItsLastQuestion(t *testing.T) {
 	}
 	look := func(l *left, today bool) {
 		t.Helper()
-		if today {
+		if today { // as Днес does: the player's runs settled, then yesterday's offered if it's open
+			if err := w.g.SettleLeft(ctx, l.user); err != nil {
+				t.Fatal(err)
+			}
 			if open, err := w.g.Unfinished(ctx, l.user); err != nil || open != nil {
 				t.Fatalf("%s: offered on Днес at %v: %+v %v", l.why, w.now, open, err)
 			}
-		} else if s, err := w.g.State(ctx, l.user, l.run); err != nil || s.Done != l.counts {
+		} else if s, err := w.g.State(ctx, l.user, l.run); err != nil || !s.Done {
 			t.Fatalf("%s, looked at %v: done %v, %v", l.why, w.now, s.Done, err)
 		}
 		w.g.AftersDone(ctx)
@@ -228,40 +236,29 @@ func TestPastDayLeftOnItsLastQuestion(t *testing.T) {
 			FROM runs WHERE id = ?`, l.run).Scan(&finished, &answers); err != nil {
 			t.Fatal(err)
 		}
-		if !l.counts {
-			if finished.Valid || answers != Length-1 {
-				t.Fatalf("%s, looked at %v: finished %v, %d answers", l.why, w.now, finished, answers)
-			}
-			return
-		}
-		q, ok := w.b.Get(w.picks(l.run)[Length-1].ID)
-		if !ok {
-			t.Fatal("the tenth gone from the bank")
-		}
-		limit := Limit(q)
-		if !finished.Valid || finished.Int64 != l.shown.Add(limit).UnixMilli() || answers != Length {
+		if !finished.Valid || finished.Int64 != l.shown.Add(l.limit).UnixMilli() || answers != Length {
 			t.Fatalf("%s, looked at %v: finished %v (its time ran out at %v), %d answers", l.why, w.now,
-				finished, l.shown.Add(limit), answers)
+				finished, l.shown.Add(l.limit), answers)
 		}
 		var lookDay bool
 		if err := w.db.Read.QueryRow(`SELECT EXISTS (SELECT 1 FROM active_days WHERE user_id = ? AND day = ?)`,
 			l.user, dayOf(w.now)).Scan(&lookDay); err != nil {
 			t.Fatal(err)
 		}
-		if lookDay && dayOf(w.now) != dayOf(l.shown.Add(limit)) {
+		if lookDay && dayOf(w.now) != dayOf(l.shown.Add(l.limit)) {
 			t.Fatalf("%s: the look's day kept as played, %v", l.why, w.now)
 		}
 	}
 
-	ranOut := []*left{leave("ran out on its day, looked at in the grace", true),
-		leave("ran out on its day, looked at past the grace", true),
-		leave("ran out on its day, looked at by Днес the next morning", true),
-		leave("ran out on its day, looked at two days later", true)}
-	inGrace := leave("ran out in the grace, looked at the next morning", true)
-	across := []*left{leave("left mid-time across the close, looked at as its time runs on", false),
-		leave("left mid-time across the close, looked at just after", false),
-		leave("left mid-time across the close, looked at by Днес the next morning", false),
-		leave("left mid-time across the close, looked at two days later", false)}
+	ranOut := []*left{leave("ran out on its day, looked at in the grace"),
+		leave("ran out on its day, looked at past the grace"),
+		leave("ran out on its day, looked at by Днес the next morning"),
+		leave("ran out on its day, looked at two days later")}
+	inGrace := leave("ran out in the grace, looked at the next morning")
+	across := []*left{leave("left mid-time across the close, looked at as its time is over"),
+		leave("left mid-time across the close, looked at just after"),
+		leave("left mid-time across the close, looked at by Днес the next morning"),
+		leave("left mid-time across the close, looked at two days later")}
 
 	w.at(17, 23, 58, 50) // a minute before midnight: the longest time runs out on Tuesday
 	for _, l := range ranOut {
@@ -274,7 +271,7 @@ func TestPastDayLeftOnItsLastQuestion(t *testing.T) {
 	for _, l := range across {
 		show(l)
 	}
-	w.at(18, 0, 15, 59) // its time, and its answer's LateGrace, over for all but the longest questions
+	w.now = across[0].shown.Add(across[0].limit + LateGrace + time.Second) // its time, and its answer's LateGrace, over
 	look(across[0], false)
 	w.at(18, 0, 20, 0)
 	look(ranOut[1], false)
@@ -284,7 +281,7 @@ func TestPastDayLeftOnItsLastQuestion(t *testing.T) {
 	look(across[2], true)
 	look(inGrace, false)
 	for _, l := range []*left{ranOut[2], across[2], inGrace} { // the morning after Tuesday: its streak
-		if st, err := w.g.StreakOf(ctx, l.user); err != nil || st.Days != map[bool]int{true: 1}[l.counts] {
+		if st, err := w.g.StreakOf(ctx, l.user); err != nil || st.Days != 1 {
 			t.Fatalf("%s: the streak on Wednesday morning: %+v %v", l.why, st, err)
 		}
 	}
@@ -316,44 +313,51 @@ func (w *world) tuesdayLeft(user int64, day, hour, minute, second int) (int64, t
 	return s.ID, w.now.Add(Limit(q))
 }
 
-// A day whose tenth ran out before the day closed counts as the day closes, by the minute's sweep alone (SettleLeft),
-// with nobody looking: the streak, the day's board and the friends' board have it, kept as its time ran out. One whose
-// time ran past the close is left as it was.
+// A day whose tenth ran out in its time counts as the day closes, by the minute's sweep alone (SettleLeft), with
+// nobody looking: the streak, the day's board and the friends' board have it, kept as its time ran out. A tenth shown
+// just before the close, whose time runs out after it, counts the same with the phone locked (the sweep) as with the
+// tab open (the screen's null as its countdown ends): both close at the same moment (lastClose).
 func TestDayClosedCountsWithoutALook(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	ana, bo, cy := w.user(), w.user(), w.user()
+	ana, bo, cy, dan := w.user(), w.user(), w.user(), w.user()
 	w.befriend(ana, bo)
 	aRun, ranOut := w.tuesdayLeft(ana, 24, 23, 58, 0)
 	w.at(24, 23, 50, 0)
-	w.dayGame(bo, nil) // Bo played Tuesday's through
-	cRun, _ := w.tuesdayLeft(cy, 25, 0, 14, 50)
-	w.at(25, 0, 1, 0) // a minute after Ana's tenth ran out, and its LateGrace
+	w.dayGame(bo, nil)                              // Bo played Tuesday's through
+	cRun, cOut := w.tuesdayLeft(cy, 25, 0, 14, 50)  // the phone locked
+	dRun, dOut := w.tuesdayLeft(dan, 25, 0, 14, 50) // the tab open
+	w.at(25, 0, 1, 0)                               // a minute after Ana's tenth ran out, and its LateGrace
 	if err := w.g.SettleLeft(ctx, 0); err != nil {
 		t.Fatal(err)
 	}
-	w.at(25, 0, 20, 0) // Cy's ran past the close: the sweep leaves it
+	w.now = dOut
+	if res, err := w.answer(dan, dRun, Length-1, json.RawMessage("null")); err != nil || !res.State.Done {
+		t.Fatalf("Dan's null as the tenth ran out, at %v: %+v %v", w.now, res, err)
+	}
+	w.at(25, 0, 20, 0) // Cy's ran out past the close: the sweep settles it as Dan's screen did
 	if err := w.g.SettleLeft(ctx, 0); err != nil {
 		t.Fatal(err)
 	}
 	w.g.AftersDone(ctx)
-	var finished sql.NullInt64
-	if err := w.db.Read.QueryRow(`SELECT finished_at FROM runs WHERE id = ?`, aRun).Scan(&finished); err != nil ||
-		finished.Int64 != ranOut.UnixMilli() {
-		t.Fatalf("Ana's Tuesday finished at %v, its time ran out at %v (%v)", finished, ranOut, err)
-	}
-	if err := w.db.Read.QueryRow(`SELECT finished_at FROM runs WHERE id = ?`, cRun).Scan(&finished); err != nil ||
-		finished.Valid {
-		t.Fatalf("Cy's Tuesday, left across the close, finished: %v (%v)", finished, err)
+	for _, f := range []struct {
+		who string
+		run int64
+		out time.Time
+	}{{"Ana", aRun, ranOut}, {"Cy", cRun, cOut}, {"Dan", dRun, dOut}} {
+		var finished sql.NullInt64
+		if err := w.db.Read.QueryRow(`SELECT finished_at FROM runs WHERE id = ?`, f.run).Scan(&finished); err != nil ||
+			finished.Int64 != f.out.UnixMilli() {
+			t.Fatalf("%s's Tuesday finished at %v, its time ran out at %v (%v)", f.who, finished, f.out, err)
+		}
 	}
 	w.at(25, 9, 5, 0)
-	if st, err := w.g.StreakOf(ctx, ana); err != nil || st.Days != 3 || len(st.Forgiven) != 0 {
-		t.Fatalf("Ana's streak on Wednesday, nobody having looked: %+v %v", st, err)
+	for _, u := range []int64{ana, cy, dan} {
+		if st, err := w.g.StreakOf(ctx, u); err != nil || st.Days != 3 || len(st.Forgiven) != 0 {
+			t.Fatalf("player %d's streak on Wednesday: %+v %v", u, st, err)
+		}
 	}
-	if st, err := w.g.StreakOf(ctx, cy); err != nil || st.Days != 2 || !slices.Equal(st.Forgiven, []string{"2026-11-24"}) {
-		t.Fatalf("Cy's streak on Wednesday: %+v %v", st, err)
-	}
-	if b, err := w.g.BoardOf(ctx, "2026-11-24", ana); err != nil || b.Players != 2 || b.Place == 0 {
+	if b, err := w.g.BoardOf(ctx, "2026-11-24", ana); err != nil || b.Players != 4 || b.Place == 0 {
 		t.Fatalf("Tuesday's board: %d players, Ana's place %d (%v)", b.Players, b.Place, err)
 	}
 	if f, err := w.g.FriendsBoard(ctx, "2026-11-24", bo); err != nil || len(f) != 2 {
@@ -389,10 +393,9 @@ func TestTimedOutAnswerKeptAsItRanOut(t *testing.T) {
 	}
 }
 
-// A game that ended as its last question's time ran out, settled after midnight, is gone over as one finished by a
-// look then would be (reviewOpen): Ana's Tuesday, run out just before midnight, at 00:20 and on Wednesday morning,
-// not on Thursday; and with it how her friends did (FriendsOn). A game finished by its answers at 23:59 only until
-// DayGrace after it, as before.
+// A game is gone over on its own day, and DayGrace after it at least, however it ended (reviewOpen): Ana's Tuesday,
+// its last question run out just before midnight and settled by the sweep after it, closes for review as Bo's,
+// finished by its answers at 23:59, does; and with it how her friends did (FriendsOn).
 func TestReviewOfADayThatRanOut(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
@@ -413,19 +416,18 @@ func TestReviewOfADayThatRanOut(t *testing.T) {
 		}
 		return err
 	}
-	w.at(25, 0, 20, 0)
+	w.at(25, 0, 10, 0)
 	if err := review(ana, aRun); err != nil {
+		t.Fatalf("Ana's Tuesday, run out at 23:59, at 00:10: %v", err)
+	}
+	if err := review(bo, bRun); err != nil {
+		t.Fatalf("Bo's Tuesday, finished at 23:59, at 00:10: %v", err)
+	}
+	w.at(25, 0, 20, 0)
+	if err := review(ana, aRun); !errors.Is(err, ErrReviewOver) {
 		t.Fatalf("Ana's Tuesday, run out at 23:59, at 00:20: %v", err)
 	}
 	if err := review(bo, bRun); !errors.Is(err, ErrReviewOver) {
 		t.Fatalf("Bo's Tuesday, finished at 23:59, at 00:20: %v", err)
-	}
-	w.at(25, 9, 5, 0)
-	if err := review(ana, aRun); err != nil {
-		t.Fatalf("Ana's Tuesday on Wednesday morning: %v", err)
-	}
-	w.at(26, 0, 0, 1)
-	if err := review(ana, aRun); !errors.Is(err, ErrReviewOver) {
-		t.Fatalf("Ana's Tuesday on Thursday: %v", err)
 	}
 }

@@ -11,9 +11,9 @@
 // as long as they like; a question of the day's ten dealt on its own date („На този ден“) shows its day's line with
 // them (dealtOn). A question left showing past its time counts as unanswered, kept when its time ran out, by the run's
 // own clock alone, never by when or whether it's looked at: a day's run is settled by the server's sweep within the
-// minute, or sooner by any look, the player's Днес first of all (SettleLeft); one whose time would run out only after
-// its day or its duel closed is left as it was (settles). A question is graded against the version of it
-// that showed, whatever the bank has become meanwhile (versions.go); the day's ten hold still for their day, and one found wrong during it counts for nobody that day (day.go). Everything a
+// minute, or sooner by any look, the player's Днес first of all (SettleLeft); one shown before its day closed gets its
+// full time past the close, as its answer would (lastClose, settles). A question is graded against
+// the version of it that showed, whatever the bank has become meanwhile (versions.go); the day's ten hold still for their day, and one found wrong during it counts for nobody that day (day.go). Everything a
 // run does goes through the database, so a refresh, a second tab or a restart of the server changes nothing. A run left
 // half-way goes on where it stopped: the day's when the player comes back to it that day (a run of the day's questions
 // ends with its day, DayGrace after: dayOver), a chapter's when they start the same chapter again that day
@@ -233,14 +233,21 @@ func (r *run) dayCloses() time.Time {
 }
 
 // pastClose is whether a run that closes at `closes` (its day's: dayOver; its duel's: duelOver) can't be played on at
-// `now`: past it, and no question shown before it still in its time, the longest a question's can be (LongestLimit),
-// and the LateGrace its answer has to arrive in. A question shown before the close gets its full time.
+// `now`: past its last close (lastClose).
 func (r *run) pastClose(closes, now time.Time) bool {
+	return now.After(r.lastClose(closes))
+}
+
+// lastClose is when a run that closes at `closes` is closed to every answer: then, or, with a question shown before
+// it, once that question's time is over, the longest a question's can be (LongestLimit), and the LateGrace its answer
+// has to arrive in. A question shown before the close gets its full time: its answer is taken then (pastClose), and,
+// a day's, its time run out with nobody there counts as the screen's null would (settles).
+func (r *run) lastClose(closes time.Time) time.Time {
 	if shown := time.UnixMilli(r.shownAt.Int64); r.shownAt.Valid && shown.Before(closes) &&
 		shown.Add(LongestLimit+LateGrace).After(closes) {
-		closes = shown.Add(LongestLimit + LateGrace)
+		return shown.Add(LongestLimit + LateGrace)
 	}
-	return now.After(closes)
+	return closes
 }
 
 // closes is when a run closes, if it does: a day's (dayCloses), a duel's while the duel is on (duelCloses); zero for
@@ -419,13 +426,13 @@ func (g *Game) settle(tx *sql.Tx, r *run) (bool, error) {
 // settles says whether settle has anything to do: a question showing past its time, or gone from the bank; or one that
 // counts for nobody, where the run stands. Its question is read through tx, the transaction the caller holds.
 //
-// What it does hangs on the run's own clock, never on when the run is looked at. A question whose time ran out before
-// the run closed (closes: its day's, its duel's) counted as unanswered then, so it's settled at the next look, or by
-// the sweep (SettleLeft), past its close too: a day's run whose tenth ran out before its day closed is finished, and
-// counts for its day, whether it's looked at at 23:59, the next morning, or never. One whose time would run out only
-// after the close is left as it was: unanswered, the run stays unfinished. Past its close nothing else is settled
-// (dayOver, duelOver), and a duel past its time is the sweep's, which ends it as it stood (SettleDue): nobody is told
-// it was played.
+// What it does hangs on the run's own clock, never on when the run is looked at. A day's question whose time ran out
+// before its run closed for good (lastClose: one shown before the close has its full time past it, as its answer, a
+// timed-out one too, is taken then: dayOver) counted as unanswered then, so it's settled at the next look, or by the
+// sweep (SettleLeft), past its close too: a day's run whose tenth ran out in its time is finished, and counts for its
+// day, whether it's looked at at 23:59, the next morning, or never, as it would with its tab open. A duel's is
+// settled by a look only before its week ends (duelCloses): past it nothing else is settled (dayOver, duelOver), and
+// a duel past its time is the sweep's, which ends it as it stood (SettleDue): nobody is told it was played.
 func (g *Game) settles(tx *sql.Tx, r *run) (bool, error) {
 	if r.finished {
 		return false, nil
@@ -452,10 +459,12 @@ func (g *Game) settles(tx *sql.Tx, r *run) (bool, error) {
 		return false, nil
 	case closes.IsZero():
 		return true, nil
+	case r.kind == "day":
+		return !ends.After(r.lastClose(closes)), nil
 	case ends.After(closes):
 		return false, nil
 	}
-	return open || r.kind == "day", nil
+	return open, nil
 }
 
 // record keeps an answer (to a number, if it's one: what decides a tie, tiebreak), and moves the run to the next
@@ -791,25 +800,12 @@ type Reviewed struct {
 }
 
 // reviewOpen says whether a finished run can still be gone over (Review: a duel's on any day): until the end of the
-// day it ended on, in Bulgaria, and DayGrace after it at least (one ended at 23:59 is gone over after). One that ended
-// as its last question's time ran out ended out of its player's sight, perhaps, and is kept as ended then however much
-// later its result is seen (settle); it's measured as if it ended DayGrace later, the grace a player had to come back
-// in and finish it by a look. So one that ran out in its day's last quarter hour is gone over through the next day, as
-// one finished by a look just after midnight is; one that ran out earlier, on its own day only.
+// day it ended on, in Bulgaria, and DayGrace after it at least (one ended at 23:59 is gone over after), however it
+// ended: by its answers, or as its last question's time ran out (kept as it ran out: settle).
 func (g *Game) reviewOpen(ctx context.Context, r *run) (bool, error) {
-	var ended, ms int64
-	var n int
-	var unanswered bool
-	err := g.DB.Read.QueryRowContext(ctx, `SELECT r.finished_at, coalesce(a.n, -1), coalesce(a.given IS NULL, 0),
-		coalesce(a.ms, 0) FROM runs r LEFT JOIN answers a ON a.run_id = r.id AND a.n = (SELECT max(n) FROM answers
-		WHERE run_id = r.id) WHERE r.id = ?`, r.id).Scan(&ended, &n, &unanswered, &ms)
-	if err != nil {
+	var ended int64
+	if err := g.DB.Read.QueryRowContext(ctx, `SELECT finished_at FROM runs WHERE id = ?`, r.id).Scan(&ended); err != nil {
 		return false, err
-	}
-	if unanswered && n >= 0 && n < len(r.picks) {
-		if d, ok := g.deal(g.DB.Read, r.picks[n]); ok && ms >= Limit(d.Question()).Milliseconds() {
-			ended += DayGrace.Milliseconds() // its time ran out
-		}
 	}
 	_, dayEnd := dayBounds(dayOf(time.UnixMilli(ended)))
 	return store.Ms(g.Now()) < max(dayEnd, ended+DayGrace.Milliseconds()), nil
