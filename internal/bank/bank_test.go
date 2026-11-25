@@ -130,22 +130,39 @@ func TestDealsAreStableAndShuffled(t *testing.T) {
 	}
 }
 
-// A question's sources and its keepers' notes stay in the bank: no player is dealt them, every kind alike.
+// A question's sources and its keepers' notes stay in the bank: no player is dealt them, every kind alike. Its fact
+// comes with its answer only: in the reveal, never in what shows while it's asked (its view, a paced one's at every
+// step, its pictures before its time), so it can't give the answer away.
 func TestKeepersFieldsStayInTheBank(t *testing.T) {
 	b := loadSample(t)
+	const fact = "fact-with-the-answer"
 	for _, typ := range Types() {
 		q := ofType(b, typ)[0]
 		tail := q.Extra()
+		was := tail.Fact
 		tail.Sources, tail.Checked, tail.CheckedBy = []string{"https://example.org/source"}, "2026-11-17", "keepers-only"
+		tail.Fact = fact
 		d := q.Deal(1)
-		view, _ := json.Marshal(d.View())
+		asked := []any{d.View(), PicturesView(d)}
+		if p, ok := d.(Paced); ok {
+			for _, s := range p.Steps() {
+				asked = append(asked, ViewAt(d, s))
+			}
+		}
+		view, _ := json.Marshal(asked)
 		reveal, _ := json.Marshal(d.Reveal(nil))
 		for _, s := range []string{"example.org", "keepers-only", "2026-11-17"} {
 			if strings.Contains(string(view)+string(reveal), s) {
 				t.Errorf("%s: a player is dealt %s", typ, s)
 			}
 		}
-		tail.Sources, tail.Checked, tail.CheckedBy = nil, "", ""
+		if strings.Contains(string(view), fact) {
+			t.Errorf("%s: the fact shows while the question is asked: %s", typ, view)
+		}
+		if !strings.Contains(string(reveal), fact) {
+			t.Errorf("%s: the reveal has no fact: %s", typ, reveal)
+		}
+		tail.Sources, tail.Checked, tail.CheckedBy, tail.Fact = nil, "", "", was
 	}
 }
 
