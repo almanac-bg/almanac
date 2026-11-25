@@ -497,6 +497,61 @@ func TestDayTurnsWhileTheDaysAreDrawn(t *testing.T) {
 	}
 }
 
+// The days after tomorrow are drawn again when the bank's dated questions change, never for its questions about
+// Bulgaria: one made so, made not so, retired or brought back leaves drawnBy as it was, and the days ahead what they
+// hold; a question given a date, or another date, changes it, and so do the rules (DayRules is in it).
+func TestDaysDrawnByTheirDates(t *testing.T) {
+	b := biggerSample(t, 2)
+	var bg, plain, dated bank.Question
+	for _, q := range b.Live("", "") {
+		switch t := q.Extra(); {
+		case len(t.On) > 0:
+		case t.BG:
+			bg = q
+		case dated == nil:
+			dated = q
+		default:
+			plain = q
+		}
+	}
+	if bg == nil || plain == nil || dated == nil {
+		t.Fatal("the sample needs a question about Bulgaria, and two not")
+	}
+	dated.Extra().On = []string{"03-03"}
+	was := drawnBy(b)
+	if !strings.HasPrefix(was, DayRules+" ") {
+		t.Fatalf("drawnBy %q doesn't name the rules", was)
+	}
+	same := func(what string) {
+		t.Helper()
+		if now := drawnBy(b); now != was {
+			t.Errorf("%s: the days ahead would be drawn again (%q → %q)", what, was, now)
+		}
+	}
+	plain.Extra().BG = true
+	same("a question made one about Bulgaria")
+	plain.Extra().BG = false
+	bg.Extra().BG = false
+	same("one made not")
+	bg.Extra().BG = true
+	bg.Extra().Retired = true
+	same("one retired")
+	bg.Extra().Retired = false
+	same("one brought back")
+	plain.Extra().On = []string{"12-24"}
+	if drawnBy(b) == was {
+		t.Error("a question given a date: the days ahead aren't drawn again")
+	}
+	plain.Extra().On = nil
+	on := dated.Extra().On
+	dated.Extra().On = []string{"02-29"}
+	if drawnBy(b) == was {
+		t.Error("a question given another date: the days ahead aren't drawn again")
+	}
+	dated.Extra().On = on
+	same("everything as it was")
+}
+
 // A day drawn on its morning, not ahead, takes of the questions that fit one nobody has answered, as a day drawn ahead
 // does: when KeepDays draws it (keepToday), and when a player's game draws it first, by who had as KeepDays last read
 // them (lastMet). Here the day turns while the days ahead are written, so none is: the new today is the player's to
