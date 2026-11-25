@@ -42,8 +42,9 @@ import (
 // drawn ahead is drawn by today's rules, never an older version's.
 //
 // Past the days drawn, the day and the other games keep apart by what they prefer, not by a bar: of the questions
-// that fit, the day takes one nobody has answered, and a chapter's game or a duel one somebody has (Draw), each while
-// any is left. A question met in another game before an issue deals it is never ink for that player (ink.go), so a
+// that fit, the day takes one nobody has answered (drawn on its morning too: by who had as KeepDays last read it,
+// lastMet, if a player's game draws it first), and a chapter's game or a duel one somebody has (Draw), each while any
+// is left. A question met in another game before an issue deals it is never ink for that player (ink.go), so a
 // player who plays the chapters most would otherwise meet more and more of the days to come there, and lose their
 // ink in the issue for it; this way the other games walk the bank already walked, and leave the untouched to the days.
 //
@@ -100,7 +101,7 @@ func (g *Game) days(tx *sql.Tx) (dayBars, error) {
 	if day == today && drawnFrom == b {
 		return bars, nil
 	}
-	if _, err := g.day(tx, today, b); err != nil && !errors.Is(err, ErrNoQuestion) {
+	if _, err := g.day(tx, today, b, g.lastMet()); err != nil && !errors.Is(err, ErrNoQuestion) {
 		return dayBars{}, err
 	}
 	stored, err := storedDays(tx, "")
@@ -150,7 +151,7 @@ func (g *Game) EnsureDays(ctx context.Context) error {
 	var stored map[string][]Pick
 	err = g.DB.Tx(context.WithoutCancel(ctx), func(tx *sql.Tx) error {
 		var err error
-		stored, err = g.keepToday(tx, today, b)
+		stored, err = g.keepToday(tx, today, b, answered)
 		return err
 	})
 	if err != nil {
@@ -170,7 +171,9 @@ func (g *Game) EnsureDays(ctx context.Context) error {
 	}
 	g.keptDays(today, b, both)
 	if err := g.writeDays(ctx, today, stored, all); err != nil {
-		g.keptDays("", nil, dayBars{}) // the games read the days from the database, and the next minute tries again
+		// The games read the days from the database, and the next minute tries again; who has answered what stays, for
+		// the new today a player may draw meanwhile (lastMet).
+		g.keptDays("", nil, dayBars{met: answered})
 		if errors.Is(err, errDayTurned) {
 			return nil
 		}
@@ -188,11 +191,21 @@ func (g *Game) keptDays(day string, b *bank.Bank, bars dayBars) {
 	g.daysAhead.day, g.daysAhead.bank, g.daysAhead.bars = day, b, bars
 }
 
-// keepToday draws today if it isn't yet, voids today's questions the bank no longer plays as the day began (day.go),
-// and lets go of the days after tomorrow if the rules or the bank's dated and Bulgarian questions changed since they
-// were drawn (drawAhead draws them again); it says which days are stored.
-func (g *Game) keepToday(tx *sql.Tx, today string, b *bank.Bank) (map[string][]Pick, error) {
-	if _, err := g.day(tx, today, b); err != nil && !errors.Is(err, ErrNoQuestion) {
+// lastMet are the questions anyone had answered as KeepDays last read them, whatever the day and bank it drew for
+// since (nil until it first has): a player's game that draws today, before KeepDays has (a new day's first minute, the
+// day turned while the days were written), prefers by them, at most a day old, rather than read every answer inside
+// the one write.
+func (g *Game) lastMet() map[string]bool {
+	g.daysAhead.mu.Lock()
+	defer g.daysAhead.mu.Unlock()
+	return g.daysAhead.bars.met
+}
+
+// keepToday draws today if it isn't yet (those nobody has answered first), voids today's questions the bank no longer
+// plays as the day began (day.go), and lets go of the days after tomorrow if the rules or the bank's dated and
+// Bulgarian questions changed since they were drawn (drawAhead draws them again); it says which days are stored.
+func (g *Game) keepToday(tx *sql.Tx, today string, b *bank.Bank, answered map[string]bool) (map[string][]Pick, error) {
+	if _, err := g.day(tx, today, b, answered); err != nil && !errors.Is(err, ErrNoQuestion) {
 		return nil, err
 	}
 	if err := g.voidDay(tx, today, b); err != nil {
