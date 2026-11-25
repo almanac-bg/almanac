@@ -5,9 +5,9 @@
 // Every API answer says the server's version (X-Almanac-Version: server/api.go); a session the server says has ended
 // ends here too; and each tab tells the others of the player it has (a BroadcastChannel). A page that has fallen behind
 // (stale) loads itself anew at the next moment that costs the player nothing: the next screen opened (router.ts,
-// loadAnew: that screen is going anyway), or the page come back into view while no game is under way (playing). Back
-// after a while away (a phone's app brought back), the page asks the server first (GET /api/me) whether it's
-// behind.
+// loadAnew: that screen is going anyway), or the page come back into view while no game is under way (playing) and no
+// report is half written (quiet). Back after a while away (a phone's app brought back), the page asks the server first
+// (GET /api/me) whether it's behind.
 
 import { api, hearing } from "./lib/api.ts";
 import { version } from "./lib/boot.ts";
@@ -22,8 +22,9 @@ const behind = (why: "version" | "session") => {
   if (!stale.peek()) stale.set(why);
 };
 
-/** A moment a reload costs nothing: no game under way. */
-const quiet = () => !playing.peek();
+/** A moment a reload costs nothing: no game under way, and nothing being written in a dialog (a question's report:
+ * the player may have gone to look up a source, and comes back to finish it). */
+const quiet = () => !playing.peek() && !document.querySelector<HTMLTextAreaElement>("dialog[open] textarea")?.value;
 
 /** Loads the page anew if it's behind and the moment is quiet. */
 function catchUp(): void {

@@ -1,7 +1,7 @@
 // A page kept current (web/src/fresh.ts): one loaded before a deploy loads anew at its next screen, never in the middle
 // of a question; a profile gone in one tab is gone in the others too.
 import { expect, type Page, test } from "@playwright/test";
-import { answer, openGame } from "./play.ts";
+import { answer, openGame, playRun } from "./play.ts";
 
 /** Marks the page as it is now: a page loaded anew no longer has the mark. */
 const mark = (page: Page) => page.evaluate(() => Object.assign(window, { before: true }));
@@ -35,6 +35,51 @@ test("a page loaded before a deploy opens its next screen by loading anew, and n
   await expect(page).toHaveURL(/\/almanac$/);
   expect(await marked(page)).toBe(false);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+});
+
+/** The page put out of view (another app, another tab) or back into it, as a phone does. */
+const inView = (page: Page, shown: boolean) =>
+  page.evaluate((shown) => {
+    Object.defineProperty(document, "hidden", { configurable: true, get: () => !shown });
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => (shown ? "visible" : "hidden"),
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+  }, shown);
+
+test("a question's report being written keeps a page behind a deploy as it is; without one, it loads anew", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await openGame(page, "/play/history");
+  await playRun(page);
+  await page.getByRole("button", { name: "Прегледай въпросите" }).click();
+  const sheet = page.locator("dialog[open]");
+  await sheet.getByRole("button", { name: "Нещо не е наред с въпроса?" }).first().click();
+  const draft = "Източникът дава друга година";
+  await sheet.locator("textarea").fill(draft);
+  await deployed(page);
+  await mark(page);
+
+  // Away for over a minute (gone to look up a source), a deploy meanwhile: back, the page asks, and is behind, but
+  // the report stays as it was.
+  await inView(page, false);
+  await page.clock.fastForward(61_000);
+  const asked = page.waitForResponse("**/api/me");
+  await inView(page, true);
+  await asked;
+  await page.clock.runFor(1000);
+  expect(await marked(page)).toBe(true);
+  await expect(sheet.locator("textarea")).toHaveValue(draft);
+
+  // The report given up on: the next return loads the page anew.
+  await sheet.locator("textarea").fill("");
+  await inView(page, false);
+  const loaded = page.waitForEvent("load");
+  await inView(page, true);
+  await loaded;
+  expect(await marked(page)).toBe(false);
 });
 
 test("a profile deleted in one tab: another tab of it loads anew as no one's", async ({ context }) => {
