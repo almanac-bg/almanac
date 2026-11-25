@@ -4,14 +4,14 @@ import { expect, test } from "@playwright/test";
 import { answer, moveOn, openGame } from "./play.ts";
 
 test("Днес that can't load tries again, by a tap", async ({ page }) => {
-  // Днес's page comes with the day in it: the day is asked for when Днес is opened from another screen. (A player:
-  // a new visitor's cover has no places.)
+  // Днес's page comes with the day in it, and Днес come back to is drawn from it (or from the day asked last): the
+  // day is asked for over nothing only when the page came in at another screen. (A player: a new visitor's cover has
+  // no places.)
   await page.goto("/");
   await page.evaluate(() => fetch("/api/guest", { method: "POST", body: "{}" }));
-  await page.reload();
-  await expect(page.locator(".issue")).toBeVisible();
+  await page.goto("/friends");
+  await expect(page.getByRole("heading", { name: "Приятели", level: 1 })).toBeVisible();
   await page.route("**/api/day", (route) => route.abort("internetdisconnected"));
-  await page.locator("nav.places-foot").getByRole("link", { name: "Приятели" }).click();
   await page.locator("nav.places-foot").getByRole("link", { name: "Днес" }).click();
   await expect(page.getByRole("alert")).toContainText("Няма връзка");
   await page.unroute("**/api/day");
