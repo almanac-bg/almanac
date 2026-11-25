@@ -37,9 +37,11 @@ import (
 // bank, or is due for review by its day (overdue), has that question replaced in its own place, the rest kept as drawn
 // (mendDay); drawn again only if a place has no question that fits it so. One of a kind the game no longer deals
 // (bank.Off) is replaced the same way, and a day after tomorrow whose question changed its kind is drawn again
-// (shaped). All the days after tomorrow are drawn again
-// when the draw's rules change (DayRules) or the bank's days and Bulgarian questions do (bank.Tail.On, BG): a day
-// drawn ahead is drawn by today's rules, never an older version's.
+// (shaped). All the days after tomorrow are drawn again when the draw's rules change (DayRules), so that a day drawn
+// ahead is drawn by today's rules, never an older version's, or the bank's dated questions do (bank.Tail.On), so that
+// each takes its date (drawnBy). Not when its questions about Bulgaria do: every day is drawn with BGFloor of them, a
+// retired one is replaced by another, and a new one changes nothing a day drawn needs; a redraw gives back what drawing
+// ahead kept from the other games, and a new Bulgarian question in nearly every batch redrew the season for nothing.
 //
 // Past the days drawn, the day and the other games keep apart by what they prefer, not by a bar: of the questions
 // that fit, the day takes one nobody has answered (drawn on its morning too: by who had as KeepDays last read it,
@@ -202,8 +204,8 @@ func (g *Game) lastMet() map[string]bool {
 }
 
 // keepToday draws today if it isn't yet (those nobody has answered first), voids today's questions the bank no longer
-// plays as the day began (day.go), and lets go of the days after tomorrow if the rules or the bank's dated and
-// Bulgarian questions changed since they were drawn (drawAhead draws them again); it says which days are stored.
+// plays as the day began (day.go), and lets go of the days after tomorrow if the rules or the bank's dated questions
+// changed since they were drawn (drawnBy: drawAhead draws them again); it says which days are stored.
 func (g *Game) keepToday(tx *sql.Tx, today string, b *bank.Bank, answered map[string]bool) (map[string][]Pick, error) {
 	if _, err := g.day(tx, today, b, answered); err != nil && !errors.Is(err, ErrNoQuestion) {
 		return nil, err
@@ -430,17 +432,19 @@ func (g *Game) DaysUsed(ctx context.Context) (Used, error) {
 	return used, err
 }
 
-// drawnBy names what the days ahead were drawn by: the rules, and the bank's dated and Bulgarian questions.
+// drawnBy names what the days ahead were drawn by: the rules, and the bank's dated questions, never its questions
+// about Bulgaria (in them, they drew the days again on 18 of the 28 bank commits that did from 15 to 24 Nov 2026: audit
+// 24 Nov, C-29.1).
 func drawnBy(b *bank.Bank) string {
-	var tagged []string
+	var dated []string
 	for _, q := range b.Live("", "") {
-		if t := q.Extra(); len(t.On) > 0 || t.BG {
-			tagged = append(tagged, fmt.Sprintf("%s %v %v", q.Base().ID, t.On, t.BG))
+		if on := q.Extra().On; len(on) > 0 {
+			dated = append(dated, fmt.Sprintf("%s %v", q.Base().ID, on))
 		}
 	}
-	slices.Sort(tagged)
+	slices.Sort(dated)
 	h := sha256.New()
-	for _, s := range tagged {
+	for _, s := range dated {
 		h.Write([]byte(s + "\n"))
 	}
 	return DayRules + " " + hex.EncodeToString(h.Sum(nil))[:16]
