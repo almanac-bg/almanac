@@ -75,6 +75,16 @@ func (u User) Drawn() bool {
 	return strings.Trim(rest, "0123456789") == ""
 }
 
+// TagDrawn is whether the player still has the tag drawn for them (draw): their animal's and four digits, or "new"
+// and nine. Name and tag are chosen apart (Rename), so each is drawn or not on its own.
+func (u User) TagDrawn() bool {
+	number := func(prefix string, n int) bool {
+		rest, ok := strings.CutPrefix(u.Tag, prefix)
+		return ok && len(rest) == n && strings.Trim(rest, "0123456789") == ""
+	}
+	return number(AnimalOf(u.ID).Tag, 4) || number("new", 9)
+}
+
 // MarshalJSON is a player as their own screen knows them: with Drawn, wherever they're sent.
 func (u User) MarshalJSON() ([]byte, error) {
 	type plain User
@@ -881,13 +891,14 @@ func (a *Accounts) Verify(ctx context.Context, p Proof, session string) (User, s
 	return u, token, nil
 }
 
-// fold moves what player `from` has into player `to` (Merge), and deletes `from`. A name `from` chose, with its tag,
-// becomes `to`'s if `to` still has the one drawn for it (Drawn): the player's own look, as the avatar is (Merge),
-// chosen beats drawn. The tag is taken once `from` is gone, since a tag is one player's.
+// fold moves what player `from` has into player `to` (Merge), and deletes `from`. A name `from` chose becomes `to`'s
+// if `to` still has the one drawn for it (Drawn), and a tag `from` chose likewise (TagDrawn), each on its own, since
+// they're chosen apart (Rename): the player's own look, as the avatar is (Merge), chosen beats drawn. The tag is taken
+// once `from` is gone, since a tag is one player's.
 func (a *Accounts) fold(tx *sql.Tx, from, to int64) error {
 	guest, account := User{ID: from}, User{ID: to}
-	if err := tx.QueryRow(`SELECT g.name, g.tag, a.name FROM users g, users a WHERE g.id = ? AND a.id = ?`, from, to).
-		Scan(&guest.Name, &guest.Tag, &account.Name); err != nil {
+	if err := tx.QueryRow(`SELECT g.name, g.tag, a.name, a.tag FROM users g, users a WHERE g.id = ? AND a.id = ?`,
+		from, to).Scan(&guest.Name, &guest.Tag, &account.Name, &account.Tag); err != nil {
 		return err
 	}
 	for _, merge := range a.Merge {
@@ -898,10 +909,17 @@ func (a *Accounts) fold(tx *sql.Tx, from, to int64) error {
 	if err := a.remove(tx, from); err != nil {
 		return err
 	}
-	if !account.Drawn() || guest.Drawn() {
+	name, tag := account.Drawn() && !guest.Drawn(), account.TagDrawn() && !guest.TagDrawn()
+	if name {
+		account.Name = guest.Name
+	}
+	if tag {
+		account.Tag = guest.Tag
+	}
+	if !name && !tag {
 		return nil
 	}
-	_, err := tx.Exec(`UPDATE users SET name = ?, tag = ? WHERE id = ?`, guest.Name, guest.Tag, to)
+	_, err := tx.Exec(`UPDATE users SET name = ?, tag = ? WHERE id = ?`, account.Name, account.Tag, to)
 	return err
 }
 
