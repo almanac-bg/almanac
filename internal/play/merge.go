@@ -31,14 +31,15 @@ var mergeSteps = []mergeStep{
 		AND NOT (kind = 'day' AND day IN (SELECT day FROM runs WHERE user_id = ?1 AND kind = 'day'))`},
 	// The guest's friends become the account's (the two aren't friends with themselves), as many as the account has
 	// room for (MaxFriends: the guest, who goes, takes none of it), the latest first: a guest's game brought along can't
-	// give it more friends than befriending could.
-	{carries: []string{"friends.user_id", "friends.friend_id"}, sql: `INSERT INTO friends (user_id, friend_id, since, asked)
-		SELECT ?1, friend_id, since, asked FROM friends WHERE user_id = ?2 AND friend_id <> ?1
+	// give it more friends than befriending could. What the guest was told of them comes along (a yes told isn't told
+	// again).
+	{carries: []string{"friends.user_id", "friends.friend_id"}, sql: `INSERT INTO friends (user_id, friend_id, since, asked, told)
+		SELECT ?1, friend_id, since, asked, told FROM friends WHERE user_id = ?2 AND friend_id <> ?1
 			AND friend_id NOT IN (SELECT friend_id FROM friends WHERE user_id = ?1)
 		ORDER BY since DESC LIMIT max(0, ` + strconv.Itoa(MaxFriends) + ` - (SELECT count(*) FROM friends WHERE user_id = ?1
 			AND friend_id <> ?2))`},
-	{sql: `INSERT OR IGNORE INTO friends (user_id, friend_id, since, asked)
-		SELECT user_id, ?1, since, asked FROM friends WHERE friend_id = ?2 AND user_id <> ?1
+	{sql: `INSERT OR IGNORE INTO friends (user_id, friend_id, since, asked, told)
+		SELECT user_id, ?1, since, asked, told FROM friends WHERE friend_id = ?2 AND user_id <> ?1
 			AND user_id IN (SELECT friend_id FROM friends WHERE user_id = ?1)`},
 	{sql: `DELETE FROM friends WHERE user_id = ?2 OR friend_id = ?2`},
 	// The guest's duels are the account's. One between the two is deleted (what's left of the guest's then): its games
@@ -56,13 +57,11 @@ var mergeSteps = []mergeStep{
 	// question met first by either is ink once at most.
 	{carries: []string{"facts.user_id"}, sql: `DELETE FROM facts WHERE user_id IN (?1, ?2)`},
 	// The guest's ranks are the account's, the higher of the two in each chapter (a rank never falls), told as the
-	// higher was; then they're counted again from the book the two share now (Merge: rewriteBook), and a rank that rises
-	// by it is told with the next news.
-	{carries: []string{"ranks.user_id"}, sql: `INSERT INTO ranks (user_id, chapter, level, quarter, ink, told)
-		SELECT ?1, chapter, level, quarter, ink, told FROM ranks WHERE user_id = ?2 AND true
+	// higher was; then they're counted again from the book the two share now (Merge: rewriteBook: the ink too), and a
+	// rank that rises by it is told with the next news.
+	{carries: []string{"ranks.user_id"}, sql: `INSERT INTO ranks (user_id, chapter, level, ink, told)
+		SELECT ?1, chapter, level, ink, told FROM ranks WHERE user_id = ?2 AND true
 		ON CONFLICT (user_id, chapter) DO UPDATE SET level = max(ranks.level, excluded.level),
-			quarter = CASE WHEN excluded.level > ranks.level THEN excluded.quarter ELSE ranks.quarter END,
-			ink = max(ranks.ink, excluded.ink),
 			told = max(ranks.told, excluded.told)`},
 	// The guest's notifications come along, with what they chose of them (unless the account has chosen), the days
 	// they were reminded on, and those on their way (but a day's reminder the account has one of). So does what they chose of mails, though a guest gets none.
@@ -91,9 +90,7 @@ var mergeSteps = []mergeStep{
 	{sql: `DELETE FROM share_asks WHERE from_id = ?2`},
 	// The questions the guest reported, still theirs.
 	{carries: []string{"reports.user_id"}, sql: `UPDATE reports SET user_id = ?1 WHERE user_id = ?2`},
-	// What the guest has been told, so that nothing is told twice: of Днес's lines, of their streak.
-	{carries: []string{"today_lines.user_id"},
-		sql: `INSERT OR IGNORE INTO today_lines (user_id, what, at) SELECT ?1, what, at FROM today_lines WHERE user_id = ?2`},
+	// What the guest has been told of their streak, so that it isn't told twice.
 	{carries: []string{"users.streak_told"},
 		sql: `UPDATE users SET streak_told = CASE WHEN substr(g.streak_told, instr(g.streak_told, ':') + 1)
 			> substr(users.streak_told, instr(users.streak_told, ':') + 1) THEN g.streak_told ELSE users.streak_told END

@@ -197,10 +197,9 @@ func (g *Game) DuelFriend(ctx context.Context, userID, friendID int64) (int64, e
 		if err != nil {
 			return err
 		}
-		data, _ := json.Marshal(picks)
 		now := g.Now()
-		res, err := tx.Exec(`INSERT INTO duels (questions, a_id, a_run, b_id, created_at, expires_at)
-			VALUES (?, ?, ?, ?, ?, ?)`, string(data), userID, r.id, friendID, store.Ms(now), store.Ms(now.Add(DuelFor)))
+		res, err := tx.Exec(`INSERT INTO duels (a_id, a_run, b_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)`,
+			userID, r.id, friendID, store.Ms(now), store.Ms(now.Add(DuelFor)))
 		if err != nil {
 			return err
 		}

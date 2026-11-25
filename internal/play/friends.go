@@ -69,7 +69,7 @@ func (g *Game) DayRights(ctx context.Context, userID int64, day string, viewer i
 
 // befriend makes two players friends (if they aren't yet) and settles any requests between them, in the write that
 // read what made them friends (a request), so that one called off meanwhile can't. a is the one who asked (whose
-// request b accepted): told of the yes (AcceptedOf).
+// request b accepted): told of the yes (AcceptedOf), once.
 func (g *Game) befriend(tx *sql.Tx, a, b int64) error {
 	if _, err := tx.Exec(`DELETE FROM friend_requests WHERE (from_id = ?1 AND (to_id = ?2
 		OR to_email = (SELECT email FROM users WHERE id = ?2))) OR (from_id = ?2 AND (to_id = ?1
@@ -346,6 +346,46 @@ func (g *Game) SawFriends(ctx context.Context, userID int64) error {
 	_, err := g.DB.Write.ExecContext(ctx, `UPDATE users SET friends_seen_at = max(friends_seen_at, ?) WHERE id = ?`,
 		store.Ms(g.Now()), userID)
 	return err
+}
+
+// AcceptedRecent is how long a friend's yes waits to be told (AcceptedOf): past it, it's old news.
+const AcceptedRecent = 7 * 24 * time.Hour
+
+// Accepted is a friend who said yes to the player's request.
+type Accepted struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
+}
+
+// AcceptedOf is the latest friend who said yes to the player's request in the last AcceptedRecent, and whose yes the
+// player hasn't been told of yet (ToldAccepted); or nil. Приятели tells it once, in a line over the friends.
+func (g *Game) AcceptedOf(ctx context.Context, userID int64) (*Accepted, error) {
+	var a Accepted
+	err := g.DB.Read.QueryRowContext(ctx, `SELECT f.friend_id, u.name FROM friends f JOIN users u ON u.id = f.friend_id
+		WHERE f.user_id = ? AND f.asked = 1 AND NOT f.told AND f.since >= ?
+		ORDER BY f.since DESC LIMIT 1`, userID, store.Ms(g.Now().Add(-AcceptedRecent))).Scan(&a.ID, &a.Name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+// ToldAccepted keeps that the player has been told of a friend's yes (AcceptedOf), on the friendship itself
+// (friends.told): it isn't told again on any device, and a friendship ended and begun again is told again.
+// ErrNotFriends if the two aren't friends.
+func (g *Game) ToldAccepted(ctx context.Context, userID, friendID int64) error {
+	res, err := g.DB.Write.ExecContext(ctx, `UPDATE friends SET told = 1 WHERE user_id = ? AND friend_id = ?`,
+		userID, friendID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFriends
+	}
+	return nil
 }
 
 // Unfriend ends a friendship, for both, and the duels open between them with it: their time is up now, and each ends

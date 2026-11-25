@@ -290,8 +290,8 @@ export const chapters = [
  * литература“) among them. Each chapter's ink is its rank's first, or as `ink` gives it. */
 export async function ranked(page: Page, level = 3, ink: Record<string, number> = {}): Promise<void> {
   await inDB(page, (db, id) => {
-    const add = db.prepare(`INSERT OR REPLACE INTO ranks (user_id, chapter, level, quarter, ink, told)
-      VALUES (?, ?, ?, 1, ?, ?)`);
+    const add = db.prepare(`INSERT OR REPLACE INTO ranks (user_id, chapter, level, ink, told)
+      VALUES (?, ?, ?, ?, ?)`);
     for (const c of chapters) add.run(id, c, level, ink[c] ?? [0, 1, 5, 15, 40][level] ?? 15, level);
   });
 }
@@ -336,8 +336,8 @@ export const longestNational = [
  * tells it (play.roseOf), as the player's best rank risen if no chapter is higher (after ranked(page, level - 1)). */
 export async function rose(page: Page, level: number, risen: string[]): Promise<void> {
   await inDB(page, (db, id) => {
-    const add = db.prepare(`INSERT OR REPLACE INTO ranks (user_id, chapter, level, quarter, ink, told)
-      VALUES (?, ?, ?, 1, ?, ?)`);
+    const add = db.prepare(`INSERT OR REPLACE INTO ranks (user_id, chapter, level, ink, told)
+      VALUES (?, ?, ?, ?, ?)`);
     for (const c of risen) add.run(id, c, level, [0, 1, 5, 15, 40][level] ?? 15, level - 1);
   });
 }

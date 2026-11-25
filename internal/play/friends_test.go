@@ -400,3 +400,67 @@ func TestFriendsAskingAtOnce(t *testing.T) {
 		}
 	}
 }
+
+// The one who asked hears once that the other said yes to their request: not the one who said yes, nor once it's old
+// news; and again after the two parted and became friends again.
+func TestAccepted(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana, bo, cy, di := w.user(), w.user(), w.user(), w.user()
+
+	// Bo says yes to Ana: Ana hears of it, Bo doesn't.
+	w.befriend(ana, bo)
+	a, err := w.g.AcceptedOf(ctx, ana)
+	if err != nil || a == nil || a.ID != bo {
+		t.Fatalf("Ana: %+v (%v)", a, err)
+	}
+	if a, _ := w.g.AcceptedOf(ctx, bo); a != nil {
+		t.Fatalf("Bo said yes, he isn't told: %+v", a)
+	}
+	if err := w.g.ToldAccepted(ctx, ana, bo); err != nil {
+		t.Fatal(err)
+	}
+	if a, _ := w.g.AcceptedOf(ctx, ana); a != nil {
+		t.Fatalf("told twice: %+v", a)
+	}
+
+	// Cy asks Ana by her tag, and she says yes: Cy hears of it.
+	if _, err := w.g.Request(ctx, cy, "player1", false); err != nil {
+		t.Fatal(err)
+	}
+	in, _, err := w.g.Requests(ctx, ana)
+	if err != nil || len(in) != 1 {
+		t.Fatalf("Ana's requests: %+v (%v)", in, err)
+	}
+	if _, err := w.g.Accept(ctx, ana, in[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if a, _ := w.g.AcceptedOf(ctx, cy); a == nil || a.ID != ana {
+		t.Fatalf("Cy: %+v", a)
+	}
+	if a, _ := w.g.AcceptedOf(ctx, ana); a != nil {
+		t.Fatalf("Ana said yes to Cy: %+v", a)
+	}
+
+	// Ana and Bo part, and Bo says yes to her again: she hears of it again.
+	if err := w.g.Unfriend(ctx, bo, ana); err != nil {
+		t.Fatal(err)
+	}
+	w.wait(time.Minute)
+	w.befriend(ana, bo)
+	if a, _ := w.g.AcceptedOf(ctx, ana); a == nil || a.ID != bo {
+		t.Fatalf("Ana, friends again: %+v", a)
+	}
+
+	// Di says yes to Bo; a week later it's old news.
+	w.befriend(bo, di)
+	w.wait(AcceptedRecent + time.Hour)
+	if a, _ := w.g.AcceptedOf(ctx, bo); a != nil {
+		t.Fatalf("old news: %+v", a)
+	}
+
+	// Told of someone not a friend: nothing to keep.
+	if err := w.g.ToldAccepted(ctx, ana, w.user()); !errors.Is(err, ErrNotFriends) {
+		t.Fatalf("a stranger: %v", err)
+	}
+}

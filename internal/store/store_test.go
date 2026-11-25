@@ -1087,3 +1087,55 @@ func TestChapters(t *testing.T) {
 	}
 	db.Close()
 }
+
+// Dead weight (0124): ranks.quarter, duels.questions, outbox.last_error and today_lines go, every row kept; a friend's
+// yes told is the asker's friendship's mark (friends.told), but a line told before a friendship that began again;
+// a guest's day once kept off friends' boards (runs.shadow = 2) is any day's, a script's game (1) still one.
+func TestDeadWeight(t *testing.T) {
+	db := openBefore(t, filepath.Join(t.TempDir(), "game.db"), "0124_dead_weight.sql")
+	for _, q := range []string{
+		`INSERT INTO users (id, name, tag, created_at, seen_at) VALUES (1, 'А', 'a', 1, 1), (2, 'Б', 'b', 1, 1),
+			(3, 'В', 'c', 1, 1), (4, 'Г', 'd', 1, 1)`,
+		// Ana asked Bo (told), Cy (not told) and Di (told, then parted and asked again since).
+		`INSERT INTO friends (user_id, friend_id, since, asked) VALUES (1, 2, 10, 1), (2, 1, 10, 0), (1, 3, 10, 1),
+			(3, 1, 10, 0), (1, 4, 50, 1), (4, 1, 50, 0)`,
+		`INSERT INTO today_lines (user_id, what, at) VALUES (1, 'friend:2', 20), (1, 'friend:4', 30), (2, 'friend:1', 20)`,
+		`INSERT INTO ranks (user_id, chapter, level, quarter, ink, told) VALUES (1, 'history', 2, 3, 13, 2)`,
+		`INSERT INTO runs (id, user_id, kind, day, questions, started_at, finished_at, shadow) VALUES
+			(10, 1, 'day', '2026-11-20', '[]', 1, 2, 2), (11, 1, 'day', '2026-11-21', '[]', 1, 2, 1),
+			(12, 2, 'day', '2026-11-21', '[]', 1, 2, 0)`,
+		`INSERT INTO duels (id, questions, a_id, a_run, b_id, created_at, expires_at) VALUES (1, '[]', 1, 10, 2, 1, 9)`,
+		`INSERT INTO outbox (message, attempts, next_at, last_error, created_at) VALUES ('{}', 1, 1, 'x@y.bg: no', 1)`,
+	} {
+		if _, err := db.Write.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	if err := db.migrateTo(migrationsThrough("0124_dead_weight.sql")); err != nil {
+		t.Fatal(err)
+	}
+	var friends, ranks, runs string
+	var duels, outbox int
+	_ = db.Read.QueryRow(`SELECT group_concat(concat_ws(' ', user_id, friend_id, told), ', ')
+		FROM (SELECT * FROM friends ORDER BY user_id, friend_id)`).Scan(&friends)
+	_ = db.Read.QueryRow(`SELECT group_concat(concat_ws(' ', user_id, chapter, level, ink, told)) FROM ranks`).Scan(&ranks)
+	_ = db.Read.QueryRow(`SELECT group_concat(id || '=' || shadow, ' ') FROM (SELECT * FROM runs ORDER BY id)`).Scan(&runs)
+	_ = db.Read.QueryRow(`SELECT count(*) FROM duels WHERE a_run = 10`).Scan(&duels)
+	_ = db.Read.QueryRow(`SELECT count(*) FROM outbox`).Scan(&outbox)
+	if friends != "1 2 1, 1 3 0, 1 4 0, 2 1 0, 3 1 0, 4 1 0" || ranks != "1 history 2 13 2" || runs != "10=0 11=1 12=0" ||
+		duels != 1 || outbox != 1 {
+		t.Fatalf("friends %q, ranks %q, runs %q, duels %d, outbox %d", friends, ranks, runs, duels, outbox)
+	}
+	for _, column := range []string{"ranks.quarter", "duels.questions", "outbox.last_error"} {
+		table, name, _ := strings.Cut(column, ".")
+		var n int
+		if _ = db.Read.QueryRow(`SELECT count(*) FROM pragma_table_info(?) WHERE name = ?`, table, name).Scan(&n); n != 0 {
+			t.Errorf("%s is still there", column)
+		}
+	}
+	var lines int
+	if _ = db.Read.QueryRow(`SELECT count(*) FROM sqlite_schema WHERE name = 'today_lines'`).Scan(&lines); lines != 0 {
+		t.Error("today_lines is still there")
+	}
+	db.Close()
+}

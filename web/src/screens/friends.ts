@@ -57,7 +57,7 @@ interface Request {
 interface Friends {
   friends: Friend[];
   requests: { in: Request[]; out: Request[] };
-  /** A friend said yes to the player's request: told once (play/lines.go). */
+  /** A friend said yes to the player's request: told once (play.AcceptedOf). */
   accepted?: Accepted | null;
 }
 

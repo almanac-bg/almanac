@@ -166,8 +166,8 @@ func TestGradedAsShown(t *testing.T) {
 	w.reload(before)
 	run = w.runOf(gal, "chapter", "geo-960")
 	w.show(gal, run)
-	sent, err := w.db.Write.Exec(`INSERT INTO duels (questions, a_id, a_run, b_id, created_at, sent_at, expires_at)
-		VALUES ('[]', ?, ?, ?, 0, 0, ?)`, gal, run, di, store.Ms(w.now.Add(time.Hour)))
+	sent, err := w.db.Write.Exec(`INSERT INTO duels (a_id, a_run, b_id, created_at, sent_at, expires_at)
+		VALUES (?, ?, ?, 0, 0, ?)`, gal, run, di, store.Ms(w.now.Add(time.Hour)))
 	if err != nil {
 		t.Fatal(err)
 	}

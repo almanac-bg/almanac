@@ -19,8 +19,8 @@ import (
 //
 // A rank is kept, never worked out on view (ranks): it's counted as a day's issue is finished (afterRun: only the
 // issue writes ink), and it never falls, whatever the bank does to the facts under it later. With it is kept the
-// chapter's ink as counted and how far it is to the next rank in quarters (Quarter); a player is shown the way from
-// one rank's ink to the next's (ChapterRank: From, NextAt) as a bar. There's no check of guessing: a tapper climbs as slowly as their ink does.
+// chapter's ink as counted; a player is shown the way from one rank's ink to the next's (ChapterRank: From, NextAt)
+// as a bar. There's no check of guessing: a tapper climbs as slowly as their ink does.
 //
 // A rank risen is told once, with the game's news (NewsOf: Rose), several at once as one; Бележка, the first, never.
 // A seal's reward is the seal itself: it unlocks nothing (an avatar is an animal: progress.go, SetAvatar), and it is
@@ -77,21 +77,14 @@ func RankName(level int) string {
 	return Ranks[len(Ranks)-1].Name + " · " + strconv.Itoa(level-len(Ranks)+1)
 }
 
-// Quarter is how many quarters of the way from a level to the next a chapter's ink is: 0 to 3.
-func Quarter(level, ink int) int {
-	from, to := RankFrom(level), RankFrom(level+1)
-	return min(3, max(0, 4*(ink-from)/(to-from)))
-}
-
 // ChapterRank is a player's rank in a chapter, as kept: its level and name, the ink it starts at (From), the
 // chapter's ink as counted then, and the next rank and the ink it starts at: the way from From to NextAt is the bar
-// beside a seal (web/src/ui.ts, standing). The quarters toward the next are the kept rank's own (countRanks).
+// beside a seal (web/src/ui.ts, standing).
 type ChapterRank struct {
 	Chapter string `json:"chapter"`
 	Level   int    `json:"level"`
 	Name    string `json:"name"`
 	From    int    `json:"from"`
-	Quarter int    `json:"-"`
 	Ink     int    `json:"ink"`
 	Next    string `json:"next"`
 	NextAt  int    `json:"nextAt"`
@@ -99,7 +92,7 @@ type ChapterRank struct {
 
 func chapterRank(chapter string, k keptRank) ChapterRank {
 	return ChapterRank{Chapter: chapter, Level: k.level, Name: RankName(k.level), From: RankFrom(k.level),
-		Quarter: k.quarter, Ink: k.ink, Next: RankName(k.level + 1), NextAt: RankFrom(k.level + 1)}
+		Ink: k.ink, Next: RankName(k.level + 1), NextAt: RankFrom(k.level + 1)}
 }
 
 // rightChance is the chance a guess at a question of each kind is right: one of four options; one of two; an order of
@@ -111,12 +104,12 @@ var rightChance = map[string]float64{"choice": 0.25, "clues": 0.25, "truefalse":
 
 // keptRank is a chapter's rank as the ranks table keeps it.
 type keptRank struct {
-	level, quarter, ink, told int
+	level, ink, told int
 }
 
 // ranksOf reads a player's kept ranks, by chapter.
 func ranksOf(ctx context.Context, db querier, userID int64) (map[string]keptRank, error) {
-	rows, err := db.QueryContext(ctx, `SELECT chapter, level, quarter, ink, told FROM ranks WHERE user_id = ?`,
+	rows, err := db.QueryContext(ctx, `SELECT chapter, level, ink, told FROM ranks WHERE user_id = ?`,
 		userID)
 	if err != nil {
 		return nil, err
@@ -126,7 +119,7 @@ func ranksOf(ctx context.Context, db querier, userID int64) (map[string]keptRank
 	for rows.Next() {
 		var c string
 		var k keptRank
-		if err := rows.Scan(&c, &k.level, &k.quarter, &k.ink, &k.told); err != nil {
+		if err := rows.Scan(&c, &k.level, &k.ink, &k.told); err != nil {
 			return nil, err
 		}
 		out[c] = k
@@ -166,15 +159,14 @@ func countRanksIn(ctx context.Context, r querier, w execer, b *bank.Bank, userID
 		if level == 0 {
 			continue
 		}
-		quarter := Quarter(level, n)
 		told := 0 // a chapter's first rank waits to be told; a rank kept already keeps what was told of it
-		if ok && level == was.level && quarter == was.quarter && n == was.ink {
+		if ok && level == was.level && n == was.ink {
 			continue
 		}
-		if _, err := w.ExecContext(ctx, `INSERT INTO ranks (user_id, chapter, level, quarter, ink, told)
-			VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT (user_id, chapter) DO UPDATE SET
-				level = max(ranks.level, excluded.level), quarter = excluded.quarter, ink = excluded.ink`,
-			userID, c.ID, level, quarter, n, told); err != nil {
+		if _, err := w.ExecContext(ctx, `INSERT INTO ranks (user_id, chapter, level, ink, told)
+			VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (user_id, chapter) DO UPDATE SET
+				level = max(ranks.level, excluded.level), ink = excluded.ink`,
+			userID, c.ID, level, n, told); err != nil {
 			return err
 		}
 	}

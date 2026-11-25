@@ -278,8 +278,8 @@ func TestAssetsGoOutCompressed(t *testing.T) {
 func TestNoSealOnTheFrame(t *testing.T) {
 	g := start(t)
 	ana, id := g.guest()
-	if _, err := g.db.Write.Exec(`INSERT INTO ranks (user_id, chapter, level, quarter, ink, told)
-		VALUES (?1, 'history', 2, 1, 7, 2), (?1, 'science', 1, 0, 2, 1)`, id); err != nil {
+	if _, err := g.db.Write.Exec(`INSERT INTO ranks (user_id, chapter, level, ink, told)
+		VALUES (?1, 'history', 2, 7, 2), (?1, 'science', 1, 2, 1)`, id); err != nil {
 		t.Fatal(err)
 	}
 	boot := bootOf(t, ana, "/friends")

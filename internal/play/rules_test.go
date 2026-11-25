@@ -134,9 +134,9 @@ func TestMergeBringsProgress(t *testing.T) {
 
 	// The guest's ranks: the higher of the two in each chapter, as a rank never falls.
 	for _, q := range []string{
-		`INSERT INTO ranks (user_id, chapter, level, quarter, ink, told) VALUES
-			(?1, 'geography', 3, 1, 18, 3), (?1, 'history', 1, 0, 2, 1)`,
-		`INSERT INTO ranks (user_id, chapter, level, quarter, ink, told) VALUES (?2, 'history', 2, 0, 6, 2)`,
+		`INSERT INTO ranks (user_id, chapter, level, ink, told) VALUES
+			(?1, 'geography', 3, 18, 3), (?1, 'history', 1, 2, 1)`,
+		`INSERT INTO ranks (user_id, chapter, level, ink, told) VALUES (?2, 'history', 2, 6, 2)`,
 	} {
 		if _, err := w.db.Write.Exec(q, guest, owner); err != nil {
 			t.Fatal(err)

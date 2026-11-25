@@ -53,7 +53,7 @@ func (s *Server) friends(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	// A friend said yes to their request: told once, here (POST /api/told).
+	// A friend said yes to their request: told once (POST /api/friends/{id}/told).
 	accepted, err := s.game.AcceptedOf(r.Context(), u.ID)
 	if err != nil {
 		return err
@@ -249,22 +249,18 @@ func (s *Server) unfriend(w http.ResponseWriter, r *http.Request) error {
 	return ok(w, map[string]bool{"ok": true})
 }
 
-// told keeps a line Днес has told the player once (play.Told): a friend's yes, what came of a duel they left.
-func (s *Server) told(w http.ResponseWriter, r *http.Request) error {
+// toldAccepted keeps that Приятели has told the player of a friend's yes (play.ToldAccepted): not told again, on any
+// device.
+func (s *Server) toldAccepted(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
 		return err
 	}
-	var in struct {
-		Line string `json:"line"`
-	}
-	if err := readJSON(r, &in); err != nil {
+	id, err := s.friendOf(r)
+	if err != nil {
 		return err
 	}
-	if err := s.game.Told(r.Context(), u.ID, in.Line); err != nil {
-		if errors.Is(err, play.ErrNoLine) {
-			return errBadRequest
-		}
+	if err := s.game.ToldAccepted(r.Context(), u.ID, id); err != nil {
 		return err
 	}
 	return ok(w, map[string]bool{"ok": true})

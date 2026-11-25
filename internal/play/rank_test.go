@@ -11,7 +11,7 @@ import (
 )
 
 // The ladder: Бележка 1, Страница 5, Тетрадка 15, Книга 40, Том 100, Летопис 250, then „Летопис · N“ for each
-// further 100; the quarters between two ranks are kept with a rank.
+// further 100.
 func TestRankLadder(t *testing.T) {
 	for _, c := range []struct {
 		ink, level int
@@ -28,25 +28,17 @@ func TestRankLadder(t *testing.T) {
 			t.Errorf("level %d starts at %d, which makes %d", c.level, RankFrom(c.level), RankAt(RankFrom(c.level)))
 		}
 	}
-	for _, c := range []struct{ level, ink, q int }{
-		{2, 5, 0}, {2, 7, 0}, {2, 8, 1}, {2, 10, 2}, {2, 13, 3}, {2, 14, 3}, {2, 30, 3}, {6, 275, 1}, {7, 449, 3},
-	} {
-		if q := Quarter(c.level, c.ink); q != c.q {
-			t.Errorf("level %d at %d ink: quarter %d, want %d", c.level, c.ink, q, c.q)
-		}
-	}
 }
 
 // A rank as the client gets it says the way to the next one: the ink its rank starts at, the chapter's ink and the
 // ink the next starts at, the bar between them (web/src/ui.ts, standing), before a first rank and past Летопис too.
-// The quarters are the kept rank's own, never sent.
 func TestRankSaysItsWay(t *testing.T) {
 	for _, c := range []struct {
 		k    keptRank
 		want string
 	}{
 		{keptRank{}, `{"chapter":"history","level":0,"name":"","from":0,"ink":0,"next":"Бележка","nextAt":1}`},
-		{keptRank{level: 2, quarter: 3, ink: 13}, `{"chapter":"history","level":2,"name":"Страница","from":5,"ink":13,` +
+		{keptRank{level: 2, ink: 13}, `{"chapter":"history","level":2,"name":"Страница","from":5,"ink":13,` +
 			`"next":"Тетрадка","nextAt":15}`},
 		{keptRank{level: 7, ink: 413}, `{"chapter":"history","level":7,"name":"Летопис · 2","from":350,"ink":413,` +
 			`"next":"Летопис · 3","nextAt":450}`},
@@ -164,7 +156,7 @@ func TestRanksFromInk(t *testing.T) {
 		w.countRanks(u)
 	}
 	for _, u := range []int64{tapper, reader} {
-		if r := w.rankIn(u, "geography"); r.Level != 3 || r.Name != "Тетрадка" || r.Ink != 20 || r.Quarter != 0 ||
+		if r := w.rankIn(u, "geography"); r.Level != 3 || r.Name != "Тетрадка" || r.Ink != 20 ||
 			r.Next != "Книга" || r.NextAt != 40 {
 			t.Fatalf("player %d's geography: %+v", u, r)
 		}

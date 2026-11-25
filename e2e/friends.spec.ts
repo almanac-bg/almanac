@@ -235,6 +235,12 @@ test("friends by tag: a name and a tag of one's own, a request, a yes", async ({
   await b.reload();
   await expect(b.locator(".friend")).toHaveCount(1);
   await expect(yes).toHaveCount(0);
+  // Nor on another device of his: told once is told everywhere (play.ToldAccepted).
+  const other = await (await browser.newContext({ storageState: await b.context().storageState() })).newPage();
+  await other.goto("/friends");
+  await expect(other.locator(".friend")).toHaveCount(1);
+  await expect(other.locator(".friends .accepted-notice")).toHaveCount(0);
+  await other.context().close();
   await b.goto("/");
   await expect(b.locator(".day")).toBeVisible();
   await expect(b.locator(".notices")).toBeEmpty();
