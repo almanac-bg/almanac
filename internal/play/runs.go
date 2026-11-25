@@ -13,9 +13,9 @@ import (
 	"github.com/almanac-bg/almanac/internal/store"
 )
 
-// day reads a day's questions, drawing them the first time the day is asked for; on the day itself, each kept as it
-// is as the day begins (pinDay).
-func (g *Game) day(tx *sql.Tx, day string, b *bank.Bank) ([]Pick, error) {
+// day reads a day's questions, drawing them the first time the day is asked for (of those that fit, one nobody has
+// answered first: answered, ahead.go); on the day itself, each kept as it is as the day begins (pinDay).
+func (g *Game) day(tx *sql.Tx, day string, b *bank.Bank, answered map[string]bool) ([]Pick, error) {
 	var stored string
 	err := tx.QueryRow(`SELECT questions FROM days WHERE day = ?`, day).Scan(&stored)
 	if err == nil {
@@ -38,7 +38,7 @@ func (g *Game) day(tx *sql.Tx, day string, b *bank.Bank) ([]Pick, error) {
 			used[p.ID] = true
 		}
 	}
-	picks, _ := drawDay(b, day, used, nil, recentSubjects(b, days, day), mrand.New(mrand.NewPCG(newSeed(), newSeed())))
+	picks, _ := drawDay(b, day, used, answered, recentSubjects(b, days, day), mrand.New(mrand.NewPCG(newSeed(), newSeed())))
 	if len(picks) == 0 {
 		return nil, ErrNoQuestion
 	}
@@ -107,7 +107,7 @@ func (g *Game) StartDay(ctx context.Context, userID int64) (State, error) {
 		today := g.Today()
 		r, err := scanRun(tx.QueryRow(`SELECT `+runColumns+` FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?`, userID, today))
 		if errors.Is(err, ErrNoRun) {
-			picks, derr := g.day(tx, today, g.Bank())
+			picks, derr := g.day(tx, today, g.Bank(), g.lastMet())
 			if derr != nil {
 				return derr
 			}

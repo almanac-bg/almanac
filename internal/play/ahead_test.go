@@ -496,3 +496,76 @@ func TestDayTurnsWhileTheDaysAreDrawn(t *testing.T) {
 		t.Errorf("%d days ahead of the new day drawn, %d stored before", len(after), len(before))
 	}
 }
+
+// A day drawn on its morning, not ahead, takes of the questions that fit one nobody has answered, as a day drawn ahead
+// does: when KeepDays draws it (keepToday), and when a player's game draws it first, by who had as KeepDays last read
+// them (lastMet). Here the day turns while the days ahead are written, so none is: the new today is the player's to
+// draw. Drawn by nobody's answers, about half of each day had been answered, with an unanswered question of its place
+// left (audit 24 Nov 2026, A25a-1).
+func TestDayOnItsMorningPrefersNeverOpened(t *testing.T) {
+	w := setup(t)
+	w.use(biggerSample(t, 20))
+	ctx := t.Context()
+	answered := map[string]bool{}
+	ana := w.user()
+	if err := w.db.Tx(ctx, func(tx *sql.Tx) error {
+		res, err := tx.Exec(`INSERT INTO runs (user_id, kind, chapter, questions, at, started_at, finished_at)
+			VALUES (?, 'chapter', ?, '[]', 0, 0, 0)`, ana, MixChapter)
+		if err != nil {
+			return err
+		}
+		run, _ := res.LastInsertId()
+		for i, q := range w.b.Live("", "") {
+			if i%2 == 0 {
+				answered[q.Base().ID] = true
+				if _, err := tx.Exec(`INSERT INTO answers (run_id, n, question_id, score, is_right, ms, at)
+					VALUES (?, ?, ?, 0, 0, 4000, 0)`, run, i/2, q.Base().ID); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var once sync.Once
+	w.g.drawn = func(string) { once.Do(func() { w.wait(24 * time.Hour) }) }
+	if err := w.g.EnsureDays(ctx); err != nil {
+		t.Fatal(err)
+	}
+	w.g.drawn = nil
+	today := w.g.Today()
+	if _, err := w.g.StartDay(ctx, w.user()); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := storedDays(mustTx(t, w), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if was := DayShift(today, -1); len(stored) != 2 || len(stored[was]) != Length || len(stored[today]) != Length {
+		t.Fatalf("days stored: %d (the day that ended %d questions, the new today %d)", len(stored), len(stored[was]),
+			len(stored[today]))
+	}
+	used := map[string]bool{}
+	for _, picks := range stored {
+		for _, p := range picks {
+			used[p.ID] = true
+		}
+	}
+	for day, picks := range stored {
+		for _, p := range picks {
+			if !answered[p.ID] {
+				continue
+			}
+			q, _ := w.b.Get(p.ID)
+			for _, o := range w.b.Live(q.Base().Category, q.Base().Type) {
+				if !answered[o.Base().ID] && !used[o.Base().ID] && o.Base().Difficulty == q.Base().Difficulty &&
+					bank.HasPictures(o) == bank.HasPictures(q) && w.b.Estimate(o) == w.b.Estimate(q) &&
+					len(o.Extra().On) == 0 {
+					t.Errorf("%s took %s, answered before, over %s, never", day, p.ID, o.Base().ID)
+					break
+				}
+			}
+		}
+	}
+}
