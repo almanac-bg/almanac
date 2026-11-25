@@ -102,10 +102,11 @@ func (s *Server) admin(w http.ResponseWriter, r *http.Request) {
 	data := struct {
 		Players, WithEmail, DayToday, DayScripted, Questions, Live int
 		Days                                                       []dayRow
+		Pooled                                                     dayRow
 	}{Questions: len(b.Questions), Live: len(b.Live("", ""))}
 	today := s.game.Today()
 	var err error
-	if data.Days, err = s.dayRows(ctx); err != nil {
+	if data.Days, data.Pooled, err = s.dayRows(ctx); err != nil {
 		slog.Error("admin: the days", "err", err)
 	}
 	_ = db.QueryRowContext(ctx, `SELECT count(*), count(email) FROM users`).Scan(&data.Players, &data.WithEmail)

@@ -182,7 +182,7 @@ func TestNewByLink(t *testing.T) {
 	_, link := sharedLink(g)
 	byLink := func() int {
 		t.Helper()
-		rows, err := g.srv.dayRows(t.Context())
+		rows, _, err := g.srv.dayRows(t.Context())
 		if err != nil || len(rows) == 0 {
 			t.Fatal(err)
 		}
@@ -244,23 +244,24 @@ func TestNewByLink(t *testing.T) {
 		play.DayShift(g.srv.game.Today(), -100)); err != nil {
 		t.Fatal(err)
 	}
-	rows, _ := g.srv.dayRows(t.Context())
+	rows, _, _ := g.srv.dayRows(t.Context())
 	isNew := rows[0].New
 	again, _ := g.guest()
 	day(again, link, 3*time.Second)
-	if rows, _ := g.srv.dayRows(t.Context()); rows[0].ByLink != 4 || rows[0].New != isNew+1 {
+	if rows, _, _ := g.srv.dayRows(t.Context()); rows[0].ByLink != 4 || rows[0].New != isNew+1 {
 		t.Fatalf("a new guest by a link: %d by a link, %d new (were %d)", rows[0].ByLink, rows[0].New, isNew)
 	}
 	again.signIn("old@example.com")
-	if rows, _ := g.srv.dayRows(t.Context()); rows[0].ByLink != 3 || rows[0].New != isNew {
+	if rows, _, _ := g.srv.dayRows(t.Context()); rows[0].ByLink != 3 || rows[0].New != isNew {
 		t.Fatalf("signed in to an older profile: %d by a link, %d new (want 3, %d)", rows[0].ByLink, rows[0].New, isNew)
 	}
 	// On /admin, beside the days shared.
 	if _, err := g.db.Write.Exec(`UPDATE users SET admin = 1`); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, body := fresh.get("/admin", browserUA); !strings.Contains(body, "<th class=\"num\">Нови по връзка</th>") {
-		t.Fatalf("/admin has no „Нови по връзка“:\n%s", body)
+	if _, _, body := fresh.get("/admin", browserUA); !strings.Contains(body, "<th class=\"num\">Нови по връзка</th>") ||
+		!strings.Contains(body, "<td><strong>Общо</strong></td>") {
+		t.Fatalf("/admin has no „Нови по връзка“, or no days pooled:\n%s", body)
 	}
 }
 
