@@ -42,34 +42,33 @@ func (g *Game) DayRights(ctx context.Context, userID int64, day string, viewer i
 	return rights, err == nil, err
 }
 
-// befriend makes two players friends (if they aren't yet), settles any requests between them, and awards what that
-// earns them. a is the one who asked (whose request b accepted): told of the yes (AcceptedOf).
-func (g *Game) befriend(ctx context.Context, a, b int64) error {
-	return g.DB.Tx(ctx, func(tx *sql.Tx) error {
-		if _, err := tx.Exec(`DELETE FROM friend_requests WHERE (from_id = ?1 AND (to_id = ?2
-			OR to_email = (SELECT email FROM users WHERE id = ?2))) OR (from_id = ?2 AND (to_id = ?1
-			OR to_email = (SELECT email FROM users WHERE id = ?1)))`, a, b); err != nil {
-			return err
-		}
-		var already bool
-		if err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM friends WHERE user_id = ? AND friend_id = ?)`, a, b).
-			Scan(&already); err != nil || already {
-			return err
-		}
-		for _, who := range []int64{a, b} {
-			var n int
-			if err := tx.QueryRow(`SELECT count(*) FROM friends WHERE user_id = ?`, who).Scan(&n); err != nil {
-				return err
-			}
-			if n >= MaxFriends {
-				return ErrManyFriends
-			}
-		}
-		now := store.Ms(g.Now())
-		_, err := tx.Exec(`INSERT OR IGNORE INTO friends (user_id, friend_id, since, asked) VALUES (?, ?, ?, 1), (?, ?, ?, 0)`,
-			a, b, now, b, a, now)
+// befriend makes two players friends (if they aren't yet) and settles any requests between them, in the write that
+// read what made them friends (a request), so that one called off meanwhile can't. a is the one who asked (whose
+// request b accepted): told of the yes (AcceptedOf).
+func (g *Game) befriend(tx *sql.Tx, a, b int64) error {
+	if _, err := tx.Exec(`DELETE FROM friend_requests WHERE (from_id = ?1 AND (to_id = ?2
+		OR to_email = (SELECT email FROM users WHERE id = ?2))) OR (from_id = ?2 AND (to_id = ?1
+		OR to_email = (SELECT email FROM users WHERE id = ?1)))`, a, b); err != nil {
 		return err
-	})
+	}
+	var already bool
+	if err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM friends WHERE user_id = ? AND friend_id = ?)`, a, b).
+		Scan(&already); err != nil || already {
+		return err
+	}
+	for _, who := range []int64{a, b} {
+		var n int
+		if err := tx.QueryRow(`SELECT count(*) FROM friends WHERE user_id = ?`, who).Scan(&n); err != nil {
+			return err
+		}
+		if n >= MaxFriends {
+			return ErrManyFriends
+		}
+	}
+	now := store.Ms(g.Now())
+	_, err := tx.Exec(`INSERT OR IGNORE INTO friends (user_id, friend_id, since, asked) VALUES (?, ?, ?, 1), (?, ?, ?, 0)`,
+		a, b, now, b, a, now)
+	return err
 }
 
 // Sent is what came of a friend request: sent, or (when the other had asked first) friends at once.
@@ -126,8 +125,11 @@ func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool)
 	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
 		if other != 0 {
 			if err := tx.QueryRow(`SELECT EXISTS (SELECT 1 FROM friend_requests WHERE from_id = ?
-				AND (to_id = ? OR to_email = ?))`, other, from, mine.String).Scan(&crossed); err != nil || crossed {
+				AND (to_id = ? OR to_email = ?))`, other, from, mine.String).Scan(&crossed); err != nil {
 				return err
+			}
+			if crossed {
+				return g.befriend(tx, other, from)
 			}
 		}
 		// Waiting is one by tag: one by a link to the same player is a request apart, which says nothing of whom.
@@ -150,16 +152,15 @@ func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool)
 			from, other, now)
 		return err
 	})
-	if err == nil && crossed {
-		if err := g.befriend(ctx, other, from); err != nil {
-			return Sent{}, err
-		}
-		return Sent{Friends: true, Name: name}, nil
-	}
-	if byEmail {
+	switch {
+	case err != nil:
 		return Sent{}, err
+	case crossed:
+		return Sent{Friends: true, Name: name}, nil
+	case byEmail:
+		return Sent{}, nil
 	}
-	return Sent{Name: name, New: !waiting, To: other}, err
+	return Sent{Name: name, New: !waiting, To: other}, nil
 }
 
 // FriendRequest is a friend request as one of the two sees it: who asked (to the one asked), or whom it went to (to
@@ -225,22 +226,28 @@ func (g *Game) Requests(ctx context.Context, userID int64) (in, out []FriendRequ
 	return in, out, rows.Err()
 }
 
-// Accept says yes to a friend request sent to this player: the two are friends.
+// Accept says yes to a friend request sent to this player: the two are friends. The request is read in the write that
+// makes them friends: one its sender has called off is ErrNoRequest, however close the two came.
 func (g *Game) Accept(ctx context.Context, userID, requestID int64) (name string, err error) {
-	var from int64
-	err = g.DB.Read.QueryRowContext(ctx, `SELECT r.from_id, u.name FROM friend_requests r JOIN users u ON u.id = r.from_id
-		WHERE r.id = ?1 AND (r.to_id = ?2 OR r.to_email = (SELECT email FROM users WHERE id = ?2)) AND NOT r.declined`,
-		requestID, userID).Scan(&from, &name)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", ErrNoRequest
-	}
+	err = g.DB.Tx(ctx, func(tx *sql.Tx) error {
+		var from int64
+		err := tx.QueryRow(`SELECT r.from_id, u.name FROM friend_requests r JOIN users u ON u.id = r.from_id
+			WHERE r.id = ?1 AND (r.to_id = ?2 OR r.to_email = (SELECT email FROM users WHERE id = ?2)) AND NOT r.declined`,
+			requestID, userID).Scan(&from, &name)
+		switch {
+		case errors.Is(err, sql.ErrNoRows):
+			return ErrNoRequest
+		case err != nil:
+			return err
+		case from == userID:
+			return ErrSelf
+		}
+		return g.befriend(tx, from, userID)
+	})
 	if err != nil {
 		return "", err
 	}
-	if from == userID {
-		return "", ErrSelf
-	}
-	return name, g.befriend(ctx, from, userID)
+	return name, nil
 }
 
 // Withdraw drops a friend request: its sender calls it off, or the one asked says no (the sender isn't told). A no to

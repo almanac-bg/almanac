@@ -1013,7 +1013,6 @@ func TestDuelScore(t *testing.T) {
 	}
 }
 
-// befriend makes two players friends: a asked, b said yes.
 // requestsIn is how many friend requests wait for a player's answer.
 func (w *world) requestsIn(user int64) int {
 	w.t.Helper()
@@ -1024,9 +1023,10 @@ func (w *world) requestsIn(user int64) int {
 	return len(in)
 }
 
+// befriend makes two players friends: a asked, b said yes.
 func (w *world) befriend(a, b int64) {
 	w.t.Helper()
-	if err := w.g.befriend(w.t.Context(), a, b); err != nil {
+	if err := w.db.Tx(w.t.Context(), func(tx *sql.Tx) error { return w.g.befriend(tx, a, b) }); err != nil {
 		w.t.Fatal(err)
 	}
 }
