@@ -299,14 +299,11 @@ function land(card: HTMLElement, d: DuelView): void {
   void feel.duel(card, { mine: rights(d.you), theirs: rights(d.opponent), end }, hands());
 }
 
-/** One of the player's two groups of duels in Приятели (`which`), under its heading, or nothing while it's empty. The
- * open ones („Чакащи дуели (N)“, at the page's top: a duel to play stays first there until it's played): the duels to
- * play, all in one stack, in the order they were challenged (the first on top, its „Играй“ the page's one action),
- * then those waiting for a friend, each card saying whose turn it is. Those played („Завършени дуели“, under the
- * friends), the last ten, which the heading says once there are that many. The one named in the address (`top`: just
- * played, or an old link to it) is first in its own: a result first of the played, one sent first of those waiting
- * for a friend; what its game brought under it (`under`: game/news.ts), its result landing once, brought into sight
- * once a visit (`sight`: one object for the visit, marked done). */
+/** One of the player's two groups of duels in Приятели (`which`: „Чакащи дуели“, „Завършени дуели“), under its
+ * heading, or nothing while it's empty; what each holds and in what order is DESIGN.md's („Places“: Приятели). The
+ * one named in the address (`top`: just played, or an old link to it) is first in its own, what its game brought
+ * under it (`under`: game/news.ts), its result landing once, brought into sight once a visit (`sight`: one object for
+ * the visit, marked done). */
 export function duelGroup(
   which: "open" | "played",
   d: Duels,

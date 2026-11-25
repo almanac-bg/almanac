@@ -2,8 +2,8 @@
 # client under its size ceiling) — a couple of minutes, all a pull request waits for. The race detector runs beside
 # them over the same tests (about eight minutes): not required, as its failure is rare and goes to main's red.
 # After a merge, on main, the game is also played in Chromium, WebKit and Firefox (about 10 minutes): it doesn't
-# hold anything up, and a failure there is fixed with the next change. Run it on a branch by hand (Actions → CI →
-# Run workflow) when a change is risky for the browsers.
+# hold anything up; whoever sees a failure there fixes it, at once (CLAUDE.md, Shipping). Run it on a branch by hand
+# (Actions → CI → Run workflow) when a change is risky for the browsers.
 # Once a week, on main, the checks run by themselves (not the race detector nor the browsers, whose rare failures a
 # session meets at the next merge): in a quiet spell with no merge, a newly known vulnerability (Go's own library
 # included) or a test the calendar broke still fails, and GitHub mails a failed scheduled run to whoever last changed

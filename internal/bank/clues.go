@@ -7,9 +7,8 @@ import (
 )
 
 // Clues is „Подсказки“: three clues to one answer, from the hardest to the easiest, and four options from the start.
-// The clues come one at a time as the question's time runs (ClueEvery apart), and a right answer is worth more the
-// fewer clues it took: knowing it from the first clue is knowing it well. A wrong answer ends the question, as any
-// answer does.
+// The clues come one at a time as the question's time runs (ClueEvery apart). A wrong answer ends the question, as any
+// answer does. The kind is off (Off: DECISIONS.md, „The kinds“): its questions stay in the bank, never dealt.
 type Clues struct {
 	Head
 	// Clues go from the hardest to the easiest; the last one alone should give it away to most.

@@ -2,6 +2,7 @@
 //
 //	almanac serve                       run the game
 //	almanac bank check [-sample] [-used file] [-live dir] [dir]  check a question bank (what a server would refuse, and the bank's rules), its runway
+//	almanac bank lint [-rule R,…] [-summary] [dir]  the bank's editorial rules: each warning, or only their count by rule
 //	almanac bank fmt [dir]              rewrite a bank's files in their one format
 //	almanac bank subjects [dir]         the subjects that come back, all of them (check shows the top)
 //	almanac bank related [-n N] [-json] [-from batches] [ids…] [dir]   each question with the ones most like it, to read for giveaways

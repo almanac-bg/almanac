@@ -1,10 +1,8 @@
-// Приятели, one of the three places (DESIGN.md, Places), one page with no tabs (owner, 2026-11-22: both in sight at
-// once): who asks to be friends; the duels open („Чакащи дуели“: a friend's waiting for you first, yours waiting for
-// them), first while there are any, for a duel to play stays first here until it's played; the friends, each with
-// their day, the duels between you and „Дуел“ (the one way to start one here), and the one way to make more (by
-// потребителско име or email, one's own said under it); and the last ten duels played („Завършени дуели“, compact rows). Each duel holds all
-// there is of it (screens/duelcards.ts). A duel named in the address (`?duel=<id>`: one just played, or an old link
-// to it: screens/duel.ts) is first in its group. The day's board is on Днес's result (today.ts, dayBoard).
+// Приятели, one of the three places, one page with no tabs (owner, 2026-11-22: both in sight at once): requests, the
+// duels open, the friends and the way to add one, the duels finished, in the order DESIGN.md („Places“) and
+// DECISIONS.md (duels, friends) give. Each duel is its card (screens/duelcards.ts); one named in the address
+// (`?duel=<id>`: just played, or an old link to it: screens/duel.ts) is first in its group. The day's board is on
+// Днес's result (today.ts, dayBoard).
 
 import { news } from "../game/news.ts";
 import { shareWordsOut } from "../game/share.ts";

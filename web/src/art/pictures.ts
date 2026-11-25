@@ -79,7 +79,7 @@ const chest = "M25 66C25.5 57 28.5 52.5 32 52.5C35.5 52.5 38.5 57 39 66V72H25Z";
 const chinShadow = E(33, 51.5, 13.5, 4.4);
 const chin: Layer = ["ks", chinShadow];
 
-// ---- Avatars: fifteen animals, each anyone's from the first day (play.Animals). Each is a bust on a tile of its
+// ---- Avatars: fifteen animals, each anyone's from the first day (account.Animals). Each is a bust on a tile of its
 // scene, in its own colours (app.css, .tone-natural.sh-<shape>: k1 its darkest fur, k2 its fur, k4 and k5 its pale
 // parts, ka and kb its own accents), drawn to one sheet: a skull 34–38 wide about x = 32, the eyes at y 32–36, the
 // shoulders the same for all, the light on its upper left and its shadow under the chin.

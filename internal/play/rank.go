@@ -13,8 +13,7 @@ import (
 // The seal (DECISIONS.md, „The direction“, as the Fable review amended it): a player's seal in a chapter says how much
 // of it their book holds in ink (ink.go). Its states are named for the book, not the person: Бележка at 1, Страница
 // at 5, Тетрадка at 15, Книга at 40, Том at 100, Летопис at 250, then „Летопис · 2“ at 350 and another for each
-// further 100 (RankAt). With a player only the seal shows, on their avatar's corner, never its word: the word is the
-// Алманах's and a rank-up's.
+// further 100 (RankAt). A seal's word (its rank's name) is the Алманах's, Профил's and a rank-up's.
 // The seals are the only levels, titles and unlocks the game has. In code a seal's state is its rank.
 //
 // A rank is kept, never worked out on view (ranks): it's counted as a day's issue is finished (afterRun: only the

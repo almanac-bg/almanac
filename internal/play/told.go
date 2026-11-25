@@ -16,12 +16,12 @@ import (
 //   - A game's news belongs to that game (NewsOf): its result tells it as it ends. A game that ended without its result
 //     on screen (the day's last question let run out with the tab in the background, or a game left at its last
 //     question) has its news told on Днес instead, once (Untold), and not after some later game.
-//   - What came of the days just missed (the week forgave one, or the streak ended) is said once (StreakNotice,
-//     TellStreak). A player back after days away (BackFrom) is welcomed back once, with the longest streak they've
-//     had, in the same way.
+//   - What came of the days just missed (the week forgave one, or the streak ended) is said once (TellStreak; Днес's
+//     streakNotice). A player back after days away (Away) is welcomed back once, in the same way, never with a
+//     streak's number (an ended one is never named).
 
 // UntoldWithin is how long a game's untold news waits for Днес: older, it's let go (what it brought is the player's
-// all the same, and its notes are told with the next game's news).
+// all the same).
 const UntoldWithin = 3 * 24 * time.Hour
 
 // Untold is the latest game the player finished whose news hasn't been told (0 for none): Днес tells it (NewsOf
@@ -40,8 +40,8 @@ func (g *Game) Untold(ctx context.Context, userID int64) (int64, error) {
 // before a player came back, BackFrom).
 var streakKey = regexp.MustCompile(`^(forgiven|ended|back):\d{4}-\d{2}-\d{2}$`)
 
-// BackFrom is how many days after the last day played a player who comes back is welcomed back (BackOf): two days
-// missed or more, so further back than a streak's end that Днес tells (StreakNotice).
+// BackFrom is how many days after the last day played a player who comes back is welcomed back (Away): two days
+// missed or more, so further back than a streak's end that Днес tells.
 const BackFrom = 3
 
 // LastDay is the last day before today that a player finished the day's ten on ("" for none).

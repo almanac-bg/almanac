@@ -10,7 +10,7 @@ import (
 )
 
 // news tells the player, once, what's new since they last looked (play.NewsOf): the milestones noted in their book;
-// and, for the game they just played (run), the facts it put in their Алманах and how it moved a chapter's mastery.
+// and, for the game they just played (run), the facts it put in their Алманах (mastery is never shown).
 func (s *Server) news(w http.ResponseWriter, r *http.Request) error {
 	u, err := s.mustUser(r)
 	if err != nil {
