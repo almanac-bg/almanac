@@ -15,10 +15,8 @@ import (
 // counts in its score. Every other fact met is in the book in grey, as met: a miss in the issue, any answer (right or
 // not, or let run out) in a chapter's game, a duel, and a right answer in the issue to a question met
 // before. Grey is never counted and never turns to ink: nothing is ink twice, and nothing played before is ink at
-// all. A game played at a script's speed (ShadowScript, fair.go) writes nothing. The other shadows are a person's own
-// game (fair.go: their own numbers are theirs): a guest's day brought to an account (ShadowGuest) is written by the
-// same rule. A question that counts for nobody
-// in its day (Pick.Void, day.go) writes nothing, and what it wrote goes when it's voided. The issue played a second
+// all. A game played at a script's speed (ShadowScript, fair.go) writes nothing. A question that counts for nobody in
+// its day (Pick.Void, day.go) writes nothing, and what it wrote goes when it's voided. The issue played a second
 // time in one browser (runs.pencil: SecondPlay, the day's answers in sight there) writes grey. A fact is written once.
 //
 // The book keeps what was written (facts: the player, the question, ink or not, when, and the game), so that a

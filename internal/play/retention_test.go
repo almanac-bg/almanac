@@ -28,28 +28,18 @@ func (w *world) stored(user int64, kind, day string, finished, scripted bool) {
 	}
 }
 
-// shadowed puts a game straight in the database, as stored does, a shadow for the reason given.
-func (w *world) shadowed(user int64, day string, shadow int) {
-	w.t.Helper()
-	w.stored(user, "chapter", day, true, false)
-	if _, err := w.db.Write.Exec(`UPDATE runs SET shadow = ? WHERE id = (SELECT max(id) FROM runs WHERE user_id = ?)`,
-		shadow, user); err != nil {
-		w.t.Fatal(err)
-	}
-}
-
 // /admin counts people (review 2026-11-18, D1): not a player at a script's speed, nor an admin; a gone player's days
-// still, as nobody's. A guest's day brought to an account (ShadowGuest) counts.
+// still, as nobody's.
 func TestPeopleDays(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	ana, script, admin, brought := w.user(), w.user(), w.user(), w.user()
+	ana, script, admin, bo := w.user(), w.user(), w.user(), w.user()
 	w.stored(ana, "chapter", "2026-11-11", true, false)
 	w.stored(ana, "day", "2026-11-12", true, false)
 	w.stored(script, "day", "2026-11-12", true, true)
 	w.stored(admin, "day", "2026-11-12", true, false)
 	_, _ = w.db.Write.Exec(`UPDATE users SET admin = 1 WHERE id = ?`, admin)
-	w.shadowed(brought, "2026-11-12", ShadowGuest)
+	w.stored(bo, "chapter", "2026-11-12", true, false)
 	_, _ = w.db.Write.Exec(`INSERT INTO active_days (user_id, day) VALUES (-999, '2026-11-12')`) // one gone
 	// A day kept with no game that day to tell it by (a game begun the evening before, say, long before): not counted.
 	_, _ = w.db.Write.Exec(`INSERT INTO active_days (user_id, day) VALUES (?, '2026-11-10')`, ana)
@@ -59,14 +49,14 @@ func TestPeopleDays(t *testing.T) {
 		t.Fatal(err)
 	}
 	if n := playedOn(act, "2026-11-12"); n != 3 {
-		t.Fatalf("people on the 12th: %d, want Ана, the one brought and the one gone", n)
+		t.Fatalf("people on the 12th: %d, want Ана, Бо and the one gone", n)
 	}
 	if playedOn(act, "2026-11-10") != 0 || act.first(ana) != "2026-11-11" {
 		t.Fatalf("Ана's first day: %q", act.first(ana))
 	}
 	// Who played before the days read isn't new in them.
 	act, _ = w.g.Activity(ctx, "2026-11-12")
-	if act.first(ana) != "" || act.first(brought) != "2026-11-12" {
+	if act.first(ana) != "" || act.first(bo) != "2026-11-12" {
 		t.Fatal("played before the days read")
 	}
 }

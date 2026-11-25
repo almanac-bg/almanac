@@ -19,9 +19,7 @@ import (
 //
 // A marked run is a shadow (runs.shadow, ShadowScript): its player sees it as any other game, with its score, and
 // their place among the others as if it were in, and nothing tells them otherwise; for everyone else it isn't there.
-// One other run is a shadow, for another reason (ShadowGuest): a day's run a guest played and brought to an account
-// that was there already, signing in (merge.go). Whoever played the day as several guests could otherwise sign in
-// from the best of them, and the day's one game would be the best of many. It's left out of:
+// It's left out of:
 //   - the day's board, its count of players and its places, and friends' results of the day (BoardOf, FriendsBoard,
 //     FriendsOf; fairFor);
 //   - the questions' statistics: how players answered each (crowd.go), how hard each is (hardness, Calibrate) and
@@ -30,18 +28,12 @@ import (
 // What it isn't left out of: the player's own numbers (their profile, Алманах, streak), which are
 // theirs; and a duel, which is between two who know each other.
 
-// Why a run is a shadow (runs.shadow; 0: it isn't one).
-const (
-	// ShadowScript is a run played at a script's speed (scriptPaced).
-	ShadowScript = 1
-	// ShadowGuest is a day's run a guest brought to an account that was there when it was played (merge.go).
-	ShadowGuest = 2
-)
+// ShadowScript is a shadow run (runs.shadow; 0: it isn't one): one played at a script's speed (scriptPaced).
+const ShadowScript = 1
 
 // People is a SQL condition on a run (its columns, unaliased) that /admin counts it as a player's game: one population
 // on the whole page, the same that its days played are (retention.go, personDays). Not one at a script's speed
-// (ShadowScript), nor an admin's (whoever keeps the game, trying it). A guest's day brought to an account
-// (ShadowGuest) was a person's, and counts, once: only one game of a day is ever an account's.
+// (ShadowScript), nor an admin's (whoever keeps the game, trying it).
 var People = personRun + ` AND user_id NOT IN (SELECT id FROM users WHERE admin)`
 
 // personRun is People without the admins: not the shadow that isn't a person's game (ShadowScript; TestPeopleDays

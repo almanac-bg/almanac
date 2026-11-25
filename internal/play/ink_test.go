@@ -286,8 +286,8 @@ func TestFactsAsTheRule(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// A guest who signs in mid-issue to an account that was there already (its day a ShadowGuest, fair.go) goes on
-	// writing ink for the rest of it, as answer by answer and by the rule (review 2026-11-20: it wrote nothing).
+	// A guest who signs in mid-issue to an account that was there already goes on writing ink for the rest of it, as
+	// answer by answer and by the rule (review 2026-11-20: it wrote nothing).
 	w.wait(24 * time.Hour)
 	cy, guest := w.user(), w.user()
 	w.since(cy, 30*24*time.Hour)
@@ -297,9 +297,6 @@ func TestFactsAsTheRule(t *testing.T) {
 	}
 	w.playOn(guest, s.ID, 0, repeat(w.right, 4)...)
 	w.fold(guest, cy)
-	if w.shadow(s.ID) != ShadowGuest {
-		t.Fatalf("the guest's day brought to the account: shadow %d", w.shadow(s.ID))
-	}
 	w.playOn(cy, s.ID, 4, repeat(w.right, Length-4)...)
 	book := w.book(cy)
 	for n, p := range w.picks(s.ID) {
