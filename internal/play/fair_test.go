@@ -116,9 +116,7 @@ func TestScriptedDayIsTheirsAlone(t *testing.T) {
 	day(ana, nil, w.right)
 	day(cy, nil, w.wrong)
 	for _, pair := range [][2]int64{{ana, cy}, {bot, ana}, {bot, cy}} {
-		if err := w.g.befriend(ctx, pair[0], pair[1]); err != nil {
-			t.Fatal(err)
-		}
+		w.befriend(pair[0], pair[1])
 	}
 	today := w.g.Today()
 	has := func(b Board, name string) bool {

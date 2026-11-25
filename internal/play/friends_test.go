@@ -289,6 +289,41 @@ func TestFriendsOnTheDaysQuestions(t *testing.T) {
 	}
 }
 
+// A request said yes to as its sender calls it off: one of the two wins, never both (audit 2026-11-24, C-17: the yes
+// read the request outside the write, so a withdrawn one still made the two friends).
+func TestAcceptAsTheRequestIsWithdrawn(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	var tag string
+	for range 30 {
+		ana, bo := w.user(), w.user()
+		if err := w.db.Read.QueryRow(`SELECT tag FROM users WHERE id = ?`, bo).Scan(&tag); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.g.Request(ctx, ana, tag, false); err != nil {
+			t.Fatal(err)
+		}
+		var id int64
+		if err := w.db.Read.QueryRow(`SELECT id FROM friend_requests WHERE from_id = ?`, ana).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		var accepted, withdrawn error
+		var wg sync.WaitGroup
+		wg.Go(func() { _, accepted = w.g.Accept(ctx, bo, id) })
+		wg.Go(func() { withdrawn = w.g.Withdraw(ctx, ana, id) })
+		wg.Wait()
+		_, notFriends := w.g.Friend(ctx, ana, bo)
+		switch {
+		case accepted == nil && withdrawn == nil:
+			t.Fatal("a request both said yes to and called off")
+		case accepted == nil && notFriends != nil, accepted != nil && notFriends == nil:
+			t.Fatalf("said yes: %v; friends: %v", accepted, notFriends)
+		case accepted != nil && !errors.Is(accepted, ErrNoRequest), withdrawn != nil && !errors.Is(withdrawn, ErrNoRequest):
+			t.Fatalf("yes: %v; called off: %v", accepted, withdrawn)
+		}
+	}
+}
+
 // Two players asking each other at the same moment are friends, as when one asked first: never each left with a
 // request in and one out (bug hunt 2026-11-23: 1 race in 6, the check that the other asked was outside the write).
 func TestFriendsAskingAtOnce(t *testing.T) {
