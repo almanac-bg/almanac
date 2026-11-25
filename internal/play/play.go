@@ -9,9 +9,9 @@
 // gets the pictures only (bank.PicturesView): its words and options come with its time, and an answer before it is
 // refused, so that nobody reads a question off the clock. Between questions a player reads the answer and its fact for
 // as long as they like; a question of the day's ten dealt on its own date („На този ден“) shows its day's line with
-// them (dealtOn). A question left showing past its time counts as unanswered, whenever the run is next looked at. A
-// question is graded against the version of it that showed, whatever the bank has become meanwhile (versions.go); the
-// day's ten hold still for their day, and one found wrong during it counts for nobody that day (day.go). Everything a
+// them (dealtOn). A question left showing past its time counts as unanswered, whenever the run is next looked at while
+// it can still be played (a past day's stays as it was left: dayOver). A question is graded against the version of it
+// that showed, whatever the bank has become meanwhile (versions.go); the day's ten hold still for their day, and one found wrong during it counts for nobody that day (day.go). Everything a
 // run does goes through the database, so a refresh, a second tab or a restart of the server changes nothing. A run left
 // half-way goes on where it stopped: the day's when the player comes back to it that day (a run of the day's questions
 // ends with its day, DayGrace after: dayOver), a chapter's when they start the same chapter again that day
@@ -374,9 +374,10 @@ func (g *Game) settle(tx *sql.Tx, r *run) (bool, error) {
 }
 
 // settles says whether settle has anything to do: a question showing past its time, or gone from the bank; or one that
-// counts for nobody, where the run stands. Its question is read through tx, the transaction the caller holds.
+// counts for nobody, where the run stands. Nothing, once the run's day is over: it stays as it was left (dayOver), so
+// a later look doesn't finish a past day. Its question is read through tx, the transaction the caller holds.
 func (g *Game) settles(tx *sql.Tx, r *run) bool {
-	if r.finished {
+	if r.finished || r.dayOver(g.Now()) {
 		return false
 	}
 	if r.voidNow() {

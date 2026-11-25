@@ -178,3 +178,33 @@ func TestUnfinishedAfterMidnight(t *testing.T) {
 		t.Fatalf("Monday's issue past the grace: %+v %v", open, err)
 	}
 }
+
+// A day's run left with its last question showing stays as it was left once its day is over: a look at it the next
+// morning (a tab woken on it) doesn't finish it, and the day it missed stays missed (audit 2026-11-24, C-14).
+func TestPastDayLeftOnItsLastQuestion(t *testing.T) {
+	w := setup(t)
+	ctx := t.Context()
+	ana := w.user()
+	w.at(17, 23, 58, 0)
+	s, err := w.g.StartDay(ctx, ana)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.playOn(ana, s.ID, 0, repeat(w.right, Length-1)...)
+	w.at(17, 23, 59, 30)
+	w.show(ana, s.ID) // the tenth, left showing; its time runs out before midnight
+	w.at(18, 9, 0, 0)
+	look, err := w.g.State(ctx, ana, s.ID)
+	if err != nil || look.Done {
+		t.Fatalf("Tuesday's run, looked at on Wednesday: %+v %v", look, err)
+	}
+	w.g.AftersDone(ctx)
+	if st, err := w.g.StreakOf(ctx, ana); err != nil || st.Days != 0 {
+		t.Fatalf("Tuesday's run, left on its tenth, counts after a look: %+v %v", st, err)
+	}
+	var finished, answers int
+	if err := w.db.Read.QueryRow(`SELECT finished_at IS NOT NULL, (SELECT count(*) FROM answers WHERE run_id = runs.id)
+		FROM runs WHERE id = ?`, s.ID).Scan(&finished, &answers); err != nil || finished != 0 || answers != Length-1 {
+		t.Fatalf("the look wrote to Tuesday's run: finished %d, answers %d, %v", finished, answers, err)
+	}
+}

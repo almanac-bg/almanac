@@ -372,6 +372,8 @@ func (g *Game) streakDays(ctx context.Context, userID int64) (streakHistory, err
 
 // walkStreak goes over a player's days from the first played to today, as StreakOf tells them. saw, if set, hears of
 // each day missed that the streak forgave (forgiven), and of each day that ended a streak (ended: the days it had).
+// The Forgives are the calendar week's, whichever streak used them: a streak begun after one ended that week has what
+// the ended one left.
 func walkStreak(h streakHistory, today string, saw func(day string, forgiven bool, ended int)) StreakNow {
 	s := StreakNow{Forgiven: []string{}}
 	d, _ := time.Parse(time.DateOnly, h.first)
@@ -401,10 +403,6 @@ func walkStreak(h streakHistory, today string, saw func(day string, forgiven boo
 			s.Days, s.Forgiven = 0, s.Forgiven[:0]
 		}
 		d = d.AddDate(0, 0, 1)
-	}
-	end, _ := time.Parse(time.DateOnly, today)
-	if !monday(end).Equal(week) {
-		used = 0
 	}
 	s.Left = max(0, Forgives-used)
 	s.Spare = s.Left > 0
