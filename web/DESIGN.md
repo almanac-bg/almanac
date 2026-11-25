@@ -445,7 +445,8 @@ colour but `#fff` and `#16132b` on a chapter's colour (which are the same in bot
   its title's words whole,
   „Затвори“ under it where they don't fit beside it.
 - **Names** (`nameWords()`): a name breaks between its words first; a single word wider than its line, and only
-  then, at its syllables with a hyphen. „ти“ stays on its last word's line, never alone. Never cut
+  then, at its syllables with a hyphen; figures, which no syllable saves (a name ending in a year), where they must.
+  „ти“ stays on its last word's line, never alone. Never cut
   with an ellipsis. Outside the play screen a fact or an entry holds its words the same way (`textWords()`), and an
   email address breaks after its @ or before a dot (`emailWords()`). A chart's axis labels never wrap („10“). A name
   in Latin letters breaks at its syllables too („Maximi-lian“). A name that links to its player is never underlined
@@ -555,8 +556,8 @@ to show it whole; nothing over the question.
 
 ## Motion
 
-- **At most 400ms an animation;** one big moment a result: a best rank risen (the seal set large, `rankup`), or ten of
-  ten (the mark drawn petal by petal). A right answer pops (360ms, to 1.04), a wrong one shakes once (320ms, 4px); an
+- **At most 400ms an animation;** two big moments (DECISIONS.md): a best rank risen (the seal set large, `rankup`)
+  and ten of ten (the mark drawn petal by petal); on the rare day both come, both show, each told as it is. A right answer pops (360ms, to 1.04), a wrong one shakes once (320ms, 4px); an
   answer comes into place in one movement (240ms, `settle`); a pip lands (200ms).
 - **A result lands, once** (`feel.ts`): the tiles fill one by one with a pluck on the scale for each right one, and
   the score lands; a tap jumps to the end; never again on a reload.

@@ -22,10 +22,10 @@ var NationalDays = []NationalDay{
 	{"01-06", "Йордановден"},       // Epiphany
 	{"02-19", "В памет на Левски"}, // his hanging, 1873
 	{"03-01", "Баба Марта"},
-	{"03-03", "Освобождението"}, // the national day
-	{"05-06", "Гергьовден"},     // and the day of the army
-	{"05-24", "Денят на българската азбука и култура"},
-	{"06-02", "Денят на Ботев"}, // and of those who fell for Bulgaria
+	{"03-03", "Освобождението"},       // the national day
+	{"05-06", "Гергьовден"},           // and the day of the army
+	{"05-24", "Денят на писмеността"}, // Bulgarian letters, education and culture: kept short, a line on Днес at 320 px
+	{"06-02", "Денят на Ботев"},       // and of those who fell for Bulgaria
 	{"07-18", "Рожденият ден на Левски"},
 	{"09-06", "Съединението"},
 	{"09-22", "Независимостта"},

@@ -42,10 +42,24 @@ test("a chapter's game never tells how well the chapter is known, and the avatar
   // Достъпност has no switches of the game's own: the text's size and less motion are the device's.
   await expect(page.getByRole("switch", { name: "По-малко движение" })).toHaveCount(0);
   await expect(page.getByRole("radiogroup", { name: "Размер на текста" })).toHaveCount(0);
+  // The device's less motion stills every transition but the timer's, on the game's pages and on the server's own (the
+  // privacy page has the style without the script).
+  const moving = () =>
+    page.evaluate(
+      () =>
+        [...document.querySelectorAll("*")].filter((e) =>
+          getComputedStyle(e)
+            .transitionDuration.split(",")
+            .some((d) => Number.parseFloat(d) > 0),
+        ).length,
+    );
+  expect(await moving(), "the buttons' transitions").toBeGreaterThan(0);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await expect(page.locator("html")).toHaveClass(/calm/);
+  expect(await moving(), "a transition with less motion").toBe(0);
+  await page.goto("/privacy");
+  await expect(page.locator("h1").first()).toBeVisible();
+  expect(await moving(), "a transition with less motion, on the privacy page").toBe(0);
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  await expect(page.locator("html")).not.toHaveClass(/calm/);
 });
 
 // What the day wrote, as the server would have it: the whole of its ink at a glance, its chapters each with its own,

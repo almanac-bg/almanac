@@ -296,6 +296,52 @@ export async function ranked(page: Page, level = 3, ink: Record<string, number> 
   });
 }
 
+/** Днес as the server sends it, changed by `change`: in the page's boot and in GET /api/day (a national day, a duel
+ * waiting, a game's score). */
+export async function dayAs(page: Page, change: (day: Record<string, unknown>) => void): Promise<void> {
+  await page.route(
+    (url) => url.pathname === "/",
+    async (route) => {
+      const res = await route.fetch();
+      const body = (await res.text()).replace(
+        /(<script type="application\/json" id="boot">)([\s\S]*?)(<\/script>)/,
+        (_, open: string, json: string, close: string) => {
+          const boot = JSON.parse(json);
+          if (boot.day) change(boot.day);
+          return open + JSON.stringify(boot).replaceAll("<", "\\u003c") + close;
+        },
+      );
+      await route.fulfill({ response: res, body });
+    },
+  );
+  await page.route("**/api/day", async (route) => {
+    if (route.request().method() !== "GET") return route.continue();
+    const res = await route.fetch();
+    const day = await res.json();
+    change(day);
+    await route.fulfill({ response: res, json: day });
+  });
+}
+
+/** The national calendar's longest name (bank/calendar.go): the one that takes the most of Днес's cover. */
+export const longestNational = [
+  ...readFileSync(resolve(import.meta.dirname, "../internal/bank/calendar.go"), "utf8").matchAll(
+    /\{"\d\d-\d\d", "([^"]+)"\}/g,
+  ),
+]
+  .map((m) => m[1] ?? "")
+  .reduce((a, b) => (b.length > a.length ? b : a), "");
+
+/** Makes the player's rank in these chapters `level`, risen from the one under it and not yet told: the next news
+ * tells it (play.roseOf), as the player's best rank risen if no chapter is higher (after ranked(page, level - 1)). */
+export async function rose(page: Page, level: number, risen: string[]): Promise<void> {
+  await inDB(page, (db, id) => {
+    const add = db.prepare(`INSERT OR REPLACE INTO ranks (user_id, chapter, level, quarter, ink, told)
+      VALUES (?, ?, ?, 1, ?, ?)`);
+    for (const c of risen) add.run(id, c, level, [0, 1, 5, 15, 40][level] ?? 15, level - 1);
+  });
+}
+
 /** Makes the player (a guest, made now if there's none) an admin, straight in the test server's database. */
 export async function admin(page: Page): Promise<void> {
   await inDB(page, (db, id) => {
