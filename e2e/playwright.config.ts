@@ -32,6 +32,12 @@ const chromiumPath =
   process.env.BROWSER_PATH ||
   (!process.env.CI && !existsSync(chromium.executablePath()) && existsSync(brave) ? brave : undefined);
 
+// The game's sounds stay in the browser: a test's taps would otherwise play them aloud on the machine running it. The
+// audio still runs and every tone still starts (what layout.spec counts); only the speakers get nothing. WebKit has no
+// such switch.
+const quiet = { args: ["--mute-audio"] };
+const quietFirefox = { "media.volume_scale": "0.0" };
+
 export default defineConfig({
   testDir: ".",
   outputDir: "../test-results/e2e",
@@ -45,13 +51,14 @@ export default defineConfig({
   timeout: 60_000,
   use: { baseURL: `http://127.0.0.1:${port}`, trace: "retain-on-failure", locale: "bg-BG" },
   projects: [
-    { name: "chromium", use: { ...devices["Pixel 7"], launchOptions: { executablePath: chromiumPath } } },
+    { name: "chromium", use: { ...devices["Pixel 7"], launchOptions: { ...quiet, executablePath: chromiumPath } } },
     { name: "webkit", use: { ...devices["iPhone 15"] } },
     {
       name: "firefox",
       use: {
         ...devices["Desktop Firefox"],
         viewport: { width: 390, height: 844 },
+        launchOptions: { firefoxUserPrefs: quietFirefox },
       },
     },
   ],
