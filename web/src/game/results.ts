@@ -13,7 +13,7 @@ import { closeLine, closeWords } from "./numbers.ts";
 import { answered, crowdLine, picture } from "./questions.ts";
 import { report } from "./report.ts";
 import { trail } from "./run.ts";
-import type { Reviewed, Score, State, TheirMark } from "./types.ts";
+import type { Answer, Reviewed, Score, State, TheirMark, View } from "./types.ts";
 
 /** A finished run: the score as the screen's big number (its right answers), a line about it (the place), and the
  * marks; right under it what to do next (`next`: the gold action, then „Прегледай въпросите“ and the others, as
@@ -257,9 +257,8 @@ export interface Versus {
   marks: TheirMark[];
 }
 
-/** How a question went: its sign where it stands alone, and its word. The word never reads as a true-or-not
- * statement's answer („Вярно“, „Невярно“): right is „Точно“ for every kind, as in the run (verdictSays), and wrong
- * „Грешно“, as the tiles' marks say it. */
+/** How a question went: its sign where it stands alone, and its word. Right is „Точно“, wrong „Грешно“, as the tiles'
+ * marks say it; neither reads as a true-or-not statement's answer („Вярно“, „Невярно“). */
 const verdicts = {
   void: ["–", "Не се брои"],
   right: ["✓", "Точно"],
@@ -268,9 +267,21 @@ const verdicts = {
   missed: ["–", "Без отговор"],
 } as const;
 
+type Verdict = keyof typeof verdicts;
+
+/** A verdict's word on a question (`view`), as the run says it (verdictSays): a number right but not spot on (near
+ * enough to count) is „Вярно“, never „Точно“, which it isn't, and a number's „Вярно“ never meets true-or-not's answer.
+ * Spot on is as the server has it (bank.Number.Exact: within half a step of the number `value`), known only of the
+ * player's own answer (`given`); a friend's right number is „Вярно“, true either way. */
+export function verdictWord(kind: Verdict, view: View, given?: Answer | null, value?: number): string {
+  if (kind !== "right" || view.type !== "number") return verdicts[kind][1];
+  const exact = !!given && "value" in given && Math.abs(given.value - (value ?? Number.NaN)) <= view.step / 2 + 1e-9;
+  return exact ? verdicts.right[1] : "Вярно";
+}
+
 /** One side of a duel on one question: whose (the avatar; the name for a screen reader) and how it went. */
-function side(name: string, look: string | undefined, kind: keyof typeof verdicts): Child {
-  const [sign, word] = verdicts[kind];
+function side(name: string, look: string | undefined, kind: Verdict, word: string): Child {
+  const sign = verdicts[kind][0];
   return h(
     "span",
     { class: kind === "right" ? "duel-q-side right" : "duel-q-side" },
@@ -291,7 +302,10 @@ function reviewed(all: Reviewed[], versus?: Versus, friends: FriendDay[] = []): 
     { class: "review" },
     all.map((it) => {
       const kind = it.void ? "void" : it.right ? "right" : it.close ? "close" : it.given ? "wrong" : "missed";
+      const word = verdictWord(kind, it.view, it.given, it.reveal.value);
       const theirs = versus?.marks[it.n];
+      const theirKind =
+        theirs && (theirs.right ? "right" : theirs.close ? "close" : theirs.missed ? "missed" : "wrong");
       // Each fact a note of its own name among the ten („Знаеше ли? Въпрос 3“): ten of one name tell a screen reader
       // nothing apart.
       const note = fact(it.reveal.fact, it.reveal.day);
@@ -312,7 +326,7 @@ function reviewed(all: Reviewed[], versus?: Versus, friends: FriendDay[] = []): 
                 "span",
                 { class: kind === "right" ? "reviewed-says right" : "reviewed-says" },
                 h("span", { class: "duel-q-sign", "aria-hidden": "true" }, verdicts[kind][0]),
-                verdicts[kind][1],
+                word,
               ),
         ),
         h("h3", { class: "ask" }, it.view.text),
@@ -320,20 +334,14 @@ function reviewed(all: Reviewed[], versus?: Versus, friends: FriendDay[] = []): 
           ? h(
               "p",
               { class: "duel-q-sides" },
-              side("Ти", versus.mine, kind),
-              theirs
-                ? side(
-                    versus.name,
-                    versus.theirs,
-                    theirs.right ? "right" : theirs.close ? "close" : theirs.missed ? "missed" : "wrong",
-                  )
-                : null,
+              side("Ти", versus.mine, kind, word),
+              theirKind ? side(versus.name, versus.theirs, theirKind, verdictWord(theirKind, it.view)) : null,
             )
           : null,
         picture(it.view),
         answered(it.view, it.reveal, it.given, it.right ? "right" : it.close ? "partial" : "wrong"),
         crowdLine(it.view.type, it.reveal.crowd, it.right),
-        friendsOn(friends, it.n),
+        friendsOn(friends, it.n, it.view),
         note,
         report(it.reveal.id),
       );
@@ -345,7 +353,7 @@ function reviewed(all: Reviewed[], versus?: Versus, friends: FriendDay[] = []): 
  * the words): a line, then up to four friends each by name, their sign beside it, right in ink and the rest quieter
  * as a duel's sides are; more, and two rows, those who got it and those who didn't, each a few faces and names, which
  * opens to its whole list. Nothing for a question that counts for nobody, or with no friend finished. */
-function friendsOn(friends: FriendDay[], n: number): Child {
+function friendsOn(friends: FriendDay[], n: number, view: View): Child {
   const played = friends.filter((f) => f.marks.length > n && markAt(f, n) !== "void");
   if (!played.length) return null;
   const knew = played.filter((f) => markAt(f, n) === "right");
@@ -363,7 +371,7 @@ function friendsOn(friends: FriendDay[], n: number): Child {
           { class: "duel-q-sides friends-few" },
           played.map((f) => {
             const kind = markAt(f, n) as "right" | "close" | "wrong";
-            const [sign, word] = verdicts[kind];
+            const [sign, word] = [verdicts[kind][0], verdictWord(kind, view)];
             return h(
               "span",
               { class: kind === "right" ? "duel-q-side right" : "duel-q-side" },

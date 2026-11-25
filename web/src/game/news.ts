@@ -162,16 +162,18 @@ function roseLine(r: NonNullable<News["rose"]>): Child {
 
 type Risen = NonNullable<News["rose"]>["ranks"];
 
-/** The ranks risen in words, each rank once with its chapters, the chapters' names the links:
- * „„Страница“ в География и в Наука, „Тетрадка“ в История“. */
-function risen(ranks: Risen): Child[] {
+/** The ranks risen in words, each rank once with its chapters, the chapters' names the links (`link`): a list the
+ * Bulgarian way, each name with its own „в“, never left at a line's end, and „и“ only before the last, as four chapters'
+ * names have an „и“ of their own: „„Страница“ в История, в Кино и телевизия и в Спорт“; ranks apart, „а“ before the
+ * last: „„Страница“ в География и в Наука, а „Тетрадка“ в История“. */
+export function risen(ranks: Risen, link: (chapter: string) => Child = chapterLink): Child[] {
   const byRank = new Map<string, string[]>();
   for (const x of ranks) byRank.set(x.name, [...(byRank.get(x.name) ?? []), x.chapter]);
   const groups = [...byRank].map(([name, chapters]) => [
-    `„${name}“ в `,
-    ...chapters.flatMap((c, i) => [i ? " и в " : null, chapterLink(c)]),
+    `„${name}“ в\u00a0`,
+    ...chapters.flatMap((c, i) => [i === 0 ? null : i === chapters.length - 1 ? " и в\u00a0" : ", в\u00a0", link(c)]),
   ]);
-  return groups.flatMap((g, i) => [i === 0 ? null : i === groups.length - 1 ? " и " : ", ", ...g]);
+  return groups.flatMap((g, i) => [i === 0 ? null : i === groups.length - 1 ? ", а " : ", ", ...g]);
 }
 
 const chapterLink = (chapter: string) => h("a", { href: `/almanac/${chapter}` }, chapterName(chapter));
