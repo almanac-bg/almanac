@@ -1,6 +1,7 @@
 package play
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"errors"
@@ -23,10 +24,34 @@ var (
 	ErrNoPlayer     = errors.New("no player with that tag")
 	ErrNoRequest    = errors.New("no such request")
 	ErrManyRequests = errors.New("too many requests waiting")
+	// ErrManyWaiting is a request to someone MaxWaiting requests wait for already.
+	ErrManyWaiting = errors.New("too many requests waiting for the one asked")
 )
 
 // MaxRequests is how many friend requests a player may have waiting for an answer.
 const MaxRequests = 50
+
+// MaxWaiting is how many friend requests may wait for one player's answer, or one address's: far more than the people
+// anyone knows, and a bound on what strangers can pile on someone, who has no way to block them (DECISIONS.md).
+const MaxWaiting = 100
+
+// waitingFull says whether a request to a player (to; 0: not known) or an address (email) would go past MaxWaiting:
+// requests waiting for the one asked as Requests lists them (to their id or their email, not declined). Never when one
+// of the asker's waits there already, nor to a friend, nor when the one asked has asked the asker: a flood keeps no one
+// from the people they know. It's read in the write that makes the request, so requests made at once can't pass it.
+func waitingFull(tx *sql.Tx, from, to int64, email string) (bool, error) {
+	var n int
+	var mine, known bool
+	err := tx.QueryRow(`WITH them AS (SELECT id, email FROM users WHERE id = ?2 OR email = ?3)
+		SELECT count(*), coalesce(sum(r.from_id = ?1), 0) > 0,
+			EXISTS (SELECT 1 FROM friends WHERE user_id = ?1 AND friend_id = (SELECT id FROM them))
+			OR EXISTS (SELECT 1 FROM friend_requests c WHERE c.from_id = (SELECT id FROM them)
+				AND (c.to_id = ?1 OR c.to_email = (SELECT email FROM users WHERE id = ?1)))
+		FROM friend_requests r
+		WHERE (r.to_id = (SELECT id FROM them) OR r.to_email = coalesce((SELECT email FROM them), ?3)) AND NOT r.declined`,
+		from, to, sql.NullString{String: email, Valid: email != ""}).Scan(&n, &mine, &known)
+	return n >= MaxWaiting && !mine && !known, err
+}
 
 // MaxFriends is how many friends a player may have: plenty for the people they know, too few for a list of strangers.
 const MaxFriends = 200
@@ -83,7 +108,8 @@ type Sent struct {
 // Request asks a player to be friends: by their tag, or by an email address. An email request waits for whoever has
 // the address, or signs in with it later, and the sender learns nothing about whether anyone does. to is already a
 // normal tag or email (account.NormalTag, account.NormalEmail); byEmail says which. A request by a shared link
-// (AskSharer) stands apart: asked by tag too, the same player has two.
+// (AskSharer) stands apart: asked by tag too, the same player has two. Neither side may have too many waiting: the
+// sender MaxRequests (ErrManyRequests), the one asked MaxWaiting (ErrManyWaiting: waitingFull).
 func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool) (Sent, error) {
 	var mine sql.NullString // the sender's email: requests to it are to them
 	if err := g.DB.Read.QueryRowContext(ctx, `SELECT email FROM users WHERE id = ?`, from).Scan(&mine); err != nil {
@@ -131,6 +157,13 @@ func (g *Game) Request(ctx context.Context, from int64, to string, byEmail bool)
 			if crossed {
 				return g.befriend(tx, other, from)
 			}
+		}
+		email := ""
+		if byEmail {
+			email = to
+		}
+		if full, err := waitingFull(tx, from, other, email); err != nil || full {
+			return cmp.Or(err, ErrManyWaiting)
 		}
 		// Waiting is one by tag: one by a link to the same player is a request apart, which says nothing of whom.
 		var n int

@@ -174,9 +174,10 @@ var ErrPlayShared = errors.New("the day shared isn't played yet")
 //
 // Nothing it says or does tells its sender whose the link is, whoever they guess: it's a request apart from one by
 // tag to the same player (both stand, and both show in the sender's list), held to MaxRequests as any other, made the
-// same to a friend already (who never sees it: it's made as declined), to a player who has asked the sender first (no
-// friends at once: the sender has their request to say yes to), and to anyone; asked of oneself, nothing is made, and
-// it answers as if it were.
+// same to a friend already and to one MaxWaiting requests wait for already (who never see it: it's made as declined,
+// where a refusal would tell whose the link is to a sender who had filled someone's list), to a player who has asked
+// the sender first (no friends at once: the sender has their request to say yes to), and to anyone; asked of oneself,
+// nothing is made, and it answers as if it were.
 func (g *Game) AskSharer(ctx context.Context, from int64, issue int, code string) (Sent, error) {
 	sh, err := g.Shared(ctx, issue, code)
 	if err != nil {
@@ -224,8 +225,12 @@ func (g *Game) AskSharer(ctx context.Context, from int64, issue int, code string
 		if n >= MaxRequests && !waiting {
 			return ErrManyRequests
 		}
-		declined := 0 // to a friend already: theirs never to see
-		if friends {
+		full, err := waitingFull(tx, from, sh.Owner, "")
+		if err != nil {
+			return err
+		}
+		declined := 0 // to a friend already, or to one with too many waiting: theirs never to see
+		if friends || full {
 			declined = 1
 		}
 		if _, err := tx.Exec(`INSERT INTO friend_requests (from_id, to_id, at, via_issue, declined) VALUES (?, ?, ?, ?, ?)
@@ -233,7 +238,7 @@ func (g *Game) AskSharer(ctx context.Context, from int64, issue int, code string
 			from, sh.Owner, store.Ms(g.Now()), issue, declined); err != nil {
 			return err
 		}
-		sent = Sent{New: !waiting && !friends, To: sh.Owner}
+		sent = Sent{New: !waiting && declined == 0, To: sh.Owner}
 		return nil
 	})
 	return sent, err
