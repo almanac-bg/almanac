@@ -131,13 +131,10 @@ func (g *Game) StartDay(ctx context.Context, userID int64) (State, error) {
 
 // Unfinished is yesterday's issue as the player left it half-way, while it can still be finished (DayGrace after its
 // midnight, or a question shown before then still in its time: dayOver): the game allows it, and it counts for its own
-// day, so Днес offers it („Продължи“) until then. Nil for none: not begun, finished, or over. The player's runs are
-// settled by their own clocks first (SettleLeft): one left on its last question, whose time ran out before its day
-// closed, is finished, not offered.
+// day, so Днес offers it („Продължи“) until then. Nil for none: not begun, finished, or over. Днес settles the
+// player's runs by their own clocks before it asks (SettleLeft): one left on its last question, whose time ran out, is
+// finished then, not offered.
 func (g *Game) Unfinished(ctx context.Context, userID int64) (*State, error) {
-	if err := g.SettleLeft(ctx, userID); err != nil {
-		return nil, err
-	}
 	yesterday := DayShift(g.Today(), -1)
 	var id int64
 	err := g.DB.Read.QueryRowContext(ctx, `SELECT id FROM runs WHERE user_id = ? AND kind = 'day' AND day = ?
@@ -163,31 +160,23 @@ func (g *Game) Unfinished(ctx context.Context, userID int64) (*State, error) {
 	return &s, nil
 }
 
-// leftWithin is how far back the minute's sweep looks for a day's run left with a question showing (SettleLeft): well
-// past the day just closed, for a server that was down a while; one older is settled when its player next looks.
-const leftWithin = 7 * 24 * time.Hour
-
 // SettleLeft settles the day's runs left with a question showing whose time has run out, by their own clocks
 // (settles, settle): the same rule and the same stamps as any look at them, so that what a day's run counts for (the
 // streak, the day's board, the friends' boards) never waits on when, or whether, it's looked at. A question whose time
-// ran out before its day closed is kept unanswered as it ran out, and, the run's last, finishes the run on its own
-// day; one whose time ran past the close is left as it was. Of one player (userID): every run of theirs, first thing
-// wherever their past days are read or played on (Днес, Unfinished). Of every player (0), those shown within
-// leftWithin: the minute's sweep, beside SettleDue, so a day just closed counts as it closes. The runs are read in one
-// read, and each settled in a write of its own: the writer is held a moment at a time.
+// ran out in its run's time is kept unanswered as it ran out, and, the run's last, finishes the run for its own day.
+// Of one player (userID): every run of theirs, first thing wherever their past days are read (Днес). Of every player
+// (0): the minute's sweep, beside SettleDue, so a day just closed counts as it closes, however long the server was
+// down. The rows are the runs with a question showing (runs_showing): the players in the middle of one, and the few
+// whose question can't be settled (one gone from the bank, or voided, past its close). They're read in one read, and
+// each settled in a write of its own: the writer is held a moment at a time.
 func (g *Game) SettleLeft(ctx context.Context, userID int64) error {
-	now := g.Now()
-	ripe := store.Ms(now.Add(-LateGrace)) // no question's time, and its answer's LateGrace, ends sooner after it shows
-	var rows *sql.Rows
-	var err error
+	// No question's time, and its answer's LateGrace, ends sooner after it shows.
+	query, args := `SELECT id, user_id FROM runs WHERE kind = 'day' AND finished_at IS NULL AND shown_at IS NOT NULL
+		AND shown_at <= ?`, []any{store.Ms(g.Now().Add(-LateGrace))}
 	if userID != 0 {
-		rows, err = g.DB.Read.QueryContext(ctx, `SELECT id, user_id FROM runs WHERE user_id = ? AND kind = 'day'
-			AND finished_at IS NULL AND shown_at IS NOT NULL AND shown_at <= ?`, userID, ripe)
-	} else {
-		rows, err = g.DB.Read.QueryContext(ctx, `SELECT id, user_id FROM runs WHERE kind = 'day'
-			AND finished_at IS NULL AND shown_at IS NOT NULL AND shown_at BETWEEN ? AND ?`,
-			store.Ms(now.Add(-leftWithin)), ripe)
+		query, args = query+` AND user_id = ?`, append(args, userID)
 	}
+	rows, err := g.DB.Read.QueryContext(ctx, query, args...)
 	if err != nil {
 		return err
 	}
