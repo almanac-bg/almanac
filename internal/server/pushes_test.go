@@ -373,7 +373,8 @@ func crowd(t testing.TB, c crowding) (*Server, *slowPush) {
 		pool := client.Transport.(*http.Transport).TLSClientConfig.RootCAs
 		pool.AddCert(sps.Certificate())
 	}
-	client.Timeout = 15 * time.Second // as in production
+	client.Timeout = 15 * time.Second // as in production, and as many connections at once to one service
+	client.Transport.(*http.Transport).MaxConnsPerHost = push.MaxConnsPerHost
 	db := storetest.Open(t)
 	out := mail.NewOutbox(db, &inbox{}, "a@almanac.bg")
 	s, err := New(Config{PublicURL: "http://localhost", Push: &push.Sender{Keys: keys, Subject: "mailto:a@b.bg", Client: client,
