@@ -31,7 +31,7 @@ most). A change is judged by whether players come back: the retention numbers in
 | Path | What |
 | --- | --- |
 | `cmd/almanac` | The program: `serve`, `bank check/fmt`, `backup now/list/restore/verify/keys` |
-| `cmd/build` | Builds the client into `internal/assets/dist` (esbuild; precompressed; the first screen's budget, and ceilings against accidents) |
+| `cmd/build` | Builds the client into `internal/assets/dist` (esbuild; precompressed; the first screen's budget, which is the player's whole client, and the fonts' ceiling) |
 | `internal/play` | The game's rules and data: runs and their scores (`play.go`, `board.go`), the streak (`runs.go`), the Алманах, its ink and seals (`almanac.go`, `ink.go`, `rank.go`), duels on one's own time (`duels.go`: a friend's, challenged directly), friends |
 | `internal/server` | HTTP: the API (`api.go` maps errors to Bulgarian messages), routes (`server.go`), pages (`pages.go`: the paths it sends the app for, the client's router's list again; a test holds them equal) |
 | `internal/store` | SQLite; migrations in `internal/store/migrations`, applied once each by name |
@@ -222,13 +222,18 @@ while health says `ok`, and the newer program, started on the copy, migrates it 
    ```
 2. Mark vNEW as deploy.sh marks a release that failed migrating: CI then deploys neither it nor any release that
    brings its migrations unchanged (else the next merge puts it back, and it migrates the copy again). It prints the
-   mark: a line why, and a `migration <sha>  <name>` line for each migration vNEW has and vOLD hasn't (none: stop):
+   mark: a line why, and a `migration <sha>  <name>` line for each migration vNEW has and vOLD hasn't; or, marking
+   nothing, why to stop. Stopping after it, before step 5 (a step fails, or you fix forward), take the mark away, or
+   with vNEW live nothing does, and CI refuses its migrations for good: `rm /var/lib/almanac-deploy/unhealthy-vNEW`.
 
    ```bash
    v() { setpriv --reuid=almanac --regid=almanac --clear-groups /usr/local/lib/almanac/almanac-$1 migrations; }
-   mark=/var/lib/almanac-deploy/unhealthy-vNEW && v vOLD >/run/had && [ -s /run/had ] && mkdir -p "${mark%/*}" &&
-     { echo "vNEW went back by hand at $(date -u '+%Y-%m-%d %H:%M UTC'): WHY"
-       v vNEW | grep -vxFf /run/had | sed 's/^/migration /'; } >"$mark" && rm /run/had && cat "$mark"
+   mark=/var/lib/almanac-deploy/unhealthy-vNEW
+   if ! v vOLD >/run/had || [ ! -s /run/had ]; then echo "stop: vOLD can't list its migrations"
+   elif ! v vNEW >/run/has; then echo "stop: vNEW lists no migrations"
+   elif ! grep -vxFf /run/had /run/has >/run/new; then echo "stop: no migration between: almanac-deploy vOLD"
+   else mkdir -p "${mark%/*}" && { echo "vNEW went back by hand at $(date -u '+%Y-%m-%d %H:%M UTC'): WHY"
+     sed 's/^/migration /' /run/new; } >"$mark" && cat "$mark"; fi; rm -f /run/had /run/has /run/new
    ```
 3. `systemctl stop almanac.socket almanac`.
 4. The database aside with its log, the copy in its place (`before-vX.Y.Z.db` of the first release after vOLD that
@@ -236,7 +241,7 @@ while health says `ok`, and the newer program, started on the copy, migrates it 
    has nothing to go back to (deploy.sh goes back to the version linked, and vNEW would migrate the copy again):
 
    ```bash
-   cd /var/lib/almanac && f=failed-by-hand-$(date -u +%Y%m%dT%H%M%SZ).db &&
+   cd /var/lib/almanac && ls before-vX.Y.Z.db && f=failed-by-hand-$(date -u +%Y%m%dT%H%M%SZ).db &&
      mv almanac.db "$f" && { [ ! -e almanac.db-wal ] || mv almanac.db-wal "$f-wal"; } && rm -f almanac.db-shm &&
      mv before-vX.Y.Z.db almanac.db && ln -sfn /usr/local/lib/almanac/almanac-vOLD /usr/local/bin/almanac
    ```
@@ -246,5 +251,6 @@ while health says `ok`, and the newer program, started on the copy, migrates it 
    almanac.socket almanac`; then fix it and `systemctl start almanac.socket almanac`, or go back up: step 4 the other
    way (the copy aside with its `-wal`, `failed-by-hand-….db` and its `-wal` back as `almanac.db`), then
    `almanac-deploy vNEW` (by hand it goes out marked, and its mark goes once it's healthy).
-6. The fix goes forward, in a new release that changes vNEW's migration: the mark holds back every one that brings it
-   unchanged (`TestBackBelowAMigrationByHand`), and goes once a release that has run them all is live and healthy.
+6. The fix goes forward, in a new release: CI refuses every one that brings any marked migration unchanged
+   (`TestBackBelowAMigrationByHand`), so it changes each of them (from a vOLD several migrating releases back, the
+   mark has them all) or goes out by hand; the mark goes once a release that has run them all is live and healthy.

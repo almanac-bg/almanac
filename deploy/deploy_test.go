@@ -570,7 +570,8 @@ func TestBackCutOff(t *testing.T) {
 
 // Going back below a migration by hand, as CLAUDE.md's steps (Production) do it, their commands run here: the mark
 // holds the newer release back from CI, and every release that brings its migration unchanged; and with the older one
-// linked first, an older one that fails has nothing to go back to, so the newer one never starts on the copy.
+// linked first, an older one that fails has nothing to go back to, so the newer one never starts on the copy. A step
+// that can't do its part does nothing: no mark without migrations to hold back, nothing moved without the copy.
 func TestBackBelowAMigrationByHand(t *testing.T) {
 	t.Parallel()
 	src, err := os.ReadFile("../CLAUDE.md")
@@ -579,7 +580,7 @@ func TestBackBelowAMigrationByHand(t *testing.T) {
 	}
 	doc := string(src)
 	doc = doc[strings.Index(doc, "Going back to an older minor"):]
-	step := func(t *testing.T, m *machine, has string) {
+	try := func(t *testing.T, m *machine, has string) (string, error) {
 		t.Helper()
 		for _, block := range strings.Split(doc, "```bash\n")[1:] {
 			block = block[:strings.Index(block, "```")]
@@ -592,14 +593,57 @@ func TestBackBelowAMigrationByHand(t *testing.T) {
 				block = strings.ReplaceAll(block, r[0], r[1])
 			}
 			m.write(filepath.Join(m.root, "step.sh"), block, 0o755)
-			if out, err := m.command(filepath.Join(m.root, "step.sh")).CombinedOutput(); err != nil {
-				t.Fatalf("the step with %s: %v\n%s", has, err, out)
-			}
-			return
+			out, err := m.command(filepath.Join(m.root, "step.sh")).CombinedOutput()
+			return string(out), err
 		}
 		t.Fatalf("CLAUDE.md has no step with %s", has)
+		return "", nil
+	}
+	step := func(t *testing.T, m *machine, has string) string {
+		t.Helper()
+		out, err := try(t, m, has)
+		if err != nil {
+			t.Fatalf("the step with %s: %v\n%s", has, err, out)
+		}
+		return out
 	}
 	bad := mig('3', "0003_c.sql")
+	for _, c := range []struct {
+		name, says string
+		old        release
+		newer      []string
+	}{
+		{"no migration between", "stop: no migration between",
+			release{tag: "v1.0.0", migrations: healthy.migrations}, healthy.migrations},
+		{"the older one can't list them", "stop: v1.0.0 can't list its migrations",
+			release{tag: "v1.0.0", old: true}, append(slices.Clone(healthy.migrations), bad)},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			m := newMachine(t)
+			m.install(c.old)
+			m.install(release{tag: "v1.1.0", migrations: c.newer})
+			if out := step(t, m, "unhealthy-vNEW"); !strings.Contains(out, c.says) {
+				t.Fatalf("doesn't say %q:\n%s", c.says, out)
+			}
+			if left, _ := os.ReadDir(m.marks); len(left) > 0 {
+				t.Fatalf("marked: %v", left)
+			}
+		})
+	}
+	t.Run("the copy is missing", func(t *testing.T) {
+		t.Parallel()
+		m := newMachine(t)
+		m.install(release{tag: "v1.1.0", migrations: append(slices.Clone(healthy.migrations), bad)})
+		m.write(filepath.Join(m.data, "almanac.db-wal"), "log of v1.1.0\n", 0o600)
+		if out, err := try(t, m, "failed-by-hand"); err == nil {
+			t.Fatalf("went on without the copy:\n%s", out)
+		}
+		left, _ := os.ReadDir(m.data)
+		if len(left) != 2 || m.read(filepath.Join(m.data, "almanac.db")) != "the game\n" || m.live() != "v1.1.0" {
+			t.Fatalf("moved: %v, linked %s", left, m.live())
+		}
+	})
 	for _, fails := range []bool{false, true} {
 		t.Run(fmt.Sprintf("the older one fails: %v", fails), func(t *testing.T) {
 			t.Parallel()
