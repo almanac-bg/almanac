@@ -1141,8 +1141,8 @@ func TestLinkPreviews(t *testing.T) {
 	p, id := g.guest()
 	_, me := p.call("GET", "/api/me", nil)
 	u := me["user"].(map[string]any)
-	if _, err := g.db.Write.Exec(`INSERT INTO ranks (user_id, chapter, level, quarter, ink, told)
-		VALUES (?1, 'history', 3, 0, 15, 3)`, id); err != nil {
+	if _, err := g.db.Write.Exec(`INSERT INTO ranks (user_id, chapter, level, ink, told)
+		VALUES (?1, 'history', 3, 15, 3)`, id); err != nil {
 		t.Fatal(err)
 	}
 	body := page("/players/" + u["tag"].(string))

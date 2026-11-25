@@ -257,11 +257,11 @@ func TestWritesLimited(t *testing.T) {
 	p := g.player()
 	p.call("POST", "/api/guest", map[string]any{})
 	for i := range writesSession { // the guest came before the session
-		if status, _ := p.call("POST", "/api/told", map[string]string{"line": "none"}); status == 429 {
+		if status, _ := p.call("POST", "/api/friends/seen", nil); status == 429 {
 			t.Fatalf("write %d refused", i+1)
 		}
 	}
-	if status, out := p.call("POST", "/api/told", map[string]string{"line": "none"}); status != 429 {
+	if status, out := p.call("POST", "/api/friends/seen", nil); status != 429 {
 		t.Fatalf("past the session's writes: %d %v", status, out)
 	}
 	if status, _ := p.call("GET", "/api/me", nil); status != 200 {
@@ -286,7 +286,7 @@ func TestReadsLimited(t *testing.T) {
 	if status, out := p.call("GET", "/api/me", nil); status != 429 {
 		t.Fatalf("past the session's reads: %d %v", status, out)
 	}
-	if status, _ := p.call("POST", "/api/told", map[string]string{"line": "none"}); status == 429 {
+	if status, _ := p.call("POST", "/api/friends/seen", nil); status == 429 {
 		t.Fatal("a write past the reads refused")
 	}
 

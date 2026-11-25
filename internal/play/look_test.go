@@ -10,8 +10,8 @@ import (
 func (w *world) kept(user int64, ranks ...ChapterRank) {
 	w.t.Helper()
 	for _, r := range ranks {
-		if _, err := w.db.Write.Exec(`INSERT INTO ranks (user_id, chapter, level, quarter, ink, told)
-			VALUES (?, ?, ?, 0, ?, ?) ON CONFLICT (user_id, chapter) DO UPDATE SET level = excluded.level,
+		if _, err := w.db.Write.Exec(`INSERT INTO ranks (user_id, chapter, level, ink, told)
+			VALUES (?, ?, ?, ?, ?) ON CONFLICT (user_id, chapter) DO UPDATE SET level = excluded.level,
 			ink = excluded.ink`, user, r.Chapter, r.Level, r.Ink, r.Level); err != nil {
 			w.t.Fatal(err)
 		}

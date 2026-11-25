@@ -93,23 +93,23 @@ const cardHref = (id: number) => `/friends?duel=${id}`;
 export interface Accepted {
   id: number;
   name: string;
-  line: string;
 }
 
-/** Lines told on this page already: Приятели drawn again doesn't say them twice. */
-const toldHere = new Set<unknown>();
+/** The friends whose yes was told on this page already: Приятели drawn again doesn't say it twice. */
+const toldHere = new Set<number>();
 
-/** Tells a line once, wherever the player is signed in (the server keeps it as told): whether it's news here. */
-function toldOnce(line: string): boolean {
-  if (toldHere.has(line)) return false;
-  toldHere.add(line);
-  api("POST", "/api/told", { line }).catch(() => {});
+/** Tells a friend's yes once, wherever the player is signed in (the server keeps it as told, play.ToldAccepted):
+ * whether it's news here. */
+function toldOnce(friend: number): boolean {
+  if (toldHere.has(friend)) return false;
+  toldHere.add(friend);
+  api("POST", `/api/friends/${friend}/told`).catch(() => {});
   return true;
 }
 
 /** A friend said yes to the player's request: said once, in Приятели, over the friends. */
 export function acceptedLine(a?: Accepted | null): Child {
-  if (!a || !toldOnce(a.line)) return null;
+  if (!a || !toldOnce(a.id)) return null;
   return h("p", { class: "notice accepted-notice", role: "status" }, `${a.name} прие поканата ти за приятелство.`);
 }
 

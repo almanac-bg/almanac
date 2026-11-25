@@ -244,8 +244,8 @@ func TestDuelLimits(t *testing.T) {
 	// The day's: counted by the duels started today, whatever came of them.
 	now := store.Ms(w.now)
 	for range DuelsADay {
-		if _, err := w.db.Write.Exec(`INSERT INTO duels (questions, a_id, b_id, created_at, expires_at, ended_at, outcome)
-			VALUES ('[]', ?, ?, ?, ?, ?, 'expired')`, ana, cy, now, now, now); err != nil {
+		if _, err := w.db.Write.Exec(`INSERT INTO duels (a_id, b_id, created_at, expires_at, ended_at, outcome)
+			VALUES (?, ?, ?, ?, ?, 'expired')`, ana, cy, now, now, now); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -680,8 +680,8 @@ func TestDuelsPlayedByPage(t *testing.T) {
 		if i%2 == 0 {
 			sent = at // sent to Cy: hers too
 		}
-		if _, err := w.db.Write.Exec(`INSERT INTO duels (questions, a_id, b_id, created_at, sent_at, expires_at, ended_at,
-			outcome) VALUES ('[]', ?, ?, ?, ?, ?, ?, 'expired')`, ana, cy, at, sent, at, at); err != nil {
+		if _, err := w.db.Write.Exec(`INSERT INTO duels (a_id, b_id, created_at, sent_at, expires_at, ended_at,
+			outcome) VALUES (?, ?, ?, ?, ?, ?, 'expired')`, ana, cy, at, sent, at, at); err != nil {
 			t.Fatal(err)
 		}
 	}

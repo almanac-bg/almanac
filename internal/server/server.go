@@ -257,7 +257,7 @@ func (s *Server) routes() http.Handler {
 	api("POST /api/friends/requests/{id}/accept", s.answerRequest(true))
 	api("DELETE /api/friends/requests/{id}", s.answerRequest(false))
 	api("DELETE /api/friends/{id}", s.unfriend)
-	api("POST /api/told", s.told)
+	api("POST /api/friends/{id}/told", s.toldAccepted)
 	mux.Handle("/api/", s.apiHandler(func(http.ResponseWriter, *http.Request) error { return errNotFound }))
 
 	mux.HandleFunc("GET /qimg/{file}", s.picture)

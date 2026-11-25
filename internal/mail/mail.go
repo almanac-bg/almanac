@@ -294,8 +294,8 @@ func (o *Outbox) sendDue(ctx context.Context) bool {
 		_, err = o.DB.Write.Exec(`DELETE FROM outbox WHERE id = ?`, id)
 	default:
 		slog.Warn("mail failed, will retry", "outbox", id, "to", domainOf(m.To), "in", retries[attempts], "err", hidden(err, m.To))
-		_, err = o.DB.Write.Exec(`UPDATE outbox SET attempts = attempts + 1, next_at = ?, last_error = ? WHERE id = ?`,
-			store.Ms(time.Now().Add(retries[attempts])), err.Error(), id)
+		_, err = o.DB.Write.Exec(`UPDATE outbox SET attempts = attempts + 1, next_at = ? WHERE id = ?`,
+			store.Ms(time.Now().Add(retries[attempts])), id)
 	}
 	if err != nil {
 		slog.Error("outbox", "err", err)

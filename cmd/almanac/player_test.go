@@ -55,8 +55,8 @@ func TestPlayerDelete(t *testing.T) {
 		}
 	}
 	// An open duel waiting for them, a friend's if they have one (the seed's history may leave them none).
-	if _, err := db.Write.Exec(`INSERT INTO duels (questions, a_id, b_id, created_at, sent_at, expires_at)
-		SELECT '[]', u.id, ?1, 1, 1, 9999999999999 FROM users u WHERE u.id <> ?1
+	if _, err := db.Write.Exec(`INSERT INTO duels (a_id, b_id, created_at, sent_at, expires_at)
+		SELECT u.id, ?1, 1, 1, 9999999999999 FROM users u WHERE u.id <> ?1
 		ORDER BY EXISTS (SELECT 1 FROM friends WHERE user_id = ?1 AND friend_id = u.id) DESC, u.id LIMIT 1`, who.ID); err != nil {
 		t.Fatal(err)
 	}

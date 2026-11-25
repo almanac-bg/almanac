@@ -68,7 +68,12 @@ func TestMergeCoversTheSchema(t *testing.T) {
 func TestMergeCarriesTheRest(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	guest, owner := w.user(), w.user()
+	guest, owner, yes := w.user(), w.user(), w.user()
+	// The guest asked a friend, who said yes, and has been told of it.
+	w.befriend(guest, yes)
+	if err := w.g.ToldAccepted(ctx, guest, yes); err != nil {
+		t.Fatal(err)
+	}
 	for _, q := range []string{
 		`UPDATE users SET avatar = 'lynx', streak_told = 'forgiven:2026-11-12',
 			created_at = 5, seen_at = 900, friends_seen_at = 700 WHERE id = ?2`,
@@ -108,6 +113,12 @@ func TestMergeCarriesTheRest(t *testing.T) {
 	}
 	if created != 5 || seen != 900 || looked != 700 {
 		t.Fatalf("came at %d, seen %d, looked at Приятели %d", created, seen, looked)
+	}
+	if a, err := w.g.AcceptedOf(ctx, owner); err != nil || a != nil {
+		t.Fatalf("a yes told to the guest, told again: %+v (%v)", a, err)
+	}
+	if n := w.count(`SELECT count(*) FROM friends WHERE user_id = ?1 AND friend_id = ?2`, owner, yes); n != 1 {
+		t.Fatalf("the guest's friend isn't the account's: %d", n)
 	}
 }
 
