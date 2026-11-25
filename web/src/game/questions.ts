@@ -774,9 +774,17 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
     const grab = (e: PointerEvent, held: boolean) => {
       dragged = false;
       const from = arrangement.indexOf(item);
-      const first = rows[arrangement[0] ?? 0] as HTMLElement;
-      const second = rows[arrangement[1] ?? 0] as HTMLElement;
-      const pitch = n > 1 ? second.offsetTop - first.offsetTop : row.offsetHeight;
+      // Each row as it lies, by place: rows of two or three lines are taller than one of one, so every row is
+      // measured, never taken to be as tall as the first.
+      const tops = arrangement.map((other) => (rows[other] as HTMLElement).offsetTop);
+      const heights = arrangement.map((other) => (rows[other] as HTMLElement).offsetHeight);
+      const top0 = tops[from] ?? 0;
+      const height = heights[from] ?? 0;
+      const middle = (place: number) => (tops[place] ?? 0) + (heights[place] ?? 0) / 2;
+      // A row it passes makes room for it: moves by its height and the gap between rows, not by its own.
+      const room = height + (n > 1 ? (tops[1] ?? 0) - (tops[0] ?? 0) - (heights[0] ?? 0) : 0);
+      const highest = (tops[0] ?? 0) - top0;
+      const lowest = (tops[n - 1] ?? 0) + (heights[n - 1] ?? 0) - top0 - height;
       const y0 = e.clientY;
       let to = from;
       row.setPointerCapture(e.pointerId);
@@ -786,12 +794,15 @@ function order(view: OrderView, submit: (a: Answer) => void, locked: Signal<bool
       if (held) play("tap");
       const follow = (ev: PointerEvent) => {
         if (Math.abs(ev.clientY - y0) > 4) dragged = true;
-        const dy = Math.max(-from * pitch, Math.min((n - 1 - from) * pitch, ev.clientY - y0));
+        const dy = Math.max(highest, Math.min(lowest, ev.clientY - y0));
         row.style.transform = `translateY(${dy}px)`;
-        to = from + Math.round(dy / pitch);
+        // Going down, it passes a row once its bottom is past that row's middle; going up, once its top is.
+        to = from;
+        if (dy > 0) while (to < n - 1 && top0 + dy + height > middle(to + 1)) to++;
+        else while (to > 0 && top0 + dy < middle(to - 1)) to--;
         arrangement.forEach((other, place) => {
           if (other === item) return;
-          const shift = from < place && place <= to ? -pitch : to <= place && place < from ? pitch : 0;
+          const shift = from < place && place <= to ? -room : to <= place && place < from ? room : 0;
           (rows[other] as HTMLElement).style.transform = shift ? `translateY(${shift}px)` : "";
         });
       };
