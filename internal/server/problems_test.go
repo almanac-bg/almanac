@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/almanac-bg/almanac/internal/play"
 	"github.com/almanac-bg/almanac/internal/safe"
 )
 
@@ -119,6 +120,56 @@ func TestProblemsToldOverARestart(t *testing.T) {
 	later.problems.note("backup: upload failed", background)
 	if news, _ := later.problems.take(); news["backup: upload failed"] == nil {
 		t.Fatal("a day on, a problem that goes on wasn't told")
+	}
+}
+
+// The days ahead stopped short of questions are told by mail, once a day, a restart and all; while they reach
+// play.Ahead days, nothing is. The sample bank is far too small for ninety days.
+func TestDaysAheadShortTold(t *testing.T) {
+	g := start(t)
+	alerts := Alerts{Email: "owner@example.com"}
+	told := func(s *Server) int {
+		t.Helper()
+		s.checkDaysAhead(t.Context())
+		s.tellProblems(t.Context(), alerts)
+		var n int
+		if err := g.db.Read.QueryRow(`SELECT count(*) FROM outbox WHERE message ->> 'text' LIKE ?`,
+			"%"+daysShort+"%").Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	if n := told(g.srv); n != 1 {
+		t.Fatalf("the days ahead stopped short: told %d times", n)
+	}
+	next, err := New(Config{PublicURL: g.url}, Deps{DB: g.db, Accounts: g.srv.accounts, Outbox: g.outbox, Bank: g.srv.bank.Load()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { next.game.Settled(context.Background()) })
+	if n := told(next); n != 1 {
+		t.Fatalf("after a restart the same day: told %d times", n)
+	}
+
+	// The days drawn through the ninetieth ahead (a bank grown for them): nothing to tell, with nothing told today.
+	_, _ = g.db.Write.Exec(`DELETE FROM kv WHERE key = ?`, toldKey)
+	later, err := New(Config{PublicURL: g.url}, Deps{DB: g.db, Accounts: g.srv.accounts, Outbox: g.outbox, Bank: g.srv.bank.Load()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { later.game.Settled(context.Background()) })
+	if err := later.game.EnsureDays(t.Context()); err != nil { // drawn as far as the bank goes
+		t.Fatal(err)
+	}
+	full := later.game.Today()
+	for range play.Ahead { // and the rest put in, as a bigger bank would have drawn them
+		full = play.DayShift(full, 1)
+		if _, err := g.db.Write.Exec(`INSERT INTO days (day, questions) VALUES (?, '[]') ON CONFLICT DO NOTHING`, full); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := told(later); n != 1 {
+		t.Fatalf("the days ahead full: told %d times in all", n)
 	}
 }
 

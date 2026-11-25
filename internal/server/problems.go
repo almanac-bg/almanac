@@ -22,7 +22,8 @@ import (
 // having to read the logs: by mail (ALERT_EMAIL).
 //
 // What anyone can send must never silence what the server says itself, so each source has a budget of its own:
-//   - background work (a failed backup): never capped; only the code says these, a few a day at most.
+//   - background work (a failed backup, the days ahead stopped short of questions: checkDaysAhead): never capped; only
+//     the code says these, a few a day at most.
 //   - the server's own kinds (an error, a panic, a question reported): what its code can say, so never filled from
 //     outside; serverKinds a day, a guard on memory alone.
 //   - the kinds players' browsers report (/api/errors): whatever anyone sends, so few (browserKinds a day), their
@@ -205,6 +206,7 @@ func (s *Server) TellProblems(ctx context.Context, period time.Duration) {
 		case <-t.C:
 			t.Reset(period)
 		}
+		s.checkDaysAhead(ctx) // a problem no single moment says, looked for as the problems are told
 		s.tellProblems(ctx, to)
 	}
 }
