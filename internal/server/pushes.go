@@ -22,7 +22,8 @@ import (
 // (pushDevices: notify.go), and the evening's reminders go out in seconds, whoever else is in the queue.
 //
 // Nights are quiet: from quietFrom to quietTo in Bulgaria nothing is sent. A row due then waits for the morning, or,
-// if it's of no use by then (until: a day's reminder is the day's), is dropped.
+// if it's of no use by then (until: a day's reminder is the day's), is dropped. A push service is asked to keep one
+// only until then too (its TTL), so that a phone away for the night isn't told of a day that's over in the morning.
 //
 // A restart loses nothing: what's queued stays queued. Push, stopping, finishes the sends it has begun and begins no
 // more, so a deploy sends nothing twice. A crash can: a row being sent is leased (its next_at pushLease ahead) and is
@@ -50,7 +51,7 @@ const (
 	// pushTries is how many times a row is tried at most.
 	pushTries = 3
 	// pushTTL is how long a notification with no time of its own is of use: as long as the services keep it.
-	pushTTL = 12 * time.Hour
+	pushTTL = push.MaxTTL
 	// pushForgetAfter and pushForgetTries are how long, and how many tries, a device may refuse every push before
 	// it's forgotten.
 	pushForgetAfter = 7 * 24 * time.Hour
@@ -345,6 +346,9 @@ func (s *Server) deliver(ctx context.Context, j queued) {
 	}
 	m.Kind = cmp.Or(m.Kind, string(j.kind)) // a message may say more of itself (the day's last reminder: "stop")
 	m.Tag = "n" + strconv.FormatInt(j.id, 10)
+	// The service keeps it only while it's of use: a day's reminder dies with its day, not delivered the next morning
+	// to a phone that was away (asleep, out of reach) for the night.
+	m.TTL = max(time.UnixMilli(j.until).Sub(now), time.Second)
 	errs := make([]error, len(devices))
 	var wg sync.WaitGroup
 	for i, d := range devices {

@@ -10,6 +10,7 @@
 
 import * as feel from "../feel.ts";
 import { signal } from "./dom.ts";
+import { appleTouch } from "./platform.ts";
 
 export type SoundName =
   | "tap"
@@ -62,9 +63,7 @@ export function setSound(on: boolean): void {
 }
 
 /** Whether this is an iPhone or iPad, where the sounds keep quiet with the silent switch (the player is told so). */
-export const quietWhenSilent = () =>
-  /iPhone|iPad|iPod/.test(navigator.userAgent) ||
-  (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+export const quietWhenSilent = () => appleTouch();
 
 let audio: AudioContext | null = null;
 /** When (in the audio's time) the last of the sounds that take turns ends. */

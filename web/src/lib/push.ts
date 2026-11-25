@@ -5,6 +5,7 @@
 import { pushKey } from "../state.ts";
 import { api } from "./api.ts";
 import { reportProblem } from "./errors.ts";
+import { appleTouch } from "./platform.ts";
 import { navigate } from "./router.ts";
 
 /** Whether this browser can take notifications from the game. */
@@ -13,9 +14,7 @@ export const pushable = () =>
 
 /** An iPhone or iPad in a browser tab: notifications come only once the game is added to the home screen. */
 export const needsHomeScreen = () =>
-  /iPhone|iPad|iPod/.test(navigator.userAgent) &&
-  !("PushManager" in window) &&
-  !matchMedia("(display-mode: standalone)").matches;
+  appleTouch() && !("PushManager" in window) && !matchMedia("(display-mode: standalone)").matches;
 
 /** Registers the service worker as the game opens, so that a tap on „Включи“ finds it ready: on an iPhone the
  * browser asks about notifications only within a moment of the tap, and a worker still installing then costs it. A
@@ -57,11 +56,16 @@ export async function turnOn(): Promise<string | null> {
   try {
     sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key(pushKey) });
   } catch (err) {
-    if (Notification.permission !== "granted") return denied;
+    // Refused just now, or not answered: a prompt closed with no answer (an iPhone's asked outside a tap's moment,
+    // too) can be asked again.
+    const permission = Notification.permission as NotificationPermission; // changed by the prompt
+    if (permission === "denied") return denied;
+    if (permission !== "granted")
+      return "Известията още не са разрешени. Опитай пак и ги разреши, когато браузърът попита.";
     // The browser's push service said no. Brave keeps it off until it's switched on; the others have it on.
     reportProblem(`push subscribe: ${(err as Error).name}: ${(err as Error).message}`);
     return /Brave/.test(navigator.userAgent) || "brave" in navigator
-      ? "Brave изключва известията по подразбиране. Отвори brave://settings/privacy, включи „Use Google services for push messaging“ и опитай пак."
+      ? "Brave изключва известията по подразбиране. Отвори brave://settings/privacy, включи там услугите на Google за съобщения и опитай пак."
       : "Браузърът не успя да включи известията. Опитай пак или отвори играта в друг браузър (Chrome, Firefox, Safari).";
   }
   try {
