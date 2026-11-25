@@ -177,10 +177,11 @@ Fast is the rule: several sessions work at once, and every wait multiplies acros
   both still run once. Write a migration so it doesn't depend on another one being unmerged, nor on landing before
   one that isn't merged yet: production applies a late one (named before one it has run) late. What a migration
   drops on purpose (a table, a column, an index, a trigger) it names in a line `-- drops: runs.foo, runs_board`, or it
-  fails; so a rebuild (`-- rebuild`) copies every column its table has and makes its indexes again. Before applying a
-  late migration, the program tries it on a copy of the schema, and refuses to start (the deploy goes back by itself)
-  unless the schema comes out as a new database's: then the late migration never ran, so change it, or give it a
-  number after the latest. Never renumber one that may have run in production.
+  fails; so a rebuild (`-- rebuild`) copies every column its table has and makes its indexes again. As a release
+  starts, before it copies or migrates anything, it tries the migrations still to apply on a copy of the live schema,
+  and refuses to start (the deploy goes back by itself, the database as it was) unless the schema comes out as a new
+  database's (`store.CheckShape`): a late one refused never ran, so change it, or give it a number after the latest.
+  Never edit (but its comments) or renumber one that may have run in production: a change is a new migration.
 
 ## Leave the machine as you found it
 

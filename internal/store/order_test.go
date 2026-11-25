@@ -171,6 +171,91 @@ func TestLateMigrationThatDiffers(t *testing.T) {
 	if _, err := OpenMigrating(path); err == nil || !strings.Contains(err.Error(), "index t_x extra") {
 		t.Fatalf("opened with a late index a new database doesn't have: %v", err)
 	}
+	if err := CheckShape(path); err == nil || !strings.Contains(err.Error(), "index t_x extra") {
+		t.Fatalf("a release starts with a late index a new database doesn't have: %v", err)
+	}
+}
+
+// A release starts only on a database whose schema is what its migrations make (CheckShape), before it copies or
+// migrates anything: a migration the database has had, changed since in what it makes, refuses the start, and so does
+// a change made by hand; one changed in its comments and spaces only doesn't, nor migrations still to apply that hold.
+// Refused, the database is as it was.
+func TestCheckShape(t *testing.T) {
+	defer func(m fs.FS) { migrations = m }(migrations)
+	set := fstest.MapFS{"migrations/0001_t.sql": {Data: []byte(`CREATE TABLE t (x INTEGER); CREATE INDEX t_x ON t (x);`)}}
+	migrations = set
+	path := filepath.Join(t.TempDir(), "game.db")
+	if err := CheckShape(path); err != nil {
+		t.Fatalf("no database yet: %v", err)
+	}
+	db, err := OpenMigrating(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	ok := func(what string) {
+		t.Helper()
+		if err := CheckShape(path); err != nil {
+			t.Errorf("%s: %v", what, err)
+		}
+	}
+	refused := func(what, says string) {
+		t.Helper()
+		err := CheckShape(path)
+		if err == nil || !strings.Contains(err.Error(), "isn't as its migrations make it") || !strings.Contains(err.Error(), says) {
+			t.Errorf("%s: %v", what, err)
+		}
+	}
+	ok("as migrated")
+	set["migrations/0001_t.sql"] = &fstest.MapFile{Data: []byte("-- t, and why.\nCREATE TABLE t (\n\tx INTEGER -- an x\n);\n\n" +
+		"CREATE INDEX t_x ON t (x); -- by x")}
+	ok("a comment added")
+	set["migrations/0002_t_y.sql"] = &fstest.MapFile{Data: []byte(`ALTER TABLE t ADD COLUMN y TEXT;`)}
+	ok("a migration to apply")
+
+	set["migrations/0001_t.sql"] = &fstest.MapFile{Data: []byte(`CREATE TABLE t (x INTEGER NOT NULL); CREATE INDEX t_x ON t (x);`)}
+	refused("an applied migration changed", "table t is")
+	set["migrations/0001_t.sql"] = &fstest.MapFile{Data: []byte(`CREATE TABLE t (x INTEGER);`)}
+	refused("an applied migration's index taken out", "index t_x extra")
+	set["migrations/0001_t.sql"] = &fstest.MapFile{Data: []byte(`CREATE TABLE t (x INTEGER); CREATE INDEX t_x ON t (x);`)}
+	ok("put back")
+
+	db, err = OpenMigrating(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Write.Exec(`CREATE TABLE by_hand (z INTEGER)`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	refused("a table made by hand", "table by_hand extra")
+
+	// Refused, nothing of it was applied: the database has had 0001 and 0002, and has its own table still.
+	set["migrations/0003_z.sql"] = &fstest.MapFile{Data: []byte(`CREATE TABLE z (z INTEGER);`)}
+	refused("with a migration to apply", "table by_hand extra")
+	raw, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer raw.Close()
+	var n int
+	if err := raw.QueryRow(`SELECT (SELECT count(*) FROM schema_migrations) * 10 +
+		(SELECT count(*) FROM sqlite_schema WHERE name = 'z')`).Scan(&n); err != nil || n != 20 {
+		t.Fatalf("the refused database changed: %d, %v", n, err)
+	}
+}
+
+// The game's own migrations make a database CheckShape takes, with every migration had and with some still to apply.
+func TestCheckShapeOfTheGame(t *testing.T) {
+	names := gameNames(t)
+	for _, had := range []int{len(names), len(names) - 3} {
+		path := filepath.Join(t.TempDir(), "game.db")
+		db := openAt(t, path, had)
+		db.Close()
+		if err := CheckShape(path); err != nil {
+			t.Errorf("with %d of %d migrations: %v", had, len(names), err)
+		}
+	}
 }
 
 // Migrations with the same number are made side by side, and production has them in the order they land, which
