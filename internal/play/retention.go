@@ -8,13 +8,13 @@ import (
 )
 
 // Retention is whether players come back: the game's measure of itself, and the one /admin tells (DayCounts). A
-// player's days are the days (in Bulgaria) they played on — answered a question in any game — kept in active_days as
-// they happen (markActive).
+// player's days are the days (in Bulgaria) they played on — reached a question in any game: answered it, gave it up or
+// let its time run out — kept in active_days as they happen (markActive).
 //
-// /admin counts people, one population on the whole page (People, fair.go): a day counts when the player isn't an
-// admin and played a game as a person that day, not at a script's speed. That is judged as the days are read
-// (personDays), never as they're kept: a game becomes a script's only after some of its answers, and may be let out of
-// it. A player who goes leaves their days as nobody's (Forget), judged as they go: only those that counted are kept.
+// /admin counts people, one population on the whole page but its shares, which are anyone's, the owner's too, since
+// any link may bring players (People, fair.go): a day counts when the player isn't an admin and played a game as a
+// person that day, not at a script's speed. That is judged as the days are read (personDays), never as they're kept: a
+// game becomes a script's only after some of its answers, and may be let out of it. A player who goes leaves their days as nobody's (Forget), judged as they go: only those that counted are kept.
 
 // markActive keeps that a player played today.
 func (g *Game) markActive(tx *sql.Tx, userID int64) error {
@@ -115,7 +115,7 @@ func (g *Game) Activity(ctx context.Context, from string) (*Activity, error) {
 		return nil, err
 	}
 	// Of the new (who hadn't played before From), whose first game, as it stands (a guest's games brought to an older
-	// account come after the account's), was played by a shared link.
+	// account come after the account's), was played by a shared link, at a person's pace.
 	ids = ids[:0]
 	for id := range a.played {
 		if !a.before[id] {
@@ -123,8 +123,9 @@ func (g *Game) Activity(ctx context.Context, from string) (*Activity, error) {
 		}
 	}
 	who, _ = json.Marshal(ids)
-	rows, err = g.DB.Read.QueryContext(ctx, `SELECT value FROM json_each(?) j WHERE EXISTS (SELECT 1 FROM runs_by_link
-		WHERE run_id = (SELECT id FROM runs WHERE user_id = j.value ORDER BY started_at, id LIMIT 1))`, string(who))
+	rows, err = g.DB.Read.QueryContext(ctx, `SELECT value FROM json_each(?) j WHERE EXISTS (SELECT 1 FROM runs_by_link l
+		JOIN runs r ON r.id = l.run_id WHERE r.`+personRun+`
+			AND l.run_id = (SELECT id FROM runs WHERE user_id = j.value ORDER BY started_at, id LIMIT 1))`, string(who))
 	if err != nil {
 		return nil, err
 	}

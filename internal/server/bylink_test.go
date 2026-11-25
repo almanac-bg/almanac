@@ -197,6 +197,21 @@ func TestNewByLink(t *testing.T) {
 	if n := byLink(); n != 1 {
 		t.Fatalf("a new player by a link: %d", n)
 	}
+	// The game began by the link counts from its first answer: left half-way, or gone on with after a reload (the
+	// page's address is the day's then, not the link's), it's by the link all the same (audit 2026-11-24, A25d-1).
+	half, _ := g.guest()
+	_, run := half.call("POST", "/api/day", map[string]any{})
+	playAnswers(half, run, 0, play.Length/2, link, 3*time.Second)
+	if n := byLink(); n != 2 {
+		t.Fatalf("a new player by a link, left half-way: %d", n)
+	}
+	reloaded, _ := g.guest()
+	_, run = reloaded.call("POST", "/api/day", map[string]any{})
+	playAnswers(reloaded, run, 0, play.Length/2, link, 3*time.Second)
+	playAnswers(reloaded, run, play.Length/2, play.Length, "", 3*time.Second)
+	if n := byLink(); n != 3 {
+		t.Fatalf("a new player by a link, reloaded half-way: %d", n)
+	}
 	// What's kept is a mark on the game, nothing of whose link it was.
 	var cols int
 	if err := g.db.Read.QueryRow(`SELECT count(*) FROM pragma_table_info('runs_by_link')`).Scan(&cols); err != nil || cols != 1 {
@@ -205,14 +220,19 @@ func TestNewByLink(t *testing.T) {
 	back, _ := g.guest()
 	played(back)
 	day(back, link, 3*time.Second)
-	script, _ := g.guest()
+	script, scriptID := g.guest()
 	day(script, link, 50*time.Millisecond)
+	// A person's game after it makes them new that day: the first, a script's, still isn't by the link.
+	if _, err := g.db.Write.Exec(`INSERT INTO runs (user_id, kind, chapter, questions, at, started_at)
+		VALUES (?, 'chapter', 'history', '[{"id":""}]', 1, ?)`, scriptID, g.srv.game.Now().UnixMilli()); err != nil {
+		t.Fatal(err)
+	}
 	nolink, _ := g.guest()
 	day(nolink, fmt.Sprintf("%d-aaaaaaaa", play.Issue(g.srv.game.Today())), 3*time.Second)
 	direct, _ := g.guest()
 	day(direct, "", 3*time.Second)
-	if n := byLink(); n != 1 {
-		t.Fatalf("counted %d, want 1: a player back, a script, a link that isn't, or none, count nobody", n)
+	if n := byLink(); n != 3 {
+		t.Fatalf("counted %d, want 3: a player back, a script, a link that isn't, or none, count nobody", n)
 	}
 	// A new guest by a link who then signs in to a profile that played long before isn't new: counted, then not, as
 	// in „Нови“.
@@ -228,12 +248,12 @@ func TestNewByLink(t *testing.T) {
 	isNew := rows[0].New
 	again, _ := g.guest()
 	day(again, link, 3*time.Second)
-	if rows, _ := g.srv.dayRows(t.Context()); rows[0].ByLink != 2 || rows[0].New != isNew+1 {
+	if rows, _ := g.srv.dayRows(t.Context()); rows[0].ByLink != 4 || rows[0].New != isNew+1 {
 		t.Fatalf("a new guest by a link: %d by a link, %d new (were %d)", rows[0].ByLink, rows[0].New, isNew)
 	}
 	again.signIn("old@example.com")
-	if rows, _ := g.srv.dayRows(t.Context()); rows[0].ByLink != 1 || rows[0].New != isNew {
-		t.Fatalf("signed in to an older profile: %d by a link, %d new (want 1, %d)", rows[0].ByLink, rows[0].New, isNew)
+	if rows, _ := g.srv.dayRows(t.Context()); rows[0].ByLink != 3 || rows[0].New != isNew {
+		t.Fatalf("signed in to an older profile: %d by a link, %d new (want 3, %d)", rows[0].ByLink, rows[0].New, isNew)
 	}
 	// On /admin, beside the days shared.
 	if _, err := g.db.Write.Exec(`UPDATE users SET admin = 1`); err != nil {
