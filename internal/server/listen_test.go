@@ -22,10 +22,17 @@ func TestListenOnTheHandedSocket(t *testing.T) {
 		if os.Getenv("LISTEN_FDS") != "" {
 			os.Exit(3) // left for a child to take as its own
 		}
+		// The whole answer is sent before the program ends: Serve returns once the socket closes, maybe before the
+		// handler's answer is written, and an exit then cut it off (an EOF in CI).
+		sent := make(chan struct{})
 		_ = http.Serve(ln, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Length", "6")
 			io.WriteString(w, "handed")
-			go ln.Close()
+			w.(http.Flusher).Flush()
+			close(sent)
+			ln.Close()
 		}))
+		<-sent
 		os.Exit(0)
 	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
