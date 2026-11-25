@@ -1,6 +1,8 @@
 package server
 
 import (
+	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -61,6 +63,64 @@ func streakEndedOnTheDay(t *testing.T, now time.Time) {
 	// Told once: Днес, on another device, doesn't tell it again.
 	if _, today = ana.call("GET", "/api/day", nil); today["ended"] != nil {
 		t.Fatalf("told again: %v", today["ended"])
+	}
+}
+
+// A day's run whose tenth ran out before the day closed counts for its day by its own clock, whenever and however it's
+// next looked at (the review of #783): Sunday and Monday played, Tuesday's tenth shown at 23:58 and left to run out
+// with the phone locked. Днес on Wednesday at 09:05 says so on its first look (a streak of three, nothing forgiven,
+// Tuesday's result untold), and on Thursday's first look; the tab woken on the tenth gets Tuesday's result, not a day
+// over.
+func TestDayLeftOnItsTenthCountsAtTheFirstLook(t *testing.T) {
+	g := start(t)
+	var clock atomic.Int64
+	at := func(day, hour, minute int) {
+		clock.Store(time.Date(2026, 11, day, hour, minute, 0, 0, play.Bulgaria).UnixMilli())
+	}
+	g.srv.game.Now = func() time.Time { return time.UnixMilli(clock.Load()) }
+	left := func() (*player, float64) {
+		t.Helper()
+		at(24, 23, 30)
+		p, id := g.guest()
+		g.daysPlayed(id, 2, 1)
+		_, run := p.call("POST", "/api/day", map[string]any{})
+		playAnswers(p, run, 0, play.Length-1, "", 3*time.Second)
+		at(24, 23, 58)
+		runID := run["id"].(float64)
+		if status, st := p.call("POST", "/api/runs/"+strconv.Itoa(int(runID))+"/show", map[string]any{}); status != 200 ||
+			st["question"] == nil {
+			t.Fatalf("the tenth shown: %d %v", status, st)
+		}
+		return p, runID
+	}
+	ana, aRun := left()
+	bo, bRun := left()
+	cy, cRun := left()
+	g.srv.game.Settled(t.Context())
+
+	at(25, 9, 5)
+	for i := range 2 {
+		_, day := ana.call("GET", "/api/day", nil)
+		if day["streak"] != 3.0 || day["forgiven"] != nil || day["ended"] != nil || day["back"] != nil ||
+			day["yesterday"] != nil {
+			t.Fatalf("Днес on Wednesday, look %d: streak %v, forgiven %v, ended %v, back %v, yesterday %v", i+1,
+				day["streak"], day["forgiven"], day["ended"], day["back"], day["yesterday"])
+		}
+		if i == 0 && day["untold"] != aRun {
+			t.Fatalf("Днес on Wednesday's first look: untold %v, Tuesday's is %v", day["untold"], aRun)
+		}
+	}
+	status, res := cy.call("POST", "/api/runs/"+strconv.Itoa(int(cRun))+"/answer", map[string]any{"n": play.Length - 1,
+		"answer": nil})
+	if st, _ := res["state"].(map[string]any); status != 200 || res["timedOut"] != true || st["done"] != true {
+		t.Fatalf("the tab woken on Tuesday's tenth, Wednesday 09:05: %d %v", status, res)
+	}
+
+	at(26, 9, 5)
+	_, day := bo.call("GET", "/api/day", nil)
+	if day["streak"] != 3.0 || day["forgiven"] != "2026-11-25" || day["untold"] != bRun {
+		t.Fatalf("Днес on Thursday, the first look: streak %v, forgiven %v, untold %v (Tuesday's %v)", day["streak"],
+			day["forgiven"], day["untold"], bRun)
 	}
 }
 

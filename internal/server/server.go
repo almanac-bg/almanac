@@ -327,9 +327,14 @@ func (s *Server) Run(ctx context.Context, grace time.Duration) error {
 	errs := make(chan error, 1)
 	go func() { errs <- srv.Serve(ln) }() // a handler's panic is its request's alone (recovered)
 	// The work done in the background: each round on its own, a panic in one stopped and told (package safe).
-	go safe.Every(ctx, "duels: settling", time.Minute, func() {
+	go safe.Every(ctx, "settling", time.Minute, func() {
 		if err := s.game.SettleDue(ctx); err != nil && ctx.Err() == nil {
 			slog.Error("duels", "err", err)
+		}
+		// The day's runs left on a question whose time has run out, by their own clocks: a day just closed counts
+		// as it closes, not when its player next looks (play.SettleLeft).
+		if err := s.game.SettleLeft(ctx, 0); err != nil && ctx.Err() == nil {
+			slog.Error("settling the day's runs", "err", err)
 		}
 	})
 	go safe.Every(ctx, "after the runs", time.Minute, func() {
