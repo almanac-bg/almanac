@@ -173,6 +173,9 @@ test("a chapter, ten questions, a question reported, and ten more", async ({ pag
 test("a chapter's count can be backed out of, or cut short", async ({ page }) => {
   await page.clock.install(); // the page's timers, run on at once instead of waited for
   await page.goto("/almanac/history");
+  // The page's time stands still while the count is backed out of: a runner that stalls three seconds would
+  // otherwise let it run out first.
+  await page.clock.pauseAt(Date.now() + 1000);
   await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await page.getByRole("button", { name: "Отказ", exact: true }).click();
@@ -185,6 +188,7 @@ test("a chapter's count can be backed out of, or cut short", async ({ page }) =>
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page).toHaveURL(/\/almanac\/history$/);
+  await page.clock.resume();
 
   await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
   await page.getByRole("button", { name: "Веднага" }).click();
@@ -195,6 +199,9 @@ test("the day's count can be backed out of, and nothing starts; let run, it star
   await page.clock.install(); // the page's timers, run on at once instead of waited for
   await page.goto("/");
   const day = page.locator(".issue");
+  // The page's time stands still while the count is backed out of: a runner that stalls three seconds would
+  // otherwise let it run out first.
+  await page.clock.pauseAt(Date.now() + 1000);
   await page.getByRole("button", { name: "Започни", exact: true }).click();
   await expect(page.locator(".get-ready .kicker")).toHaveText("Днешният брой");
   await page.getByRole("button", { name: "Отказ", exact: true }).click();
@@ -210,6 +217,7 @@ test("the day's count can be backed out of, and nothing starts; let run, it star
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(day).toBeVisible();
+  await page.clock.resume();
 
   await go.click();
   await expect(page.getByRole("timer")).toHaveAccessibleName(/Започва след [1-3] с/);

@@ -143,6 +143,9 @@ test("a chapter counts in only after a tap; a reload goes back to its question, 
   test.setTimeout(120_000);
   await page.clock.install(); // the page's timers, run on at once instead of waited for
   await page.goto("/almanac/history");
+  // The page's time stands still through the count and the reload: a runner that stalls three seconds (CI's does)
+  // would otherwise let the count run out first, and the reload would come back to a question already shown.
+  await page.clock.pauseAt(Date.now() + 1000);
   await page.getByRole("link", { name: "Играй 10 въпроса" }).click();
   await expect(page.getByRole("heading", { name: "Приготви се" })).toBeVisible();
   // A reload in the count starts nothing: the chapter waits for „Започни“, past the count's three seconds too.
@@ -150,6 +153,7 @@ test("a chapter counts in only after a tap; a reload goes back to its question, 
   await expect(page.getByRole("button", { name: "Започни", exact: true })).toBeVisible();
   await page.clock.runFor(3500);
   await expect(page.getByRole("heading", { name: "Приготви се" })).toHaveCount(0);
+  await page.clock.resume();
   await page.getByRole("button", { name: "Започни", exact: true }).click();
   await page.getByRole("button", { name: "Веднага" }).click();
   await expect(page.locator(".question-head")).toContainText("1 от 10");
