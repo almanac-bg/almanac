@@ -335,6 +335,13 @@ export async function panelFlaws(page: Page): Promise<string[]> {
         if (hit && hit !== after && !hit.closest(".after-foot") && after.contains(hit))
           out.push(`under „Напред“ at ${Math.round(y)}: ${hit.tagName.toLowerCase()}.${hit.className}`);
       }
+    // At the screen's foot, edge to edge (a phone upright), its foot goes down to the screen's edge: the page moved
+    // for the answer never leaves an empty panel under „Напред“ (a short fact under a picture, scrolled whole under the
+    // head). Beside the question (a laptop), it ends where its parts do.
+    const f = after.querySelector<HTMLElement>(".after-foot");
+    const atFoot = f && p.left < 1 && p.right > innerWidth - 1 && getComputedStyle(f).position === "sticky";
+    const fb = atFoot ? f.getBoundingClientRect().bottom : innerHeight;
+    if (fb < innerHeight - 1) out.push(`the panel empty for ${Math.round(innerHeight - fb)}px under „Напред“`);
     return [...new Set(out)];
   });
 }
