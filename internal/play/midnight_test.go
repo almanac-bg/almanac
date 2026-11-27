@@ -25,7 +25,7 @@ func (w *world) playOn(user, runID int64, from int, answers ...func(int64, int) 
 
 // at sets the clock to a moment of November 2026, in Bulgaria.
 func (w *world) at(day, hour, minute, second int) {
-	w.now = time.Date(2026, 11, day, hour, minute, second, 0, Bulgaria)
+	w.clock.set(time.Date(2026, 11, day, hour, minute, second, 0, Bulgaria))
 }
 
 // sundayLate starts a player's day on Sunday 15 November at 23:58, answers half of it right before midnight, and the
@@ -214,7 +214,7 @@ func TestPastDayLeftOnItsLastQuestion(t *testing.T) {
 		return l
 	}
 	show := func(l *left) {
-		l.shown = w.now
+		l.shown = w.clock.now()
 		w.show(l.user, l.run)
 	}
 	look := func(l *left, today bool) {
@@ -224,10 +224,10 @@ func TestPastDayLeftOnItsLastQuestion(t *testing.T) {
 				t.Fatal(err)
 			}
 			if open, err := w.g.Unfinished(ctx, l.user); err != nil || open != nil {
-				t.Fatalf("%s: offered on Днес at %v: %+v %v", l.why, w.now, open, err)
+				t.Fatalf("%s: offered on Днес at %v: %+v %v", l.why, w.clock.now(), open, err)
 			}
 		} else if s, err := w.g.State(ctx, l.user, l.run); err != nil || !s.Done {
-			t.Fatalf("%s, looked at %v: done %v, %v", l.why, w.now, s.Done, err)
+			t.Fatalf("%s, looked at %v: done %v, %v", l.why, w.clock.now(), s.Done, err)
 		}
 		w.g.AftersDone(ctx)
 		var finished sql.NullInt64
@@ -237,16 +237,16 @@ func TestPastDayLeftOnItsLastQuestion(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !finished.Valid || finished.Int64 != l.shown.Add(l.limit).UnixMilli() || answers != Length {
-			t.Fatalf("%s, looked at %v: finished %v (its time ran out at %v), %d answers", l.why, w.now,
+			t.Fatalf("%s, looked at %v: finished %v (its time ran out at %v), %d answers", l.why, w.clock.now(),
 				finished, l.shown.Add(l.limit), answers)
 		}
 		var lookDay bool
 		if err := w.db.Read.QueryRow(`SELECT EXISTS (SELECT 1 FROM active_days WHERE user_id = ? AND day = ?)`,
-			l.user, dayOf(w.now)).Scan(&lookDay); err != nil {
+			l.user, dayOf(w.clock.now())).Scan(&lookDay); err != nil {
 			t.Fatal(err)
 		}
-		if lookDay && dayOf(w.now) != dayOf(l.shown.Add(l.limit)) {
-			t.Fatalf("%s: the look's day kept as played, %v", l.why, w.now)
+		if lookDay && dayOf(w.clock.now()) != dayOf(l.shown.Add(l.limit)) {
+			t.Fatalf("%s: the look's day kept as played, %v", l.why, w.clock.now())
 		}
 	}
 
@@ -271,7 +271,7 @@ func TestPastDayLeftOnItsLastQuestion(t *testing.T) {
 	for _, l := range across {
 		show(l)
 	}
-	w.now = across[0].shown.Add(across[0].limit + LateGrace + time.Second) // its time, and its answer's LateGrace, over
+	w.clock.set(across[0].shown.Add(across[0].limit + LateGrace + time.Second)) // its time, and its answer's LateGrace, over
 	look(across[0], false)
 	w.at(18, 0, 20, 0)
 	look(ranOut[1], false)
@@ -310,7 +310,7 @@ func (w *world) tuesdayLeft(user int64, day, hour, minute, second int) (int64, t
 	if !ok {
 		w.t.Fatal("the tenth gone from the bank")
 	}
-	return s.ID, w.now.Add(Limit(q))
+	return s.ID, w.clock.now().Add(Limit(q))
 }
 
 // A day whose tenth ran out in its time counts as the day closes, by the minute's sweep alone (SettleLeft), with
@@ -331,9 +331,9 @@ func TestDayClosedCountsWithoutALook(t *testing.T) {
 	if err := w.g.SettleLeft(ctx, 0); err != nil {
 		t.Fatal(err)
 	}
-	w.now = dOut
+	w.clock.set(dOut)
 	if res, err := w.answer(dan, dRun, Length-1, json.RawMessage("null")); err != nil || !res.State.Done {
-		t.Fatalf("Dan's null as the tenth ran out, at %v: %+v %v", w.now, res, err)
+		t.Fatalf("Dan's null as the tenth ran out, at %v: %+v %v", w.clock.now(), res, err)
 	}
 	w.at(25, 0, 20, 0) // Cy's ran out past the close: the sweep settles it as Dan's screen did
 	if err := w.g.SettleLeft(ctx, 0); err != nil {
@@ -412,7 +412,7 @@ func TestReviewOfADayThatRanOut(t *testing.T) {
 		t.Helper()
 		_, err := w.g.Review(ctx, user, run)
 		if _, ferr := w.g.FriendsOn(ctx, user, run); ferr != err {
-			t.Fatalf("how friends did at %v: %v, the review %v", w.now, ferr, err)
+			t.Fatalf("how friends did at %v: %v, the review %v", w.clock.now(), ferr, err)
 		}
 		return err
 	}

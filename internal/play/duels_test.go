@@ -106,7 +106,7 @@ func TestFriendDuel(t *testing.T) {
 		t.Fatalf("Ana's duels once sent: %+v", d)
 	}
 	db, _ := w.g.DuelsOf(ctx, bo)
-	if len(db.Yours) != 1 || db.Yours[0].Until != store.Ms(w.now.Add(DuelFor)) || db.Yours[0].Opponent.Rights != 0 ||
+	if len(db.Yours) != 1 || db.Yours[0].Until != store.Ms(w.clock.now().Add(DuelFor)) || db.Yours[0].Opponent.Rights != 0 ||
 		db.Yours[0].First {
 		t.Fatalf("Bo's duels once sent: %+v", db)
 	}
@@ -242,7 +242,7 @@ func TestDuelLimits(t *testing.T) {
 	}
 
 	// The day's: counted by the duels started today, whatever came of them.
-	now := store.Ms(w.now)
+	now := store.Ms(w.clock.now())
 	for range DuelsADay {
 		if _, err := w.db.Write.Exec(`INSERT INTO duels (a_id, b_id, created_at, expires_at, ended_at, outcome)
 			VALUES (?, ?, ?, ?, ?, 'expired')`, ana, cy, now, now, now); err != nil {
@@ -277,8 +277,8 @@ func TestDuelLapses(t *testing.T) {
 	lapses, _ := w.g.DuelFriend(ctx, ana, bo)
 	w.wait(2 * 24 * time.Hour)
 	w.playSide(ana, lapses, repeat(w.right, Length))
-	if d, _ := w.g.DuelOf(ctx, bo, lapses); d.Until != store.Ms(w.now.Add(DuelFor)) {
-		t.Fatalf("its time: %d, want %d", d.Until, store.Ms(w.now.Add(DuelFor)))
+	if d, _ := w.g.DuelOf(ctx, bo, lapses); d.Until != store.Ms(w.clock.now().Add(DuelFor)) {
+		t.Fatalf("its time: %d, want %d", d.Until, store.Ms(w.clock.now().Add(DuelFor)))
 	}
 	// Bo starts another, answers three, and leaves it.
 	halfway, _ := w.g.DuelFriend(ctx, ana, bo)
@@ -675,7 +675,7 @@ func TestDuelsPlayedByPage(t *testing.T) {
 	w.befriend(ana, cy)
 	const n = 2*DuelsShown + 3
 	for i := range n {
-		at := store.Ms(w.now.Add(time.Duration(i) * time.Minute))
+		at := store.Ms(w.clock.now().Add(time.Duration(i) * time.Minute))
 		var sent any
 		if i%2 == 0 {
 			sent = at // sent to Cy: hers too
@@ -802,7 +802,7 @@ func TestDuelGivesItsLastQuestionItsTime(t *testing.T) {
 			t.Fatal(err)
 		}
 		d.ends = time.UnixMilli(ends)
-		w.now = d.ends.Add(-time.Hour)
+		w.clock.set(d.ends.Add(-time.Hour))
 		d.run = w.playSide(d.bo, d.id, repeat(w.right, Length-1))
 		q, _ := w.b.Get(w.picks(d.run)[Length-1].ID)
 		d.limit = Limit(q)
@@ -827,13 +827,13 @@ func TestDuelGivesItsLastQuestionItsTime(t *testing.T) {
 
 	t.Run("answered in its time past the week", func(t *testing.T) {
 		d := nineIn(t)
-		d.w.now = d.ends.Add(-5 * time.Second)
+		d.w.clock.set(d.ends.Add(-5 * time.Second))
 		d.w.show(d.bo, d.run)
-		d.w.now = d.ends.Add(3 * time.Second)
+		d.w.clock.set(d.ends.Add(3 * time.Second))
 		if state, _ := standing(t, d); state != DuelYours {
 			t.Fatalf("the sweep, a question in its time: %s", state)
 		}
-		d.w.now = d.ends.Add(d.limit - 10*time.Second)
+		d.w.clock.set(d.ends.Add(d.limit - 10*time.Second))
 		if res, err := d.w.answer(d.bo, d.run, Length-1, d.w.right(d.run, Length-1)); err != nil || res.TimedOut ||
 			!res.State.Done {
 			t.Fatalf("an answer in its time, past the week: %+v %v", res, err)
@@ -854,16 +854,16 @@ func TestDuelGivesItsLastQuestionItsTime(t *testing.T) {
 	} {
 		t.Run(c.why, func(t *testing.T) {
 			d := nineIn(t)
-			d.w.now = d.ends.Add(-c.shown)
+			d.w.clock.set(d.ends.Add(-c.shown))
 			d.w.show(d.bo, d.run)
-			d.w.now = d.ends.Add(-c.shown + d.limit + LateGrace + time.Second) // past its own time
-			if d.w.now.Before(d.ends) {
-				d.w.now = d.ends.Add(time.Second)
+			d.w.clock.set(d.ends.Add(-c.shown + d.limit + LateGrace + time.Second)) // past its own time
+			if d.w.clock.now().Before(d.ends) {
+				d.w.clock.set(d.ends.Add(time.Second))
 			}
 			if s, err := d.w.g.State(t.Context(), d.bo, d.run); err != nil || s.Done || s.At != Length-1 {
 				t.Fatalf("the run looked at past the week: %+v %v", s, err)
 			}
-			d.w.now = d.ends.Add(LongestLimit + LateGrace + time.Second)
+			d.w.clock.set(d.ends.Add(LongestLimit + LateGrace + time.Second))
 			if s, err := d.w.g.State(t.Context(), d.bo, d.run); err != nil || s.Done {
 				t.Fatalf("the run looked at past the week, its question's grace over: %+v %v", s, err)
 			}

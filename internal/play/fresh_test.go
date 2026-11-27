@@ -182,11 +182,11 @@ func newFresh(t *testing.T) *fresh {
 		for n, p := range picks {
 			if _, err := tx.Exec(`INSERT INTO answers (run_id, n, question_id, given, shown, score, is_right, ms, at, version)
 				VALUES (?, ?, ?, '{"pick":0}', '{"pick":0}', ?, ?, 4000, ?, ?)`, r.id, n, p.ID, n%3, n%3 != 0,
-				store.Ms(w.now.Add(-4*24*time.Hour)), w.g.versionOf(p)); err != nil {
+				store.Ms(w.clock.now().Add(-4*24*time.Hour)), w.g.versionOf(p)); err != nil {
 				return err
 			}
 		}
-		_, err = tx.Exec(`UPDATE runs SET at = ?, finished_at = ? WHERE id = ?`, len(picks), store.Ms(w.now), r.id)
+		_, err = tx.Exec(`UPDATE runs SET at = ?, finished_at = ? WHERE id = ?`, len(picks), store.Ms(w.clock.now()), r.id)
 		return err
 	}))
 	w.g.finished(f.ctx(), f.ana, runID)

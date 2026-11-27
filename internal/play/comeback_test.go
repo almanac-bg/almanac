@@ -25,7 +25,7 @@ func (w *world) dayPlayed(user int64, day string, rights int) int64 {
 func TestAway(t *testing.T) {
 	w := setup(t)
 	ctx := t.Context()
-	w.now = time.Date(2026, 11, 20, 12, 0, 0, 0, Bulgaria)
+	w.clock.set(time.Date(2026, 11, 20, 12, 0, 0, 0, Bulgaria))
 	ana, bo, cy := w.user(), w.user(), w.user()
 	w.dayPlayed(ana, "2026-11-14", 5)
 	w.dayPlayed(ana, "2026-11-17", 5)

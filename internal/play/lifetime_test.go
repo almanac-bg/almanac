@@ -25,7 +25,7 @@ func TestDayRunEndsWithItsDay(t *testing.T) {
 	}
 	w.play(bo, half.ID, repeat(w.right, 2)...)
 
-	w.now = time.Date(2026, 11, 13, 10, 0, 0, 0, Bulgaria)
+	w.clock.set(time.Date(2026, 11, 13, 10, 0, 0, 0, Bulgaria))
 	for _, c := range []struct {
 		user, run int64
 		n         int
@@ -56,13 +56,13 @@ func TestDayRunEndsWithItsDay(t *testing.T) {
 
 	// Begun at 23:58, half before midnight and half after: finished, and the day's.
 	cy := w.user()
-	w.now = time.Date(2026, 11, 13, 23, 58, 0, 0, Bulgaria)
+	w.clock.set(time.Date(2026, 11, 13, 23, 58, 0, 0, Bulgaria))
 	late, err := w.g.StartDay(ctx, cy)
 	if err != nil {
 		t.Fatal(err)
 	}
 	w.play(cy, late.ID, repeat(w.right, Length/2)...)
-	w.now = time.Date(2026, 11, 14, 0, 5, 0, 0, Bulgaria)
+	w.clock.set(time.Date(2026, 11, 14, 0, 5, 0, 0, Bulgaria))
 	for n := Length / 2; n < Length; n++ {
 		w.show(cy, late.ID)
 		w.wait(3 * time.Second)
@@ -76,12 +76,12 @@ func TestDayRunEndsWithItsDay(t *testing.T) {
 
 	// A question shown just before the grace ends is answered in its time; the next isn't shown.
 	dan := w.user()
-	w.now = time.Date(2026, 11, 14, 23, 59, 0, 0, Bulgaria)
+	w.clock.set(time.Date(2026, 11, 14, 23, 59, 0, 0, Bulgaria))
 	edge, err := w.g.StartDay(ctx, dan)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.now = time.Date(2026, 11, 15, 0, 0, 0, 0, Bulgaria).Add(DayGrace - 5*time.Second)
+	w.clock.set(time.Date(2026, 11, 15, 0, 0, 0, 0, Bulgaria).Add(DayGrace - 5*time.Second))
 	w.show(dan, edge.ID)
 	w.wait(8 * time.Second)
 	if _, err := w.g.Answer(ctx, dan, edge.ID, 0, w.right(edge.ID, 0)); err != nil {

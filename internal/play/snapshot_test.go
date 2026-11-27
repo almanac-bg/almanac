@@ -98,7 +98,7 @@ func TestCountsKeptOfTheBank(t *testing.T) {
 	if err := w.g.Count(ctx); err != nil {
 		t.Fatal(err)
 	}
-	counted := w.now
+	counted := w.clock.now()
 	w.wait(time.Minute)
 
 	same := w.newGame()
@@ -112,7 +112,7 @@ func TestCountsKeptOfTheBank(t *testing.T) {
 	if err := same.Count(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if h, c := same.hard.last, same.crowds.last; !h.at.Equal(w.now) || !c.at.Equal(counted) {
+	if h, c := same.hard.last, same.crowds.last; !h.at.Equal(w.clock.now()) || !c.at.Equal(counted) {
 		t.Fatalf("stale, not counted again: hardness at %v, crowds at %v", h.at, c.at)
 	}
 
@@ -123,7 +123,7 @@ func TestCountsKeptOfTheBank(t *testing.T) {
 	if err := next.Count(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if h, c := next.hard.last, next.crowds.last; !h.at.Equal(w.now) || h.bank != other || !c.at.Equal(w.now) || c.bank != other {
+	if h, c := next.hard.last, next.crowds.last; !h.at.Equal(w.clock.now()) || h.bank != other || !c.at.Equal(w.clock.now()) || c.bank != other {
 		t.Fatalf("on another bank, not counted again: hardness at %v, crowds at %v", h.at, c.at)
 	}
 }

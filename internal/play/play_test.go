@@ -21,19 +21,37 @@ import (
 )
 
 type world struct {
-	t   *testing.T
-	g   *Game
-	db  *store.DB
-	b   *bank.Bank
-	now time.Time
-	// clock guards now where the game's background work reads it (a game's follow-up) while a test moves it on (wait).
-	clock sync.Mutex
+	t  *testing.T
+	g  *Game
+	db *store.DB
+	b  *bank.Bank
+	// clock is the world's time: the test moves it while the game's background work (a run's follow-up) reads it.
+	clock clock
 	next  int64
 	// pace, if set, is how long a player takes over question n (three seconds otherwise).
 	pace func(n int) time.Duration
 	// inPlay is the bank the game plays, swapped as the server swaps it on a reload (one atomic pointer): a test puts
 	// a bank in play with use or swap, never by setting Game.Bank while the game's background work may read it.
 	inPlay atomic.Pointer[bank.Bank]
+}
+
+// clock is a test's time, read and set only under its lock: the game's background work reads it as a test moves it
+// on, so a bare field set without the lock was a race (TestDayClosedCountsWithoutALook under -race).
+type clock struct {
+	mu sync.Mutex
+	t  time.Time
+}
+
+func (c *clock) now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.t
+}
+
+func (c *clock) set(t time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.t = t
 }
 
 func setup(t *testing.T) *world {
@@ -44,7 +62,8 @@ func setup(t *testing.T) *world {
 	if b == nil {
 		t.Fatal(problems)
 	}
-	w := &world{t: t, db: db, now: time.Date(2026, 11, 12, 10, 0, 0, 0, Bulgaria)}
+	w := &world{t: t, db: db}
+	w.clock.set(time.Date(2026, 11, 12, 10, 0, 0, 0, Bulgaria))
 	w.use(b)
 	w.g = w.newGame()
 	return w
@@ -54,11 +73,7 @@ func setup(t *testing.T) *world {
 // background work (the follow-ups of runs, the counts) is waited for as the test ends, before its database closes:
 // none writes into a database, or a folder, that is going away.
 func (w *world) newGame() *Game {
-	g := &Game{DB: w.db, Bank: w.inPlay.Load, Now: func() time.Time {
-		w.clock.Lock()
-		defer w.clock.Unlock()
-		return w.now
-	}}
+	g := &Game{DB: w.db, Bank: w.inPlay.Load, Now: w.clock.now}
 	w.t.Cleanup(func() { g.Settled(context.Background()) })
 	return g
 }
@@ -89,9 +104,7 @@ func (w *world) user() int64 {
 const pastLimit = LongestLimit + LateGrace + time.Second
 
 func (w *world) wait(d time.Duration) {
-	w.clock.Lock()
-	defer w.clock.Unlock()
-	w.now = w.now.Add(d)
+	w.clock.set(w.clock.now().Add(d))
 }
 
 // picks are a run's questions, as stored.
@@ -1328,7 +1341,7 @@ func TestDayCrowd(t *testing.T) {
 		id, _ := res.LastInsertId()
 		for n := range 3 {
 			if _, err := w.db.Write.Exec(`INSERT INTO answers (run_id, n, question_id, score, is_right, ms, at)
-				VALUES (?, ?, ?, 1, 1, 900, ?)`, id, n, picks[0].ID, w.now.UnixMilli()); err != nil {
+				VALUES (?, ?, ?, 1, 1, 900, ?)`, id, n, picks[0].ID, w.clock.now().UnixMilli()); err != nil {
 				t.Fatal(err)
 			}
 		}

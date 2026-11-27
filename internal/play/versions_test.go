@@ -167,7 +167,7 @@ func TestGradedAsShown(t *testing.T) {
 	run = w.runOf(gal, "chapter", "geo-960")
 	w.show(gal, run)
 	sent, err := w.db.Write.Exec(`INSERT INTO duels (a_id, a_run, b_id, created_at, sent_at, expires_at)
-		VALUES (?, ?, ?, 0, 0, ?)`, gal, run, di, store.Ms(w.now.Add(time.Hour)))
+		VALUES (?, ?, ?, 0, 0, ?)`, gal, run, di, store.Ms(w.clock.now().Add(time.Hour)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestGradedAsShown(t *testing.T) {
 	if q, _ := before.Get("geo-960"); w.g.Crowd(q) != nil {
 		t.Fatal("a crowd shown for a version the count didn't have")
 	}
-	h, err := w.g.countHardness(ctx, w.now, fixed)
+	h, err := w.g.countHardness(ctx, w.clock.now(), fixed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,7 +230,7 @@ func TestUntrueLeavesMastery(t *testing.T) {
 			q["retired"], q["retiredWhy"] = true, "weak"
 		}
 	}))
-	h, err = w.g.countHardness(ctx, w.now, w.b)
+	h, err = w.g.countHardness(ctx, w.clock.now(), w.b)
 	if err != nil {
 		t.Fatal(err)
 	}
