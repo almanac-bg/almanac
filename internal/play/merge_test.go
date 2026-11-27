@@ -307,7 +307,7 @@ func (w *world) fold(guest, owner int64) {
 // since makes a player one who came d before now.
 func (w *world) since(user int64, d time.Duration) {
 	w.t.Helper()
-	if _, err := w.db.Write.Exec(`UPDATE users SET created_at = ? WHERE id = ?`, w.now.Add(-d).UnixMilli(), user); err != nil {
+	if _, err := w.db.Write.Exec(`UPDATE users SET created_at = ? WHERE id = ?`, w.clock.now().Add(-d).UnixMilli(), user); err != nil {
 		w.t.Fatal(err)
 	}
 }
@@ -371,7 +371,7 @@ func TestMergeKeepsTheFinishedDay(t *testing.T) {
 	twoBack := DayShift(w.g.Today(), -2)
 	left := func(day string) {
 		if _, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, day, questions, at, started_at)
-			VALUES (?, 'day', ?, '[{"id":""}]', 1, ?)`, owner, day, w.now.UnixMilli()); err != nil {
+			VALUES (?, 'day', ?, '[{"id":""}]', 1, ?)`, owner, day, w.clock.now().UnixMilli()); err != nil {
 			t.Fatal(err)
 		}
 	}

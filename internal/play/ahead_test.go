@@ -226,7 +226,7 @@ func TestDaysAheadRollBack(t *testing.T) {
 	}
 	// New rules: the days after tomorrow are drawn again; today and tomorrow stay.
 	var before string
-	tomorrow := w.now.AddDate(0, 0, 1).In(Bulgaria).Format(time.DateOnly)
+	tomorrow := w.clock.now().AddDate(0, 0, 1).In(Bulgaria).Format(time.DateOnly)
 	_ = w.db.Read.QueryRow(`SELECT questions FROM days WHERE day = ?`, tomorrow).Scan(&before)
 	_, _ = w.db.Write.Exec(`UPDATE kv SET value = 'older rules' WHERE key = 'days_drawn_by'`)
 	w.g.daysAhead.mu.Lock()

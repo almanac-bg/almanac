@@ -49,7 +49,7 @@ func TestAfterARun(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := w.db.Write.Exec(`INSERT INTO runs_after (run_id, due) VALUES (?, ?)`, s.ID,
-		store.Ms(w.now.Add(afterOwn))); err != nil {
+		store.Ms(w.clock.now().Add(afterOwn))); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.g.AfterDue(ctx); err != nil { // still the finishing request's
@@ -71,7 +71,7 @@ func TestAfterARun(t *testing.T) {
 
 	// One that has failed afterTries times is given up on.
 	if _, err := w.db.Write.Exec(`INSERT INTO runs_after (run_id, due, tries) VALUES (?, ?, ?)`, s.ID,
-		store.Ms(w.now), afterTries); err != nil {
+		store.Ms(w.clock.now()), afterTries); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.g.AfterDue(ctx); err != nil {

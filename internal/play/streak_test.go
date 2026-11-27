@@ -12,7 +12,7 @@ import (
 func (w *world) daysPlayed(user int64, back ...int) {
 	w.t.Helper()
 	for _, d := range back {
-		at := w.now.AddDate(0, 0, -d)
+		at := w.clock.now().AddDate(0, 0, -d)
 		if _, err := w.db.Write.Exec(`INSERT INTO runs (user_id, kind, day, questions, started_at, finished_at)
 			VALUES (?, 'day', ?, '[{"id":""}]', ?, ?)`, user, at.In(Bulgaria).Format(time.DateOnly), at.UnixMilli(),
 			at.UnixMilli()); err != nil {

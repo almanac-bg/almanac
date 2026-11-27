@@ -83,7 +83,7 @@ func TestNewcomersMerged(t *testing.T) {
 // once that day is over; one who played before the days read is never new in them.
 func TestDayCounts(t *testing.T) {
 	w := setup(t)
-	w.now = time.Date(2026, 12, 20, 10, 0, 0, 0, Bulgaria)
+	w.clock.set(time.Date(2026, 12, 20, 10, 0, 0, 0, Bulgaria))
 	ana, bo, old := w.user(), w.user(), w.user()
 	w.stored(old, "day", "2026-10-01", true, false)
 	w.stored(old, "day", "2026-11-12", true, false)
