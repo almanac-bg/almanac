@@ -7408,14 +7408,16 @@
 
     /* The answer comes under the answers, at the screen's foot, edge to edge (run.ts, settle, moves the page for it
        only as far as it must): the verdict, how everyone answered, the fact, and the way on. Nothing is over the
-       answers: where the panel goes on past the screen's foot, the page scrolls to it. */
+       answers: where the panel goes on past the screen's foot, the page scrolls to it. Where the page is made longer
+       so the head's foot falls between two parts (--past), the room is over the panel, never in it: the panel stays at
+       the screen's foot, „Напред“ at its foot, nothing empty under it. */
     .run-question .after {
       position: relative;
       align-content: start;
       gap: var(--space-3);
-      margin: auto calc(-1 * max(var(--gutter), env(safe-area-inset-right))) calc(-1 * var(--app-foot))
+      margin: var(--past, auto) calc(-1 * max(var(--gutter), env(safe-area-inset-right))) calc(-1 * var(--app-foot))
         calc(-1 * max(var(--gutter), env(safe-area-inset-left)));
-      padding: var(--space-4) max(var(--space-4), env(safe-area-inset-right)) calc(var(--app-foot) + var(--past, 0px))
+      padding: var(--space-4) max(var(--space-4), env(safe-area-inset-right)) var(--app-foot)
         max(var(--space-4), env(safe-area-inset-left));
       border-radius: 22px 22px 0 0;
       background: var(--surface);

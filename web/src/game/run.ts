@@ -1052,8 +1052,9 @@ function settle(page: HTMLElement, head: Head, after: HTMLElement, answers: Chil
   head.stick(head.stuckAt(y - was));
   if (y !== was) scrollTo({ top: y, behavior: "instant" });
   // Moved, the head's foot falls between two parts, never across one: what it would cut there (the sheet's foot, the
-  // picture's, a row, a clue) goes whole under it, the page made a little longer where it ends short of that
-  // (app.css, --past); or, where the fact is to stay whole under „Напред“, comes back whole from under the head.
+  // picture's, a row, a clue) goes whole under it, the page made a little longer where it ends short of that, the
+  // room over the panel (app.css, --past); or, where the fact is to stay whole under „Напред“, comes back whole from
+  // under the head.
   if (y > 0) {
     const edge = head.node.getBoundingClientRect().bottom;
     let cut = 0;
